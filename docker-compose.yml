@@ -1,0 +1,12 @@
+services:
+  smartsnack:
+    build: .
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    volumes:
+      - smartsnack-data:/data
+    restart: unless-stopped
+
+volumes:
+  smartsnack-data:
