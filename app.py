@@ -13,13 +13,14 @@ from datetime import datetime, timezone
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+APP_VERSION = "0.1"
+
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 TRANSLATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translations")
 SUPPORTED_LANGUAGES = ["no", "en"]
 DEFAULT_LANGUAGE = "no"
-logger.info(f"DB_PATH = {DB_PATH}")
 def get_db():
     if "db" not in g:
         g.db = sqlite3.connect(DB_PATH)
@@ -196,6 +197,8 @@ def _set_translation_key(key, values_by_lang):
     Languages not present in the dict are skipped.
     The in-memory cache is invalidated for affected languages.
     """
+    if not re.match(r'^[a-z][a-z0-9_.]*$', key):
+        raise ValueError(f"Invalid translation key format: {key}")
     for lang, value in values_by_lang.items():
         filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
         try:
@@ -398,7 +401,7 @@ def health():
     try:
         conn = get_db()
         count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
-        return jsonify({"status": "ok", "products": count})
+        return jsonify({"status": "ok", "version": APP_VERSION, "products": count})
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         return jsonify({"status": "error"}), 500
@@ -757,6 +760,8 @@ def estimate_protein_quality(ingredients: str) -> dict:
 
     # Position weight: w = 1 / (pos + 1)
     total_w = sum(1.0 / (pos + 1) for pos, *_ in deduped)
+    if total_w == 0:
+        return {"est_pdcaas": None, "est_diaas": None, "sources": []}
     w_pdcaas = sum((1.0 / (pos + 1)) * pdcaas for pos, pdcaas, diaas, _ in deduped) / total_w
     w_diaas  = sum((1.0 / (pos + 1)) * diaas  for pos, pdcaas, diaas, _ in deduped) / total_w
 
@@ -1141,7 +1146,7 @@ def backup_db():
             pq_entry["translations"] = translations
         protein_quality.append(pq_entry)
     payload = {
-        "version": 8,
+        "version": APP_VERSION,
         "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z",
         "score_weights": weights,
         "categories": categories,
@@ -1335,9 +1340,8 @@ def get_translations(lang):
 
 try:
     init_db()
-    logger.info("Database initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize database: {e}")
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=os.environ.get("FLASK_DEBUG", "0") == "1")
+    app.run(host="0.0.0.0", port=5000)
