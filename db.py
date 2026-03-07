@@ -128,8 +128,8 @@ def init_db():
 
 
 def seed_products(cur):
-    # Small Base64 string that serves as a grey placeholder box
-    demo_image_base64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAABs0lEQVR4nO2YzZGCQBSEe7Y2hM0AI8DDXsxAwjAswsAMuOxBIpAMzME9rM9CGGRWZmiq7O8mP1Pd/d4bpgSEEEIIIYQQQgjxbji2gD7nKr/2r22KJpnOVQVwrvJrtjsMrrd1mSyEjxSLvsKYeQDIdgdvZ8RgFQE8M2+kCmHxEfCZmDLfJfY4fMZaKARfpdu6XFLCgGQBdCu9KRoX0ubPSBVU9ADMeNfsuSpfnl0z7lsvxihE3QOmqtzW5WDefZW1Z3zP99+dG8Kie0CfMYNTxmMSrQNCZ9zMhVQ3dL05XUA5B4SYs5BSQwkgtL2XCGEVJ0EmswO43oghZq6GV7RE64Bsf5ps19jt3NYlsv1p1hpvPwKzP4P9lmuPWwCPG939NHerVnvcBn/iDN96l6LBt6fjnXPBvqIHAAA/zuGryu+/+21q96fOAV2DFizwZ9xYbQCGT6DdHwvBzE+9P3b/PwFQj8KXogGq4cbYrXBqqAEAw/EAgMuC/9O8/VdAAbAFsFABbABsFwBbARgGwBbBRAGwBbBQAWwAbBcAWwEYBsAWwUQBsAWwUAFuAEILKLyvl1WbjKX5wAAAAAElFTkSuQmCC"
+    # Small Base64 string that serves as a grey placeholder box (64x64 px)
+    demo_image_base64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAX0lEQVR4nO3PMQ0AMAzAsPLHM4AFscOqFCNI5h03OuBXA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA1oDWgNaA9oC6EnB8CYNtdQAAAAASUVORK5CYII="
 
     data = [
         (
