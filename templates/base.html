@@ -13,6 +13,7 @@
 </head>
 <body>
   {% block body %}{% endblock %}
+  <div style="position:fixed;bottom:4px;right:8px;font-size:11px;color:#999;pointer-events:none;z-index:9999;">v{{ version }}</div>
   {% block scripts %}
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
   {% endblock %}
