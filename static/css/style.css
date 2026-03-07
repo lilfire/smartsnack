@@ -126,7 +126,7 @@
   .form-wrap{margin:0 auto;animation:fadeUp 0.4s ease}
   .form-title{font-size:20px;font-weight:700;margin-bottom:4px}
   .form-sub{font-size:12px;color:rgba(255,255,255,0.35);margin-bottom:20px}
-  .form-fields{display:flex;flex-direction:column;gap:14px}
+  .form-fields{display:flex;flex-direction:column;gap:10px}
   label.field-label{display:block;font-size:10px;font-weight:600;color:rgba(255,255,255,0.4);margin-bottom:5px;text-transform:uppercase;letter-spacing:0.08em;font-family:'Space Mono',monospace}
   .field-input,.field-select{width:100%;padding:11px 13px;border-radius:10px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
   .field-input:focus,.field-select:focus{border-color:rgba(232,184,75,0.3)}
@@ -137,7 +137,7 @@
   .range-row{display:flex;align-items:center;gap:10px}
   .range-row input[type="range"]{flex:1;accent-color:#E8B84B}
   .range-val{font-size:18px;font-weight:700;color:#E8B84B;min-width:28px;text-align:center;font-family:'Space Mono',monospace}
-  .btn-register{width:100%;padding:13px 24px;border-radius:12px;border:none;background:linear-gradient(135deg,#E8B84B,#C99A30);color:#0a0a0c;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;box-shadow:0 4px 20px rgba(232,184,75,0.2)}
+  .btn-register{width:100%;padding:12px;border-radius:12px;border:none;background:linear-gradient(135deg,#E8B84B,#C99A30);color:#0a0a0c;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s;box-shadow:0 4px 20px rgba(232,184,75,0.2)}
   .btn-register:hover{transform:translateY(-1px);box-shadow:0 6px 28px rgba(232,184,75,0.3)}
   .btn-register:disabled{opacity:0.5;cursor:not-allowed;transform:none}
 
@@ -196,7 +196,10 @@
   .off-result-ean{font-size:9px;color:rgba(232,184,75,0.4);font-family:'Space Mono',monospace}
 
   /* ── Settings: Weights ──────────────────────────── */
-  .weight-item{padding:14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);transition:border-color 0.2s}
+  .settings-col-title{font-size:16px;font-weight:700;margin-bottom:6px}
+.settings-item-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px}
+.cat-add-grid{display:grid;grid-template-columns:1fr 80px 1fr;gap:8px;align-items:end}
+.weight-item{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);transition:border-color 0.2s}
   .weight-item.enabled{border-color:rgba(232,184,75,0.15)}
   .weight-item.disabled .weight-slider,.weight-item.disabled .weight-val{opacity:0.2;pointer-events:none}
   .weight-header{display:flex;justify-content:space-between;align-items:center;gap:10px}.weight-header .field-label{margin-bottom:0}
@@ -211,10 +214,10 @@
   .weight-desc{font-size:11px;color:rgba(255,255,255,0.3);margin:4px 0 8px}
   .weight-config{margin:8px 0}
   .wc-row{display:flex;gap:6px;flex-wrap:wrap}
-  .wc-select{padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:11px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;flex:1;min-width:0}
+  .wc-select{padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;flex:1;min-width:0}
   .wc-select:focus{border-color:rgba(232,184,75,0.3)}
   .wc-select option{background:#1a1a1e;color:#e8e6e3}
-  .wc-max{padding:5px 6px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:12px;font-family:'Space Mono',monospace;outline:none;width:80px;flex-shrink:0}
+  .wc-max{padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:12px;font-family:'Space Mono',monospace;outline:none;width:80px;flex-shrink:0}
   .wc-max::placeholder{color:rgba(255,255,255,0.2)}
   .wc-max:focus{border-color:rgba(232,184,75,0.3)}
   .weight-slider{width:100%;accent-color:#E8B84B;height:6px;cursor:pointer}
@@ -229,7 +232,7 @@
   .btn-reset-weights:hover{border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.7)}
 
   /* ── Settings: Categories ───────────────────────── */
-  .cat-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap}
+  .cat-item{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);flex-wrap:wrap}
   .cat-item-emoji{font-size:16px;width:24px;text-align:center}
   .cat-item-label-input{flex:1;min-width:100px;padding:5px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:'DM Sans',sans-serif;outline:none;transition:border-color 0.2s}
   .cat-item-label-input:focus{border-color:rgba(232,184,75,0.3)}
@@ -240,8 +243,8 @@
   .section-divider{border:none;border-top:1px solid rgba(255,255,255,0.06);margin:24px 0}
 
   /* ── Settings: Protein Quality ────────────────────── */
-  .pq-list{display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto;margin-bottom:12px;padding-right:2px}
-  .pq-card{padding:10px 12px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)}
+  .pq-list{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;margin-bottom:12px;padding-right:2px}
+  .pq-card{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)}
   .pq-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .pq-card .pq-label{font-weight:600;color:#e8e6e3;font-size:13px;flex:1;min-width:0}
   .pq-card .pq-badges{display:flex;gap:6px;flex-shrink:0}
@@ -335,6 +338,6 @@
     .expanded-img-area{width:120px;height:120px}
     .form-wrap{max-width:100%}
     .settings-desktop-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
-    .settings-col-title{font-size:16px;margin-bottom:16px}
+    .settings-col-title{margin-bottom:16px}
   }	
 	
