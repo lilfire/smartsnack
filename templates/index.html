@@ -632,7 +632,10 @@ function triggerImageUpload(id){
       var resized=await resizeImage(e.target.result,400);
       try{
         await api('/api/products/'+id+'/image',{method:'PUT',body:JSON.stringify({image:resized})});
-        imageCache[id]=resized;showToast(t('toast_image_saved'),'success');rerender();
+        imageCache[id]=resized;
+        var p=cachedResults&&cachedResults.find(function(x){return x.id===id;});
+        if(p)p.has_image=1;
+        showToast(t('toast_image_saved'),'success');rerender();
       }catch(err){showToast(t('toast_image_upload_error'),'error');}
     };reader.readAsDataURL(file);
   };inp.click();
@@ -654,7 +657,10 @@ function resizeImage(dataUri,maxSize){
 async function removeProductImage(id){
   if(!confirm('Remove image?'))return;
   await api('/api/products/'+id+'/image',{method:'DELETE'});
-  imageCache[id]=null;showToast(t('toast_image_removed'),'success');rerender();
+  imageCache[id]=null;
+  var p=cachedResults&&cachedResults.find(function(x){return x.id===id;});
+  if(p)p.has_image=0;
+  showToast(t('toast_image_removed'),'success');rerender();
 }
 
 // ── Render ──────────────────────────────────────────
@@ -928,7 +934,7 @@ async function registerProduct(){
     validateOffBtn('f');
     NUTRI_IDS.forEach(function(id){document.getElementById('f-'+id).value='';});
     document.getElementById('f-volume').value='';document.getElementById('f-price').value='';
-    document.getElementById('f-smak').value='3';document.getElementById('smak-display').textContent='3';document.getElementById('smak-val').textContent='3';
+    document.getElementById('f-smak').value='3';document.getElementById('smak-val').textContent='3';
     showToast(t('toast_product_added',{name:name}),'success');
 
     // Switch to search view filtered by the registered category

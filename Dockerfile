@@ -8,6 +8,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
+COPY config.py .
+COPY db.py .
+COPY helpers.py .
+COPY translations.py .
+COPY services/ services/
+COPY blueprints/ blueprints/
 COPY templates/ templates/
 COPY translations/ translations/
 COPY entrypoint.sh .
