@@ -331,7 +331,10 @@
     .settings-desktop-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
     .settings-col-title{margin-bottom:16px}
   }
-  @media(min-width:1400px){
-    main{max-width:none}
+  @media(min-width:1200px){
+    main{max-width:1400px}
+  }
+  @media(min-width:1600px){
+    main{max-width:1800px}
   }
 	
