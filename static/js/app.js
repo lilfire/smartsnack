@@ -494,8 +494,9 @@ function renderWeightItems(){
       +'<div class="weight-top">'
       +'<label class="toggle"><input type="checkbox" '+(ena?'checked':'')+' onchange="toggleWeight(\''+w.field+'\',this.checked)"><span class="toggle-track"></span></label>'
       +'<label class="field-label" style="margin:0">'+esc(w.label)+'</label></div>'
-      +'<span class="weight-val mono accent" id="wv-'+w.field+'">'+w.weight.toFixed(1)+'</span></div>'
-      +'<div class="weight-config">'
+      +'<span class="weight-val mono accent" id="wv-'+w.field+'">'+w.weight.toFixed(1)+'</span>'
+      +'<button class="weight-cfg-btn" onclick="toggleWeightConfig(\''+w.field+'\')" title="Advanced">&#9881;</button></div>'
+      +'<div class="weight-config" id="wcfg-'+w.field+'" style="display:none">'
       +'<div class="wc-row">'
       +'<select class="wc-select" id="wd-'+w.field+'" onchange="onWeightDirection(\''+w.field+'\')">'
       +'<option value="lower" '+(dirLower?'selected':'')+'>'+t('direction_lower')+'</option>'
@@ -513,6 +514,14 @@ function renderWeightItems(){
   renderWeightBar();
 }
 
+function toggleWeightConfig(field){
+  var el=document.getElementById('wcfg-'+field);
+  if(el) el.style.display=el.style.display==='none'?'':'none';
+}
+
+var _weightSaveTimer=null;
+function debouncedSaveWeights(){clearTimeout(_weightSaveTimer);_weightSaveTimer=setTimeout(saveWeights,400);}
+
 function toggleWeight(field,checked){
   var item=weightData.find(function(w){return w.field===field;});
   if(item)item.enabled=checked;
@@ -520,12 +529,14 @@ function toggleWeight(field,checked){
   var col=SCORE_COLORS[field]||'#888';
   if(el){el.className='weight-item '+(checked?'enabled':'disabled');el.style.borderLeftColor=checked?col:'rgba(255,255,255,0.06)';}
   renderWeightBar();
+  debouncedSaveWeights();
 }
 
 
 function onWeightDirection(field){
   var item=weightData.find(function(w){return w.field===field;});
   if(item)item.direction=document.getElementById('wd-'+field).value;
+  debouncedSaveWeights();
 }
 
 function onWeightFormula(field){
@@ -536,6 +547,7 @@ function onWeightFormula(field){
   var maxEl=document.getElementById('wm-'+field);
   if(minEl)minEl.style.display=val==='direct'?'':'none';
   if(maxEl)maxEl.style.display=val==='direct'?'':'none';
+  debouncedSaveWeights();
 }
 
 function onWeightMin(field){
@@ -543,6 +555,7 @@ function onWeightMin(field){
   if(item){
     item.formula_min=parseFloat(document.getElementById('wn-'+field).value)||0;
   }
+  debouncedSaveWeights();
 }
 
 function onWeightMax(field){
@@ -550,6 +563,7 @@ function onWeightMax(field){
   if(item){
     item.formula_max=parseFloat(document.getElementById('wm-'+field).value)||0;
   }
+  debouncedSaveWeights();
 }
 
 function onWeightSlider(field){
@@ -558,6 +572,7 @@ function onWeightSlider(field){
   var item=weightData.find(function(w){return w.field===field;});
   if(item)item.weight=val;
   renderWeightBar();
+  debouncedSaveWeights();
 }
 
 function renderWeightBar(){
@@ -580,8 +595,10 @@ function renderWeightBar(){
   h+='</div>';wrap.innerHTML=h;
 }
 
+var _weightSaving=false;
 async function saveWeights(){
-  var btn=document.getElementById('btn-save-weights');btn.disabled=true;btn.textContent=t('toast_saving');
+  if(_weightSaving)return;
+  _weightSaving=true;
   try{
     var payload=weightData.map(function(w){
       var minEl=document.getElementById('wn-'+w.field);
@@ -590,13 +607,11 @@ async function saveWeights(){
       var obj={field:w.field,enabled:w.enabled,weight:parseFloat(sliderEl?sliderEl.value:w.weight),direction:w.direction,formula:w.formula,formula_min:parseFloat(minEl?minEl.value:0)||0,formula_max:parseFloat(maxEl?maxEl.value:0)||0};
       return obj;
     });
-    console.log('saveWeights payload:',JSON.stringify(payload));
-    var resp=await api('/api/weights',{method:'PUT',body:JSON.stringify(payload)});
-    console.log('saveWeights response:',JSON.stringify(resp));
+    await api('/api/weights',{method:'PUT',body:JSON.stringify(payload)});
     showToast(t('toast_weights_saved'),'success');
     loadData();
   }catch(e){console.error('saveWeights error:',e);showToast(t('toast_save_error'),'error');}
-  btn.disabled=false;btn.textContent=t('btn_save_weights');
+  _weightSaving=false;
 }
 
 async function resetWeights(){
@@ -648,14 +663,6 @@ async function deleteCategory(name,label){if(!confirm(t('confirm_delete_category
 
 // ── Protein Quality Settings ──────────────────────────
 var pqData=[];
-var pqEditingId=null;
-
-function togglePqSection(){
-  var sec=document.getElementById('pq-section');
-  var btn=document.getElementById('pq-toggle-btn');
-  if(sec.style.display==='none'){sec.style.display='';btn.classList.add('open');btn.innerHTML='<span class="arrow">&#9654;</span> Skjul tabell';}
-  else{sec.style.display='none';btn.classList.remove('open');btn.innerHTML='<span class="arrow">&#9654;</span> Vis tabell';}
-}
 
 async function loadPq(){
   try{pqData=await api('/api/protein-quality');}catch(e){pqData=[];}
@@ -667,46 +674,41 @@ function renderPqTable(){
   if(!pqData.length){container.innerHTML='<p style="color:rgba(255,255,255,0.3);font-size:13px;text-align:center;padding:20px">No protein sources</p>';return;}
   var h='';
   pqData.forEach(function(row){
-    if(pqEditingId===row.id){
-      h+='<div class="pq-card">'
-        +'<div class="pq-card-edit">'
-        +'<div><label class="field-label">Name</label><input class="pq-edit-input" id="pqe-label-'+row.id+'" value="'+esc(row.label)+'"></div>'
-        +'<div><label class="field-label">Keywords</label><input class="pq-edit-input" id="pqe-kw-'+row.id+'" value="'+esc(row.keywords.join(', '))+'"></div>'
-        +'<div class="pq-edit-row-fields">'
-        +'<div><label class="field-label">PDCAAS</label><input class="pq-edit-input mono" id="pqe-pdcaas-'+row.id+'" type="number" step="0.01" min="0" max="1" value="'+row.pdcaas+'"></div>'
-        +'<div><label class="field-label">DIAAS</label><input class="pq-edit-input mono" id="pqe-diaas-'+row.id+'" type="number" step="0.01" min="0" max="1.2" value="'+row.diaas+'"></div>'
-        +'</div>'
-        +'<div class="pq-edit-btns"><button class="pq-btn pq-btn-save" onclick="savePqEdit('+row.id+')">&#10003; Save</button><button class="pq-btn pq-btn-cancel" onclick="cancelPqEdit()">&#10005; Cancel</button></div>'
-        +'</div></div>';
-    } else {
-      h+='<div class="pq-card">'
-        +'<div class="pq-card-top">'
-        +'<span class="pq-label">'+esc(row.label||row.keywords[0])+'</span>'
-        +'<span class="pq-badges"><span class="pq-badge"><span class="pq-badge-label">P </span>'+row.pdcaas.toFixed(2)+'</span><span class="pq-badge"><span class="pq-badge-label">D </span>'+row.diaas.toFixed(2)+'</span></span>'
-        +'<div class="pq-card-actions"><button class="pq-btn pq-btn-edit" onclick="startPqEdit('+row.id+')">&#9998;</button><button class="pq-btn pq-btn-del" onclick="deletePq('+row.id+',\''+esc(row.label||row.keywords[0]).replace(/'/g,"\\'")+'\')">&#128465;</button></div>'
-        +'</div>'
-        +'<div class="pq-kw">'+esc(row.keywords.join(', '))+'</div>'
-        +'</div>';
-    }
+    h+='<div class="pq-card">'
+      +'<div class="pq-card-top">'
+      +'<input class="cat-item-label-input" id="pqe-label-'+row.id+'" value="'+esc(row.label||row.keywords[0])+'" onchange="autosavePq('+row.id+')" title="Name">'
+      +'<span class="pq-badges"><span class="pq-badge"><span class="pq-badge-label">P </span>'
+      +'<input class="pq-inline-num mono" id="pqe-pdcaas-'+row.id+'" type="number" step="0.01" min="0" max="1" value="'+row.pdcaas+'" onchange="autosavePq('+row.id+')">'
+      +'</span><span class="pq-badge"><span class="pq-badge-label">D </span>'
+      +'<input class="pq-inline-num mono" id="pqe-diaas-'+row.id+'" type="number" step="0.01" min="0" max="1.2" value="'+row.diaas+'" onchange="autosavePq('+row.id+')">'
+      +'</span></span>'
+      +'<button class="btn-sm btn-red" onclick="deletePq('+row.id+',\''+esc(row.label||row.keywords[0]).replace(/'/g,"\\'")+'\')">&#128465;</button>'
+      +'</div>'
+      +'<input class="pq-kw-input" id="pqe-kw-'+row.id+'" value="'+esc(row.keywords.join(', '))+'" onchange="autosavePq('+row.id+')" placeholder="Keywords (comma separated)">'
+      +'</div>';
   });
   container.innerHTML=h;
 }
 
-function startPqEdit(id){pqEditingId=id;renderPqTable();}
-function cancelPqEdit(){pqEditingId=null;renderPqTable();}
+var _pqSaveTimers={};
+function autosavePq(id){clearTimeout(_pqSaveTimers[id]);_pqSaveTimers[id]=setTimeout(function(){savePqField(id);},400);}
 
-async function savePqEdit(id){
-  var label=document.getElementById('pqe-label-'+id).value.trim();
-  var kw=document.getElementById('pqe-kw-'+id).value.trim();
-  var pdcaas=parseFloat(document.getElementById('pqe-pdcaas-'+id).value);
-  var diaas=parseFloat(document.getElementById('pqe-diaas-'+id).value);
-  if(!kw||isNaN(pdcaas)||isNaN(diaas)){showToast(t('toast_fill_all_fields'),'error');return;}
-  var keywords=kw.split(',').map(function(k){return k.trim();}).filter(Boolean);
-  var res=await api('/api/protein-quality/'+id,{method:'PUT',body:JSON.stringify({label:label,keywords:keywords,pdcaas:pdcaas,diaas:diaas})});
+async function savePqField(id){
+  var label=document.getElementById('pqe-label-'+id);
+  var kw=document.getElementById('pqe-kw-'+id);
+  var pdcaas=document.getElementById('pqe-pdcaas-'+id);
+  var diaas=document.getElementById('pqe-diaas-'+id);
+  if(!label||!kw||!pdcaas||!diaas)return;
+  var kwVal=kw.value.trim();
+  var pdVal=parseFloat(pdcaas.value);
+  var diVal=parseFloat(diaas.value);
+  if(!kwVal||isNaN(pdVal)||isNaN(diVal))return;
+  var keywords=kwVal.split(',').map(function(k){return k.trim();}).filter(Boolean);
+  var res=await api('/api/protein-quality/'+id,{method:'PUT',body:JSON.stringify({label:label.value.trim(),keywords:keywords,pdcaas:pdVal,diaas:diVal})});
   if(res.error){showToast(res.error,'error');return;}
-  pqEditingId=null;
   showToast(t('toast_updated'),'success');
-  loadPq();
+  var item=pqData.find(function(r){return r.id===id;});
+  if(item){item.label=label.value.trim();item.keywords=keywords;item.pdcaas=pdVal;item.diaas=diVal;}
 }
 
 async function addPq(){
