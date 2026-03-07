@@ -1,7 +1,6 @@
-import os
 import logging
 
-from flask import Blueprint, jsonify, send_file, current_app
+from flask import Blueprint, jsonify, render_template
 
 from db import get_db
 from config import APP_VERSION
@@ -24,4 +23,4 @@ def health():
 
 @bp.route("/")
 def index():
-    return send_file(os.path.join(current_app.root_path, "templates", "index.html"))
+    return render_template("index.html")

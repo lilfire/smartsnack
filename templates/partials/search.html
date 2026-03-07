@@ -1,0 +1,10 @@
+  <!-- SEARCH / BROWSE VIEW -->
+  <div id="view-search">
+    <div class="search-row"><div class="search-wrap" id="search-box"><span class="search-icon">&#128270;</span><input class="search-input" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Search for product or EAN..." oninput="onSearchInput()"><button class="search-clear" id="search-clear" onclick="clearSearch()">&times;</button></div><button class="btn-scan-search" onclick="openSearchScanner()" data-i18n-title="search_scan_title" title="Scan barcode to find product">&#128247;</button></div>
+    <div class="filter-wrap" id="filter-wrap">
+      <div class="filter-toggle" id="filter-toggle" onclick="toggleFilters()"><span id="filter-toggle-label" data-i18n="filter_all">All categories</span> <span class="ft-arrow">&#9660;</span></div>
+      <div class="filter-row" id="filter-row"></div>
+    </div>
+    <div class="result-count" id="result-count"></div>
+    <div id="results-container"><div class="loading"><span class="spinner"></span><span data-i18n="loading_products">Loading products...</span></div></div>
+  </div>

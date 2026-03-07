@@ -1,0 +1,64 @@
+  <!-- REGISTER VIEW -->
+  <div id="view-register" style="display:none">
+    <div class="form-wrap">
+      <h2 class="form-title mono"><span data-i18n="register_title_1">Register </span><span class="accent" data-i18n="register_title_2">product</span></h2>
+      <p class="form-sub" data-i18n="register_sub">Add a new product to the database</p>
+      <div class="form-fields">
+        <div class="grid-2">
+          <div><label class="field-label" data-i18n="label_category">Category</label><select class="field-select" id="f-type"></select></div>
+          <div><label class="field-label" data-i18n="label_ean">EAN (barcode)</label><div class="ean-row"><div><input class="field-input" id="f-ean" data-i18n-placeholder="ph_ean" placeholder="e.g. 7038010069307" oninput="validateOffBtn('f')"></div><button class="btn-scan" onclick="openScanner('f')" data-i18n-title="btn_scan_title" title="Scan barcode">&#128247;</button><button class="btn-off" id="f-off-btn" disabled onclick="lookupOFF('f')"><span class="off-spin"></span><span class="off-label" data-i18n="btn_fetch">&#127758; Fetch</span></button></div></div>
+        </div>
+        <div><label class="field-label" data-i18n="label_product_name">Product name *</label><input class="field-input" id="f-name" data-i18n-placeholder="ph_product_name" placeholder="e.g. Monster ProteinChips paprika" oninput="validateOffBtn('f')"></div>
+        <div class="grid-2">
+          <div><label class="field-label" data-i18n="label_brand">Brand / Manufacturer</label><input class="field-input" id="f-brand" data-i18n-placeholder="ph_brand" placeholder="e.g. Monster"></div>
+          <div><label class="field-label" data-i18n="label_stores">Stores</label><input class="field-input" id="f-stores" data-i18n-placeholder="ph_stores" placeholder="e.g. Rema, Kiwi"></div>
+        </div>
+        <div><label class="field-label" data-i18n="label_ingredients">Ingredients</label><textarea class="field-input" id="f-ingredients" data-i18n-placeholder="ph_ingredients" placeholder="e.g. Lentils, sunflower oil, paprika..." rows="2" style="resize:vertical;min-height:60px" oninput="updateEstimateBtn('f')"></textarea></div>
+        <div class="form-section" data-i18n="section_nutrition">N&aelig;ringsverdier per 100g</div>
+        <div class="grid-4">
+          <div><label class="field-label" data-i18n="label_kcal">Kcal</label><input class="field-input" type="number" min="0" step="1" id="f-kcal" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_energy_kj">Energi (kJ)</label><input class="field-input" type="number" min="0" step="1" id="f-energy_kj" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_fat">Fat (g)</label><input class="field-input" type="number" min="0" step="0.1" id="f-fat" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_saturated_fat">Saturated fat (g)</label><input class="field-input" type="number" min="0" step="0.1" id="f-saturated_fat" placeholder="0"></div>
+        </div>
+        <div class="grid-4">
+          <div><label class="field-label" data-i18n="label_carbs">Carbs (g)</label><input class="field-input" type="number" min="0" step="0.1" id="f-carbs" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_sugar">Sugar (g)</label><input class="field-input" type="number" min="0" step="0.1" id="f-sugar" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_protein">Protein (g)</label><input class="field-input" type="number" min="0" step="0.1" id="f-protein" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_fiber">Fiber (g)</label><input class="field-input" type="number" min="0" step="0.1" id="f-fiber" placeholder="0"></div>
+        </div>
+        <div class="grid-4">
+          <div><label class="field-label" data-i18n="label_salt">Salt (g)</label><input class="field-input" type="number" min="0" step="0.01" id="f-salt" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_weight">Weight (g)</label><input class="field-input" type="number" min="0" step="1" id="f-weight" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_portion">Portion (g)</label><input class="field-input" type="number" min="0" step="1" id="f-portion" placeholder="0"></div>
+          <div></div>
+        </div>
+        <div class="form-section" data-i18n="section_rating_price">Rating &amp; price</div>
+        <div class="grid-3">
+          <div><label class="field-label" data-i18n="label_volume">Volume (1-3)</label><input class="field-input" type="number" min="0" step="0.1" id="f-volume" placeholder="0"></div>
+          <div><label class="field-label" data-i18n="label_price">Price (kr/kg)</label><input class="field-input" type="number" min="0" step="1" id="f-price" placeholder="0"></div>
+          <div></div>
+        </div>
+        <div>
+          <label class="field-label"><span id="smak-label-text" data-i18n="label_taste">Smakskarakter ({val}/6)</span></label>
+          <div class="range-row"><input type="range" min="0" max="6" step="0.5" value="3" id="f-smak" oninput="document.getElementById('smak-display').textContent=this.value;document.getElementById('smak-val').textContent=this.value"><span class="range-val" id="smak-val">3</span></div>
+        </div>
+        <div id="f-protein-quality-wrap" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label class="field-label" style="margin:0" data-i18n="label_protein_quality_est">Protein quality (estimated)</label>
+            <button type="button" class="btn-off" id="f-estimate-btn" onclick="estimateProteinQuality('f')" style="font-size:11px;padding:5px 10px"><span class="off-spin"></span><span class="off-label" data-i18n="btn_estimate">&#9881; Estimate</span></button>
+          </div>
+          <div id="f-pq-result" style="display:none;padding:10px;border-radius:8px;background:rgba(0,229,204,0.06);border:1px solid rgba(0,229,204,0.15)">
+            <div style="display:flex;gap:16px;margin-bottom:4px">
+              <span style="font-size:11px;color:rgba(255,255,255,0.4)">PDCAAS: <span id="f-pdcaas-val" style="color:#00e5cc;font-weight:700;font-family:'Space Mono',monospace">–</span></span>
+              <span style="font-size:11px;color:rgba(255,255,255,0.4)">DIAAS: <span id="f-diaas-val" style="color:#00bfff;font-weight:700;font-family:'Space Mono',monospace">–</span></span>
+            </div>
+            <div id="f-pq-sources" style="font-size:10px;color:rgba(255,255,255,0.3);line-height:1.4"></div>
+          </div>
+          <input type="hidden" id="f-est_pdcaas" value="">
+          <input type="hidden" id="f-est_diaas" value="">
+        </div>
+        <button class="btn-register" id="btn-submit" onclick="registerProduct()" data-i18n="btn_register_product">+ Register product</button>
+      </div>
+    </div>
+  </div>
