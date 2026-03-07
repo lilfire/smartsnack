@@ -4,8 +4,11 @@ APP_VERSION = "0.1"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 TRANSLATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translations")
-SUPPORTED_LANGUAGES = ["no", "en"]
 DEFAULT_LANGUAGE = "no"
+SUPPORTED_LANGUAGES = sorted(
+    [f[:-5] for f in os.listdir(TRANSLATIONS_DIR) if f.endswith(".json")],
+    key=lambda x: (x != DEFAULT_LANGUAGE, x),  # default language first
+)
 
 # ── All product numeric fields (excluding type, name, ean, image) ─────
 NUTRITION_FIELDS = [

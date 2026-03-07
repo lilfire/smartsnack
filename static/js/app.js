@@ -49,7 +49,7 @@ function applyStaticTranslations() {
     el.title = t(key);
   });
   // Update html lang attribute
-  document.documentElement.lang = currentLang === 'no' ? 'no' : 'en';
+  document.documentElement.lang = currentLang;
 }
 
 async function changeLanguage(lang) {
@@ -460,9 +460,21 @@ async function loadSettings(){
     renderWeightItems();
   }catch(e){showToast(t('toast_load_error'),'error');}
   document.getElementById('settings-loading').style.display='none';document.getElementById('settings-content').style.display='';
-  // Set language dropdown to current language
+  // Populate language dropdown dynamically
   var langSelect=document.getElementById('language-select');
-  if(langSelect)langSelect.value=currentLang;
+  if(langSelect){
+    try{
+      var langs=await api('/api/languages');
+      langSelect.innerHTML='';
+      langs.forEach(function(l){
+        var opt=document.createElement('option');
+        opt.value=l.code;
+        opt.textContent=(l.flag?l.flag+' ':'')+l.label;
+        langSelect.appendChild(opt);
+      });
+    }catch(e){}
+    langSelect.value=currentLang;
+  }
   loadCategories();
   loadPq();
 }

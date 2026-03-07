@@ -5,6 +5,11 @@ from services import translation_service
 bp = Blueprint("translations", __name__)
 
 
+@bp.route("/api/languages")
+def get_languages():
+    return jsonify(translation_service.get_available_languages())
+
+
 @bp.route("/api/translations/<lang>")
 def get_translations(lang):
     try:
