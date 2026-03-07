@@ -245,7 +245,7 @@
   .section-divider{border:none;border-top:1px solid rgba(255,255,255,0.06);margin:24px 0}
 
   /* ── Settings: Protein Quality ────────────────────── */
-  .pq-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:12px}
+  .pq-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin-bottom:12px}
   .pq-card{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)}
   .pq-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .pq-card .pq-badges{display:flex;gap:6px;flex-shrink:0}
@@ -330,5 +330,8 @@
     .form-wrap{max-width:100%}
     .settings-desktop-grid{display:grid;grid-template-columns:1fr 1fr;gap:32px;align-items:start}
     .settings-col-title{margin-bottom:16px}
-  }	
+  }
+  @media(min-width:1400px){
+    main{max-width:1400px}
+  }
 	
