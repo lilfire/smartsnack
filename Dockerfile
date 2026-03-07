@@ -16,6 +16,7 @@ COPY services/ services/
 COPY blueprints/ blueprints/
 COPY templates/ templates/
 COPY translations/ translations/
+COPY static/ static/
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
