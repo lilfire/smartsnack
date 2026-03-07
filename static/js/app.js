@@ -494,8 +494,9 @@ function renderWeightItems(){
       +'<div class="weight-top">'
       +'<label class="toggle"><input type="checkbox" '+(ena?'checked':'')+' onchange="toggleWeight(\''+w.field+'\',this.checked)"><span class="toggle-track"></span></label>'
       +'<label class="field-label" style="margin:0">'+esc(w.label)+'</label></div>'
-      +'<span class="weight-val mono accent" id="wv-'+w.field+'">'+w.weight.toFixed(1)+'</span></div>'
-      +'<div class="weight-config">'
+      +'<span class="weight-val mono accent" id="wv-'+w.field+'">'+w.weight.toFixed(1)+'</span>'
+      +'<button class="weight-cfg-btn" onclick="toggleWeightConfig(\''+w.field+'\')" title="Advanced">&#9881;</button></div>'
+      +'<div class="weight-config" id="wcfg-'+w.field+'" style="display:none">'
       +'<div class="wc-row">'
       +'<select class="wc-select" id="wd-'+w.field+'" onchange="onWeightDirection(\''+w.field+'\')">'
       +'<option value="lower" '+(dirLower?'selected':'')+'>'+t('direction_lower')+'</option>'
@@ -511,6 +512,11 @@ function renderWeightItems(){
   });
   container.innerHTML=h;
   renderWeightBar();
+}
+
+function toggleWeightConfig(field){
+  var el=document.getElementById('wcfg-'+field);
+  if(el) el.style.display=el.style.display==='none'?'':'none';
 }
 
 function toggleWeight(field,checked){
@@ -650,12 +656,6 @@ async function deleteCategory(name,label){if(!confirm(t('confirm_delete_category
 var pqData=[];
 var pqEditingId=null;
 
-function togglePqSection(){
-  var sec=document.getElementById('pq-section');
-  var btn=document.getElementById('pq-toggle-btn');
-  if(sec.style.display==='none'){sec.style.display='';btn.classList.add('open');btn.innerHTML='<span class="arrow">&#9654;</span> Skjul tabell';}
-  else{sec.style.display='none';btn.classList.remove('open');btn.innerHTML='<span class="arrow">&#9654;</span> Vis tabell';}
-}
 
 async function loadPq(){
   try{pqData=await api('/api/protein-quality');}catch(e){pqData=[];}

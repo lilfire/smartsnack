@@ -211,6 +211,8 @@
   .toggle input:checked+.toggle-track{background:rgba(232,184,75,0.3)}
   .toggle input:checked+.toggle-track::after{transform:translateX(16px);background:#E8B84B}
   .weight-val{font-size:16px;font-weight:700}
+  .weight-cfg-btn{background:none;border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.3);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.15s;padding:0}
+  .weight-cfg-btn:hover{border-color:rgba(255,255,255,0.2);color:rgba(255,255,255,0.6)}
   .weight-desc{font-size:11px;color:rgba(255,255,255,0.3);margin:4px 0 8px}
   .weight-config{margin:8px 0}
   .wc-row{display:flex;gap:6px;flex-wrap:wrap}
@@ -265,10 +267,6 @@
   .pq-btn-cancel{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);flex:1}.pq-btn-cancel:hover{background:rgba(255,255,255,0.1)}
   .pq-add-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
   .pq-add-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .pq-toggle-btn{background:none;border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-family:'DM Sans',sans-serif;transition:all 0.2s;display:flex;align-items:center;gap:6px}
-  .pq-toggle-btn:hover{border-color:rgba(255,255,255,0.15);color:rgba(255,255,255,0.6)}
-  .pq-toggle-btn .arrow{transition:transform 0.2s;display:inline-block}
-  .pq-toggle-btn.open .arrow{transform:rotate(90deg)}
   .backup-section{display:flex;flex-direction:column;gap:10px}
   .backup-btn-row{display:grid;grid-template-columns:1fr;gap:8px}
   .backup-btn{padding:12px;border-radius:12px;cursor:pointer;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all 0.15s;text-align:center;display:flex;align-items:center;justify-content:center;gap:6px}
