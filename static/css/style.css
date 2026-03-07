@@ -332,6 +332,6 @@
     .settings-col-title{margin-bottom:16px}
   }
   @media(min-width:1400px){
-    main{max-width:1400px}
+    main{max-width:none}
   }
 	
