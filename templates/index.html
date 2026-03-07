@@ -928,7 +928,7 @@ async function registerProduct(){
     validateOffBtn('f');
     NUTRI_IDS.forEach(function(id){document.getElementById('f-'+id).value='';});
     document.getElementById('f-volume').value='';document.getElementById('f-price').value='';
-    document.getElementById('f-smak').value='3';document.getElementById('smak-display').textContent='3';document.getElementById('smak-val').textContent='3';
+    document.getElementById('f-smak').value='3';document.getElementById('smak-val').textContent='3';
     showToast(t('toast_product_added',{name:name}),'success');
 
     // Switch to search view filtered by the registered category
