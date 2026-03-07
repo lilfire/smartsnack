@@ -248,23 +248,16 @@
   .pq-list{display:flex;flex-direction:column;gap:10px;max-height:460px;overflow-y:auto;margin-bottom:12px;padding-right:2px}
   .pq-card{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06)}
   .pq-card-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .pq-card .pq-label{font-weight:600;color:#e8e6e3;font-size:13px;flex:1;min-width:0}
   .pq-card .pq-badges{display:flex;gap:6px;flex-shrink:0}
-  .pq-badge{font-family:'Space Mono',monospace;font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.6)}
-  .pq-badge-label{font-size:9px;color:rgba(255,255,255,0.3);margin-right:2px}
-  .pq-card .pq-kw{color:rgba(255,255,255,0.3);font-size:11px;font-family:'Space Mono',monospace;margin-top:4px;line-height:1.4;word-break:break-word}
-  .pq-card-actions{display:flex;gap:4px;flex-shrink:0}
-  .pq-card-edit{display:flex;flex-direction:column;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,0.06)}
-  .pq-card-edit .pq-edit-row-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .pq-edit-input{padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:#e8e6e3;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;width:100%;box-sizing:border-box}
-  .pq-edit-input:focus{border-color:rgba(232,184,75,0.3)}
-  .pq-edit-input.mono{font-family:'Space Mono',monospace}
-  .pq-edit-btns{display:flex;gap:8px}
-  .pq-btn{padding:6px 12px;border-radius:6px;border:none;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.15s}
-  .pq-btn-edit{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.5)}.pq-btn-edit:hover{background:rgba(255,255,255,0.1);color:#e8e6e3}
-  .pq-btn-del{background:rgba(255,68,68,0.08);color:rgba(255,68,68,0.6)}.pq-btn-del:hover{background:rgba(255,68,68,0.15);color:#ff4444}
-  .pq-btn-save{background:rgba(232,184,75,0.15);color:#E8B84B;flex:1}.pq-btn-save:hover{background:rgba(232,184,75,0.25)}
-  .pq-btn-cancel{background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4);flex:1}.pq-btn-cancel:hover{background:rgba(255,255,255,0.1)}
+  .pq-badge{font-family:'Space Mono',monospace;font-size:11px;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,0.05);color:rgba(255,255,255,0.6);display:flex;align-items:center;gap:2px}
+  .pq-badge-label{font-size:9px;color:rgba(255,255,255,0.3)}
+  .pq-inline-num{width:48px;padding:1px 4px;border:1px solid transparent;border-radius:4px;background:transparent;color:rgba(255,255,255,0.6);font-size:11px;font-family:'Space Mono',monospace;outline:none;transition:border-color 0.2s;text-align:right;-moz-appearance:textfield}
+  .pq-inline-num::-webkit-inner-spin-button,.pq-inline-num::-webkit-outer-spin-button{-webkit-appearance:none}
+  .pq-inline-num:hover{border-color:rgba(255,255,255,0.15)}
+  .pq-inline-num:focus{border-color:rgba(232,184,75,0.3);background:rgba(255,255,255,0.04)}
+  .pq-kw-input{width:100%;padding:4px 8px;border:1px solid transparent;border-radius:6px;background:transparent;color:rgba(255,255,255,0.3);font-size:11px;font-family:'Space Mono',monospace;outline:none;margin-top:4px;transition:border-color 0.2s;box-sizing:border-box}
+  .pq-kw-input:hover{border-color:rgba(255,255,255,0.1)}
+  .pq-kw-input:focus{border-color:rgba(232,184,75,0.3);background:rgba(255,255,255,0.04);color:rgba(255,255,255,0.6)}
   .pq-add-grid{display:flex;flex-direction:column;gap:8px;margin-bottom:8px}
   .pq-add-nums{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .backup-section{display:flex;flex-direction:column;gap:10px}
