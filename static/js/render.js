@@ -1,5 +1,5 @@
 // ── Render ──────────────────────────────────────────
-import { state, esc, safeDataUri, catEmoji, catLabel } from './state.js';
+import { state, esc, safeDataUri, catEmoji, catLabel, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { applySorting, sortIndicator } from './filters.js';
 import { loadProductImage } from './images.js';
@@ -218,6 +218,8 @@ export function renderResults(results, search) {
   });
   h += '</div>';
   container.innerHTML = h;
+  var edVol = document.getElementById('ed-volume');
+  if (edVol) upgradeSelect(edVol);
   sorted.forEach(function(p) {
     if (p.has_image) {
       loadProductImage(p.id).then(function(dataUri) {
