@@ -131,7 +131,7 @@ export function upgradeSelect(sel, onSelect) {
 
   // Build custom option items
   sel.querySelectorAll('option').forEach(function(o) {
-    if (!o.value) return; // skip placeholder
+    if (!o.value && !o.textContent.trim()) return; // skip truly empty placeholders
     var div = document.createElement('div');
     div.className = 'custom-select-option';
     div.setAttribute('role', 'option');

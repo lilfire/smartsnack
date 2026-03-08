@@ -1,5 +1,5 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc, showConfirmModal } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc, showConfirmModal, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults } from './render.js';
@@ -64,6 +64,7 @@ export async function loadData() {
     buildFilters();
     document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
     buildTypeSelect();
+    upgradeSelect(document.getElementById('f-volume'));
     var search = state.currentView === 'search' ? document.getElementById('search-input').value.trim() : '';
     var results = await fetchProducts(search, state.currentFilter);
     renderResults(results, search);
@@ -180,6 +181,7 @@ export async function registerProduct() {
     import('./openfoodfacts.js').then(function(mod) { mod.validateOffBtn('f'); });
     NUTRI_IDS.forEach(function(id) { document.getElementById('f-' + id).value = ''; });
     document.getElementById('f-volume').value = '';
+    upgradeSelect(document.getElementById('f-volume'));
     document.getElementById('f-price').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';
