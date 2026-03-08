@@ -168,6 +168,9 @@ label.field-label {
   position: relative;
   width: 100%;
 }
+.custom-select-wrap.open {
+  z-index: 51;
+}
 
 .custom-select-trigger {
   width: 100%;
@@ -247,13 +250,13 @@ label.field-label {
   .custom-select-wrap .custom-select-options {
     display: none !important;
   }
-  .custom-select-wrap select.field-select {
+  .custom-select-wrap select {
     display: block;
   }
 }
 /* On desktop: hide native select, show custom */
 @media (min-width: 640px) {
-  .custom-select-wrap select.field-select {
+  .custom-select-wrap select {
     display: none;
   }
 }

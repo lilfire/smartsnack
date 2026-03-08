@@ -84,6 +84,8 @@
     "direction_higher": "↑ Högre är bättre",
     "direction_lower_desc": "Lägre {label} → högre poäng",
     "direction_higher_desc": "Högre {label} → högre poäng",
+    "formula_minmax": "MinMax (kategori)",
+    "formula_direct": "Direkt (fast max)",
     "toast_image_too_large": "Bilden är för stor (max 10MB)",
     "toast_image_saved": "Bilden sparades",
     "toast_image_upload_error": "Fel vid uppladdning av bild",

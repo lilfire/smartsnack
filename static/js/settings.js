@@ -1,6 +1,6 @@
 // ── Weights, Categories, Protein Quality, Backup ────
-import { state, api, esc, fetchStats } from './state.js';
-import { t, getCurrentLang } from './i18n.js';
+import { state, api, esc, fetchStats, upgradeSelect } from './state.js';
+import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { showToast, loadData } from './products.js';
 
 // ── Score config (shared with render.js) ────────────
@@ -44,90 +44,12 @@ export async function loadSettings() {
       });
     } catch(e) {}
     langSelect.value = getCurrentLang();
+    upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
   loadCategories();
   loadPq();
 }
 
-// ── Custom select dropdown (desktop only) ────────
-function _initCustomSelect() {
-  var wrap = document.getElementById('weight-add-wrap');
-  if (!wrap || window.innerWidth < 640) return;
-  var trigger = wrap.querySelector('.custom-select-trigger');
-  var optionsList = wrap.querySelector('.custom-select-options');
-  var options = wrap.querySelectorAll('.custom-select-option');
-  var highlighted = -1;
-
-  trigger.addEventListener('click', function(e) {
-    e.stopPropagation();
-    var isOpen = wrap.classList.toggle('open');
-    trigger.setAttribute('aria-expanded', isOpen);
-    highlighted = -1;
-    _clearHighlight();
-  });
-
-  options.forEach(function(opt, i) {
-    opt.addEventListener('click', function(e) {
-      e.stopPropagation();
-      _selectOption(opt.getAttribute('data-value'));
-    });
-  });
-
-  trigger.addEventListener('keydown', function(e) {
-    if (!wrap.classList.contains('open')) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        wrap.classList.add('open');
-        trigger.setAttribute('aria-expanded', 'true');
-        highlighted = 0;
-        _updateHighlight();
-      }
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      highlighted = Math.min(highlighted + 1, options.length - 1);
-      _updateHighlight();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      highlighted = Math.max(highlighted - 1, 0);
-      _updateHighlight();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (highlighted >= 0 && highlighted < options.length) {
-        _selectOption(options[highlighted].getAttribute('data-value'));
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      _close();
-    }
-  });
-
-  document.addEventListener('click', function() { _close(); });
-
-  function _close() {
-    wrap.classList.remove('open');
-    trigger.setAttribute('aria-expanded', 'false');
-    highlighted = -1;
-    _clearHighlight();
-  }
-  function _clearHighlight() {
-    options.forEach(function(o) { o.classList.remove('highlighted'); });
-  }
-  function _updateHighlight() {
-    _clearHighlight();
-    if (highlighted >= 0 && highlighted < options.length) {
-      options[highlighted].classList.add('highlighted');
-      options[highlighted].scrollIntoView({ block: 'nearest' });
-    }
-  }
-  function _selectOption(value) {
-    var sel = document.getElementById('weight-add-select');
-    if (sel) sel.value = value;
-    _close();
-    addWeightFromDropdown();
-  }
-}
 
 export function renderWeightItems() {
   var container = document.getElementById('weight-items');
@@ -151,8 +73,8 @@ export function renderWeightItems() {
       + '<option value="lower" ' + (dirLower ? 'selected' : '') + '>' + t('direction_lower') + '</option>'
       + '<option value="higher" ' + (!dirLower ? 'selected' : '') + '>' + t('direction_higher') + '</option></select>'
       + '<select class="wc-select" id="wf-' + w.field + '" onchange="onWeightFormula(\'' + w.field + '\')">'
-      + '<option value="minmax" ' + (!isDirect ? 'selected' : '') + '>MinMax (category)</option>'
-      + '<option value="direct" ' + (isDirect ? 'selected' : '') + '>Direct (fixed max)</option></select>'
+      + '<option value="minmax" ' + (!isDirect ? 'selected' : '') + '>' + t('formula_minmax') + '</option>'
+      + '<option value="direct" ' + (isDirect ? 'selected' : '') + '>' + t('formula_direct') + '</option></select>'
       + '<input type="number" class="wc-max" id="wn-' + w.field + '" value="' + (w.formula_min != null ? w.formula_min : '') + '" placeholder="Min" step="0.01" oninput="onWeightMin(\'' + w.field + '\')" style="' + (isDirect ? '' : 'display:none') + '">'
       + '<input type="number" class="wc-max" id="wm-' + w.field + '" value="' + (w.formula_max != null ? w.formula_max : '') + '" placeholder="Max" step="0.01" oninput="onWeightMax(\'' + w.field + '\')" style="' + (isDirect ? '' : 'display:none') + '">'
       + '</div></div>'
@@ -163,24 +85,27 @@ export function renderWeightItems() {
   if (disabled.length) {
     var placeholder = '\u2014 ' + t('btn_add_weight') + ' \u2014';
     h += '<div class="weight-add-row">'
-      + '<div class="custom-select-wrap" id="weight-add-wrap">'
       + '<select class="field-select" id="weight-add-select">'
       + '<option value="">' + placeholder + '</option>';
     disabled.forEach(function(w) {
       h += '<option value="' + w.field + '">' + esc(w.label) + '</option>';
     });
     h += '</select>'
-      + '<button type="button" class="custom-select-trigger" tabindex="0">' + esc(placeholder) + '</button>'
-      + '<div class="custom-select-options" role="listbox">';
-    disabled.forEach(function(w) {
-      h += '<div class="custom-select-option" role="option" data-value="' + w.field + '">' + esc(w.label) + '</div>';
-    });
-    h += '</div></div>'
       + '<button class="btn-register weight-add-btn" onclick="addWeightFromDropdown()">+</button>'
       + '</div>';
   }
   container.innerHTML = h;
-  _initCustomSelect();
+  upgradeSelect(document.getElementById('weight-add-select'), function() {
+    addWeightFromDropdown();
+  });
+  enabled.forEach(function(w) {
+    upgradeSelect(document.getElementById('wd-' + w.field), function(val) {
+      onWeightDirection(w.field);
+    });
+    upgradeSelect(document.getElementById('wf-' + w.field), function(val) {
+      onWeightFormula(w.field);
+    });
+  });
 }
 
 export function toggleWeightConfig(field) {
