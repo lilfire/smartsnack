@@ -56,44 +56,42 @@
               </div>
               <button class="btn-register" style="margin-top:12px" onclick="addPq()" data-i18n="btn_add_protein_source">+ Add protein source</button>
             </div>
-          </div>
+          </div>         
+          <!-- Language -->
           <div>
-            <!-- Language -->
-            <div>
-              <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
-                <span data-i18n="settings_language">Language</span>
-                <span class="settings-chevron">&#9660;</span>
-              </h3>
-              <div class="settings-section-body" style="display:none">
-                <p class="form-sub" data-i18n="settings_language_desc">Choose display language for the app</p>
-                <select class="field-select" id="language-select" onchange="changeLanguage(this.value)">
-                </select>
-              </div>
-            </div>
-            <!-- Database -->
-            <div>
-              <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
-                <span data-i18n="settings_database_title">Database</span>
-                <span class="settings-chevron">&#9660;</span>
-              </h3>
-              <div class="settings-section-body" style="display:none">
-                <p class="form-sub" data-i18n="settings_database_desc">Backup, restore or import data</p>
-                <div class="backup-section">
-                  <div class="backup-btn-row">
-                    <button class="backup-btn backup-btn-primary" onclick="downloadBackup()" data-i18n="btn_download_backup">&#128229; Download backup</button>
-                    <button class="backup-btn backup-btn-blue" onclick="document.getElementById('import-file').click()" data-i18n="btn_import">&#128228; Import (merge)</button>
-                  </div>
-                  <div class="file-drop" id="restore-drop" onclick="document.getElementById('restore-file').click()">
-                    <span data-i18n="restore_drop_text">&#128260; Drop a backup file here, or click to restore</span>
-                    <br><span style="font-size:11px;color:rgba(255,68,68,0.6);margin-top:4px;display:inline-block" data-i18n="restore_warning">Warning: Restore replaces all existing data</span>
-                  </div>
-                  <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)">
-                  <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
-                  <p class="backup-note" data-i18n="backup_note">Backup exports all products (including images), categories and weights as a JSON file. Import adds products without deleting existing ones. Restore replaces everything.</p>
-                </div>
-              </div>
+            <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+              <span data-i18n="settings_language">Language</span>
+              <span class="settings-chevron">&#9660;</span>
+            </h3>
+            <div class="settings-section-body" style="display:none">
+              <p class="form-sub" data-i18n="settings_language_desc">Choose display language for the app</p>
+              <select class="field-select" id="language-select" onchange="changeLanguage(this.value)">
+              </select>
             </div>
           </div>
+          <!-- Database -->
+          <div>
+            <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+              <span data-i18n="settings_database_title">Database</span>
+              <span class="settings-chevron">&#9660;</span>
+            </h3>
+            <div class="settings-section-body" style="display:none">
+              <p class="form-sub" data-i18n="settings_database_desc">Backup, restore or import data</p>
+              <div class="backup-section">
+                <div class="backup-btn-row">
+                  <button class="backup-btn backup-btn-primary" onclick="downloadBackup()" data-i18n="btn_download_backup">&#128229; Download backup</button>
+                  <button class="backup-btn backup-btn-blue" onclick="document.getElementById('import-file').click()" data-i18n="btn_import">&#128228; Import (merge)</button>
+                </div>
+                <div class="file-drop" id="restore-drop" onclick="document.getElementById('restore-file').click()">
+                  <span data-i18n="restore_drop_text">&#128260; Drop a backup file here, or click to restore</span>
+                  <br><span style="font-size:11px;color:rgba(255,68,68,0.6);margin-top:4px;display:inline-block" data-i18n="restore_warning">Warning: Restore replaces all existing data</span>
+                </div>
+                <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)">
+                <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
+                <p class="backup-note" data-i18n="backup_note">Backup exports all products (including images), categories and weights as a JSON file. Import adds products without deleting existing ones. Restore replaces everything.</p>
+              </div>
+            </div>
+          </div>      
         </div>
       </div>
     </div>
