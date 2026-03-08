@@ -250,14 +250,30 @@ export async function addCategory() {
 
 export async function deleteCategory(name, label, count) {
   if (!count) {
-    // No products – simple confirm
-    if (!confirm(t('confirm_delete_category', { name: label }))) return;
-    var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
-    if (res.error) { showToast(res.error, 'error'); return; }
-    showToast(t('toast_category_deleted', { name: label }), 'success');
-    await fetchStats();
-    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-    loadCategories();
+    // No products – show confirmation modal
+    var bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.innerHTML = '<div class="scan-modal">'
+      + '<div class="scan-modal-icon">&#128465;</div>'
+      + '<h3>' + esc(label) + '</h3>'
+      + '<p>' + t('confirm_delete_category', { name: label }) + '</p>'
+      + '<div class="scan-modal-actions">'
+      + '<button class="scan-modal-btn-register cat-del-confirm">' + t('btn_delete') + '</button>'
+      + '<button class="scan-modal-btn-cancel cat-del-cancel">' + t('btn_cancel') + '</button>'
+      + '</div></div>';
+    document.body.appendChild(bg);
+    function close() { bg.remove(); }
+    bg.querySelector('.cat-del-cancel').onclick = close;
+    bg.addEventListener('click', function(e) { if (e.target === bg) close(); });
+    bg.querySelector('.cat-del-confirm').onclick = async function() {
+      close();
+      var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
+      if (res.error) { showToast(res.error, 'error'); return; }
+      showToast(t('toast_category_deleted', { name: label }), 'success');
+      await fetchStats();
+      document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+      loadCategories();
+    };
     return;
   }
   // Has products – show reassignment modal
