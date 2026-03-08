@@ -30,7 +30,7 @@ export async function lookupOFF(prefix, productId) {
       var res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + ean + '.json');
       var data = await res.json();
       if (data.status !== 1 || !data.product) {
-        updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')');
+        updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
       }
       await applyOffProduct(data.product, prefix, productId);
@@ -62,7 +62,7 @@ function showOffPickerLoading(msg) {
   document.body.appendChild(bg);
 }
 
-function updateOffPickerResults(products, errorMsg) {
+function updateOffPickerResults(products, errorMsg, ean) {
   var body = document.getElementById('off-results-body');
   var count = document.getElementById('off-result-count');
   var si = document.getElementById('off-search-input');
@@ -71,7 +71,28 @@ function updateOffPickerResults(products, errorMsg) {
   if (sb) { sb.disabled = false; sb.textContent = t('off_search_btn'); }
   if (!body) return;
   if (errorMsg) {
-    body.innerHTML = '<div class="off-modal-empty">' + esc(errorMsg) + '</div>';
+    var html = '<div class="off-modal-empty">' + esc(errorMsg);
+    if (ean) {
+      var offUrl = 'https://world.openfoodfacts.org/cgi/product.pl?code=' + encodeURIComponent(ean);
+      var prefix = _offCtx.prefix;
+      var isRegister = (prefix === 'f');
+      if (isRegister) {
+        var nameEl = document.getElementById(prefix + '-name');
+        var hasName = nameEl && nameEl.value.trim().length >= 2;
+        html += '<div style="margin-top:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);text-align:left">';
+        html += '<div style="margin-bottom:8px;font-weight:600">' + esc(t('off_add_to_off')) + '</div>';
+        if (!hasName) {
+          html += '<div style="margin-bottom:8px;color:#ff9800;font-size:12px">⚠ ' + esc(t('off_add_name_required')) + '</div>';
+        }
+        html += '<div style="margin-bottom:12px;font-size:12px;opacity:0.6">' + esc(t('off_add_to_off_tip')) + '</div>';
+        html += '<a href="' + esc(offUrl) + '" target="_blank" rel="noopener" class="btn-off" style="display:inline-block;text-decoration:none;text-align:center;padding:8px 16px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '') + '">🌎 Open Food Facts ↗</a>';
+        html += '</div>';
+      } else {
+        html += '<div style="margin-top:16px"><a href="' + esc(offUrl) + '" target="_blank" rel="noopener" class="btn-off" style="display:inline-block;text-decoration:none;text-align:center;padding:8px 16px;font-size:13px">🌎 ' + esc(t('off_add_to_off')) + ' ↗</a></div>';
+      }
+    }
+    html += '</div>';
+    body.innerHTML = html;
     if (count) count.textContent = t('off_zero_results');
     return;
   }
