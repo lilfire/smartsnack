@@ -199,6 +199,8 @@
     "settings_off_user_id": "Username",
     "settings_off_password": "Password",
     "btn_save_off_credentials": "💾 Save",
+    "ph_off_user_id": "OFF username",
+    "ph_off_password": "OFF password",
     "sources_label": "Sources: {sources}",
     "weight_label_kcal": "Calories",
     "weight_label_protein": "Protein",

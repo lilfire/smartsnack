@@ -199,6 +199,8 @@
     "settings_off_user_id": "Användarnamn",
     "settings_off_password": "Lösenord",
     "btn_save_off_credentials": "💾 Spara",
+    "ph_off_user_id": "OFF-användarnamn",
+    "ph_off_password": "OFF-lösenord",
     "sources_label": "Källor: {sources}",
     "weight_label_kcal": "Kalorier",
     "weight_label_protein": "Protein",

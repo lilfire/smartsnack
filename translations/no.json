@@ -199,6 +199,8 @@
     "settings_off_user_id": "Brukernavn",
     "settings_off_password": "Passord",
     "btn_save_off_credentials": "💾 Lagre",
+    "ph_off_user_id": "OFF-brukernavn",
+    "ph_off_password": "OFF-passord",
     "sources_label": "Kilder: {sources}",
     "weight_label_kcal": "Kalorier",
     "weight_label_protein": "Protein",
