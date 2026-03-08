@@ -38,9 +38,15 @@ def _t(key, lang=None):
     return tr.get(key, key)
 
 
+def _category_key(name):
+    slug = re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
+    return f"category_{slug}"
+
+
 def _category_label(name, lang=None):
-    label = _t(f"category_{name}", lang=lang)
-    if label == f"category_{name}":
+    key = _category_key(name)
+    label = _t(key, lang=lang)
+    if label == key:
         return name
     return label
 
