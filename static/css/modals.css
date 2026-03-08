@@ -1,0 +1,281 @@
+/* ── Scan Not Found Modal ──────────────────────── */
+.scan-modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeUp 0.15s ease;
+  padding: 16px;
+}
+
+.scan-modal {
+  background: #1a1a1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 380px;
+  padding: 24px;
+  box-shadow: 0 10px 50px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.scan-modal-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.scan-modal h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.scan-modal p {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.scan-modal-ean {
+  font-family: 'Space Mono', monospace;
+  color: #E8B84B;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(232, 184, 75, 0.08);
+  padding: 6px 12px;
+  border-radius: 8px;
+  display: inline-block;
+  margin-bottom: 16px;
+}
+
+.scan-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scan-modal-actions button {
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  width: 100%;
+}
+
+.scan-modal-btn-register {
+  border: none;
+  background: linear-gradient(135deg, #E8B84B, #C99A30);
+  color: #0a0a0c;
+}
+
+.scan-modal-btn-register:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(232, 184, 75, 0.25);
+}
+
+.scan-modal-btn-update {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.scan-modal-btn-update:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.scan-modal-btn-cancel {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  padding: 8px;
+}
+
+.scan-modal-btn-cancel:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── OFF Search Modal (mobile: bottom sheet) ────── */
+.off-modal-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: fadeUp 0.15s ease;
+}
+
+.off-modal {
+  background: #1a1a1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.off-modal-head {
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.off-modal-head h3 {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.off-modal-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.off-modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.off-modal-body {
+  overflow-y: auto;
+  padding: 6px;
+  flex: 1;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.off-modal-empty {
+  padding: 28px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
+
+.off-modal-search {
+  padding: 8px 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.off-modal-search input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+.off-modal-search input:focus {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.off-modal-search input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.off-modal-search button {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  background: #E8B84B;
+  color: #0a0a0c;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.off-modal-search button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.off-modal-count {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  padding: 2px 12px 4px;
+  font-family: 'Space Mono', monospace;
+}
+
+.off-result {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+
+.off-result:hover,
+.off-result:active {
+  background: rgba(232, 184, 75, 0.05);
+  border-color: rgba(232, 184, 75, 0.15);
+}
+
+.off-result-img {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.off-result-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.off-result-name {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.off-result-brand {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.off-result-nutri {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.25);
+  font-family: 'Space Mono', monospace;
+  margin-top: 2px;
+}
+
+.off-result-ean {
+  font-size: 9px;
+  color: rgba(232, 184, 75, 0.4);
+  font-family: 'Space Mono', monospace;
+}

@@ -1,0 +1,288 @@
+/* ── Edit Form ──────────────────────────────────── */
+.edit-form {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.edit-grid label {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: 'Space Mono', monospace;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.edit-grid input,
+.edit-grid select {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+.edit-grid input:focus,
+.edit-grid select:focus {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.edit-grid select option {
+  background: #1a1a1e;
+  color: #e8e6e3;
+}
+
+.edit-grid-2 {
+  grid-column: span 1;
+}
+
+/* ── Buttons ────────────────────────────────────── */
+.btn-sm {
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+}
+
+.btn-green {
+  border: none;
+  background: #E8B84B;
+  color: #0a0a0c;
+}
+
+.btn-green:hover {
+  background: #D4A43A;
+}
+
+.btn-outline {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.btn-outline:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #e8e6e3;
+}
+
+.btn-red {
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  background: rgba(255, 68, 68, 0.1);
+  color: #ff6666;
+}
+
+.btn-red:hover {
+  background: rgba(255, 68, 68, 0.2);
+}
+
+.empty {
+  text-align: center;
+  padding: 40px 16px;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.empty-icon {
+  font-size: 40px;
+  margin-bottom: 10px;
+}
+
+/* ── Register Form ──────────────────────────────── */
+.form-wrap {
+  margin: 0 auto;
+  animation: fadeUp 0.4s ease;
+}
+
+.form-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.form-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 20px;
+}
+
+.form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+label.field-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: 'Space Mono', monospace;
+}
+
+.field-input,
+.field-select {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.field-input:focus,
+.field-select:focus {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.field-select option {
+  background: #1a1a1e;
+  color: #e8e6e3;
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.grid-4 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.range-row input[type="range"] {
+  flex: 1;
+  accent-color: #E8B84B;
+}
+
+.range-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: #E8B84B;
+  min-width: 28px;
+  text-align: center;
+  font-family: 'Space Mono', monospace;
+}
+
+.btn-register {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #E8B84B, #C99A30);
+  color: #0a0a0c;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(232, 184, 75, 0.2);
+}
+
+.btn-register:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(232, 184, 75, 0.3);
+}
+
+.btn-register:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── EAN / OFF Button ───────────────────────────── */
+.ean-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ean-row > div:first-child {
+  flex: 1;
+}
+
+.btn-off {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(232, 184, 75, 0.25);
+  background: rgba(232, 184, 75, 0.08);
+  color: #E8B84B;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-off:hover:not(:disabled) {
+  background: rgba(232, 184, 75, 0.15);
+  border-color: rgba(232, 184, 75, 0.4);
+}
+
+.btn-off:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.btn-off.loading {
+  pointer-events: none;
+}
+
+.btn-off .off-spin {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(232, 184, 75, 0.2);
+  border-top-color: #E8B84B;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.btn-off.loading .off-spin {
+  display: inline-block;
+}
+
+.btn-off.loading .off-label {
+  display: none;
+}
