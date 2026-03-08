@@ -2,7 +2,7 @@ from db import get_db
 from config import (
     PRODUCT_COLS_NO_IMAGE, INSERT_FIELDS, INSERT_PLACEHOLDERS,
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
-    SCORE_CONFIG_MAP,
+    SCORE_CONFIG_MAP, COMPUTED_FIELDS,
 )
 from helpers import _num, _safe_float
 
@@ -21,13 +21,14 @@ def list_products(search, type_filter):
             weight_config[r["field"]] = {"direction": r["direction"], "formula": r["formula"], "formula_min": r["formula_min"], "formula_max": r["formula_max"]}
     enabled_fields = [f for f in enabled_weights if f in SCORE_CONFIG_MAP]
 
-    # Compute min/max per category for all enabled fields
+    # Compute min/max per category for all enabled fields (skip computed fields)
     cat_ranges = {}
-    if enabled_fields:
-        for f in enabled_fields:
+    db_fields = [f for f in enabled_fields if f not in COMPUTED_FIELDS]
+    if db_fields:
+        for f in db_fields:
             if f not in _VALID_COLUMNS:
                 raise ValueError("Invalid field")
-        agg = ", ".join(f"MIN({f}) as min_{f}, MAX({f}) as max_{f}" for f in enabled_fields)
+        agg = ", ".join(f"MIN({f}) as min_{f}, MAX({f}) as max_{f}" for f in db_fields)
         type_rows = cur.execute(f"SELECT type, {agg} FROM products GROUP BY type").fetchall()
         for tr in type_rows:
             cat_ranges[tr["type"]] = {
@@ -55,6 +56,9 @@ def list_products(search, type_filter):
     results = []
     for r in rows:
         p = dict(r)
+        # Inject computed/derived fields
+        for cf, compute_fn in COMPUTED_FIELDS.items():
+            p[cf] = compute_fn(p)
         scores = {}
         weighted_score_sum = 0.0
         num_scored_fields = 0

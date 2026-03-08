@@ -8,7 +8,8 @@ export var SCORE_COLORS = {
   kcal: '#aa66ff', energy_kj: '#9955ee', carbs: '#ff44aa', sugar: '#ff66cc',
   fat: '#ff8844', saturated_fat: '#ffaa66', protein: '#00d4ff', fiber: '#44ff88',
   salt: '#ff4444', taste_score: '#E8B84B', volume: '#ff8800', price: '#ff6600',
-  est_pdcaas: '#00e5cc', est_diaas: '#00bfff'
+  est_pdcaas: '#00e5cc', est_diaas: '#00bfff',
+  pct_protein_cal: '#00d4ff', pct_fat_cal: '#ff8844', pct_carb_cal: '#ff44aa'
 };
 export var SCORE_CFG_MAP = {};
 export var weightData = [];
