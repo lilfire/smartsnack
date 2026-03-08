@@ -13,7 +13,7 @@
   transition: all 0.15s;
 }
 
-@media (max-width: 639px) {
+@media (pointer: coarse) {
   .btn-scan {
     display: flex;
   }

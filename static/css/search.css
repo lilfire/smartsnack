@@ -76,7 +76,7 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 639px) {
+@media (pointer: coarse) {
   .btn-scan-search {
     display: flex;
   }
