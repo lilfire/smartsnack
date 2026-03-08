@@ -66,6 +66,7 @@
     "label_internal_name": "Internt namn",
     "label_emoji": "Emoji",
     "label_display_name": "Visningsnamn",
+    "label_change_emoji": "Klicka för att ändra emoji",
     "btn_add_category": "+ Lägg till kategori",
     "btn_add_weight": "Lägg till vikt",
     "settings_database_title": "Databas",

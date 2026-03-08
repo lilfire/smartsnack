@@ -200,12 +200,19 @@ export async function loadCategories() {
   var h = '';
   cats.forEach(function(c) {
     var canDel = c.count === 0;
-    h += '<div class="cat-item"><span class="cat-item-emoji">' + esc(c.emoji) + '</span>'
+    h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
       + '<input class="cat-item-label-input" value="' + esc(c.label) + '" onchange="updateCategoryLabel(\'' + esc(c.name).replace(/'/g, "\\'") + '\',this.value)" title="' + t('label_display_name') + '">'
       + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
       + '<button class="btn-sm btn-red" ' + (canDel ? '' : 'disabled') + ' onclick="deleteCategory(\'' + esc(c.name).replace(/'/g, "\\'") + '\',\'' + esc(c.label).replace(/'/g, "\\'") + '\')">&#128465;</button></div>';
   });
   list.innerHTML = h;
+  // Init emoji pickers on each category emoji
+  list.querySelectorAll('.cat-item-emoji-edit').forEach(function(el) {
+    var catName = el.getAttribute('data-cat');
+    initEmojiPicker(el, null, function(emoji) {
+      updateCategoryEmoji(catName, emoji);
+    });
+  });
 }
 
 export async function updateCategoryLabel(name, val) {
@@ -214,6 +221,14 @@ export async function updateCategoryLabel(name, val) {
   showToast(t('toast_category_updated'), 'success');
   await fetchStats();
   document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+}
+
+export async function updateCategoryEmoji(name, emoji) {
+  await api('/api/categories/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ emoji: emoji }) });
+  showToast(t('toast_category_updated'), 'success');
+  await fetchStats();
+  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+  loadCategories();
 }
 
 export async function addCategory() {

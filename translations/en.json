@@ -66,6 +66,7 @@
     "label_internal_name": "Internal name",
     "label_emoji": "Emoji",
     "label_display_name": "Display name",
+    "label_change_emoji": "Click to change emoji",
     "btn_add_category": "+ Add category",
     "btn_add_weight": "Add weight",
     "settings_database_title": "Database",
