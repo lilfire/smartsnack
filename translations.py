@@ -39,7 +39,8 @@ def _t(key, lang=None):
 
 
 def _category_key(name):
-    return f"category_{name.lower().replace(' ', '_')}"
+    slug = re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
+    return f"category_{slug}"
 
 
 def _category_label(name, lang=None):
