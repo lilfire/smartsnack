@@ -45,8 +45,12 @@ def update_category(n):
 
 @bp.route("/api/categories/<n>", methods=["DELETE"])
 def delete_category(n):
+    from flask import request
+    move_to = None
+    if request.is_json and request.get_json(silent=True):
+        move_to = request.get_json(silent=True).get("move_to", "").strip() or None
     try:
-        category_service.delete_category(n)
+        count = category_service.delete_category(n, move_to=move_to)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"message": "Category deleted"})
+    return jsonify({"message": "Category deleted", "moved": count or 0})

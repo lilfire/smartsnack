@@ -200,11 +200,10 @@ export async function loadCategories() {
   if (!cats.length) { list.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px">No categories</p>'; return; }
   var h = '';
   cats.forEach(function(c) {
-    var canDel = c.count === 0;
     h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
       + '<input class="cat-item-label-input" value="' + esc(c.label) + '" onchange="updateCategoryLabel(\'' + esc(c.name).replace(/'/g, "\\'") + '\',this.value)" title="' + t('label_display_name') + '">'
       + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
-      + '<button class="btn-sm btn-red" ' + (canDel ? '' : 'disabled') + ' onclick="deleteCategory(\'' + esc(c.name).replace(/'/g, "\\'") + '\',\'' + esc(c.label).replace(/'/g, "\\'") + '\')">&#128465;</button></div>';
+      + '<button class="btn-sm btn-red" onclick="deleteCategory(\'' + esc(c.name).replace(/'/g, "\\'") + '\',\'' + esc(c.label).replace(/'/g, "\\'") + '\','+c.count+')">&#128465;</button></div>';
   });
   list.innerHTML = h;
   // Init emoji pickers on each category emoji
@@ -249,14 +248,54 @@ export async function addCategory() {
   loadCategories();
 }
 
-export async function deleteCategory(name, label) {
-  if (!confirm(t('confirm_delete_category', { name: label }))) return;
-  var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
-  if (res.error) { showToast(res.error, 'error'); return; }
-  showToast(t('toast_category_deleted', { name: label }), 'success');
-  await fetchStats();
-  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-  loadCategories();
+export async function deleteCategory(name, label, count) {
+  if (!count) {
+    // No products – simple confirm
+    if (!confirm(t('confirm_delete_category', { name: label }))) return;
+    var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast(t('toast_category_deleted', { name: label }), 'success');
+    await fetchStats();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    loadCategories();
+    return;
+  }
+  // Has products – show reassignment modal
+  var cats = await api('/api/categories');
+  var others = cats.filter(function(c) { return c.name !== name; });
+  if (!others.length) { showToast(t('toast_cannot_delete_only_category'), 'error'); return; }
+  var bg = document.createElement('div');
+  bg.className = 'scan-modal-bg cat-move-modal-bg';
+  var options = others.map(function(c) {
+    return '<option value="' + esc(c.name) + '">' + esc(c.emoji) + ' ' + esc(c.label) + '</option>';
+  }).join('');
+  bg.innerHTML = '<div class="scan-modal cat-move-modal">'
+    + '<div class="scan-modal-icon">&#128465;</div>'
+    + '<h3>' + esc(label) + '</h3>'
+    + '<p>' + t('confirm_move_products', { count: count }) + '</p>'
+    + '<select class="cat-move-select">' + options + '</select>'
+    + '<div class="scan-modal-actions">'
+    + '<button class="scan-modal-btn-register cat-move-confirm">' + t('btn_move_and_delete') + '</button>'
+    + '<button class="scan-modal-btn-cancel cat-move-cancel">' + t('btn_cancel') + '</button>'
+    + '</div></div>';
+  document.body.appendChild(bg);
+  function close() { bg.remove(); }
+  bg.querySelector('.cat-move-cancel').onclick = close;
+  bg.addEventListener('click', function(e) { if (e.target === bg) close(); });
+  bg.querySelector('.cat-move-confirm').onclick = async function() {
+    var moveTo = bg.querySelector('.cat-move-select').value;
+    var target = others.find(function(c) { return c.name === moveTo; });
+    close();
+    var res = await api('/api/categories/' + encodeURIComponent(name), {
+      method: 'DELETE',
+      body: JSON.stringify({ move_to: moveTo })
+    });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast(t('toast_category_moved_deleted', { count: count, target: target ? target.label : moveTo, name: label }), 'success');
+    await fetchStats();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    loadCategories();
+  };
 }
 
 // ── Protein Quality Settings ────────────────────────

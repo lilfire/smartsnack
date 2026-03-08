@@ -45,14 +45,25 @@ def update_category(name, label, emoji):
         _set_translation_key(_category_key(name), {lang: label})
 
 
-def delete_category(name):
+def delete_category(name, move_to=None):
     err = _validate_category_name(name)
     if err:
         raise ValueError(err)
     conn = get_db()
     count = conn.execute("SELECT COUNT(*) FROM products WHERE type = ?", (name,)).fetchone()[0]
     if count > 0:
-        raise ValueError(f"Cannot delete: {count} products still use this category")
+        if not move_to:
+            raise ValueError(f"Cannot delete: {count} products still use this category")
+        if move_to == name:
+            raise ValueError("Cannot move products to the same category")
+        err = _validate_category_name(move_to)
+        if err:
+            raise ValueError(err)
+        target = conn.execute("SELECT name FROM categories WHERE name = ?", (move_to,)).fetchone()
+        if not target:
+            raise ValueError("Target category does not exist")
+        conn.execute("UPDATE products SET type = ? WHERE type = ?", (move_to, name))
     conn.execute("DELETE FROM categories WHERE name = ?", (name,))
     conn.commit()
     _delete_translation_key(_category_key(name))
+    return count
