@@ -98,6 +98,14 @@ export function renderWeightItems() {
   upgradeSelect(document.getElementById('weight-add-select'), function() {
     addWeightFromDropdown();
   });
+  enabled.forEach(function(w) {
+    upgradeSelect(document.getElementById('wd-' + w.field), function(val) {
+      onWeightDirection(w.field);
+    });
+    upgradeSelect(document.getElementById('wf-' + w.field), function(val) {
+      onWeightFormula(w.field);
+    });
+  });
 }
 
 export function toggleWeightConfig(field) {
