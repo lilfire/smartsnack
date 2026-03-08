@@ -13,6 +13,7 @@ COPY db.py .
 COPY helpers.py .
 COPY translations.py .
 COPY migrations.py .
+COPY exceptions.py .
 COPY services/ services/
 COPY blueprints/ blueprints/
 COPY templates/ templates/
