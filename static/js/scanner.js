@@ -44,7 +44,7 @@ export function openScanner(prefix, productId) {
     },
     function onError() {}
   ).catch(function(err) {
-    console.error('Scanner start error:', err);
+    showToast(t('toast_scanner_load_error'), 'error');
     var wrap = document.querySelector('.scanner-video-wrap');
     if (wrap) wrap.innerHTML = '<div class="scanner-error"><div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p><button class="btn-sm btn-outline" style="margin-top:16px" onclick="closeScanner()">Close</button></div>';
   });
@@ -116,7 +116,7 @@ export function openSearchScanner() {
     },
     function onError() {}
   ).catch(function(err) {
-    console.error('Scanner start error:', err);
+    showToast(t('toast_scanner_load_error'), 'error');
     var wrap = document.querySelector('.scanner-video-wrap');
     if (wrap) wrap.innerHTML = '<div class="scanner-error"><div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p><button class="btn-sm btn-outline" style="margin-top:16px" onclick="closeScanner();window._searchScanMode=false;">Close</button></div>';
   });

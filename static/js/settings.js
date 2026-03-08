@@ -44,7 +44,7 @@ export async function loadSettings() {
         opt.textContent = (l.flag ? l.flag + ' ' : '') + l.label;
         langSelect.appendChild(opt);
       });
-    } catch(e) { console.error('Failed to load languages:', e); }
+    } catch(e) { showToast(t('toast_load_error'), 'error'); }
     langSelect.value = getCurrentLang();
     upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
@@ -188,7 +188,7 @@ export async function saveWeights() {
     await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
     showToast(t('toast_weights_saved'), 'success');
     loadData();
-  } catch(e) { console.error('saveWeights error:', e); showToast(t('toast_save_error'), 'error'); }
+  } catch(e) { showToast(t('toast_save_error'), 'error'); }
   _weightSaving = false;
 }
 
@@ -304,7 +304,7 @@ export async function deleteCategory(name, label, count) {
 var pqData = [];
 
 export async function loadPq() {
-  try { pqData = await api('/api/protein-quality'); } catch(e) { pqData = []; }
+  try { pqData = await api('/api/protein-quality'); } catch(e) { pqData = []; showToast(t('toast_load_error'), 'error'); }
   renderPqTable();
 }
 
@@ -444,7 +444,7 @@ async function loadOffCredentials() {
     if (el) el.value = data.off_user_id || '';
     var pw = document.getElementById('off-password');
     if (pw) pw.value = data.has_password ? '••••••••' : '';
-  } catch(e) {}
+  } catch(e) { showToast(t('toast_load_error'), 'error'); }
 }
 
 export async function saveOffCredentials() {

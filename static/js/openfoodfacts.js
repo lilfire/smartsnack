@@ -35,7 +35,7 @@ export async function lookupOFF(prefix, productId) {
       }
       await applyOffProduct(data.product, prefix, productId);
       closeOffPicker();
-    } catch(e) { console.error('OFF lookup error:', e); updateOffPickerResults([], 'Kunne ikke kontakte OpenFoodFacts'); }
+    } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   } else if (name.length >= 2) {
     showOffPickerLoading(t('off_searching_name', { name: name }));
     try {
@@ -43,7 +43,7 @@ export async function lookupOFF(prefix, productId) {
       updateOffPickerResults(products);
       var si = document.getElementById('off-search-input');
       if (si) si.value = name;
-    } catch(e) { console.error('OFF search error:', e); updateOffPickerResults([], 'Kunne ikke kontakte OpenFoodFacts'); }
+    } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   }
 }
 
@@ -168,7 +168,7 @@ export async function selectOffResult(idx) {
       await applyOffProduct(selected, prefix, productId);
     }
   } catch(e) {
-    console.error('OFF select error:', e);
+    showToast(t('toast_network_error'), 'error');
     await applyOffProduct(selected, prefix, productId);
   }
 
@@ -242,7 +242,7 @@ async function applyOffProduct(prod, prefix, productId) {
         }
         filled.push('image');
       }
-    } catch(ie) { console.log('Image fetch failed:', ie); }
+    } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
   }
 
   showToast('Fetched from OFF: ' + filled.join(', '), 'success');
