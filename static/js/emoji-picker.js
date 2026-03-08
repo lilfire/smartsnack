@@ -105,7 +105,7 @@ export function initEmojiPicker(triggerEl, inputEl) {
       popup.style.top = (rect.top - popupH - 4) + 'px';
     }
     // Center horizontally on trigger, but keep within viewport
-    var left = rect.left + rect.width / 2 - 140;
+    var left = rect.left;
     left = Math.max(8, Math.min(left, window.innerWidth - 288));
     popup.style.left = left + 'px';
 
