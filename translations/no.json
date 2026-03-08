@@ -66,6 +66,7 @@
     "label_internal_name": "Internt navn",
     "label_emoji": "Emoji",
     "label_display_name": "Visningsnavn",
+    "label_change_emoji": "Klikk for å endre emoji",
     "btn_add_category": "+ Legg til kategori",
     "btn_add_weight": "Legg til vekt",
     "settings_database_title": "Database",
