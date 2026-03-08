@@ -511,7 +511,6 @@ function renderWeightItems(){
       +'</div>';
   });
   container.innerHTML=h;
-  renderWeightBar();
 }
 
 function toggleWeightConfig(field){
@@ -528,7 +527,6 @@ function toggleWeight(field,checked){
   var el=document.getElementById('wi-'+field);
   var col=SCORE_COLORS[field]||'#888';
   if(el){el.className='weight-item '+(checked?'enabled':'disabled');el.style.borderLeftColor=checked?col:'rgba(255,255,255,0.06)';}
-  renderWeightBar();
   debouncedSaveWeights();
 }
 
@@ -571,28 +569,7 @@ function onWeightSlider(field){
   document.getElementById('wv-'+field).textContent=val.toFixed(1);
   var item=weightData.find(function(w){return w.field===field;});
   if(item)item.weight=val;
-  renderWeightBar();
   debouncedSaveWeights();
-}
-
-function renderWeightBar(){
-  var enabled=weightData.filter(function(w){return w.enabled;});
-  var total=enabled.reduce(function(s,w){return s+w.weight;},0);
-  var wrap=document.getElementById('weight-bar-wrap');
-  var h='<div class="weight-bar-title">Distribution ('+enabled.length+' active)</div><div class="weight-bar-track">';
-  enabled.forEach(function(w){
-    var pct=total>0?(w.weight/total*100):0;
-    var col=SCORE_COLORS[w.field]||'#888';
-    h+='<div class="weight-bar-seg" style="width:'+pct+'%;background:'+col+'" title="'+esc(w.label)+': '+pct.toFixed(0)+'%"></div>';
-  });
-  if(!enabled.length)h+='<div style="width:100%;text-align:center;font-size:11px;color:rgba(255,255,255,0.2);line-height:24px">None active</div>';
-  h+='</div><div class="weight-bar-legend">';
-  enabled.forEach(function(w){
-    var pct=total>0?(w.weight/total*100):0;
-    var col=SCORE_COLORS[w.field]||'#888';
-    h+='<span class="weight-bar-legend-item"><span class="weight-bar-dot" style="background:'+col+'"></span>'+esc(w.label)+' '+pct.toFixed(0)+'%</span>';
-  });
-  h+='</div>';wrap.innerHTML=h;
 }
 
 var _weightSaving=false;
