@@ -119,6 +119,9 @@ def init_db():
     if cur.fetchone()[0] == 0:
         cur.execute("INSERT INTO user_settings (key, value) VALUES ('language', ?)", (DEFAULT_LANGUAGE,))
 
+    # Migrate volume weight to direct formula
+    cur.execute("UPDATE score_weights SET formula='direct', formula_min=1, formula_max=3 WHERE field='volume' AND formula='minmax'")
+
     cur.execute("SELECT COUNT(*) FROM products")
     if cur.fetchone()[0] == 0:
         seed_products(cur)

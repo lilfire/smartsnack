@@ -82,7 +82,7 @@ SCORE_CONFIG = [
     {"field": "fiber",          "label_key": "weight_label_fiber",          "desc_key": "weight_desc_fiber",          "direction": "higher", "formula": "minmax", "formula_min": 0, "formula_max": 0},
     {"field": "salt",           "label_key": "weight_label_salt",           "desc_key": "weight_desc_salt",           "direction": "lower",  "formula": "minmax", "formula_min": 0, "formula_max": 0},
     {"field": "taste_score", "label_key": "weight_label_taste_score", "desc_key": "weight_desc_taste_score", "direction": "higher", "formula": "direct", "formula_min": 0, "formula_max": 6},
-    {"field": "volume",         "label_key": "weight_label_volume",         "desc_key": "weight_desc_volume",         "direction": "higher", "formula": "minmax", "formula_min": 0, "formula_max": 0},
+    {"field": "volume",         "label_key": "weight_label_volume",         "desc_key": "weight_desc_volume",         "direction": "higher", "formula": "direct", "formula_min": 1, "formula_max": 3},
     {"field": "price",           "label_key": "weight_label_price",           "desc_key": "weight_desc_price",           "direction": "lower",  "formula": "minmax", "formula_min": 0, "formula_max": 0},
     {"field": "est_pdcaas",     "label_key": "weight_label_est_pdcaas",     "desc_key": "weight_desc_est_pdcaas",     "direction": "higher", "formula": "direct", "formula_min": 0, "formula_max": 1.0},
     {"field": "est_diaas",      "label_key": "weight_label_est_diaas",      "desc_key": "weight_desc_est_diaas",      "direction": "higher", "formula": "direct", "formula_min": 0, "formula_max": 1.2},
