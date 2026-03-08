@@ -324,10 +324,8 @@
 }
 
 /* ── Settings: Protein Quality ────────────────────── */
-.pq-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+.pq-list {  
+  gap: 8px;
   margin-bottom: 12px;
 }
 
