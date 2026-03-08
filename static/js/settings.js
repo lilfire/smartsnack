@@ -49,6 +49,86 @@ export async function loadSettings() {
   loadPq();
 }
 
+// ── Custom select dropdown (desktop only) ────────
+function _initCustomSelect() {
+  var wrap = document.getElementById('weight-add-wrap');
+  if (!wrap || window.innerWidth < 640) return;
+  var trigger = wrap.querySelector('.custom-select-trigger');
+  var optionsList = wrap.querySelector('.custom-select-options');
+  var options = wrap.querySelectorAll('.custom-select-option');
+  var highlighted = -1;
+
+  trigger.addEventListener('click', function(e) {
+    e.stopPropagation();
+    var isOpen = wrap.classList.toggle('open');
+    trigger.setAttribute('aria-expanded', isOpen);
+    highlighted = -1;
+    _clearHighlight();
+  });
+
+  options.forEach(function(opt, i) {
+    opt.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _selectOption(opt.getAttribute('data-value'));
+    });
+  });
+
+  trigger.addEventListener('keydown', function(e) {
+    if (!wrap.classList.contains('open')) {
+      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        wrap.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+        highlighted = 0;
+        _updateHighlight();
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      highlighted = Math.min(highlighted + 1, options.length - 1);
+      _updateHighlight();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      highlighted = Math.max(highlighted - 1, 0);
+      _updateHighlight();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlighted >= 0 && highlighted < options.length) {
+        _selectOption(options[highlighted].getAttribute('data-value'));
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      _close();
+    }
+  });
+
+  document.addEventListener('click', function() { _close(); });
+
+  function _close() {
+    wrap.classList.remove('open');
+    trigger.setAttribute('aria-expanded', 'false');
+    highlighted = -1;
+    _clearHighlight();
+  }
+  function _clearHighlight() {
+    options.forEach(function(o) { o.classList.remove('highlighted'); });
+  }
+  function _updateHighlight() {
+    _clearHighlight();
+    if (highlighted >= 0 && highlighted < options.length) {
+      options[highlighted].classList.add('highlighted');
+      options[highlighted].scrollIntoView({ block: 'nearest' });
+    }
+  }
+  function _selectOption(value) {
+    var sel = document.getElementById('weight-add-select');
+    if (sel) sel.value = value;
+    _close();
+    addWeightFromDropdown();
+  }
+}
+
 export function renderWeightItems() {
   var container = document.getElementById('weight-items');
   var enabled = weightData.filter(function(w) { return w.enabled; });
@@ -81,17 +161,26 @@ export function renderWeightItems() {
   });
   // Dropdown to add disabled weights
   if (disabled.length) {
+    var placeholder = '\u2014 ' + t('btn_add_weight') + ' \u2014';
     h += '<div class="weight-add-row">'
+      + '<div class="custom-select-wrap" id="weight-add-wrap">'
       + '<select class="field-select" id="weight-add-select">'
-      + '<option value="">\u2014 ' + t('btn_add_weight') + ' \u2014</option>';
+      + '<option value="">' + placeholder + '</option>';
     disabled.forEach(function(w) {
       h += '<option value="' + w.field + '">' + esc(w.label) + '</option>';
     });
     h += '</select>'
+      + '<button type="button" class="custom-select-trigger" tabindex="0">' + esc(placeholder) + '</button>'
+      + '<div class="custom-select-options" role="listbox">';
+    disabled.forEach(function(w) {
+      h += '<div class="custom-select-option" role="option" data-value="' + w.field + '">' + esc(w.label) + '</div>';
+    });
+    h += '</div></div>'
       + '<button class="btn-register weight-add-btn" onclick="addWeightFromDropdown()">+</button>'
       + '</div>';
   }
   container.innerHTML = h;
+  _initCustomSelect();
 }
 
 export function toggleWeightConfig(field) {

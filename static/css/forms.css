@@ -163,6 +163,101 @@ label.field-label {
   color: #e8e6e3;
 }
 
+/* ── Custom Select (desktop dark-themed dropdown) ── */
+.custom-select-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  width: 100%;
+  padding: 11px 32px 11px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+  appearance: none;
+}
+.custom-select-trigger::after {
+  content: '';
+  position: absolute;
+  right: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-top-color: #e8e6e3;
+  pointer-events: none;
+}
+.custom-select-wrap.open .custom-select-trigger::after {
+  border-top-color: transparent;
+  border-bottom-color: #e8e6e3;
+  transform: translateY(-80%);
+}
+.custom-select-trigger:focus,
+.custom-select-trigger:hover {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.custom-select-options {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: #1a1a1e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.custom-select-wrap.open .custom-select-options {
+  display: block;
+}
+
+.custom-select-option {
+  padding: 10px 13px;
+  color: #e8e6e3;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  transition: background 0.15s;
+}
+.custom-select-option:hover,
+.custom-select-option.highlighted {
+  background: rgba(232, 184, 75, 0.15);
+}
+.custom-select-option:first-child {
+  border-radius: 10px 10px 0 0;
+}
+.custom-select-option:last-child {
+  border-radius: 0 0 10px 10px;
+}
+
+/* On mobile: show native select, hide custom trigger/options */
+@media (max-width: 639px) {
+  .custom-select-wrap .custom-select-trigger,
+  .custom-select-wrap .custom-select-options {
+    display: none !important;
+  }
+  .custom-select-wrap select.field-select {
+    display: block;
+  }
+}
+/* On desktop: hide native select, show custom */
+@media (min-width: 640px) {
+  .custom-select-wrap select.field-select {
+    display: none;
+  }
+}
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr;
