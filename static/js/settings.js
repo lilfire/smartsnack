@@ -44,7 +44,7 @@ export async function loadSettings() {
         opt.textContent = (l.flag ? l.flag + ' ' : '') + l.label;
         langSelect.appendChild(opt);
       });
-    } catch(e) {}
+    } catch(e) { console.error('Failed to load languages:', e); }
     langSelect.value = getCurrentLang();
     upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
