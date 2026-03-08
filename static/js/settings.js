@@ -1,6 +1,6 @@
 // ── Weights, Categories, Protein Quality, Backup ────
 import { state, api, esc, fetchStats } from './state.js';
-import { t, getCurrentLang } from './i18n.js';
+import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { showToast, loadData } from './products.js';
 
 // ── Score config (shared with render.js) ────────────
@@ -44,32 +44,70 @@ export async function loadSettings() {
       });
     } catch(e) {}
     langSelect.value = getCurrentLang();
+    _upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
   loadCategories();
   loadPq();
 }
 
 // ── Custom select dropdown (desktop only) ────────
-function _initCustomSelect() {
-  var wrap = document.getElementById('weight-add-wrap');
-  if (!wrap || window.innerWidth < 640) return;
-  var trigger = wrap.querySelector('.custom-select-trigger');
-  var optionsList = wrap.querySelector('.custom-select-options');
-  var options = wrap.querySelectorAll('.custom-select-option');
+// Wraps a native <select> with a styled custom dropdown.
+// onSelect is called with the chosen value after selection.
+function _upgradeSelect(sel, onSelect) {
+  if (!sel || window.innerWidth < 640) return;
+  // Skip if already upgraded
+  if (sel.parentNode && sel.parentNode.classList.contains('custom-select-wrap')) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'custom-select-wrap';
+  sel.parentNode.insertBefore(wrap, sel);
+  wrap.appendChild(sel);
+
+  var nativeOpts = sel.querySelectorAll('option');
+  var selectedOpt = sel.options[sel.selectedIndex];
+  var triggerText = selectedOpt ? selectedOpt.textContent : '';
+
+  var trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'custom-select-trigger';
+  trigger.tabIndex = 0;
+  trigger.textContent = triggerText;
+  trigger.setAttribute('aria-expanded', 'false');
+  wrap.appendChild(trigger);
+
+  var optionsDiv = document.createElement('div');
+  optionsDiv.className = 'custom-select-options';
+  optionsDiv.setAttribute('role', 'listbox');
+  wrap.appendChild(optionsDiv);
+
+  var items = [];
+  nativeOpts.forEach(function(o) {
+    if (!o.value) return; // skip placeholder
+    var div = document.createElement('div');
+    div.className = 'custom-select-option';
+    div.setAttribute('role', 'option');
+    div.setAttribute('data-value', o.value);
+    div.textContent = o.textContent;
+    if (o.value === sel.value) div.classList.add('selected');
+    optionsDiv.appendChild(div);
+    items.push(div);
+  });
+
   var highlighted = -1;
 
   trigger.addEventListener('click', function(e) {
     e.stopPropagation();
+    _closeAllCustomSelects(wrap);
     var isOpen = wrap.classList.toggle('open');
     trigger.setAttribute('aria-expanded', isOpen);
     highlighted = -1;
-    _clearHighlight();
+    _clearHL();
   });
 
-  options.forEach(function(opt, i) {
-    opt.addEventListener('click', function(e) {
+  items.forEach(function(item) {
+    item.addEventListener('click', function(e) {
       e.stopPropagation();
-      _selectOption(opt.getAttribute('data-value'));
+      _pick(item.getAttribute('data-value'), item.textContent);
     });
   });
 
@@ -77,25 +115,26 @@ function _initCustomSelect() {
     if (!wrap.classList.contains('open')) {
       if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
+        _closeAllCustomSelects(wrap);
         wrap.classList.add('open');
         trigger.setAttribute('aria-expanded', 'true');
         highlighted = 0;
-        _updateHighlight();
+        _updateHL();
       }
       return;
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      highlighted = Math.min(highlighted + 1, options.length - 1);
-      _updateHighlight();
+      highlighted = Math.min(highlighted + 1, items.length - 1);
+      _updateHL();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       highlighted = Math.max(highlighted - 1, 0);
-      _updateHighlight();
+      _updateHL();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (highlighted >= 0 && highlighted < options.length) {
-        _selectOption(options[highlighted].getAttribute('data-value'));
+      if (highlighted >= 0 && highlighted < items.length) {
+        _pick(items[highlighted].getAttribute('data-value'), items[highlighted].textContent);
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -109,24 +148,34 @@ function _initCustomSelect() {
     wrap.classList.remove('open');
     trigger.setAttribute('aria-expanded', 'false');
     highlighted = -1;
-    _clearHighlight();
+    _clearHL();
   }
-  function _clearHighlight() {
-    options.forEach(function(o) { o.classList.remove('highlighted'); });
+  function _clearHL() {
+    items.forEach(function(o) { o.classList.remove('highlighted'); });
   }
-  function _updateHighlight() {
-    _clearHighlight();
-    if (highlighted >= 0 && highlighted < options.length) {
-      options[highlighted].classList.add('highlighted');
-      options[highlighted].scrollIntoView({ block: 'nearest' });
+  function _updateHL() {
+    _clearHL();
+    if (highlighted >= 0 && highlighted < items.length) {
+      items[highlighted].classList.add('highlighted');
+      items[highlighted].scrollIntoView({ block: 'nearest' });
     }
   }
-  function _selectOption(value) {
-    var sel = document.getElementById('weight-add-select');
-    if (sel) sel.value = value;
+  function _pick(value, label) {
+    sel.value = value;
+    trigger.textContent = label;
     _close();
-    addWeightFromDropdown();
+    if (onSelect) onSelect(value);
   }
+}
+
+function _closeAllCustomSelects(except) {
+  document.querySelectorAll('.custom-select-wrap.open').forEach(function(w) {
+    if (w !== except) {
+      w.classList.remove('open');
+      var t = w.querySelector('.custom-select-trigger');
+      if (t) t.setAttribute('aria-expanded', 'false');
+    }
+  });
 }
 
 export function renderWeightItems() {
@@ -163,24 +212,19 @@ export function renderWeightItems() {
   if (disabled.length) {
     var placeholder = '\u2014 ' + t('btn_add_weight') + ' \u2014';
     h += '<div class="weight-add-row">'
-      + '<div class="custom-select-wrap" id="weight-add-wrap">'
       + '<select class="field-select" id="weight-add-select">'
       + '<option value="">' + placeholder + '</option>';
     disabled.forEach(function(w) {
       h += '<option value="' + w.field + '">' + esc(w.label) + '</option>';
     });
     h += '</select>'
-      + '<button type="button" class="custom-select-trigger" tabindex="0">' + esc(placeholder) + '</button>'
-      + '<div class="custom-select-options" role="listbox">';
-    disabled.forEach(function(w) {
-      h += '<div class="custom-select-option" role="option" data-value="' + w.field + '">' + esc(w.label) + '</div>';
-    });
-    h += '</div></div>'
       + '<button class="btn-register weight-add-btn" onclick="addWeightFromDropdown()">+</button>'
       + '</div>';
   }
   container.innerHTML = h;
-  _initCustomSelect();
+  _upgradeSelect(document.getElementById('weight-add-select'), function() {
+    addWeightFromDropdown();
+  });
 }
 
 export function toggleWeightConfig(field) {
