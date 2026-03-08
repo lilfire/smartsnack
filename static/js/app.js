@@ -15,7 +15,7 @@ import {
   SCORE_CFG_MAP, weightData,
   loadSettings, toggleSettingsSection, toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
-  saveWeights, resetWeights,
+  saveWeights,
   updateCategoryLabel, addCategory, deleteCategory,
   autosavePq, deletePq, addPq,
   downloadBackup, handleRestore, handleImport,
@@ -50,7 +50,6 @@ Object.assign(window, {
   // settings — weights
   toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
-  resetWeights,
   // settings — categories
   updateCategoryLabel, addCategory, deleteCategory,
   // settings — protein quality

@@ -251,24 +251,6 @@
   font-size: 18px;
 }
 
-.btn-reset-weights {
-  width: 100%;
-  padding: 12px;
-  border-radius: 12px;
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 13px;
-  font-weight: 600;
-  font-family: 'DM Sans', sans-serif;
-  transition: all 0.2s;
-}
-
-.btn-reset-weights:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.7);
-}
 
 /* ── Settings: Categories ───────────────────────── */
 .cat-item {

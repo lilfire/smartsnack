@@ -59,7 +59,6 @@
     "settings_weights_title": "Score weighting",
     "settings_weights_desc": "Choose which nutritional values affect the score, and adjust the weighting",
     "btn_save_weights": "💾 Save weights",
-    "btn_reset_weights": "↺ Reset to default",
     "settings_categories_title": "Categories",
     "settings_categories_desc": "Change display names, add new or delete empty categories",
     "label_internal_name": "Internal name",
