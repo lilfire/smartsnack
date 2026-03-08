@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
 COPY config.py .
+copy exceptions.py .
 COPY db.py .
 COPY helpers.py .
 COPY translations.py .
