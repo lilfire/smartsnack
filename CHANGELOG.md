@@ -4,6 +4,43 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-03-08
+
+### Added
+
+- Swedish language support (full UI translation)
+- Add product to Open Food Facts via API when EAN barcode is not found, with credential storage in settings
+- Emoji picker with search functionality for category creation
+- EAN format validation (8-13 digits) on product save
+- Macro calorie percentage weights for scoring: protein %kcal, fat %kcal, carbs %kcal
+- Version display in the UI footer and health check endpoint
+- Dynamic language selection based on available translation files in `translations/`
+- Translated formula dropdown options (MinMax/Direct)
+
+### Changed
+
+- Replaced native select elements with custom dark-themed dropdowns on desktop
+- Made all settings sections collapsible (hidden by default)
+- Redesigned weights section to show only active weights with add/remove controls
+- Removed "Reset to default" button for weights
+- Split settings page into responsive grid columns for wider screens
+
+### Refactored
+
+- Refactored monolithic `app.js` into 12 ES modules (`state.js`, `i18n.js`, `products.js`, `settings.js`, `scanner.js`, `openfoodfacts.js`, `render.js`, `filters.js`, `images.js`, `emoji-picker.js`, `emoji-data.js`)
+- Refactored monolithic `style.css` into 14 modular CSS files
+- Refactored Flask monolith into blueprints + service layer architecture (12 blueprints, 12 services)
+- Refactored `index.html` into Jinja2 templates with partials
+
+### Fixed
+
+- Security hardening and robustness guards from code review
+- Settings page crash caused by dead `renderWeightBar` code
+- Category placeholder translation to respect selected language
+- Emoji picker positioning and layout on desktop
+- Settings section spacing and margin inconsistencies
+- Missing static assets in Docker build
+
 ## [0.1.0] - 2026-03-06
 
 ### Added
