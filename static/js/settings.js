@@ -380,7 +380,7 @@ export function downloadBackup() {
   showToast(t('toast_backup_downloaded'), 'success');
 }
 
-export function handleRestore(input) {
+export async function handleRestore(input) {
   if (!input.files.length) return;
   if (!await showConfirmModal('&#9888;', t('restore_title') || 'Restore database', t('restore_confirm') || 'Are you sure? This replaces ALL existing data in the database.', t('btn_restore') || 'Restore', t('btn_cancel'))) { input.value = ''; return; }
   var reader = new FileReader();
