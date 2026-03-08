@@ -13,15 +13,15 @@ OFF_API_URL = "https://world.openfoodfacts.org/cgi/product_jqm2.pl"
 def add_product_to_off(product_data):
     creds = get_off_credentials()
     if not creds["off_user_id"] or not creds["off_password"]:
-        raise ValueError("OFF credentials not configured. Set them in Settings.")
+        raise ValueError("off_err_no_credentials")
 
     code = product_data.get("code", "").strip()
     if not code:
-        raise ValueError("EAN/barcode is required")
+        raise ValueError("off_err_no_ean")
 
     product_name = product_data.get("product_name", "").strip()
     if not product_name:
-        raise ValueError("Product name is required")
+        raise ValueError("off_err_no_name")
 
     fields = {
         "user_id": creds["off_user_id"],
@@ -77,7 +77,7 @@ def add_product_to_off(product_data):
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         logger.error(f"OFF API HTTP error {e.code}: {body}")
-        raise RuntimeError(f"OFF API error ({e.code})")
+        raise RuntimeError("off_err_api")
     except urllib.error.URLError as e:
         logger.error(f"OFF API URL error: {e.reason}")
-        raise RuntimeError("Could not connect to Open Food Facts")
+        raise RuntimeError("off_err_network")

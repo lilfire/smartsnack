@@ -382,7 +382,8 @@ export async function submitToOff(ean) {
       body: JSON.stringify(body)
     });
     if (res.error) {
-      showToast(t('toast_error_prefix', { msg: res.error }), 'error');
+      var msg = t(res.error) !== res.error ? t(res.error) : res.error;
+      showToast(msg, 'error');
       if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
       return;
     }
@@ -390,7 +391,7 @@ export async function submitToOff(ean) {
     closeOffPicker();
     showToast(t('toast_off_product_added'), 'success');
   } catch(e) {
-    showToast(t('toast_error_prefix', { msg: e.message || 'Network error' }), 'error');
+    showToast(t('toast_network_error'), 'error');
     if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
   }
 }
