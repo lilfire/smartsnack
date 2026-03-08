@@ -1,3 +1,5 @@
+"""Blueprint registration for all route handlers."""
+
 from blueprints.core import bp as core_bp
 from blueprints.products import bp as products_bp
 from blueprints.images import bp as images_bp

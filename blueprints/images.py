@@ -1,3 +1,5 @@
+"""Blueprint for product image endpoints."""
+
 from flask import Blueprint, jsonify
 
 from helpers import _require_json

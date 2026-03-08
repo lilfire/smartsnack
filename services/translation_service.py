@@ -1,3 +1,5 @@
+"""Service for reading translation files and available languages."""
+
 import logging
 import os
 import json

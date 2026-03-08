@@ -1,5 +1,8 @@
+"""Blueprint for protein quality CRUD and estimation endpoints."""
+
 from flask import Blueprint, jsonify
 
+from exceptions import ConflictError
 from helpers import _require_json
 from services import protein_quality_service
 
@@ -18,11 +21,10 @@ def add_protein_quality():
         return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
         result = protein_quality_service.add_entry(data)
+    except ConflictError as e:
+        return jsonify({"error": str(e)}), 409
     except ValueError as e:
-        err = str(e)
-        if "already exists" in err:
-            return jsonify({"error": err}), 409
-        return jsonify({"error": err}), 400
+        return jsonify({"error": str(e)}), 400
     return jsonify(result)
 
 

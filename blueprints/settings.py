@@ -1,3 +1,5 @@
+"""Blueprint for user settings (language, OFF credentials)."""
+
 from flask import Blueprint, jsonify
 
 from helpers import _require_json

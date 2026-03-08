@@ -1,3 +1,5 @@
+"""Service for product statistics and category summaries."""
+
 from db import get_db
 from translations import _category_label
 

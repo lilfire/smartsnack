@@ -1,6 +1,7 @@
-# ── Database Migrations ──────────────────────────────
-# Each migration is a (name, sql_list) tuple. Migrations run once and are
-# tracked in the `schema_migrations` table.  Add new migrations at the end.
+"""Database migrations tracked in the schema_migrations table.
+
+Each migration is a (name, sql_list) tuple. Add new migrations at the end.
+"""
 
 MIGRATIONS = [
     (
