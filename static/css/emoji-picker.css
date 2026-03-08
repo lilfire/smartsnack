@@ -2,17 +2,18 @@
 
 .emoji-picker-trigger {
   width: 100%;
-  padding: 7px 9px;
-  border-radius: 7px;
+  padding: 11px 13px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: #e8e6e3;
-  font-size: 20px;
-  line-height: 1;
+  font-size: 14px;
+  line-height: 1.2;
   text-align: center;
   cursor: pointer;
   outline: none;
   font-family: 'DM Sans', sans-serif;
+  box-sizing: border-box;
 }
 
 .emoji-picker-trigger:hover {
