@@ -49,6 +49,8 @@
     "ph_brand": "f.eks. Monster",
     "ph_stores": "f.eks. Rema, Kiwi",
     "ph_ingredients": "f.eks. Linser, solsikkeolje, paprika...",
+    "ph_category_name": "f.eks. Drikke",
+    "ph_category_display": "f.eks. Drikke/Smoothie",
     "btn_fetch": "🌎 Hent",
     "btn_scan_title": "Skann strekkode",
     "settings_title_1": "Inn",

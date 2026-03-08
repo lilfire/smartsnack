@@ -49,6 +49,8 @@
     "ph_brand": "e.g. Monster",
     "ph_stores": "e.g. Rema, Kiwi",
     "ph_ingredients": "e.g. Lentils, sunflower oil, paprika...",
+    "ph_category_name": "e.g. Drinks",
+    "ph_category_display": "e.g. Drinks/Smoothie",
     "btn_fetch": "🌎 Fetch",
     "btn_scan_title": "Scan barcode",
     "settings_title_1": "Set",
