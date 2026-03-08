@@ -17,6 +17,82 @@ from translations import (
 
 logger = logging.getLogger(__name__)
 
+_EMOJI_KEYWORDS = [
+    # Fruits
+    ("apple", "🍎"), ("pear", "🍐"), ("orange", "🍊"), ("lemon", "🍋"),
+    ("banana", "🍌"), ("melon", "🍈"), ("grape", "🍇"), ("berry", "🍓"),
+    ("cherry", "🍒"), ("peach", "🍑"), ("mango", "🥭"), ("pineapple", "🍍"),
+    ("kiwi", "🥝"), ("coconut", "🥥"), ("avocado", "🥑"), ("tomato", "🍅"),
+    ("fruit", "🍎"),
+    # Vegetables
+    ("vegetable", "🥦"), ("broccoli", "🥦"), ("salad", "🥗"),
+    ("carrot", "🥕"), ("potato", "🥔"), ("corn", "🌽"), ("bean", "🫘"),
+    ("mushroom", "🍄"), ("pepper", "🌶️"), ("onion", "🧅"), ("garlic", "🧄"),
+    ("greens", "🥬"),
+    # Grains & Bread
+    ("bread", "🍞"), ("bakery", "🥐"), ("grain", "🌾"), ("cereal", "🌾"),
+    ("rice", "🍚"), ("pasta", "🍝"), ("noodle", "🍜"), ("waffle", "🧇"),
+    ("pancake", "🥞"),
+    # Dairy & Eggs
+    ("dairy", "🥛"), ("milk", "🥛"), ("cheese", "🧀"), ("butter", "🧈"),
+    ("yogurt", "🥛"), ("egg", "🥚"), ("cream", "🥛"),
+    # Meat & Seafood
+    ("meat", "🥩"), ("beef", "🥩"), ("steak", "🥩"), ("chicken", "🍗"),
+    ("poultry", "🍗"), ("pork", "🥓"), ("bacon", "🥓"), ("sausage", "🌭"),
+    ("burger", "🍔"), ("fish", "🐟"), ("seafood", "🦐"), ("shrimp", "🦐"),
+    # Prepared Food
+    ("pizza", "🍕"), ("taco", "🌮"), ("burrito", "🌯"), ("sandwich", "🥪"),
+    ("soup", "🍲"), ("stew", "🥘"), ("curry", "🍛"), ("sushi", "🍱"),
+    ("falafel", "🧆"),
+    # Snacks
+    ("snack", "🍿"), ("chip", "🍿"), ("popcorn", "🍿"), ("nut", "🥜"),
+    ("cookie", "🍪"), ("cracker", "🍪"),
+    # Sweets & Desserts
+    ("candy", "🍬"), ("chocolate", "🍫"), ("cake", "🎂"), ("dessert", "🍰"),
+    ("ice cream", "🍦"), ("donut", "🍩"), ("pastry", "🥐"), ("sweet", "🍬"),
+    ("honey", "🍯"), ("sugar", "🍬"),
+    # Drinks
+    ("drink", "🥤"), ("beverage", "🥤"), ("juice", "🧃"), ("soda", "🥤"),
+    ("coffee", "☕"), ("tea", "🍵"), ("beer", "🍺"), ("wine", "🍷"),
+    ("water", "💧"), ("smoothie", "🥤"), ("energy", "⚡"),
+    # Condiments & Cooking
+    ("sauce", "🫙"), ("spice", "🧂"), ("oil", "🫒"), ("vinegar", "🫙"),
+    ("condiment", "🧂"), ("dressing", "🫙"),
+    # Health & Supplements
+    ("supplement", "💊"), ("vitamin", "💊"), ("protein", "💪"),
+    ("health", "🩺"), ("organic", "🌿"), ("vegan", "🌱"),
+    # General food
+    ("food", "🍽️"), ("meal", "🍽️"), ("frozen", "❄️"), ("canned", "🥫"),
+]
+
+
+def _guess_emoji(category_name):
+    name_lower = category_name.lower()
+    for keyword, emoji in _EMOJI_KEYWORDS:
+        if keyword in name_lower:
+            return emoji
+    return "\U0001F4E6"
+
+
+def _auto_create_missing_categories(cur, products):
+    product_types = {p.get("type", "").strip() for p in products}
+    product_types.discard("")
+    if not product_types:
+        return
+    existing = {row[0] for row in cur.execute("SELECT name FROM categories").fetchall()}
+    for type_name in product_types:
+        if type_name not in existing:
+            emoji = _guess_emoji(type_name)
+            try:
+                cur.execute("INSERT INTO categories (name, emoji) VALUES (?,?)",
+                            (type_name, emoji))
+                _set_translation_key(
+                    f"category_{type_name}",
+                    {lang: type_name for lang in SUPPORTED_LANGUAGES},
+                )
+            except sqlite3.IntegrityError:
+                pass
+
 
 def _restore_product(cur, p):
     def _n(v):
@@ -151,6 +227,7 @@ def restore_backup(data):
                         kws = [k.strip() for k in kws.split(",") if k.strip()]
                     if kws:
                         _set_translation_key(f"pq_{name}_keywords", {lang: ", ".join(kws) for lang in SUPPORTED_LANGUAGES})
+        _auto_create_missing_categories(cur, data["products"])
         cur.execute("DELETE FROM products")
         for p in data["products"]:
             _restore_product(cur, p)
@@ -181,6 +258,7 @@ def import_products(data):
                         _set_translation_key(f"category_{c['name']}", translations)
                 except sqlite3.IntegrityError:
                     pass
+        _auto_create_missing_categories(cur, data["products"])
         for p in data["products"]:
             _restore_product(cur, p)
             added += 1
