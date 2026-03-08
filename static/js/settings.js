@@ -1,5 +1,5 @@
 // ── Weights, Categories, Protein Quality, Backup ────
-import { state, api, esc, fetchStats, upgradeSelect } from './state.js';
+import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal } from './state.js';
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { showToast, loadData } from './products.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
@@ -250,8 +250,8 @@ export async function addCategory() {
 
 export async function deleteCategory(name, label, count) {
   if (!count) {
-    // No products – simple confirm
-    if (!confirm(t('confirm_delete_category', { name: label }))) return;
+    // No products – show confirmation modal
+    if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_category', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
     var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
     if (res.error) { showToast(res.error, 'error'); return; }
     showToast(t('toast_category_deleted', { name: label }), 'success');
@@ -368,7 +368,7 @@ export async function addPq() {
 }
 
 export async function deletePq(id, label) {
-  if (!confirm(t('confirm_delete_product', { name: label }))) return;
+  if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_product', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
   await api('/api/protein-quality/' + id, { method: 'DELETE' });
   showToast(t('toast_pq_deleted', { name: label }), 'success');
   loadPq();
@@ -380,9 +380,9 @@ export function downloadBackup() {
   showToast(t('toast_backup_downloaded'), 'success');
 }
 
-export function handleRestore(input) {
+export async function handleRestore(input) {
   if (!input.files.length) return;
-  if (!confirm('Are you sure? This replaces ALL existing data in the database.')) { input.value = ''; return; }
+  if (!await showConfirmModal('&#9888;', t('restore_title') || 'Restore database', t('restore_confirm') || 'Are you sure? This replaces ALL existing data in the database.', t('btn_restore') || 'Restore', t('btn_cancel'))) { input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = async function(e) {
     try {

@@ -67,6 +67,27 @@ export async function fetchStats() {
 }
 
 // ── Custom select dropdown (desktop only) ────────
+// Shows a styled confirmation modal. Returns a Promise that resolves true/false.
+export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel) {
+  return new Promise(function(resolve) {
+    var bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.innerHTML = '<div class="scan-modal">'
+      + '<div class="scan-modal-icon">' + icon + '</div>'
+      + '<h3>' + title + '</h3>'
+      + '<p>' + message + '</p>'
+      + '<div class="scan-modal-actions">'
+      + '<button class="scan-modal-btn-register confirm-yes">' + confirmLabel + '</button>'
+      + '<button class="scan-modal-btn-cancel confirm-no">' + cancelLabel + '</button>'
+      + '</div></div>';
+    document.body.appendChild(bg);
+    function close(val) { bg.remove(); resolve(val); }
+    bg.querySelector('.confirm-no').onclick = function() { close(false); };
+    bg.querySelector('.confirm-yes').onclick = function() { close(true); };
+    bg.addEventListener('click', function(e) { if (e.target === bg) close(false); });
+  });
+}
+
 // Wraps a native <select> with a styled custom dropdown.
 // onSelect is called with the chosen value after selection.
 // Supports re-calling to refresh options when the native <select> is repopulated.
