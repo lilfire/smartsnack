@@ -93,7 +93,11 @@ export function renderResults(results, search) {
       + '</div>';
     if (search) {
       window._createFromSearch = function() {
-        document.getElementById('f-name').value = search;
+        if (isValidEan(search)) {
+          document.getElementById('f-ean').value = search;
+        } else {
+          document.getElementById('f-name').value = search;
+        }
         window.switchView('register');
       };
     }
