@@ -11,7 +11,7 @@ from config import (
 )
 from helpers import _safe_float
 from translations import (
-    _category_label, _pq_label, _pq_keywords,
+    _category_label, _category_key, _pq_label, _pq_keywords,
     _set_translation_key,
 )
 
@@ -188,7 +188,7 @@ def restore_backup(data):
                 if not translations and c.get("label"):
                     translations = {lang: c["label"] for lang in SUPPORTED_LANGUAGES}
                 if translations:
-                    _set_translation_key(f"category_{c['name']}", translations)
+                    _set_translation_key(_category_key(c['name']), translations)
         if "protein_quality" in data:
             cur.execute("DELETE FROM protein_quality")
             for pq in data["protein_quality"]:
@@ -244,7 +244,7 @@ def import_products(data):
                     if not translations and c.get("label"):
                         translations = {lang: c["label"] for lang in SUPPORTED_LANGUAGES}
                     if translations:
-                        _set_translation_key(f"category_{c['name']}", translations)
+                        _set_translation_key(_category_key(c['name']), translations)
                 except sqlite3.IntegrityError:
                     pass
         existing_cats = {r["name"] for r in cur.execute("SELECT name FROM categories").fetchall()}
@@ -254,7 +254,7 @@ def import_products(data):
                 emoji = _pick_emoji_for_category(cat)
                 try:
                     cur.execute("INSERT INTO categories (name, emoji) VALUES (?,?)", (cat, emoji))
-                    _set_translation_key(f"category_{cat}", {lang: cat for lang in SUPPORTED_LANGUAGES})
+                    _set_translation_key(_category_key(cat), {lang: cat for lang in SUPPORTED_LANGUAGES})
                     existing_cats.add(cat)
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
