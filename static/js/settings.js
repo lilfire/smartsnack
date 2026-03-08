@@ -51,21 +51,20 @@ export async function loadSettings() {
 
 export function renderWeightItems() {
   var container = document.getElementById('weight-items');
+  var enabled = weightData.filter(function(w) { return w.enabled; });
+  var disabled = weightData.filter(function(w) { return !w.enabled; });
   var h = '';
-  weightData.forEach(function(w, i) {
-    var ena = w.enabled;
+  enabled.forEach(function(w) {
     var col = SCORE_COLORS[w.field] || '#888';
     var dirLower = w.direction === 'lower';
     var isDirect = w.formula === 'direct';
-    var desc = dirLower ? t('direction_lower_desc', { label: w.label.toLowerCase() }) : t('direction_higher_desc', { label: w.label.toLowerCase() });
-    if (isDirect) desc += ' (fixed max: ' + w.formula_max + ')';
-    h += '<div class="weight-item ' + (ena ? 'enabled' : 'disabled') + '" id="wi-' + w.field + '" style="margin-bottom:10px;border-left:3px solid ' + (ena ? col : 'rgba(255,255,255,0.06)') + '">'
+    h += '<div class="weight-item enabled" id="wi-' + w.field + '" style="margin-bottom:10px;border-left:3px solid ' + col + '">'
       + '<div class="weight-header">'
       + '<div class="weight-top">'
-      + '<label class="toggle"><input type="checkbox" ' + (ena ? 'checked' : '') + ' onchange="toggleWeight(\'' + w.field + '\',this.checked)"><span class="toggle-track"></span></label>'
       + '<label class="field-label" style="margin:0">' + esc(w.label) + '</label></div>'
       + '<span class="weight-val mono accent" id="wv-' + w.field + '">' + w.weight.toFixed(1) + '</span>'
-      + '<button class="weight-cfg-btn" onclick="toggleWeightConfig(\'' + w.field + '\')" title="Advanced">&#9881;</button></div>'
+      + '<button class="weight-cfg-btn" onclick="toggleWeightConfig(\'' + w.field + '\')" title="Advanced">&#9881;</button>'
+      + '<button class="btn-sm btn-red" onclick="removeWeight(\'' + w.field + '\')" title="Remove">&#128465;</button></div>'
       + '<div class="weight-config" id="wcfg-' + w.field + '" style="display:none">'
       + '<div class="wc-row">'
       + '<select class="wc-select" id="wd-' + w.field + '" onchange="onWeightDirection(\'' + w.field + '\')">'
@@ -80,6 +79,18 @@ export function renderWeightItems() {
       + '<input type="range" min="0" max="100" step="1" value="' + w.weight + '" id="w-' + w.field + '" class="weight-slider" oninput="onWeightSlider(\'' + w.field + '\')">'
       + '</div>';
   });
+  // Dropdown to add disabled weights
+  if (disabled.length) {
+    h += '<div class="weight-add-row">'
+      + '<select class="field-select" id="weight-add-select">'
+      + '<option value="">\u2014 ' + t('btn_add_weight') + ' \u2014</option>';
+    disabled.forEach(function(w) {
+      h += '<option value="' + w.field + '">' + esc(w.label) + '</option>';
+    });
+    h += '</select>'
+      + '<button class="btn-register weight-add-btn" onclick="addWeightFromDropdown()">+</button>'
+      + '</div>';
+  }
   container.innerHTML = h;
 }
 
@@ -91,12 +102,19 @@ export function toggleWeightConfig(field) {
 var _weightSaveTimer = null;
 function debouncedSaveWeights() { clearTimeout(_weightSaveTimer); _weightSaveTimer = setTimeout(saveWeights, 400); }
 
-export function toggleWeight(field, checked) {
+export function removeWeight(field) {
   var item = weightData.find(function(w) { return w.field === field; });
-  if (item) item.enabled = checked;
-  var el = document.getElementById('wi-' + field);
-  var col = SCORE_COLORS[field] || '#888';
-  if (el) { el.className = 'weight-item ' + (checked ? 'enabled' : 'disabled'); el.style.borderLeftColor = checked ? col : 'rgba(255,255,255,0.06)'; }
+  if (item) { item.enabled = false; item.weight = 0; }
+  renderWeightItems();
+  debouncedSaveWeights();
+}
+
+export function addWeightFromDropdown() {
+  var sel = document.getElementById('weight-add-select');
+  if (!sel || !sel.value) return;
+  var item = weightData.find(function(w) { return w.field === sel.value; });
+  if (item) { item.enabled = true; if (item.weight === 0) item.weight = 10; }
+  renderWeightItems();
   debouncedSaveWeights();
 }
 

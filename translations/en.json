@@ -66,6 +66,7 @@
     "label_emoji": "Emoji",
     "label_display_name": "Display name",
     "btn_add_category": "+ Add category",
+    "btn_add_weight": "Add weight",
     "settings_database_title": "Database",
     "settings_database_desc": "Backup, restore or import data",
     "btn_download_backup": "📥 Download backup",

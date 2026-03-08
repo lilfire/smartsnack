@@ -66,6 +66,7 @@
     "label_emoji": "Emoji",
     "label_display_name": "Visningsnamn",
     "btn_add_category": "+ Lägg till kategori",
+    "btn_add_weight": "Lägg till vikt",
     "settings_database_title": "Databas",
     "settings_database_desc": "Säkerhetskopiera, återställ eller importera data",
     "btn_download_backup": "📥 Ladda ner säkerhetskopia",
