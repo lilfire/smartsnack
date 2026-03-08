@@ -1,7 +1,10 @@
+import logging
 import os
 import json
 
 from config import SUPPORTED_LANGUAGES, TRANSLATIONS_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def get_available_languages():
@@ -10,8 +13,12 @@ def get_available_languages():
         filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
         if not os.path.isfile(filepath):
             continue
-        with open(filepath, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            logger.error("Failed to load translation file %s: %s", filepath, e)
+            continue
         languages.append({
             "code": lang,
             "label": data.get("lang_label", lang),
