@@ -4,6 +4,32 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-03-08
+
+### Added
+
+- Auto-create categories with emoji when importing products with unknown types
+- Ability to change emoji on existing categories
+- "Create product" button when search returns no results
+- Custom styled modals replacing native browser confirm() dialogs
+- Toast notifications for errors (replacing silent console.error calls)
+- Structured database migrations module (`migrations.py`)
+
+### Changed
+
+- Volume field changed from numeric input to Low/Medium/High dropdown with custom dark theme
+- Barcode scan buttons hidden on desktop, shown only on mobile (pointer: coarse media query)
+- All combobox and dropdown options sorted alphabetically
+- Number input spinner arrows hidden on desktop
+
+### Fixed
+
+- Product list 500 error with error toasts
+- Category deletion now prompts user to reassign products instead of silently disabling
+- Pre-fill EAN field instead of name when searching by barcode
+- Broken language section on settings page
+- Translation key format for category names with uppercase letters
+
 ## [0.2.0] - 2026-03-08
 
 ### Added

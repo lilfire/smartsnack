@@ -6,11 +6,11 @@ A mobile-first web app for tracking and scoring Norwegian food products. Search 
 
 - **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera. Detected codes auto-lookup product data from OpenFoodFacts.
 - **OpenFoodFacts Integration** — Fetch nutrition info, product names, and images by barcode or text search.
-- **Configurable Scoring** — 12 weight fields (kcal, sugar, protein, fiber, fat, price, taste, etc.) each with toggleable enable, weight slider (0–100), direction (lower/higher is better), and formula (MinMax normalization or Direct mapping). Total score is a weighted average from 1–100.
-- **Categories** — Create custom categories with emoji labels. Multi-select filtering on the product list.
+- **Configurable Scoring** — 17 weight fields (kcal, sugar, protein, fiber, fat, price, taste, macro %kcal, etc.) each with toggleable enable, weight slider (0–100), direction (lower/higher is better), and formula (MinMax normalization or Direct mapping). Total score is a weighted average from 1–100.
+- **Categories** — Create custom categories with emoji picker. Change emoji on existing categories. Auto-create categories when importing products with unknown types. Multi-select filtering on the product list.
 - **Backup & Restore** — Full JSON export/import of the database (products, weights, categories).
-- **Responsive UI** — Dark theme, three-tab layout (Search, Register, Settings). Single-column on mobile, multi-column on tablet/desktop.
-- **Multi-language** — Norwegian and English UI translations.
+- **Responsive UI** — Dark theme with custom styled modals and toast notifications, three-tab layout (Search, Register, Settings). Single-column on mobile, multi-column on tablet/desktop.
+- **Multi-language** — Norwegian, English, and Swedish UI translations.
 - **HTTPS by Default** — Self-signed certificate generated at startup so camera APIs work over LAN.
 
 ## Requirements
@@ -58,12 +58,22 @@ The SQLite database is created automatically at startup. Set the `DB_PATH` envir
 ## Project Structure
 
 ```
-├── app.py                  # Flask backend — API, scoring engine, DB migrations
-├── templates/
-│   └── index.html          # Single-file frontend (HTML + CSS + JS)
+├── app.py                  # Flask app factory, registers blueprints
+├── config.py               # All constants: nutrition fields, score config, text limits
+├── db.py                   # SQLite connection, schema init with seed data
+├── migrations.py           # Structured database migrations
+├── helpers.py              # Request parsing and validation
+├── translations.py         # i18n system, reads/writes JSON translation files
+├── blueprints/             # Route handlers, one file per domain
+├── services/               # Business logic, one file per domain
+├── templates/              # Jinja2 templates with partials
+├── static/
+│   ├── js/                 # Modular vanilla JS frontend (12 ES modules)
+│   └── css/                # Modular CSS files (14 files)
 ├── translations/
 │   ├── no.json             # Norwegian translations
-│   └── en.json             # English translations
+│   ├── en.json             # English translations
+│   └── se.json             # Swedish translations
 ├── Dockerfile              # Python 3.12-slim + OpenSSL
 ├── docker-compose.yml      # Service config, persistent volume
 ├── entrypoint.sh           # SSL cert generation + Gunicorn startup
