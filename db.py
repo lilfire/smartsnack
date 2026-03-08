@@ -5,6 +5,7 @@ import logging
 from flask import g
 
 from config import DB_PATH, SCORE_CONFIG, DEFAULT_WEIGHTS, PQ_SEED, DEFAULT_LANGUAGE
+from migrations import run_migrations
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +120,7 @@ def init_db():
     if cur.fetchone()[0] == 0:
         cur.execute("INSERT INTO user_settings (key, value) VALUES ('language', ?)", (DEFAULT_LANGUAGE,))
 
-    # Migrate volume weight to direct formula
-    cur.execute("UPDATE score_weights SET formula='direct', formula_min=1, formula_max=3 WHERE field='volume' AND formula='minmax'")
+    run_migrations(cur)
 
     cur.execute("SELECT COUNT(*) FROM products")
     if cur.fetchone()[0] == 0:
