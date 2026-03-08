@@ -3,6 +3,7 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc } from './state.j
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults } from './render.js';
+import { isValidEan } from './openfoodfacts.js';
 
 export function showToast(msg, type) {
   var toast = document.getElementById('toast');
@@ -40,6 +41,7 @@ export async function saveProduct(id) {
     est_diaas: numOrNull('ed-est_diaas'),
   };
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
+  if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
   state.editingId = null;
   showToast(t('toast_product_updated'), 'success');
@@ -121,6 +123,8 @@ export function clearSearch() {
 export async function registerProduct() {
   var name = document.getElementById('f-name').value.trim();
   if (!name) { showToast(t('toast_product_name_required'), 'error'); return; }
+  var ean = document.getElementById('f-ean').value.trim();
+  if (ean && !isValidEan(ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   var btn = document.getElementById('btn-submit');
   btn.disabled = true;
   btn.textContent = t('toast_saving');

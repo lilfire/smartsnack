@@ -1,3 +1,5 @@
+import re
+
 from db import get_db
 from config import (
     PRODUCT_COLS_NO_IMAGE, INSERT_FIELDS, INSERT_PLACEHOLDERS,
@@ -119,6 +121,9 @@ def add_product(data):
         val = data.get(tf, "")
         if isinstance(val, str) and len(val) > max_len:
             raise ValueError(f"{tf} exceeds max length of {max_len}")
+    ean = data.get("ean", "").strip()
+    if ean and not re.fullmatch(r"\d{8,13}", ean):
+        raise ValueError("EAN must be 8-13 digits")
     conn = get_db()
     cur = conn.cursor()
     cat_exists = cur.execute("SELECT 1 FROM categories WHERE name = ?", (data["type"].strip(),)).fetchone()
@@ -151,6 +156,10 @@ def update_product(pid, data):
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
         if tf in data and isinstance(data[tf], str) and len(data[tf]) > max_len:
             raise ValueError(f"{tf} exceeds max length of {max_len}")
+    if "ean" in data:
+        ean = (data["ean"] or "").strip()
+        if ean and not re.fullmatch(r"\d{8,13}", ean):
+            raise ValueError("EAN must be 8-13 digits")
     for f in ALL_PRODUCT_FIELDS:
         if f in data:
             v = data[f]

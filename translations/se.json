@@ -96,6 +96,7 @@
     "toast_product_updated": "Produkt uppdaterad",
     "toast_product_deleted": "”{name}” raderad",
     "toast_product_name_required": "Produktnamn krävs",
+    "toast_invalid_ean": "EAN måste vara 8-13 siffror",
     "toast_saving": "Sparar...",
     "toast_product_added": "”{name}” tillagd!",
     "toast_save_error": "Fel vid sparning",

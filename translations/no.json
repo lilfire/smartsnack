@@ -96,6 +96,7 @@
     "toast_product_updated": "Produkt oppdatert",
     "toast_product_deleted": "\"{name}\" slettet",
     "toast_product_name_required": "Produktnavn er påkrevd",
+    "toast_invalid_ean": "EAN må være 8-13 siffer",
     "toast_saving": "Lagrer...",
     "toast_product_added": "\"{name}\" lagt til!",
     "toast_save_error": "Feil ved lagring",
