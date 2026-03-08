@@ -1,3 +1,5 @@
+"""Central configuration: nutrition fields, score config, text limits, SQL helpers."""
+
 import os
 
 APP_VERSION = "0.3"
@@ -5,10 +7,13 @@ APP_VERSION = "0.3"
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 TRANSLATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translations")
 DEFAULT_LANGUAGE = "no"
-SUPPORTED_LANGUAGES = sorted(
-    [f[:-5] for f in os.listdir(TRANSLATIONS_DIR) if f.endswith(".json")],
-    key=lambda x: (x != DEFAULT_LANGUAGE, x),  # default language first
-)
+try:
+    SUPPORTED_LANGUAGES = sorted(
+        [f[:-5] for f in os.listdir(TRANSLATIONS_DIR) if f.endswith(".json")],
+        key=lambda x: (x != DEFAULT_LANGUAGE, x),  # default language first
+    )
+except OSError:
+    SUPPORTED_LANGUAGES = [DEFAULT_LANGUAGE]
 
 # ── All product numeric fields (excluding type, name, ean, image) ─────
 NUTRITION_FIELDS = [
@@ -94,9 +99,21 @@ SCORE_CONFIG_MAP = {c["field"]: c for c in SCORE_CONFIG}
 
 # Computed/derived fields — not stored in DB, calculated on-the-fly
 COMPUTED_FIELDS = {
-    "pct_protein_cal": lambda p: (p["protein"] * 4 / p["kcal"] * 100) if p.get("protein") is not None and p.get("kcal") else None,
-    "pct_fat_cal":     lambda p: (p["fat"] * 9 / p["kcal"] * 100) if p.get("fat") is not None and p.get("kcal") else None,
-    "pct_carb_cal":    lambda p: (p["carbs"] * 4 / p["kcal"] * 100) if p.get("carbs") is not None and p.get("kcal") else None,
+    "pct_protein_cal": lambda p: (
+        (p["protein"] * 4 / p["kcal"] * 100)
+        if p.get("protein") is not None and p.get("kcal") not in (None, 0)
+        else None
+    ),
+    "pct_fat_cal": lambda p: (
+        (p["fat"] * 9 / p["kcal"] * 100)
+        if p.get("fat") is not None and p.get("kcal") not in (None, 0)
+        else None
+    ),
+    "pct_carb_cal": lambda p: (
+        (p["carbs"] * 4 / p["kcal"] * 100)
+        if p.get("carbs") is not None and p.get("kcal") not in (None, 0)
+        else None
+    ),
 }
 
 DEFAULT_WEIGHTS = {

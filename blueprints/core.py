@@ -1,3 +1,5 @@
+"""Blueprint for health check and main page."""
+
 import logging
 
 from flask import Blueprint, jsonify, render_template
@@ -17,7 +19,7 @@ def health():
         count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
         return jsonify({"status": "ok", "version": APP_VERSION, "products": count})
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
+        logger.error("Health check failed: %s", e)
         return jsonify({"status": "error"}), 500
 
 

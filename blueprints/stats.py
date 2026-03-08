@@ -1,3 +1,5 @@
+"""Blueprint for product statistics endpoints."""
+
 from flask import Blueprint, jsonify
 
 from services import stats_service

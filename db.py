@@ -1,3 +1,5 @@
+"""SQLite database connection management, schema init, and seed data."""
+
 import os
 import sqlite3
 import logging

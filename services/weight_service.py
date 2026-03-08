@@ -1,7 +1,12 @@
+"""Service for managing score weight configuration."""
+
 from db import get_db
 from config import SCORE_CONFIG, SCORE_CONFIG_MAP
 from translations import _t, _get_current_lang
 from helpers import _safe_float
+
+_VALID_DIRECTIONS = frozenset({"lower", "higher"})
+_VALID_FORMULAS = frozenset({"minmax", "direct"})
 
 
 def get_weights():
@@ -31,8 +36,6 @@ def update_weights(data):
     if not isinstance(data, list):
         raise ValueError("Expected array of weights")
     conn = get_db()
-    _VALID_DIRECTIONS = {"lower", "higher"}
-    _VALID_FORMULAS = {"minmax", "direct"}
     for item in data:
         f = item.get("field", "")
         if f not in SCORE_CONFIG_MAP:

@@ -1,3 +1,5 @@
+"""Service for proxying images from allowed external domains."""
+
 import logging
 import urllib.request
 import urllib.error
@@ -35,5 +37,5 @@ def proxy_image(url):
     except (ValueError, PermissionError):
         raise
     except Exception as e:
-        logger.error(f"Image proxy error: {e}")
+        logger.error("Image proxy error: %s", e)
         raise RuntimeError("Failed to fetch image")

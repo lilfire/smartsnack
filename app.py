@@ -1,4 +1,7 @@
+"""Flask application factory and entry point for SmartSnack."""
+
 import logging
+import sys
 
 from flask import Flask, jsonify
 
@@ -9,7 +12,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_app():
+def create_app() -> Flask:
+    """Create and configure the Flask application."""
+    try:
+        init_db()
+    except Exception as e:
+        logger.error("Failed to initialize database: %s", e)
+        sys.exit(1)
+
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
 
@@ -19,16 +29,11 @@ def create_app():
 
     @app.errorhandler(Exception)
     def handle_error(e):
-        logger.error(f"Unhandled error: {e}", exc_info=True)
+        logger.error("Unhandled error: %s", e, exc_info=True)
         return jsonify({"error": "An internal error occurred"}), 500
 
     return app
 
-
-try:
-    init_db()
-except Exception as e:
-    logger.error(f"Failed to initialize database: {e}")
 
 app = create_app()
 
