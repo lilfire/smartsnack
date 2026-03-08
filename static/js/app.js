@@ -13,7 +13,7 @@ import {
 } from './products.js';
 import {
   SCORE_CFG_MAP, weightData,
-  loadSettings, toggleWeightConfig, removeWeight, addWeightFromDropdown,
+  loadSettings, toggleSettingsSection, toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights, resetWeights,
   updateCategoryLabel, addCategory, deleteCategory,
@@ -45,6 +45,8 @@ Object.assign(window, {
   switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct,
   rerender,
+  // settings — sections
+  toggleSettingsSection,
   // settings — weights
   toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,

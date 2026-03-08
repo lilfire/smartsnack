@@ -8,67 +8,92 @@
         <div class="settings-desktop-grid">
           <!--  Weights -->
           <div>
-            <h3 class="mono settings-col-title" data-i18n="settings_weights_title">Score-weighting</h3>
-            <p class="form-sub" data-i18n="settings_weights_desc">Choose which nutritional values affect the score, and adjust the weighting</p>
-            <div class="form-fields">
-              <div id="weight-items"></div>              
-              <button class="btn-reset-weights" onclick="resetWeights()" data-i18n="btn_reset_weights">&#8634; Reset to default</button>
+            <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+              <span data-i18n="settings_weights_title">Score-weighting</span>
+              <span class="settings-chevron">&#9660;</span>
+            </h3>
+            <div class="settings-section-body" style="display:none">
+              <p class="form-sub" data-i18n="settings_weights_desc">Choose which nutritional values affect the score, and adjust the weighting</p>
+              <div class="form-fields">
+                <div id="weight-items"></div>
+                <button class="btn-reset-weights" onclick="resetWeights()" data-i18n="btn_reset_weights">&#8634; Reset to default</button>
+              </div>
             </div>
           </div>
           <!-- Categories -->
           <div>
-            <h3 class="mono settings-col-title" data-i18n="settings_categories_title">Categories</h3>
-            <p class="form-sub" data-i18n="settings_categories_desc">Edit display names, add new or delete empty categories</p>
-            <div id="cat-list" class="settings-item-list"></div>
-            <div class="cat-add-grid">
-              <div><label class="field-label" data-i18n="label_internal_name">Internal name</label><input class="field-input" id="cat-name" placeholder="e.g. Drinks"></div>
-              <div><label class="field-label" data-i18n="label_emoji">Emoji</label><input class="field-input" id="cat-emoji" placeholder="&#129380;" maxlength="4" style="text-align:center;font-size:18px"></div>
-              <div><label class="field-label" data-i18n="label_display_name">Display name</label><input class="field-input" id="cat-label" placeholder="e.g. Drinks/Smoothie"></div>
+            <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+              <span data-i18n="settings_categories_title">Categories</span>
+              <span class="settings-chevron">&#9660;</span>
+            </h3>
+            <div class="settings-section-body" style="display:none">
+              <p class="form-sub" data-i18n="settings_categories_desc">Edit display names, add new or delete empty categories</p>
+              <div id="cat-list" class="settings-item-list"></div>
+              <div class="cat-add-grid">
+                <div><label class="field-label" data-i18n="label_internal_name">Internal name</label><input class="field-input" id="cat-name" placeholder="e.g. Drinks"></div>
+                <div><label class="field-label" data-i18n="label_emoji">Emoji</label><input class="field-input" id="cat-emoji" placeholder="&#129380;" maxlength="4" style="text-align:center;font-size:18px"></div>
+                <div><label class="field-label" data-i18n="label_display_name">Display name</label><input class="field-input" id="cat-label" placeholder="e.g. Drinks/Smoothie"></div>
+              </div>
+              <button class="btn-register" style="margin-top:12px" onclick="addCategory()" data-i18n="btn_add_category">+ Add category</button>
             </div>
-            <button class="btn-register" style="margin-top:12px" onclick="addCategory()" data-i18n="btn_add_category">+ Add category</button>
           </div>
           <!-- Protein Quality -->
           <div>
-            <h3 class="mono settings-col-title" data-i18n="settings_pq_title">Protein quality</h3>
-            <p class="form-sub" data-i18n="settings_pq_desc">Keywords used to estimate PDCAAS and DIAAS from the ingredient list</p>
-            <div class="pq-list" id="pq-list"></div>
-            <div class="pq-add-grid">
-              <div><label class="field-label" data-i18n="label_pq_name">Name</label><input class="field-input" id="pq-add-label" placeholder="e.g. Oats"></div>
-              <div><label class="field-label" data-i18n="label_pq_keywords">Keywords (comma separated)</label><input class="field-input" id="pq-add-kw" placeholder="oats, oat, oatmeal"></div>
-              <div class="pq-add-nums">
-                <div><label class="field-label">PDCAAS</label><input class="field-input" id="pq-add-pdcaas" type="number" step="0.01" min="0" max="1" placeholder="0.57"></div>
-                <div><label class="field-label">DIAAS</label><input class="field-input" id="pq-add-diaas" type="number" step="0.01" min="0" max="1.2" placeholder="0.53"></div>
+            <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+              <span data-i18n="settings_pq_title">Protein quality</span>
+              <span class="settings-chevron">&#9660;</span>
+            </h3>
+            <div class="settings-section-body" style="display:none">
+              <p class="form-sub" data-i18n="settings_pq_desc">Keywords used to estimate PDCAAS and DIAAS from the ingredient list</p>
+              <div class="pq-list" id="pq-list"></div>
+              <div class="pq-add-grid">
+                <div><label class="field-label" data-i18n="label_pq_name">Name</label><input class="field-input" id="pq-add-label" placeholder="e.g. Oats"></div>
+                <div><label class="field-label" data-i18n="label_pq_keywords">Keywords (comma separated)</label><input class="field-input" id="pq-add-kw" placeholder="oats, oat, oatmeal"></div>
+                <div class="pq-add-nums">
+                  <div><label class="field-label">PDCAAS</label><input class="field-input" id="pq-add-pdcaas" type="number" step="0.01" min="0" max="1" placeholder="0.57"></div>
+                  <div><label class="field-label">DIAAS</label><input class="field-input" id="pq-add-diaas" type="number" step="0.01" min="0" max="1.2" placeholder="0.53"></div>
+                </div>
               </div>
+              <button class="btn-register" style="margin-top:12px" onclick="addPq()" data-i18n="btn_add_protein_source">+ Add protein source</button>
             </div>
-            <button class="btn-register" style="margin-top:12px" onclick="addPq()" data-i18n="btn_add_protein_source">+ Add protein source</button>
-          </div>  
+          </div>
           <div>
             <!-- Language -->
             <div>
-              <h3 class="mono settings-col-title" data-i18n="settings_language">Language</h3>
-              <p class="form-sub" data-i18n="settings_language_desc">Choose display language for the app</p>
-              <select class="field-select" id="language-select" onchange="changeLanguage(this.value)">
-              </select>
+              <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+                <span data-i18n="settings_language">Language</span>
+                <span class="settings-chevron">&#9660;</span>
+              </h3>
+              <div class="settings-section-body" style="display:none">
+                <p class="form-sub" data-i18n="settings_language_desc">Choose display language for the app</p>
+                <select class="field-select" id="language-select" onchange="changeLanguage(this.value)">
+                </select>
+              </div>
             </div>
             <!-- Database -->
             <div>
-              <h3 class="mono settings-col-title" data-i18n="settings_database_title">Database</h3>
-              <p class="form-sub" data-i18n="settings_database_desc">Backup, restore or import data</p>
-              <div class="backup-section">
-                <div class="backup-btn-row">
-                  <button class="backup-btn backup-btn-primary" onclick="downloadBackup()" data-i18n="btn_download_backup">&#128229; Download backup</button>
-                  <button class="backup-btn backup-btn-blue" onclick="document.getElementById('import-file').click()" data-i18n="btn_import">&#128228; Import (merge)</button>
+              <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+                <span data-i18n="settings_database_title">Database</span>
+                <span class="settings-chevron">&#9660;</span>
+              </h3>
+              <div class="settings-section-body" style="display:none">
+                <p class="form-sub" data-i18n="settings_database_desc">Backup, restore or import data</p>
+                <div class="backup-section">
+                  <div class="backup-btn-row">
+                    <button class="backup-btn backup-btn-primary" onclick="downloadBackup()" data-i18n="btn_download_backup">&#128229; Download backup</button>
+                    <button class="backup-btn backup-btn-blue" onclick="document.getElementById('import-file').click()" data-i18n="btn_import">&#128228; Import (merge)</button>
+                  </div>
+                  <div class="file-drop" id="restore-drop" onclick="document.getElementById('restore-file').click()">
+                    <span data-i18n="restore_drop_text">&#128260; Drop a backup file here, or click to restore</span>
+                    <br><span style="font-size:11px;color:rgba(255,68,68,0.6);margin-top:4px;display:inline-block" data-i18n="restore_warning">Warning: Restore replaces all existing data</span>
+                  </div>
+                  <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)">
+                  <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
+                  <p class="backup-note" data-i18n="backup_note">Backup exports all products (including images), categories and weights as a JSON file. Import adds products without deleting existing ones. Restore replaces everything.</p>
                 </div>
-                <div class="file-drop" id="restore-drop" onclick="document.getElementById('restore-file').click()">
-                  <span data-i18n="restore_drop_text">&#128260; Drop a backup file here, or click to restore</span>
-                  <br><span style="font-size:11px;color:rgba(255,68,68,0.6);margin-top:4px;display:inline-block" data-i18n="restore_warning">Warning: Restore replaces all existing data</span>
-                </div>
-                <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)">
-                <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)">
-                <p class="backup-note" data-i18n="backup_note">Backup exports all products (including images), categories and weights as a JSON file. Import adds products without deleting existing ones. Restore replaces everything.</p>
               </div>
             </div>
-          </div>  
+          </div>
         </div>
       </div>
     </div>

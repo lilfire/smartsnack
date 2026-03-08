@@ -5,6 +5,39 @@
   margin-bottom: 6px;
 }
 
+.settings-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.settings-toggle:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.settings-toggle.open {
+  border-color: rgba(232, 184, 75, 0.2);
+  margin-bottom: 10px;
+}
+
+.settings-chevron {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.3);
+  transition: transform 0.2s;
+}
+
+.settings-toggle.open .settings-chevron {
+  transform: rotate(180deg);
+}
+
 .settings-item-list {
   display: flex;
   flex-direction: column;

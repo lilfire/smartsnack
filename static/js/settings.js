@@ -367,6 +367,15 @@ export function handleImport(input) {
   reader.readAsText(input.files[0]);
 }
 
+// ── Collapsible settings sections ───────────────────
+export function toggleSettingsSection(header) {
+  var body = header.nextElementSibling;
+  if (!body) return;
+  var isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : '';
+  header.classList.toggle('open', !isOpen);
+}
+
 // Drag-and-drop for restore
 export function initRestoreDragDrop() {
   var drop = document.getElementById('restore-drop');
