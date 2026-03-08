@@ -22,3 +22,20 @@ def set_language():
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "language": lang})
+
+
+@bp.route("/api/settings/off-credentials")
+def get_off_credentials():
+    creds = settings_service.get_off_credentials()
+    return jsonify({"off_user_id": creds["off_user_id"], "has_password": bool(creds["off_password"])})
+
+
+@bp.route("/api/settings/off-credentials", methods=["PUT"])
+def set_off_credentials():
+    data = _require_json()
+    if not data:
+        return jsonify({"error": "JSON body required"}), 400
+    user_id = data.get("off_user_id", "").strip()
+    password = data.get("off_password", "")
+    settings_service.set_off_credentials(user_id, password)
+    return jsonify({"ok": True})

@@ -19,7 +19,8 @@ import {
   updateCategoryLabel, addCategory, deleteCategory,
   autosavePq, deletePq, addPq,
   downloadBackup, handleRestore, handleImport,
-  initRestoreDragDrop
+  initRestoreDragDrop,
+  saveOffCredentials
 } from './settings.js';
 import {
   openScanner, closeScanner, openSearchScanner,
@@ -29,7 +30,8 @@ import {
 } from './scanner.js';
 import {
   validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
-  selectOffResult, estimateProteinQuality, updateEstimateBtn
+  selectOffResult, estimateProteinQuality, updateEstimateBtn,
+  showOffAddReview, closeOffAddReview, submitToOff
 } from './openfoodfacts.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
@@ -56,6 +58,8 @@ Object.assign(window, {
   autosavePq, deletePq, addPq,
   // settings — backup
   downloadBackup, handleRestore, handleImport,
+  // settings — OFF credentials
+  saveOffCredentials,
   // scanner
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
@@ -64,6 +68,7 @@ Object.assign(window, {
   // openfoodfacts
   validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
   selectOffResult, estimateProteinQuality, updateEstimateBtn,
+  showOffAddReview, closeOffAddReview, submitToOff,
   // state access for inline handlers
   get editingId() { return state.editingId; },
   set editingId(v) { state.editingId = v; },
