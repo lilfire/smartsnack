@@ -32,3 +32,7 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.event.inputs.tag }}
+          labels: |
+            org.opencontainers.image.description=A self-hosted web application for rating snacks.
+            org.opencontainers.image.documentation=https://github.com/lilfire/smartsnack/blob/main/CHANGELOG.md
+            org.opencontainers.image.source=https://github.com/lilfire/smartsnack
