@@ -37,6 +37,7 @@ export async function loadSettings() {
     try {
       var langs = await api('/api/languages');
       langSelect.innerHTML = '';
+      langs.sort(function(a, b) { return a.label.localeCompare(b.label); });
       langs.forEach(function(l) {
         var opt = document.createElement('option');
         opt.value = l.code;
@@ -90,7 +91,7 @@ export function renderWeightItems() {
     h += '<div class="weight-add-row">'
       + '<select class="field-select" id="weight-add-select">'
       + '<option value="">' + placeholder + '</option>';
-    disabled.forEach(function(w) {
+    disabled.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(w) {
       h += '<option value="' + w.field + '">' + esc(w.label) + '</option>';
     });
     h += '</select>'
