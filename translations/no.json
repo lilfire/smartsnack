@@ -16,6 +16,7 @@
     "result_count_search": "{count} resultat for “{query}”",
     "result_count_search_plural": "{count} resultater for “{query}”",
     "no_products_found": "Ingen produkter funnet",
+    "create_product": "Opprett produkt",
     "register_title_1": "Registrer ",
     "register_title_2": "produkt",
     "register_sub": "Legg til et nytt produkt i databasen",

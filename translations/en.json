@@ -16,6 +16,7 @@
     "result_count_search": "{count} result for “{query}”",
     "result_count_search_plural": "{count} results for “{query}”",
     "no_products_found": "No products found",
+    "create_product": "Create product",
     "register_title_1": "Register ",
     "register_title_2": "product",
     "register_sub": "Add a new product to the database",

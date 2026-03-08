@@ -88,7 +88,19 @@ export function renderResults(results, search) {
     : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
   var container = document.getElementById('results-container');
   if (!results.length) {
-    container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p></div>';
+    container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p>'
+      + (search ? '<button class="btn-create-from-search" onclick="window._createFromSearch()">' + t('create_product') + '</button>' : '')
+      + '</div>';
+    if (search) {
+      window._createFromSearch = function() {
+        if (isValidEan(search)) {
+          document.getElementById('f-ean').value = search;
+        } else {
+          document.getElementById('f-name').value = search;
+        }
+        window.switchView('register');
+      };
+    }
     return;
   }
   var sorted = applySorting(results);
