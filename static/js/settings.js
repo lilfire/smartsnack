@@ -273,17 +273,19 @@ export async function deleteCategory(name, label, count) {
     + '<div class="scan-modal-icon">&#128465;</div>'
     + '<h3>' + esc(label) + '</h3>'
     + '<p>' + t('confirm_move_products', { count: count }) + '</p>'
-    + '<select class="cat-move-select">' + options + '</select>'
+    + '<select class="field-select cat-move-select">' + options + '</select>'
     + '<div class="scan-modal-actions">'
     + '<button class="scan-modal-btn-register cat-move-confirm">' + t('btn_move_and_delete') + '</button>'
     + '<button class="scan-modal-btn-cancel cat-move-cancel">' + t('btn_cancel') + '</button>'
     + '</div></div>';
   document.body.appendChild(bg);
+  var sel = bg.querySelector('.cat-move-select');
+  upgradeSelect(sel);
   function close() { bg.remove(); }
   bg.querySelector('.cat-move-cancel').onclick = close;
   bg.addEventListener('click', function(e) { if (e.target === bg) close(); });
   bg.querySelector('.cat-move-confirm').onclick = async function() {
-    var moveTo = bg.querySelector('.cat-move-select').value;
+    var moveTo = sel.value;
     var target = others.find(function(c) { return c.name === moveTo; });
     close();
     var res = await api('/api/categories/' + encodeURIComponent(name), {
