@@ -49,6 +49,8 @@
     "ph_brand": "t.ex. Monster",
     "ph_stores": "t.ex. ICA, Coop",
     "ph_ingredients": "t.ex. Linser, solrosolja, paprika...",
+    "ph_category_name": "t.ex. Drycker",
+    "ph_category_display": "t.ex. Drycker/Smoothie",
     "btn_fetch": "🌎 Hämta",
     "btn_scan_title": "Skanna streckkod",
     "settings_title_1": "Inställ",
