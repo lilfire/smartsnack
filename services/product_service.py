@@ -34,7 +34,7 @@ def list_products(search, type_filter):
         type_rows = cur.execute(f"SELECT type, {agg} FROM products GROUP BY type").fetchall()
         for tr in type_rows:
             cat_ranges[tr["type"]] = {
-                f: (tr[f"min_{f}"] or 0, tr[f"max_{f}"] or 0) for f in enabled_fields
+                f: (tr[f"min_{f}"] or 0, tr[f"max_{f}"] or 0) for f in db_fields
             }
 
     conditions, params = [], []

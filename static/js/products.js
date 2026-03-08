@@ -59,13 +59,17 @@ export async function deleteProduct(id, name) {
 }
 
 export async function loadData() {
-  await fetchStats();
-  buildFilters();
-  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-  buildTypeSelect();
-  var search = state.currentView === 'search' ? document.getElementById('search-input').value.trim() : '';
-  var results = await fetchProducts(search, state.currentFilter);
-  renderResults(results, search);
+  try {
+    await fetchStats();
+    buildFilters();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    buildTypeSelect();
+    var search = state.currentView === 'search' ? document.getElementById('search-input').value.trim() : '';
+    var results = await fetchProducts(search, state.currentFilter);
+    renderResults(results, search);
+  } catch (e) {
+    showToast(t('toast_load_error'), 'error');
+  }
 }
 
 export function switchView(v) {
