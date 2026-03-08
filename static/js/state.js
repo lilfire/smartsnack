@@ -48,7 +48,9 @@ export function fmtNum(v) {
 export async function api(path, opts) {
   opts = opts || {};
   var res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
-  return res.json();
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
 }
 
 export async function fetchProducts(search, types) {
