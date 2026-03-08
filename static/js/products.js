@@ -1,5 +1,5 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc, showConfirmModal } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults } from './render.js';
@@ -49,7 +49,7 @@ export async function saveProduct(id) {
 }
 
 export async function deleteProduct(id, name) {
-  if (!confirm(t('confirm_delete_product', { name: name }))) return;
+  if (!await showConfirmModal('&#128465;', esc(name), t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'))) return;
   await api('/api/products/' + id, { method: 'DELETE' });
   delete state.imageCache[id];
   state.expandedId = null;
