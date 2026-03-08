@@ -86,8 +86,18 @@ SCORE_CONFIG = [
     {"field": "price",           "label_key": "weight_label_price",           "desc_key": "weight_desc_price",           "direction": "lower",  "formula": "minmax", "formula_min": 0, "formula_max": 0},
     {"field": "est_pdcaas",     "label_key": "weight_label_est_pdcaas",     "desc_key": "weight_desc_est_pdcaas",     "direction": "higher", "formula": "direct", "formula_min": 0, "formula_max": 1.0},
     {"field": "est_diaas",      "label_key": "weight_label_est_diaas",      "desc_key": "weight_desc_est_diaas",      "direction": "higher", "formula": "direct", "formula_min": 0, "formula_max": 1.2},
+    {"field": "pct_protein_cal", "label_key": "weight_label_pct_protein_cal", "desc_key": "weight_desc_pct_protein_cal", "direction": "higher", "formula": "direct", "formula_min": 0, "formula_max": 100},
+    {"field": "pct_fat_cal",     "label_key": "weight_label_pct_fat_cal",     "desc_key": "weight_desc_pct_fat_cal",     "direction": "lower",  "formula": "direct", "formula_min": 0, "formula_max": 100},
+    {"field": "pct_carb_cal",    "label_key": "weight_label_pct_carb_cal",    "desc_key": "weight_desc_pct_carb_cal",    "direction": "lower",  "formula": "direct", "formula_min": 0, "formula_max": 100},
 ]
 SCORE_CONFIG_MAP = {c["field"]: c for c in SCORE_CONFIG}
+
+# Computed/derived fields — not stored in DB, calculated on-the-fly
+COMPUTED_FIELDS = {
+    "pct_protein_cal": lambda p: (p["protein"] * 4 / p["kcal"] * 100) if p.get("protein") is not None and p.get("kcal") else None,
+    "pct_fat_cal":     lambda p: (p["fat"] * 9 / p["kcal"] * 100) if p.get("fat") is not None and p.get("kcal") else None,
+    "pct_carb_cal":    lambda p: (p["carbs"] * 4 / p["kcal"] * 100) if p.get("carbs") is not None and p.get("kcal") else None,
+}
 
 DEFAULT_WEIGHTS = {
     "taste_score": {"enabled": 1, "weight": 100.0},

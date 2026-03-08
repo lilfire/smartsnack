@@ -39,7 +39,7 @@ export function renderNutriTable(p) {
 }
 
 // ── Dynamic column helpers ──────────────────────────
-var COL_UNITS = { kcal: '', energy_kj: '', carbs: 'g', sugar: 'g', fat: 'g', saturated_fat: 'g', protein: 'g', fiber: 'g', salt: 'g', taste_score: '', volume: '', price: 'kr' };
+var COL_UNITS = { kcal: '', energy_kj: '', carbs: 'g', sugar: 'g', fat: 'g', saturated_fat: 'g', protein: 'g', fiber: 'g', salt: 'g', taste_score: '', volume: '', price: 'kr', pct_protein_cal: '%', pct_fat_cal: '%', pct_carb_cal: '%' };
 
 export function fmtCell(field, val) {
   if (val == null) return '-';
@@ -48,6 +48,7 @@ export function fmtCell(field, val) {
     return '<span class="stars">' + st + '<span class="stars-dim">' + dm + '</span></span>';
   }
   if (field === 'price') return val ? val.toFixed(0) + 'kr' : '-';
+  if (field === 'pct_protein_cal' || field === 'pct_fat_cal' || field === 'pct_carb_cal') return parseFloat(val).toFixed(1) + '%';
   var u = COL_UNITS[field] || '';
   if (field === 'salt') return val.toFixed(2) + u;
   if (field === 'kcal' || field === 'energy_kj') return Math.round(val) + u;
