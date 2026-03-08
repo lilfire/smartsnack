@@ -50,6 +50,7 @@ export async function loadSettings() {
   loadCategories();
   initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
   loadPq();
+  loadOffCredentials();
 }
 
 
@@ -376,4 +377,27 @@ export function initRestoreDragDrop() {
       handleRestore(fi);
     }
   });
+}
+
+// ── OFF Credentials ─────────────────────────────────
+async function loadOffCredentials() {
+  try {
+    var data = await api('/api/settings/off-credentials');
+    var el = document.getElementById('off-user-id');
+    if (el) el.value = data.off_user_id || '';
+    var pw = document.getElementById('off-password');
+    if (pw) pw.value = data.has_password ? '••••••••' : '';
+  } catch(e) {}
+}
+
+export async function saveOffCredentials() {
+  var userId = (document.getElementById('off-user-id').value || '').trim();
+  var pw = document.getElementById('off-password').value || '';
+  if (pw === '••••••••') pw = '';
+  var body = { off_user_id: userId };
+  if (pw) body.off_password = pw;
+  try {
+    await api('/api/settings/off-credentials', { method: 'PUT', body: JSON.stringify(body) });
+    showToast(t('toast_off_credentials_saved'), 'success');
+  } catch(e) { showToast(t('toast_save_error'), 'error'); }
 }

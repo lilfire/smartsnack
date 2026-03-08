@@ -73,23 +73,7 @@ function updateOffPickerResults(products, errorMsg, ean) {
   if (errorMsg) {
     var html = '<div class="off-modal-empty">' + esc(errorMsg);
     if (ean) {
-      var offUrl = 'https://world.openfoodfacts.org/cgi/product.pl?code=' + encodeURIComponent(ean);
-      var prefix = _offCtx.prefix;
-      var isRegister = (prefix === 'f');
-      if (isRegister) {
-        var nameEl = document.getElementById(prefix + '-name');
-        var hasName = nameEl && nameEl.value.trim().length >= 2;
-        html += '<div style="margin-top:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);text-align:left">';
-        html += '<div style="margin-bottom:8px;font-weight:600">' + esc(t('off_add_to_off')) + '</div>';
-        if (!hasName) {
-          html += '<div style="margin-bottom:8px;color:#ff9800;font-size:12px">⚠ ' + esc(t('off_add_name_required')) + '</div>';
-        }
-        html += '<div style="margin-bottom:12px;font-size:12px;opacity:0.6">' + esc(t('off_add_to_off_tip')) + '</div>';
-        html += '<a href="' + esc(offUrl) + '" target="_blank" rel="noopener" class="btn-off" style="display:inline-block;text-decoration:none;text-align:center;padding:8px 16px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '') + '">🌎 Open Food Facts ↗</a>';
-        html += '</div>';
-      } else {
-        html += '<div style="margin-top:16px"><a href="' + esc(offUrl) + '" target="_blank" rel="noopener" class="btn-off" style="display:inline-block;text-decoration:none;text-align:center;padding:8px 16px;font-size:13px">🌎 ' + esc(t('off_add_to_off')) + ' ↗</a></div>';
-      }
+      html += '<div style="margin-top:16px"><button class="btn-off" style="padding:8px 16px;font-size:13px" onclick="showOffAddReview(\'' + esc(ean) + '\')">🌎 ' + esc(t('off_add_to_off')) + '</button></div>';
     }
     html += '</div>';
     body.innerHTML = html;
@@ -288,6 +272,127 @@ function blobToResizedDataUri(blob) {
     reader.onerror = function() { resolve(null); };
     reader.readAsDataURL(blob);
   });
+}
+
+// ── Add Product to OFF ──────────────────────────────
+var _offReviewFields = [
+  { key: 'name', offKey: 'product_name', label: 'label_product_name', required: true },
+  { key: 'brand', offKey: 'brands', label: 'label_brand' },
+  { key: 'stores', offKey: 'stores', label: 'label_stores' },
+  { key: 'ingredients', offKey: 'ingredients_text', label: 'label_ingredients' },
+  { key: 'kcal', offKey: 'energy-kcal', label: 'label_kcal' },
+  { key: 'energy_kj', offKey: 'energy-kj', label: 'label_energy_kj' },
+  { key: 'fat', offKey: 'fat', label: 'label_fat' },
+  { key: 'saturated_fat', offKey: 'saturated-fat', label: 'label_saturated_fat' },
+  { key: 'carbs', offKey: 'carbohydrates', label: 'label_carbs' },
+  { key: 'sugar', offKey: 'sugars', label: 'label_sugar' },
+  { key: 'protein', offKey: 'proteins', label: 'label_protein' },
+  { key: 'fiber', offKey: 'fiber', label: 'label_fiber' },
+  { key: 'salt', offKey: 'salt', label: 'label_salt' },
+  { key: 'weight', offKey: 'quantity', label: 'label_weight' },
+  { key: 'portion', offKey: 'serving_size', label: 'label_portion' },
+];
+
+export function showOffAddReview(ean) {
+  var prefix = _offCtx.prefix;
+  var filled = [];
+  var empty = [];
+  _offReviewFields.forEach(function(f) {
+    var el = document.getElementById(prefix + '-' + f.key);
+    var val = el ? el.value.trim() : '';
+    var label = t(f.label);
+    if (val) {
+      filled.push({ label: label, value: val, required: f.required });
+    } else {
+      empty.push({ label: label, required: f.required });
+    }
+  });
+
+  var hasName = filled.some(function(f) { return f.required; });
+  var h = '<div style="text-align:left;max-height:60vh;overflow-y:auto;padding:4px">';
+  h += '<div style="font-weight:600;margin-bottom:4px">EAN: ' + esc(ean) + '</div>';
+
+  if (filled.length) {
+    h += '<div style="margin:12px 0 6px;font-size:12px;opacity:0.5;text-transform:uppercase">' + esc(t('off_review_filled')) + '</div>';
+    filled.forEach(function(f) {
+      var display = f.value.length > 50 ? f.value.substring(0, 50) + '...' : f.value;
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">';
+      h += '<span style="color:#4caf50">&#10003;</span>';
+      h += '<span style="opacity:0.6;min-width:100px">' + esc(f.label) + '</span>';
+      h += '<span style="font-family:\'Space Mono\',monospace;font-size:12px">' + esc(display) + '</span>';
+      h += '</div>';
+    });
+  }
+
+  if (empty.length) {
+    h += '<div style="margin:12px 0 6px;font-size:12px;opacity:0.5;text-transform:uppercase">' + esc(t('off_review_empty')) + '</div>';
+    empty.forEach(function(f) {
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">';
+      h += '<span style="color:' + (f.required ? '#f44336' : '#ff9800') + '">' + (f.required ? '&#10007;' : '&#9888;') + '</span>';
+      h += '<span style="opacity:0.6">' + esc(f.label) + (f.required ? ' *' : '') + '</span>';
+      h += '</div>';
+    });
+  }
+
+  if (!hasName) {
+    h += '<div style="margin-top:12px;color:#f44336;font-size:12px">&#9888; ' + esc(t('off_add_name_required')) + '</div>';
+  }
+
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">';
+  h += '<button class="btn-off" style="padding:8px 16px;font-size:13px;opacity:0.7" onclick="closeOffAddReview()">' + esc(t('btn_cancel')) + '</button>';
+  h += '<button class="btn-register" id="off-submit-btn" style="padding:8px 20px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '') + '" onclick="submitToOff(\'' + esc(ean) + '\')">🌎 ' + esc(t('off_submit_btn')) + '</button>';
+  h += '</div>';
+
+  var bg = document.getElementById('off-add-review-bg');
+  if (!bg) {
+    bg = document.createElement('div');
+    bg.className = 'off-modal-bg';
+    bg.id = 'off-add-review-bg';
+    bg.onclick = function(e) { if (e.target === bg) closeOffAddReview(); };
+    document.body.appendChild(bg);
+  }
+  bg.innerHTML = '<div class="off-modal"><div class="off-modal-head"><h3>🌎 ' + esc(t('off_add_to_off')) + '</h3><button class="off-modal-close" onclick="closeOffAddReview()">&times;</button></div><div class="off-modal-body" style="padding:16px">' + h + '</div></div>';
+}
+
+export function closeOffAddReview() {
+  var el = document.getElementById('off-add-review-bg');
+  if (el) el.remove();
+}
+
+export async function submitToOff(ean) {
+  var prefix = _offCtx.prefix;
+  var btn = document.getElementById('off-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+
+  var body = { code: ean };
+  _offReviewFields.forEach(function(f) {
+    var el = document.getElementById(prefix + '-' + f.key);
+    var val = el ? el.value.trim() : '';
+    if (val) body[f.offKey] = val;
+  });
+
+  // Convert quantity/serving_size to string with unit
+  if (body.quantity) body.quantity = body.quantity + ' g';
+  if (body.serving_size) body.serving_size = body.serving_size + ' g';
+
+  try {
+    var res = await api('/api/off/add-product', {
+      method: 'POST',
+      body: JSON.stringify(body)
+    });
+    if (res.error) {
+      showToast(t('toast_error_prefix', { msg: res.error }), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
+      return;
+    }
+    closeOffAddReview();
+    closeOffPicker();
+    showToast(t('toast_off_product_added'), 'success');
+  } catch(e) {
+    showToast(t('toast_error_prefix', { msg: e.message || 'Network error' }), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
+  }
 }
 
 // ── Protein Quality Estimation ─────────────────────

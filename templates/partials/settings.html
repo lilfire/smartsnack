@@ -68,6 +68,21 @@
               </select>
             </div>
           </div>
+          <!-- Open Food Facts -->
+          <div>
+            <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
+              <span data-i18n="settings_off_title">Open Food Facts</span>
+              <span class="settings-chevron">&#9660;</span>
+            </h3>
+            <div class="settings-section-body" style="display:none">
+              <p class="form-sub" data-i18n="settings_off_desc">Credentials for adding products to Open Food Facts</p>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <div><label class="field-label" data-i18n="settings_off_user_id">Username</label><input class="field-input" id="off-user-id" placeholder="OFF username" autocomplete="username"></div>
+                <div><label class="field-label" data-i18n="settings_off_password">Password</label><input class="field-input" id="off-password" type="password" placeholder="OFF password" autocomplete="current-password"></div>
+                <button class="btn-register" style="margin-top:4px" onclick="saveOffCredentials()" data-i18n="btn_save_off_credentials">&#128190; Save</button>
+              </div>
+            </div>
+          </div>
           <!-- Database -->
           <div>
             <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
