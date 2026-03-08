@@ -2,6 +2,7 @@
 import { state, api, esc, fetchStats, upgradeSelect } from './state.js';
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { showToast, loadData } from './products.js';
+import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
 
 // ── Score config (shared with render.js) ────────────
 export var SCORE_COLORS = {
@@ -47,6 +48,7 @@ export async function loadSettings() {
     upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
   loadCategories();
+  initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
   loadPq();
 }
 
@@ -223,6 +225,7 @@ export async function addCategory() {
   document.getElementById('cat-name').value = '';
   document.getElementById('cat-emoji').value = '';
   document.getElementById('cat-label').value = '';
+  resetEmojiPicker(document.getElementById('cat-emoji-trigger'));
   showToast(t('toast_category_added', { name: label }), 'success');
   await fetchStats();
   document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });

@@ -1,0 +1,101 @@
+/* ── Emoji Picker ───────────────────────────────── */
+
+.emoji-picker-trigger {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 14px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  font-family: 'DM Sans', sans-serif;
+  box-sizing: border-box;
+}
+
+.emoji-picker-trigger:hover {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.emoji-picker-popup {
+  width: 100%;
+  max-height: 320px;
+  margin-top: 8px;
+  background: #1a1a1e;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.emoji-picker-search {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+.emoji-picker-search::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.emoji-picker-search:focus {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 2px;
+  padding: 6px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.emoji-picker-grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.emoji-picker-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.emoji-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.emoji-picker-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.emoji-picker-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+  padding: 20px;
+  font-family: 'DM Sans', sans-serif;
+}
