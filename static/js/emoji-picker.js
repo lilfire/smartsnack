@@ -94,20 +94,9 @@ export function initEmojiPicker(triggerEl, inputEl) {
       emptyMsg.style.display = anyVisible ? 'none' : '';
     });
 
-    // Position popup relative to trigger
-    document.body.appendChild(popup);
-    var rect = triggerEl.getBoundingClientRect();
-    var popupH = popup.offsetHeight;
-    var spaceBelow = window.innerHeight - rect.bottom;
-    if (spaceBelow >= popupH + 8 || spaceBelow > rect.top) {
-      popup.style.top = (rect.bottom + 4) + 'px';
-    } else {
-      popup.style.top = (rect.top - popupH - 4) + 'px';
-    }
-    // Center horizontally on trigger, but keep within viewport
-    var left = rect.left;
-    left = Math.max(8, Math.min(left, window.innerWidth - 288));
-    popup.style.left = left + 'px';
+    // Insert popup inline after the .cat-add-grid container
+    var container = triggerEl.closest('.cat-add-grid') || triggerEl.parentNode;
+    container.insertAdjacentElement('afterend', popup);
 
     activePopup = popup;
 
