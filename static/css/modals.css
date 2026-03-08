@@ -279,3 +279,8 @@
   color: rgba(232, 184, 75, 0.4);
   font-family: 'Space Mono', monospace;
 }
+
+/* ── Category Move Modal ─────────────────────────── */
+.cat-move-modal .cat-move-select {
+  margin-bottom: 16px;
+}

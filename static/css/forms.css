@@ -42,6 +42,15 @@
   border-color: rgba(232, 184, 75, 0.3);
 }
 
+.edit-grid input::-webkit-inner-spin-button,
+.edit-grid input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.edit-grid input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .edit-grid select option {
   background: #1a1a1e;
   color: #e8e6e3;
@@ -104,6 +113,26 @@
   margin-bottom: 10px;
 }
 
+.btn-create-from-search {
+  margin-top: 16px;
+  padding: 10px 24px;
+  border-radius: 10px;
+  border: none;
+  background: linear-gradient(135deg, #E8B84B, #C99A30);
+  color: #0a0a0c;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(232, 184, 75, 0.2);
+}
+
+.btn-create-from-search:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(232, 184, 75, 0.3);
+}
+
 /* ── Register Form ──────────────────────────────── */
 .form-wrap {
   margin: 0 auto;
@@ -156,6 +185,15 @@ label.field-label {
 .field-input:focus,
 .field-select:focus {
   border-color: rgba(232, 184, 75, 0.3);
+}
+
+.field-input::-webkit-inner-spin-button,
+.field-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field-input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 .field-select option {

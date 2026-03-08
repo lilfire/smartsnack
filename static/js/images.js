@@ -1,5 +1,5 @@
 // ── Image handling ──────────────────────────────────
-import { state, api } from './state.js';
+import { state, api, showConfirmModal } from './state.js';
 import { t } from './i18n.js';
 import { rerender } from './filters.js';
 
@@ -58,7 +58,7 @@ export function resizeImage(dataUri, maxSize) {
 }
 
 export async function removeProductImage(id) {
-  if (!confirm('Remove image?')) return;
+  if (!await showConfirmModal('&#128247;', t('remove_image_title') || 'Remove image', t('remove_image_confirm') || 'Remove image?', t('btn_delete'), t('btn_cancel'))) return;
   await api('/api/products/' + id + '/image', { method: 'DELETE' });
   state.imageCache[id] = null;
   var p = state.cachedResults && state.cachedResults.find(function(x) { return x.id === id; });

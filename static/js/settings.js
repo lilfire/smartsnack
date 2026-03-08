@@ -1,5 +1,5 @@
 // ── Weights, Categories, Protein Quality, Backup ────
-import { state, api, esc, fetchStats, upgradeSelect } from './state.js';
+import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal } from './state.js';
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { showToast, loadData } from './products.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
@@ -37,13 +37,14 @@ export async function loadSettings() {
     try {
       var langs = await api('/api/languages');
       langSelect.innerHTML = '';
+      langs.sort(function(a, b) { return a.label.localeCompare(b.label); });
       langs.forEach(function(l) {
         var opt = document.createElement('option');
         opt.value = l.code;
         opt.textContent = (l.flag ? l.flag + ' ' : '') + l.label;
         langSelect.appendChild(opt);
       });
-    } catch(e) {}
+    } catch(e) { showToast(t('toast_load_error'), 'error'); }
     langSelect.value = getCurrentLang();
     upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
@@ -90,7 +91,7 @@ export function renderWeightItems() {
     h += '<div class="weight-add-row">'
       + '<select class="field-select" id="weight-add-select">'
       + '<option value="">' + placeholder + '</option>';
-    disabled.forEach(function(w) {
+    disabled.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(w) {
       h += '<option value="' + w.field + '">' + esc(w.label) + '</option>';
     });
     h += '</select>'
@@ -187,7 +188,7 @@ export async function saveWeights() {
     await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
     showToast(t('toast_weights_saved'), 'success');
     loadData();
-  } catch(e) { console.error('saveWeights error:', e); showToast(t('toast_save_error'), 'error'); }
+  } catch(e) { showToast(t('toast_save_error'), 'error'); }
   _weightSaving = false;
 }
 
@@ -199,13 +200,19 @@ export async function loadCategories() {
   if (!cats.length) { list.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px">No categories</p>'; return; }
   var h = '';
   cats.forEach(function(c) {
-    var canDel = c.count === 0;
-    h += '<div class="cat-item"><span class="cat-item-emoji">' + esc(c.emoji) + '</span>'
+    h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
       + '<input class="cat-item-label-input" value="' + esc(c.label) + '" onchange="updateCategoryLabel(\'' + esc(c.name).replace(/'/g, "\\'") + '\',this.value)" title="' + t('label_display_name') + '">'
       + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
-      + '<button class="btn-sm btn-red" ' + (canDel ? '' : 'disabled') + ' onclick="deleteCategory(\'' + esc(c.name).replace(/'/g, "\\'") + '\',\'' + esc(c.label).replace(/'/g, "\\'") + '\')">&#128465;</button></div>';
+      + '<button class="btn-sm btn-red" onclick="deleteCategory(\'' + esc(c.name).replace(/'/g, "\\'") + '\',\'' + esc(c.label).replace(/'/g, "\\'") + '\','+c.count+')">&#128465;</button></div>';
   });
   list.innerHTML = h;
+  // Init emoji pickers on each category emoji
+  list.querySelectorAll('.cat-item-emoji-edit').forEach(function(el) {
+    var catName = el.getAttribute('data-cat');
+    initEmojiPicker(el, null, function(emoji) {
+      updateCategoryEmoji(catName, emoji);
+    });
+  });
 }
 
 export async function updateCategoryLabel(name, val) {
@@ -214,6 +221,14 @@ export async function updateCategoryLabel(name, val) {
   showToast(t('toast_category_updated'), 'success');
   await fetchStats();
   document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+}
+
+export async function updateCategoryEmoji(name, emoji) {
+  await api('/api/categories/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ emoji: emoji }) });
+  showToast(t('toast_category_updated'), 'success');
+  await fetchStats();
+  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+  loadCategories();
 }
 
 export async function addCategory() {
@@ -233,21 +248,63 @@ export async function addCategory() {
   loadCategories();
 }
 
-export async function deleteCategory(name, label) {
-  if (!confirm(t('confirm_delete_category', { name: label }))) return;
-  var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
-  if (res.error) { showToast(res.error, 'error'); return; }
-  showToast(t('toast_category_deleted', { name: label }), 'success');
-  await fetchStats();
-  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-  loadCategories();
+export async function deleteCategory(name, label, count) {
+  if (!count) {
+    // No products – show confirmation modal
+    if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_category', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
+    var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast(t('toast_category_deleted', { name: label }), 'success');
+    await fetchStats();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    loadCategories();
+    return;
+  }
+  // Has products – show reassignment modal
+  var cats = await api('/api/categories');
+  var others = cats.filter(function(c) { return c.name !== name; });
+  if (!others.length) { showToast(t('toast_cannot_delete_only_category'), 'error'); return; }
+  var bg = document.createElement('div');
+  bg.className = 'scan-modal-bg cat-move-modal-bg';
+  var options = others.map(function(c) {
+    return '<option value="' + esc(c.name) + '">' + esc(c.emoji) + ' ' + esc(c.label) + '</option>';
+  }).join('');
+  bg.innerHTML = '<div class="scan-modal cat-move-modal">'
+    + '<div class="scan-modal-icon">&#128465;</div>'
+    + '<h3>' + esc(label) + '</h3>'
+    + '<p>' + t('confirm_move_products', { count: count }) + '</p>'
+    + '<select class="field-select cat-move-select">' + options + '</select>'
+    + '<div class="scan-modal-actions">'
+    + '<button class="scan-modal-btn-register cat-move-confirm">' + t('btn_move_and_delete') + '</button>'
+    + '<button class="scan-modal-btn-cancel cat-move-cancel">' + t('btn_cancel') + '</button>'
+    + '</div></div>';
+  document.body.appendChild(bg);
+  var sel = bg.querySelector('.cat-move-select');
+  upgradeSelect(sel);
+  function close() { bg.remove(); }
+  bg.querySelector('.cat-move-cancel').onclick = close;
+  bg.addEventListener('click', function(e) { if (e.target === bg) close(); });
+  bg.querySelector('.cat-move-confirm').onclick = async function() {
+    var moveTo = sel.value;
+    var target = others.find(function(c) { return c.name === moveTo; });
+    close();
+    var res = await api('/api/categories/' + encodeURIComponent(name), {
+      method: 'DELETE',
+      body: JSON.stringify({ move_to: moveTo })
+    });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast(t('toast_category_moved_deleted', { count: count, target: target ? target.label : moveTo, name: label }), 'success');
+    await fetchStats();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    loadCategories();
+  };
 }
 
 // ── Protein Quality Settings ────────────────────────
 var pqData = [];
 
 export async function loadPq() {
-  try { pqData = await api('/api/protein-quality'); } catch(e) { pqData = []; }
+  try { pqData = await api('/api/protein-quality'); } catch(e) { pqData = []; showToast(t('toast_load_error'), 'error'); }
   renderPqTable();
 }
 
@@ -311,7 +368,7 @@ export async function addPq() {
 }
 
 export async function deletePq(id, label) {
-  if (!confirm(t('confirm_delete_product', { name: label }))) return;
+  if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_product', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
   await api('/api/protein-quality/' + id, { method: 'DELETE' });
   showToast(t('toast_pq_deleted', { name: label }), 'success');
   loadPq();
@@ -323,9 +380,9 @@ export function downloadBackup() {
   showToast(t('toast_backup_downloaded'), 'success');
 }
 
-export function handleRestore(input) {
+export async function handleRestore(input) {
   if (!input.files.length) return;
-  if (!confirm('Are you sure? This replaces ALL existing data in the database.')) { input.value = ''; return; }
+  if (!await showConfirmModal('&#9888;', t('restore_title') || 'Restore database', t('restore_confirm') || 'Are you sure? This replaces ALL existing data in the database.', t('btn_restore') || 'Restore', t('btn_cancel'))) { input.value = ''; return; }
   var reader = new FileReader();
   reader.onload = async function(e) {
     try {
@@ -387,7 +444,7 @@ async function loadOffCredentials() {
     if (el) el.value = data.off_user_id || '';
     var pw = document.getElementById('off-password');
     if (pw) pw.value = data.has_password ? '••••••••' : '';
-  } catch(e) {}
+  } catch(e) { showToast(t('toast_load_error'), 'error'); }
 }
 
 export async function saveOffCredentials() {

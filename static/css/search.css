@@ -69,11 +69,17 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 20px;
   cursor: pointer;
-  display: flex;
+  display: none;
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
   flex-shrink: 0;
+}
+
+@media (pointer: coarse) {
+  .btn-scan-search {
+    display: flex;
+  }
 }
 
 .btn-scan-search:hover {

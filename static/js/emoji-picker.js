@@ -27,8 +27,8 @@ function getSearchTerms(entry) {
   return terms.toLowerCase();
 }
 
-export function initEmojiPicker(triggerEl, inputEl) {
-  if (!triggerEl || !inputEl) return;
+export function initEmojiPicker(triggerEl, inputEl, onSelect) {
+  if (!triggerEl) return;
 
   triggerEl.addEventListener('click', function(e) {
     e.preventDefault();
@@ -61,9 +61,10 @@ export function initEmojiPicker(triggerEl, inputEl) {
       btn.textContent = entry.emoji;
       btn.title = entry.name.replace(/_/g, ' ');
       btn.addEventListener('click', function() {
-        inputEl.value = entry.emoji;
+        if (inputEl) inputEl.value = entry.emoji;
         triggerEl.textContent = entry.emoji;
         closePopup();
+        if (onSelect) onSelect(entry.emoji);
       });
       grid.appendChild(btn);
       buttons.push({ btn: btn, entry: entry });

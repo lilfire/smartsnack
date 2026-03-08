@@ -2,7 +2,7 @@
 // ES Module entry point — imports all modules and exposes functions to window
 
 import { state, api } from './state.js';
-import { initLanguage, changeLanguage } from './i18n.js';
+import { initLanguage, changeLanguage, t } from './i18n.js';
 import { toggleFilters, setSort, rerender } from './filters.js';
 import { triggerImageUpload, removeProductImage } from './images.js';
 import { renderResults } from './render.js';
@@ -83,7 +83,7 @@ Object.assign(window, {
     weightData.length = 0;
     wc.forEach(function(w) { weightData.push(w); });
     wc.forEach(function(w) { SCORE_CFG_MAP[w.field] = { label: w.label, desc: w.desc, direction: w.direction }; });
-  } catch(e) {}
+  } catch(e) { showToast(t('toast_load_error'), 'error'); }
   initRestoreDragDrop();
   loadData();
   document.getElementById('search-input').focus();

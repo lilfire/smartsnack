@@ -1,5 +1,5 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc, showConfirmModal, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults } from './render.js';
@@ -49,7 +49,7 @@ export async function saveProduct(id) {
 }
 
 export async function deleteProduct(id, name) {
-  if (!confirm(t('confirm_delete_product', { name: name }))) return;
+  if (!await showConfirmModal('&#128465;', esc(name), t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'))) return;
   await api('/api/products/' + id, { method: 'DELETE' });
   delete state.imageCache[id];
   state.expandedId = null;
@@ -59,13 +59,18 @@ export async function deleteProduct(id, name) {
 }
 
 export async function loadData() {
-  await fetchStats();
-  buildFilters();
-  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-  buildTypeSelect();
-  var search = state.currentView === 'search' ? document.getElementById('search-input').value.trim() : '';
-  var results = await fetchProducts(search, state.currentFilter);
-  renderResults(results, search);
+  try {
+    await fetchStats();
+    buildFilters();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    buildTypeSelect();
+    upgradeSelect(document.getElementById('f-volume'));
+    var search = state.currentView === 'search' ? document.getElementById('search-input').value.trim() : '';
+    var results = await fetchProducts(search, state.currentFilter);
+    renderResults(results, search);
+  } catch (e) {
+    showToast(t('toast_load_error'), 'error');
+  }
 }
 
 export function switchView(v) {
@@ -158,7 +163,7 @@ export async function registerProduct() {
     var result = await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
     var newProductId = result.id;
     if (window._pendingImage && newProductId) {
-      try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) {}
+      try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
       window._pendingImage = null;
     }
     document.getElementById('f-name').value = '';
@@ -176,6 +181,7 @@ export async function registerProduct() {
     import('./openfoodfacts.js').then(function(mod) { mod.validateOffBtn('f'); });
     NUTRI_IDS.forEach(function(id) { document.getElementById('f-' + id).value = ''; });
     document.getElementById('f-volume').value = '';
+    upgradeSelect(document.getElementById('f-volume'));
     document.getElementById('f-price').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';

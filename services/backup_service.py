@@ -11,11 +11,77 @@ from config import (
 )
 from helpers import _safe_float
 from translations import (
-    _category_label, _pq_label, _pq_keywords,
+    _category_label, _category_key, _pq_label, _pq_keywords,
     _set_translation_key,
 )
 
 logger = logging.getLogger(__name__)
+
+# Mapping of keywords (lowercase) to emojis for auto-categorization
+_CATEGORY_EMOJI_MAP = [
+    # Drinks
+    (["juice", "saft", "drikke", "drink", "beverage", "smoothie"], "🧃"),
+    (["coffee", "kaffe"], "☕"),
+    (["tea", "te"], "🍵"),
+    (["milk", "melk", "mjölk", "dairy", "meieri"], "🥛"),
+    (["water", "vann", "vatten"], "💧"),
+    (["soda", "brus", "cola", "energy", "energi"], "🥤"),
+    (["beer", "øl", "öl", "wine", "vin", "alcohol", "alkohol"], "🍺"),
+    # Sweets & snacks
+    (["candy", "godteri", "godis", "sweet", "søt"], "🍬"),
+    (["chocolate", "sjokolade", "choklad"], "🍫"),
+    (["ice cream", "iskrem", "is", "glass", "gelato"], "🍦"),
+    (["cookie", "kjeks", "kex", "biscuit"], "🍪"),
+    (["cake", "kake", "tårta", "pastry", "bakst"], "🎂"),
+    (["chip", "chips", "snack", "crisp"], "🍿"),
+    (["nut", "nøtt", "nöt", "almond", "mandel", "peanut"], "🥜"),
+    # Bread & grains
+    (["bread", "brød", "bröd", "toast"], "🍞"),
+    (["cereal", "frokostblanding", "müsli", "muesli", "granola", "oat", "havre"], "🥣"),
+    (["pasta", "nudel", "noodle", "spaghetti"], "🍝"),
+    (["rice", "ris"], "🍚"),
+    (["pizza"], "🍕"),
+    # Protein
+    (["meat", "kjøtt", "kött", "beef", "biff", "steak"], "🥩"),
+    (["chicken", "kylling", "poultry", "fjærfe"], "🍗"),
+    (["fish", "fisk", "seafood", "sjømat", "salmon", "laks", "tuna", "tunfisk"], "🐟"),
+    (["egg", "egg"], "🥚"),
+    (["protein", "supplement", "shake"], "💪"),
+    # Fruits & vegetables
+    (["fruit", "frukt", "berry", "bær", "bär"], "🍎"),
+    (["vegetable", "grønnsak", "grönsak", "veggie", "salad", "salat"], "🥬"),
+    # Dairy & cheese
+    (["cheese", "ost"], "🧀"),
+    (["yoghurt", "yogurt", "yoggi"], "🥄"),
+    # Spreads & sauces
+    (["spread", "pålegg", "jam", "syltetøy"], "🫙"),
+    (["sauce", "saus", "dressing", "ketchup", "dip"], "🫗"),
+    # Meals & prepared food
+    (["meal", "måltid", "dinner", "middag", "lunch", "lunsj", "ready", "ferdig"], "🍽️"),
+    (["soup", "suppe"], "🍲"),
+    (["sandwich", "wrap", "burrito", "taco"], "🌮"),
+    (["burger", "hamburger"], "🍔"),
+    # Health & supplements
+    (["vitamin", "health", "helse", "supplement", "tilskudd"], "💊"),
+    (["baby", "barn", "barnemat"], "🍼"),
+    (["organic", "økologisk", "ekologisk", "bio"], "🌿"),
+    # Other food categories
+    (["frozen", "frys", "frossen"], "🧊"),
+    (["spice", "krydder", "herb"], "🌶️"),
+    (["oil", "olje", "butter", "smør"], "🧈"),
+    (["flour", "mel", "baking", "bake"], "🧁"),
+    (["canned", "hermetikk", "boks"], "🥫"),
+]
+
+
+def _pick_emoji_for_category(name):
+    """Pick the best-matching emoji for a category name."""
+    lower = name.lower()
+    for keywords, emoji in _CATEGORY_EMOJI_MAP:
+        for kw in keywords:
+            if kw in lower:
+                return emoji
+    return "\U0001F4E6"  # 📦 default
 
 
 def _restore_product(cur, p):
@@ -122,7 +188,7 @@ def restore_backup(data):
                 if not translations and c.get("label"):
                     translations = {lang: c["label"] for lang in SUPPORTED_LANGUAGES}
                 if translations:
-                    _set_translation_key(f"category_{c['name']}", translations)
+                    _set_translation_key(_category_key(c['name']), translations)
         if "protein_quality" in data:
             cur.execute("DELETE FROM protein_quality")
             for pq in data["protein_quality"]:
@@ -178,10 +244,20 @@ def import_products(data):
                     if not translations and c.get("label"):
                         translations = {lang: c["label"] for lang in SUPPORTED_LANGUAGES}
                     if translations:
-                        _set_translation_key(f"category_{c['name']}", translations)
+                        _set_translation_key(_category_key(c['name']), translations)
                 except sqlite3.IntegrityError:
                     pass
+        existing_cats = {r["name"] for r in cur.execute("SELECT name FROM categories").fetchall()}
         for p in data["products"]:
+            cat = p.get("type", "").strip()
+            if cat and cat not in existing_cats:
+                emoji = _pick_emoji_for_category(cat)
+                try:
+                    cur.execute("INSERT INTO categories (name, emoji) VALUES (?,?)", (cat, emoji))
+                    _set_translation_key(_category_key(cat), {lang: cat for lang in SUPPORTED_LANGUAGES})
+                    existing_cats.add(cat)
+                except sqlite3.IntegrityError:
+                    existing_cats.add(cat)
             _restore_product(cur, p)
             added += 1
         conn.commit()

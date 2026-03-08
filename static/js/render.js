@@ -1,9 +1,12 @@
 // ── Render ──────────────────────────────────────────
-import { state, esc, safeDataUri, catEmoji, catLabel } from './state.js';
+import { state, esc, safeDataUri, catEmoji, catLabel, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { applySorting, sortIndicator } from './filters.js';
 import { loadProductImage } from './images.js';
 import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings.js';
+
+var _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
+function volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
 export function renderNutriTable(p) {
   var rows = [
@@ -33,7 +36,7 @@ export function renderNutriTable(p) {
   if (p.weight) extras.push(t('extra_weight', { val: p.weight }));
   if (p.portion) extras.push(t('extra_portion', { val: p.portion }));
   if (p.price) extras.push(t('extra_price', { val: p.price }));
-  if (p.volume) extras.push(t('extra_volume', { val: p.volume }));
+  if (p.volume) extras.push(t('extra_volume', { val: volumeLabel(p.volume) }));
   if (extras.length) h += '<div style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.3)">' + extras.join(' \u00B7 ') + '</div>';
   return h;
 }
@@ -43,6 +46,7 @@ var COL_UNITS = { kcal: '', energy_kj: '', carbs: 'g', sugar: 'g', fat: 'g', sat
 
 export function fmtCell(field, val) {
   if (val == null) return '-';
+  if (field === 'volume') return volumeLabel(val);
   if (field === 'taste_score') {
     var st = '\u2605'.repeat(Math.round(val)), dm = '\u2605'.repeat(6 - Math.round(val));
     return '<span class="stars">' + st + '<span class="stars-dim">' + dm + '</span></span>';
@@ -88,7 +92,19 @@ export function renderResults(results, search) {
     : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
   var container = document.getElementById('results-container');
   if (!results.length) {
-    container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p></div>';
+    container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p>'
+      + (search ? '<button class="btn-create-from-search" onclick="window._createFromSearch()">' + t('create_product') + '</button>' : '')
+      + '</div>';
+    if (search) {
+      window._createFromSearch = function() {
+        if (isValidEan(search)) {
+          document.getElementById('f-ean').value = search;
+        } else {
+          document.getElementById('f-name').value = search;
+        }
+        window.switchView('register');
+      };
+    }
     return;
   }
   var sorted = applySorting(results);
@@ -151,7 +167,7 @@ export function renderResults(results, search) {
 
       if (state.editingId === p.id) {
         var opts = '';
-        state.categories.forEach(function(c) { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
+        state.categories.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(c) { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('edit_label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '" oninput="validateOffBtn(\'ed\')"></div>'
           + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '" oninput="validateOffBtn(\'ed\')"></div><button class="btn-scan" onclick="event.stopPropagation();openScanner(\'ed\',' + p.id + ')" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' onclick="event.stopPropagation();lookupOFF(\'ed\',' + p.id + ')"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'
@@ -171,7 +187,7 @@ export function renderResults(results, search) {
           + '<div><label>' + t('edit_label_salt') + '</label><input type="number" step="0.01" id="ed-salt" value="' + ev(p.salt) + '"></div>'
           + '<div><label>' + t('edit_label_weight') + '</label><input type="number" step="1" id="ed-weight" value="' + ev(p.weight) + '"></div>'
           + '<div><label>' + t('edit_label_portion') + '</label><input type="number" step="1" id="ed-portion" value="' + ev(p.portion) + '"></div>'
-          + '<div><label>' + t('edit_label_volume') + '</label><input type="number" step="0.1" id="ed-volume" value="' + ev(p.volume) + '"></div>'
+          + '<div><label>' + t('edit_label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume == 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume == 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume == 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
           + '<div><label>' + t('edit_label_price') + '</label><input type="number" step="1" id="ed-price" value="' + ev(p.price) + '"></div>'
           + '<div><label>' + t('edit_label_taste') + '</label><input type="number" step="0.5" min="0" max="6" id="ed-smak" value="' + ev(p.taste_score) + '"></div>'
           + '</div>'
@@ -202,6 +218,8 @@ export function renderResults(results, search) {
   });
   h += '</div>';
   container.innerHTML = h;
+  var edVol = document.getElementById('ed-volume');
+  if (edVol) upgradeSelect(edVol);
   sorted.forEach(function(p) {
     if (p.has_image) {
       loadProductImage(p.id).then(function(dataUri) {
