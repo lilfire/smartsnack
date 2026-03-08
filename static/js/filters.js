@@ -1,5 +1,5 @@
 // ── Filters & Sorting ───────────────────────────────
-import { state, esc } from './state.js';
+import { state, esc, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
 export function buildFilters() {
@@ -54,6 +54,7 @@ export function buildTypeSelect() {
       if (sel.options[i].value === prev) { sel.value = prev; break; }
     }
   }
+  upgradeSelect(sel);
 }
 
 export function sortIndicator(col) {

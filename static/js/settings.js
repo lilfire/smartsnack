@@ -1,5 +1,5 @@
 // ── Weights, Categories, Protein Quality, Backup ────
-import { state, api, esc, fetchStats } from './state.js';
+import { state, api, esc, fetchStats, upgradeSelect } from './state.js';
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { showToast, loadData } from './products.js';
 
@@ -44,139 +44,12 @@ export async function loadSettings() {
       });
     } catch(e) {}
     langSelect.value = getCurrentLang();
-    _upgradeSelect(langSelect, function(val) { changeLanguage(val); });
+    upgradeSelect(langSelect, function(val) { changeLanguage(val); });
   }
   loadCategories();
   loadPq();
 }
 
-// ── Custom select dropdown (desktop only) ────────
-// Wraps a native <select> with a styled custom dropdown.
-// onSelect is called with the chosen value after selection.
-function _upgradeSelect(sel, onSelect) {
-  if (!sel || window.innerWidth < 640) return;
-  // Skip if already upgraded
-  if (sel.parentNode && sel.parentNode.classList.contains('custom-select-wrap')) return;
-
-  var wrap = document.createElement('div');
-  wrap.className = 'custom-select-wrap';
-  sel.parentNode.insertBefore(wrap, sel);
-  wrap.appendChild(sel);
-
-  var nativeOpts = sel.querySelectorAll('option');
-  var selectedOpt = sel.options[sel.selectedIndex];
-  var triggerText = selectedOpt ? selectedOpt.textContent : '';
-
-  var trigger = document.createElement('button');
-  trigger.type = 'button';
-  trigger.className = 'custom-select-trigger';
-  trigger.tabIndex = 0;
-  trigger.textContent = triggerText;
-  trigger.setAttribute('aria-expanded', 'false');
-  wrap.appendChild(trigger);
-
-  var optionsDiv = document.createElement('div');
-  optionsDiv.className = 'custom-select-options';
-  optionsDiv.setAttribute('role', 'listbox');
-  wrap.appendChild(optionsDiv);
-
-  var items = [];
-  nativeOpts.forEach(function(o) {
-    if (!o.value) return; // skip placeholder
-    var div = document.createElement('div');
-    div.className = 'custom-select-option';
-    div.setAttribute('role', 'option');
-    div.setAttribute('data-value', o.value);
-    div.textContent = o.textContent;
-    if (o.value === sel.value) div.classList.add('selected');
-    optionsDiv.appendChild(div);
-    items.push(div);
-  });
-
-  var highlighted = -1;
-
-  trigger.addEventListener('click', function(e) {
-    e.stopPropagation();
-    _closeAllCustomSelects(wrap);
-    var isOpen = wrap.classList.toggle('open');
-    trigger.setAttribute('aria-expanded', isOpen);
-    highlighted = -1;
-    _clearHL();
-  });
-
-  items.forEach(function(item) {
-    item.addEventListener('click', function(e) {
-      e.stopPropagation();
-      _pick(item.getAttribute('data-value'), item.textContent);
-    });
-  });
-
-  trigger.addEventListener('keydown', function(e) {
-    if (!wrap.classList.contains('open')) {
-      if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        _closeAllCustomSelects(wrap);
-        wrap.classList.add('open');
-        trigger.setAttribute('aria-expanded', 'true');
-        highlighted = 0;
-        _updateHL();
-      }
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      highlighted = Math.min(highlighted + 1, items.length - 1);
-      _updateHL();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      highlighted = Math.max(highlighted - 1, 0);
-      _updateHL();
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (highlighted >= 0 && highlighted < items.length) {
-        _pick(items[highlighted].getAttribute('data-value'), items[highlighted].textContent);
-      }
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      _close();
-    }
-  });
-
-  document.addEventListener('click', function() { _close(); });
-
-  function _close() {
-    wrap.classList.remove('open');
-    trigger.setAttribute('aria-expanded', 'false');
-    highlighted = -1;
-    _clearHL();
-  }
-  function _clearHL() {
-    items.forEach(function(o) { o.classList.remove('highlighted'); });
-  }
-  function _updateHL() {
-    _clearHL();
-    if (highlighted >= 0 && highlighted < items.length) {
-      items[highlighted].classList.add('highlighted');
-      items[highlighted].scrollIntoView({ block: 'nearest' });
-    }
-  }
-  function _pick(value, label) {
-    sel.value = value;
-    trigger.textContent = label;
-    _close();
-    if (onSelect) onSelect(value);
-  }
-}
-
-function _closeAllCustomSelects(except) {
-  document.querySelectorAll('.custom-select-wrap.open').forEach(function(w) {
-    if (w !== except) {
-      w.classList.remove('open');
-      var t = w.querySelector('.custom-select-trigger');
-      if (t) t.setAttribute('aria-expanded', 'false');
-    }
-  });
-}
 
 export function renderWeightItems() {
   var container = document.getElementById('weight-items');
@@ -222,7 +95,7 @@ export function renderWeightItems() {
       + '</div>';
   }
   container.innerHTML = h;
-  _upgradeSelect(document.getElementById('weight-add-select'), function() {
+  upgradeSelect(document.getElementById('weight-add-select'), function() {
     addWeightFromDropdown();
   });
 }
