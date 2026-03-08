@@ -242,7 +242,8 @@
   margin-top: 10px;
 }
 
-.weight-add-row .field-select {
+.weight-add-row .field-select,
+.weight-add-row .custom-select-wrap {
   flex: 1;
   min-width: 0;
 }
