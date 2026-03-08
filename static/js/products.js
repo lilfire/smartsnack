@@ -162,7 +162,7 @@ export async function registerProduct() {
     var result = await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
     var newProductId = result.id;
     if (window._pendingImage && newProductId) {
-      try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) {}
+      try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
       window._pendingImage = null;
     }
     document.getElementById('f-name').value = '';
