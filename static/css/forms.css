@@ -42,6 +42,15 @@
   border-color: rgba(232, 184, 75, 0.3);
 }
 
+.edit-grid input::-webkit-inner-spin-button,
+.edit-grid input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.edit-grid input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .edit-grid select option {
   background: #1a1a1e;
   color: #e8e6e3;
@@ -176,6 +185,15 @@ label.field-label {
 .field-input:focus,
 .field-select:focus {
   border-color: rgba(232, 184, 75, 0.3);
+}
+
+.field-input::-webkit-inner-spin-button,
+.field-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.field-input[type="number"] {
+  -moz-appearance: textfield;
 }
 
 .field-select option {
