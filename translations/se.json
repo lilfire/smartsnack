@@ -59,7 +59,6 @@
     "settings_weights_title": "Poängviktning",
     "settings_weights_desc": "Välj vilka näringsvärden som påverkar poängen och justera viktningen",
     "btn_save_weights": "💾 Spara viktning",
-    "btn_reset_weights": "↺ Återställ till standard",
     "settings_categories_title": "Kategorier",
     "settings_categories_desc": "Ändra visningsnamn, lägg till nya eller ta bort tomma kategorier",
     "label_internal_name": "Internt namn",

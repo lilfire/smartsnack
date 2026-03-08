@@ -59,7 +59,6 @@
     "settings_weights_title": "Score-vekting",
     "settings_weights_desc": "Velg hvilke næringsverdier som påvirker scoren, og juster vektingen",
     "btn_save_weights": "💾 Lagre vekting",
-    "btn_reset_weights": "↺ Tilbakestill til standard",
     "settings_categories_title": "Kategorier",
     "settings_categories_desc": "Endre visningsnavn, legg til nye eller slett tomme kategorier",
     "label_internal_name": "Internt navn",

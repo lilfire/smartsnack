@@ -174,37 +174,6 @@ export async function saveWeights() {
   _weightSaving = false;
 }
 
-export async function resetWeights() {
-  if (!confirm('Reset to default values?')) return;
-  var defaults = {
-    kcal: { e: 1, w: 38.18, d: 'lower', f: 'minmax', mn: 0, mx: 0 },
-    carbs: { e: 1, w: 5.09, d: 'lower', f: 'minmax', mn: 0, mx: 0 },
-    protein: { e: 1, w: 40, d: 'higher', f: 'minmax', mn: 0, mx: 0 },
-    taste_score: { e: 1, w: 31.82, d: 'higher', f: 'direct', mn: 0, mx: 6 },
-    volume: { e: 1, w: 44.09, d: 'higher', f: 'minmax', mn: 0, mx: 0 },
-    price: { e: 1, w: 44.09, d: 'lower', f: 'minmax', mn: 0, mx: 0 }
-  };
-  var cfgDefaults = {
-    kcal: { d: 'lower', f: 'minmax', mn: 0, mx: 0 }, energy_kj: { d: 'lower', f: 'minmax', mn: 0, mx: 0 },
-    carbs: { d: 'lower', f: 'minmax', mn: 0, mx: 0 }, sugar: { d: 'lower', f: 'minmax', mn: 0, mx: 0 },
-    fat: { d: 'lower', f: 'minmax', mn: 0, mx: 0 }, saturated_fat: { d: 'lower', f: 'minmax', mn: 0, mx: 0 },
-    protein: { d: 'higher', f: 'minmax', mn: 0, mx: 0 }, fiber: { d: 'higher', f: 'minmax', mn: 0, mx: 0 },
-    salt: { d: 'lower', f: 'minmax', mn: 0, mx: 0 }, taste_score: { d: 'higher', f: 'direct', mn: 0, mx: 6 },
-    volume: { d: 'higher', f: 'minmax', mn: 0, mx: 0 }, price: { d: 'lower', f: 'minmax', mn: 0, mx: 0 }
-  };
-  weightData.forEach(function(item) {
-    var d = defaults[item.field];
-    var c = cfgDefaults[item.field] || { d: 'lower', f: 'minmax', m: 0 };
-    item.enabled = d ? true : false;
-    item.weight = d ? d.w : 0;
-    item.direction = d ? d.d : c.d;
-    item.formula = d ? d.f : c.f;
-    item.formula_min = d ? d.mn : c.mn;
-    item.formula_max = d ? d.mx : c.mx;
-  });
-  renderWeightItems();
-  await saveWeights();
-}
 
 // ── Categories ──────────────────────────────────────
 export async function loadCategories() {
