@@ -1,3 +1,5 @@
+"""Blueprint for product CRUD endpoints."""
+
 from flask import Blueprint, request, jsonify
 
 from helpers import _require_json

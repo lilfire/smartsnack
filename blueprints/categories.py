@@ -1,5 +1,8 @@
-from flask import Blueprint, jsonify
+"""Blueprint for category CRUD endpoints."""
 
+from flask import Blueprint, jsonify, request
+
+from exceptions import ConflictError
 from helpers import _require_json
 from services import category_service
 
@@ -21,11 +24,10 @@ def add_category():
     emoji = data.get("emoji", "\U0001F4E6").strip()
     try:
         category_service.add_category(name, label, emoji)
+    except ConflictError as e:
+        return jsonify({"error": str(e)}), 409
     except ValueError as e:
-        err = str(e)
-        if "already exists" in err:
-            return jsonify({"error": err}), 409
-        return jsonify({"error": err}), 400
+        return jsonify({"error": str(e)}), 400
     return jsonify({"message": "Category added"}), 201
 
 
@@ -45,10 +47,10 @@ def update_category(n):
 
 @bp.route("/api/categories/<n>", methods=["DELETE"])
 def delete_category(n):
-    from flask import request
     move_to = None
-    if request.is_json and request.get_json(silent=True):
-        move_to = request.get_json(silent=True).get("move_to", "").strip() or None
+    body = request.get_json(silent=True)
+    if body:
+        move_to = (body.get("move_to") or "").strip() or None
     try:
         count = category_service.delete_category(n, move_to=move_to)
     except ValueError as e:

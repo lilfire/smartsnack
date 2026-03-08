@@ -1,3 +1,5 @@
+"""Request parsing and validation helpers used across blueprints."""
+
 import math
 import re
 
@@ -7,10 +9,8 @@ from config import _PQ_MAX_KEYWORDS, _PQ_MAX_KEYWORD_LEN
 
 
 def _require_json():
-    data = request.get_json(silent=True)
-    if data is None:
-        return None
-    return data
+    """Parse JSON from request body, returning None on failure."""
+    return request.get_json(silent=True)
 
 
 def _num(data, field):
