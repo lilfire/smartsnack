@@ -151,7 +151,7 @@ export function renderResults(results, search) {
 
       if (state.editingId === p.id) {
         var opts = '';
-        state.categories.forEach(function(c) { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
+        state.categories.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(c) { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('edit_label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '" oninput="validateOffBtn(\'ed\')"></div>'
           + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '" oninput="validateOffBtn(\'ed\')"></div><button class="btn-scan" onclick="event.stopPropagation();openScanner(\'ed\',' + p.id + ')" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' onclick="event.stopPropagation();lookupOFF(\'ed\',' + p.id + ')"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'

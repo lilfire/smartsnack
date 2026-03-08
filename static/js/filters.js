@@ -43,7 +43,7 @@ export function buildTypeSelect() {
   var sel = document.getElementById('f-type');
   var prev = sel.value;
   sel.innerHTML = '';
-  state.categories.forEach(function(c) {
+  state.categories.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(c) {
     var o = document.createElement('option');
     o.value = c.name;
     o.textContent = c.emoji + ' ' + c.label;
