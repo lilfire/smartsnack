@@ -42,7 +42,7 @@ export function applyStaticTranslations() {
   });
   document.querySelectorAll('[data-i18n-html]').forEach(function(el) {
     var key = el.getAttribute('data-i18n-html');
-    el.innerHTML = t(key);
+    el.textContent = t(key);
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
     var key = el.getAttribute('data-i18n-placeholder');

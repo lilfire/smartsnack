@@ -2,7 +2,7 @@
 import { state, api, esc, safeDataUri } from './state.js';
 import { t } from './i18n.js';
 import { resizeImage } from './images.js';
-import { showToast } from './products.js';
+import { showToast } from './state.js';
 
 export function isValidEan(v) {
   if (!v) return false;
@@ -18,6 +18,7 @@ export function validateOffBtn(prefix) {
 }
 
 var _offCtx = { prefix: null, productId: null };
+var _offPickerProducts = null;
 
 export async function lookupOFF(prefix, productId) {
   var ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
@@ -54,11 +55,49 @@ function showOffPickerLoading(msg) {
   bg.className = 'off-modal-bg';
   bg.id = 'off-modal-bg';
   bg.onclick = function(e) { if (e.target === bg) closeOffPicker(); };
-  var h = '<div class="off-modal"><div class="off-modal-head"><h3>&#127758; OpenFoodFacts</h3><button class="off-modal-close" onclick="closeOffPicker()">&times;</button></div>'
-    + '<div class="off-modal-search"><input id="off-search-input" placeholder="Search OpenFoodFacts..." disabled onkeydown="if(event.key===\'Enter\')offModalSearch()"><button id="off-search-btn" disabled onclick="offModalSearch()">Search</button></div>'
-    + '<div class="off-modal-count" id="off-result-count">' + (msg || t('off_searching')) + '</div>'
-    + '<div class="off-modal-body" id="off-results-body"><div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div></div></div>';
-  bg.innerHTML = h;
+
+  var modal = document.createElement('div');
+  modal.className = 'off-modal';
+
+  var head = document.createElement('div');
+  head.className = 'off-modal-head';
+  head.innerHTML = '<h3>&#127758; OpenFoodFacts</h3>';
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'off-modal-close';
+  closeBtn.textContent = '\u00D7';
+  closeBtn.addEventListener('click', function() { closeOffPicker(); });
+  head.appendChild(closeBtn);
+  modal.appendChild(head);
+
+  var searchDiv = document.createElement('div');
+  searchDiv.className = 'off-modal-search';
+  var searchInput = document.createElement('input');
+  searchInput.id = 'off-search-input';
+  searchInput.placeholder = 'Search OpenFoodFacts...';
+  searchInput.disabled = true;
+  searchInput.addEventListener('keydown', function(event) { if (event.key === 'Enter') offModalSearch(); });
+  searchDiv.appendChild(searchInput);
+  var searchBtn = document.createElement('button');
+  searchBtn.id = 'off-search-btn';
+  searchBtn.disabled = true;
+  searchBtn.textContent = 'Search';
+  searchBtn.addEventListener('click', function() { offModalSearch(); });
+  searchDiv.appendChild(searchBtn);
+  modal.appendChild(searchDiv);
+
+  var countDiv = document.createElement('div');
+  countDiv.className = 'off-modal-count';
+  countDiv.id = 'off-result-count';
+  countDiv.textContent = msg || t('off_searching');
+  modal.appendChild(countDiv);
+
+  var bodyDiv = document.createElement('div');
+  bodyDiv.className = 'off-modal-body';
+  bodyDiv.id = 'off-results-body';
+  bodyDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
+  modal.appendChild(bodyDiv);
+
+  bg.appendChild(modal);
   document.body.appendChild(bg);
 }
 
@@ -70,18 +109,35 @@ function updateOffPickerResults(products, errorMsg, ean) {
   if (si) si.disabled = false;
   if (sb) { sb.disabled = false; sb.textContent = t('off_search_btn'); }
   if (!body) return;
+  // Capture context snapshot at render time to avoid race conditions
+  var ctxSnapshot = { prefix: _offCtx.prefix, productId: _offCtx.productId };
   if (errorMsg) {
-    var html = '<div class="off-modal-empty">' + esc(errorMsg);
+    var errDiv = document.createElement('div');
+    errDiv.className = 'off-modal-empty';
+    errDiv.textContent = errorMsg;
     if (ean) {
-      html += '<div style="margin-top:16px"><button class="btn-off" style="padding:8px 16px;font-size:13px" onclick="showOffAddReview(\'' + esc(ean) + '\')">🌎 ' + esc(t('off_add_to_off')) + '</button></div>';
+      var addDiv = document.createElement('div');
+      addDiv.style.marginTop = '16px';
+      var addBtn = document.createElement('button');
+      addBtn.className = 'btn-off';
+      addBtn.style.cssText = 'padding:8px 16px;font-size:13px';
+      addBtn.textContent = '\u{1F30E} ' + t('off_add_to_off');
+      addBtn.addEventListener('click', function() { showOffAddReview(ean); });
+      addDiv.appendChild(addBtn);
+      errDiv.appendChild(addDiv);
     }
-    html += '</div>';
-    body.innerHTML = html;
+    body.innerHTML = '';
+    body.appendChild(errDiv);
     if (count) count.textContent = t('off_zero_results');
     return;
   }
-  window._offPickerProducts = products;
+  _offPickerProducts = products;
   body.innerHTML = renderOffResults(products);
+  // Attach click handlers via event delegation
+  body.addEventListener('click', function(e) {
+    var row = e.target.closest('[data-action="off-select"]');
+    if (row) selectOffResult(parseInt(row.dataset.idx, 10), ctxSnapshot);
+  });
   if (count) count.textContent = t('off_result_count', { count: products.length });
 }
 
@@ -105,7 +161,7 @@ function renderOffResults(products) {
     var pro = parseFloat(n['proteins_100g'] || n['proteins'] || 0).toFixed(1);
     var carb = parseFloat(n['carbohydrates_100g'] || n['carbohydrates'] || 0).toFixed(1);
     var code = p.code || '';
-    h += '<div class="off-result" onclick="selectOffResult(' + i + ')">';
+    h += '<div class="off-result" data-action="off-select" data-idx="' + i + '">';
     if (img) h += '<img class="off-result-img" src="' + esc(img) + '" onerror="this.style.display=\'none\'">';
     else h += '<div class="off-result-img" style="display:flex;align-items:center;justify-content:center;font-size:20px;opacity:0.2">&#127828;</div>';
     h += '<div class="off-result-info"><div class="off-result-name">' + esc(name) + '</div>';
@@ -124,9 +180,9 @@ export async function offModalSearch() {
   if (query.length < 2) return;
   if (input) input.disabled = true;
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
-  var body = document.getElementById('off-results-body');
+  var bodyEl = document.getElementById('off-results-body');
   var cnt = document.getElementById('off-result-count');
-  if (body) body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
+  if (bodyEl) bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('off_searching_name', { name: query });
   try {
     var products = await searchOFF(query);
@@ -138,18 +194,19 @@ export function closeOffPicker() {
   var el = document.getElementById('off-modal-bg');
   if (el) el.remove();
   document.body.style.overflow = '';
-  window._offPickerProducts = null;
+  _offPickerProducts = null;
 }
 
-export async function selectOffResult(idx) {
-  var products = window._offPickerProducts;
+export async function selectOffResult(idx, ctxSnapshot) {
+  var products = _offPickerProducts;
   if (!products || !products[idx]) return;
   var selected = products[idx];
   closeOffPicker();
 
   var code = selected.code;
-  var prefix = _offCtx.prefix;
-  var productId = _offCtx.productId;
+  var ctx = ctxSnapshot || _offCtx;
+  var prefix = ctx.prefix;
+  var productId = ctx.productId;
   var btn = document.getElementById(prefix + '-off-btn');
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
 
@@ -170,9 +227,9 @@ export async function selectOffResult(idx) {
   } catch(e) {
     showToast(t('toast_network_error'), 'error');
     await applyOffProduct(selected, prefix, productId);
+  } finally {
+    if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
   }
-
-  if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
 }
 
 async function applyOffProduct(prod, prefix, productId) {
@@ -190,29 +247,29 @@ async function applyOffProduct(prod, prefix, productId) {
   };
 
   var filled = [];
-  for (var key in offMap) {
+  Object.keys(offMap).forEach(function(key) {
     var val = offMap[key];
-    if (val == null) continue;
-    var el = document.getElementById(prefix + '-' + key);
-    if (el) {
-      el.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
+    if (val == null) return;
+    var fieldEl = document.getElementById(prefix + '-' + key);
+    if (fieldEl) {
+      fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
       filled.push(key);
     }
-  }
+  });
 
   var serving = prod.serving_size || '';
   var servMatch = serving.match(/([\d.]+)\s*g/);
-  if (servMatch) { var el = document.getElementById(prefix + '-portion'); if (el) { el.value = Math.round(parseFloat(servMatch[1])); filled.push('portion'); } }
+  if (servMatch) { var portionEl = document.getElementById(prefix + '-portion'); if (portionEl) { portionEl.value = Math.round(parseFloat(servMatch[1])); filled.push('portion'); } }
 
   var qty = prod.product_quantity || 0;
-  if (qty) { var el = document.getElementById(prefix + '-weight'); if (el) { el.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
+  if (qty) { var weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
 
   var nameEl = document.getElementById(prefix + '-name');
   if (nameEl) { var pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
 
   if (prod.code) {
-    var eanEl = document.getElementById(prefix + '-ean');
-    if (eanEl && !eanEl.value.trim()) { eanEl.value = prod.code; filled.push('ean'); }
+    var codeEl = document.getElementById(prefix + '-ean');
+    if (codeEl && !codeEl.value.trim()) { codeEl.value = prod.code; filled.push('ean'); }
   }
 
   var brand = prod.brands || '';
@@ -224,7 +281,7 @@ async function applyOffProduct(prod, prefix, productId) {
   if (stores) { var storesEl = document.getElementById(prefix + '-stores'); if (storesEl) { storesEl.value = stores; filled.push('stores'); } }
 
   var ing = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
-  if (ing) { var ingEl2 = document.getElementById(prefix + '-ingredients'); if (ingEl2) { ingEl2.value = ing; filled.push('ingredients'); updateEstimateBtn(prefix); } }
+  if (ing) { var ingEl = document.getElementById(prefix + '-ingredients'); if (ingEl) { ingEl.value = ing; filled.push('ingredients'); updateEstimateBtn(prefix); } }
 
   var imgUrl = prod.image_front_url || prod.image_url || prod.image_front_small_url || '';
   if (imgUrl) {
@@ -298,8 +355,8 @@ export function showOffAddReview(ean) {
   var filled = [];
   var empty = [];
   _offReviewFields.forEach(function(f) {
-    var el = document.getElementById(prefix + '-' + f.key);
-    var val = el ? el.value.trim() : '';
+    var fieldEl = document.getElementById(prefix + '-' + f.key);
+    var val = fieldEl ? fieldEl.value.trim() : '';
     var label = t(f.label);
     if (val) {
       filled.push({ label: label, value: val, required: f.required });
@@ -339,10 +396,6 @@ export function showOffAddReview(ean) {
   }
 
   h += '</div>';
-  h += '<div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">';
-  h += '<button class="btn-off" style="padding:8px 16px;font-size:13px;opacity:0.7" onclick="closeOffAddReview()">' + esc(t('btn_cancel')) + '</button>';
-  h += '<button class="btn-register" id="off-submit-btn" style="padding:8px 20px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '') + '" onclick="submitToOff(\'' + esc(ean) + '\')">🌎 ' + esc(t('off_submit_btn')) + '</button>';
-  h += '</div>';
 
   var bg = document.getElementById('off-add-review-bg');
   if (!bg) {
@@ -352,7 +405,45 @@ export function showOffAddReview(ean) {
     bg.onclick = function(e) { if (e.target === bg) closeOffAddReview(); };
     document.body.appendChild(bg);
   }
-  bg.innerHTML = '<div class="off-modal"><div class="off-modal-head"><h3>🌎 ' + esc(t('off_add_to_off')) + '</h3><button class="off-modal-close" onclick="closeOffAddReview()">&times;</button></div><div class="off-modal-body" style="padding:16px">' + h + '</div></div>';
+
+  var modalDiv = document.createElement('div');
+  modalDiv.className = 'off-modal';
+
+  var headDiv = document.createElement('div');
+  headDiv.className = 'off-modal-head';
+  headDiv.innerHTML = '<h3>\u{1F30E} ' + esc(t('off_add_to_off')) + '</h3>';
+  var headClose = document.createElement('button');
+  headClose.className = 'off-modal-close';
+  headClose.textContent = '\u00D7';
+  headClose.addEventListener('click', function() { closeOffAddReview(); });
+  headDiv.appendChild(headClose);
+  modalDiv.appendChild(headDiv);
+
+  var bodyDiv = document.createElement('div');
+  bodyDiv.className = 'off-modal-body';
+  bodyDiv.style.padding = '16px';
+  bodyDiv.innerHTML = h;
+
+  var btnRow = document.createElement('div');
+  btnRow.style.cssText = 'display:flex;gap:8px;margin-top:16px;justify-content:flex-end';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn-off';
+  cancelBtn.style.cssText = 'padding:8px 16px;font-size:13px;opacity:0.7';
+  cancelBtn.textContent = t('btn_cancel');
+  cancelBtn.addEventListener('click', function() { closeOffAddReview(); });
+  btnRow.appendChild(cancelBtn);
+  var submitBtn = document.createElement('button');
+  submitBtn.className = 'btn-register';
+  submitBtn.id = 'off-submit-btn';
+  submitBtn.style.cssText = 'padding:8px 20px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '');
+  submitBtn.textContent = '\u{1F30E} ' + t('off_submit_btn');
+  submitBtn.addEventListener('click', function() { submitToOff(ean); });
+  btnRow.appendChild(submitBtn);
+  bodyDiv.appendChild(btnRow);
+
+  modalDiv.appendChild(bodyDiv);
+  bg.innerHTML = '';
+  bg.appendChild(modalDiv);
 }
 
 export function closeOffAddReview() {
@@ -367,8 +458,8 @@ export async function submitToOff(ean) {
 
   var body = { code: ean };
   _offReviewFields.forEach(function(f) {
-    var el = document.getElementById(prefix + '-' + f.key);
-    var val = el ? el.value.trim() : '';
+    var fieldEl = document.getElementById(prefix + '-' + f.key);
+    var val = fieldEl ? fieldEl.value.trim() : '';
     if (val) body[f.offKey] = val;
   });
 

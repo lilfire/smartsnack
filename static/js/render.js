@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { applySorting, sortIndicator } from './filters.js';
 import { loadProductImage } from './images.js';
 import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings.js';
+import { isValidEan } from './openfoodfacts.js';
 
 var _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
@@ -120,13 +121,14 @@ export function renderResults(results, search) {
     var thumbHtml = hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '';
     var eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
     var brandHtml = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
-    h += '<div class="table-row" style="grid-template-columns:' + gridTpl + '" onclick="toggleExpand(' + p.id + ')">'
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" onclick="toggleExpand(' + p.id + ')">'
       + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + catEmoji(p.type) + '</span>' + thumbHtml + '<span class="prod-name">' + esc(p.name) + '</span></div>'
       + '<div class="prod-meta"><span>' + catLabel(p.type) + '</span>' + brandHtml + eanHtml + '</div></div>';
     for (var ci = 1; ci < cols.length; ci++) {
       var c = cols[ci];
       if (c.key === 'total_score') {
-        h += '<span class="cell-score">' + p.total_score.toFixed(1) + (p.has_missing_scores ? '<span style="color:#f5a623;margin-left:1px" title="Score based on incomplete data — some values are 0 or missing">*</span>' : '') + '</span>';
+        var scoreDisplay = (p.total_score != null) ? p.total_score.toFixed(1) : '-';
+        h += '<span class="cell-score">' + scoreDisplay + (p.has_missing_scores ? '<span style="color:#f5a623;margin-left:1px" title="Score based on incomplete data — some values are 0 or missing">*</span>' : '') + '</span>';
       } else {
         h += '<span class="cell-right">' + fmtCell(c.key, p[c.key]) + '</span>';
       }
@@ -140,14 +142,14 @@ export function renderResults(results, search) {
         + '<div class="expanded-right">';
       h += '<p class="expanded-title">' + t('expanded_score_breakdown') + '</p><div class="score-grid">';
       var sc = p.scores || {};
-      for (var sf in sc) {
+      Object.keys(sc).forEach(function(sf) {
         var scfg = SCORE_CFG_MAP[sf];
-        if (!scfg) continue;
+        if (!scfg) return;
         var sv = sc[sf];
         var pct = Math.min(sv, 100);
         var col = SCORE_COLORS[sf] || '#888';
         h += '<div><div class="score-label">' + scfg.label + '</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div><span class="score-val">' + sv.toFixed(1) + '</span></div>';
-      }
+      });
       if (!Object.keys(sc).length) h += '<div style="color:rgba(255,255,255,0.3);font-size:12px;grid-column:1/-1">' + t('expanded_no_weights') + '</div>';
       h += '</div>';
       if (p.has_missing_scores && p.missing_fields && p.missing_fields.length) {
@@ -168,6 +170,7 @@ export function renderResults(results, search) {
       if (state.editingId === p.id) {
         var opts = '';
         state.categories.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(c) { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
+        var ev = function(v) { return v == null ? '' : v; };
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('edit_label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '" oninput="validateOffBtn(\'ed\')"></div>'
           + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '" oninput="validateOffBtn(\'ed\')"></div><button class="btn-scan" onclick="event.stopPropagation();openScanner(\'ed\',' + p.id + ')" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' onclick="event.stopPropagation();lookupOFF(\'ed\',' + p.id + ')"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'
@@ -175,7 +178,6 @@ export function renderResults(results, search) {
           + '<div><label>' + t('edit_label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('edit_label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
           + '<div class="edit-grid-2"><label>' + t('edit_label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none" oninput="updateEstimateBtn(\'ed\')">' + esc(p.ingredients || '') + '</textarea></div>';
-        function ev(v) { return v == null ? '' : v; }
         h += '<div><label>' + t('edit_label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
           + '<div><label>' + t('edit_label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
@@ -210,7 +212,7 @@ export function renderResults(results, search) {
         h += '<div class="expanded-actions">'
           + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();startEdit(' + p.id + ')">' + t('btn_edit') + '</button>';
         if (hasImg) h += '<button class="btn-sm btn-outline" onclick="event.stopPropagation();removeProductImage(' + p.id + ')">' + t('btn_remove_image') + '</button>';
-        h += '<button class="btn-sm btn-red" onclick="event.stopPropagation();deleteProduct(' + p.id + ',\'' + esc(p.name).replace(/'/g, "\\'") + '\')">' + t('btn_delete') + '</button>'
+        h += '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
           + '</div>';
       }
       h += '</div>';
@@ -218,6 +220,14 @@ export function renderResults(results, search) {
   });
   h += '</div>';
   container.innerHTML = h;
+  // Attach delete handlers via event delegation (avoids XSS from embedding names in onclick)
+  container.querySelectorAll('[data-action="delete"]').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var id = parseInt(btn.dataset.id);
+      window.deleteProduct(id);
+    });
+  });
   var edVol = document.getElementById('ed-volume');
   if (edVol) upgradeSelect(edVol);
   sorted.forEach(function(p) {
@@ -231,11 +241,4 @@ export function renderResults(results, search) {
       });
     }
   });
-}
-
-// isValidEan is needed for the edit form rendering
-function isValidEan(v) {
-  if (!v) return false;
-  var s = v.replace(/\s/g, '');
-  return /^\d{8,13}$/.test(s);
 }

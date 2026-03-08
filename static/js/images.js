@@ -1,5 +1,5 @@
 // ── Image handling ──────────────────────────────────
-import { state, api, showConfirmModal } from './state.js';
+import { state, api, showConfirmModal, showToast } from './state.js';
 import { t } from './i18n.js';
 import { rerender } from './filters.js';
 
@@ -7,11 +7,15 @@ export async function loadProductImage(id) {
   if (state.imageCache[id] !== undefined) return state.imageCache[id];
   try {
     var res = await fetch('/api/products/' + id + '/image');
-    if (!res.ok) { state.imageCache[id] = null; return null; }
+    if (!res.ok) {
+      // Only cache null for 404 (no image); transient errors should allow retry
+      if (res.status === 404) state.imageCache[id] = null;
+      return null;
+    }
     var d = await res.json();
     state.imageCache[id] = d.image;
     return d.image;
-  } catch(e) { state.imageCache[id] = null; return null; }
+  } catch(e) { return null; }
 }
 
 export function triggerImageUpload(id) {
@@ -40,37 +44,34 @@ export function triggerImageUpload(id) {
 }
 
 export function resizeImage(dataUri, maxSize) {
-  return new Promise(function(resolve) {
+  return new Promise(function(resolve, reject) {
     var img = new Image();
     img.onload = function() {
       var w = img.width, h = img.height;
       if (w <= maxSize && h <= maxSize) { resolve(dataUri); return; }
       var ratio = Math.min(maxSize / w, maxSize / h);
       var canvas = document.createElement('canvas');
-      canvas.width = w * ratio;
-      canvas.height = h * ratio;
+      canvas.width = Math.round(w * ratio);
+      canvas.height = Math.round(h * ratio);
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       resolve(canvas.toDataURL('image/jpeg', 0.85));
     };
+    img.onerror = function() { resolve(dataUri); };
     img.src = dataUri;
   });
 }
 
 export async function removeProductImage(id) {
   if (!await showConfirmModal('&#128247;', t('remove_image_title') || 'Remove image', t('remove_image_confirm') || 'Remove image?', t('btn_delete'), t('btn_cancel'))) return;
-  await api('/api/products/' + id + '/image', { method: 'DELETE' });
-  state.imageCache[id] = null;
-  var p = state.cachedResults && state.cachedResults.find(function(x) { return x.id === id; });
-  if (p) p.has_image = 0;
-  showToast(t('toast_image_removed'), 'success');
-  rerender();
-}
-
-// Import showToast lazily to avoid circular deps
-function showToast(msg, type) {
-  var toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.className = 'toast ' + type + ' show';
-  setTimeout(function() { toast.classList.remove('show'); }, 3000);
+  try {
+    await api('/api/products/' + id + '/image', { method: 'DELETE' });
+    state.imageCache[id] = null;
+    var p = state.cachedResults && state.cachedResults.find(function(x) { return x.id === id; });
+    if (p) p.has_image = 0;
+    showToast(t('toast_image_removed'), 'success');
+    rerender();
+  } catch(e) {
+    showToast(t('toast_image_delete_error') || t('toast_network_error'), 'error');
+  }
 }

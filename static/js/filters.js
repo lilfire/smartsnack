@@ -18,7 +18,7 @@ export function buildFilters() {
 export function updateFilterToggle() {
   var tog = document.getElementById('filter-toggle');
   var label = document.getElementById('filter-toggle-label');
-  if (!tog) return;
+  if (!tog || !label) return;
   if (state.currentFilter.length > 0) {
     var names = state.currentFilter.map(function(f) {
       var cat = state.categories.find(function(c) { return c.name === f; });
