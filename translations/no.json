@@ -66,6 +66,7 @@
     "label_emoji": "Emoji",
     "label_display_name": "Visningsnavn",
     "btn_add_category": "+ Legg til kategori",
+    "btn_add_weight": "Legg til vekt",
     "settings_database_title": "Database",
     "settings_database_desc": "Sikkerhetskopi, gjenopprett eller importer data",
     "btn_download_backup": "📥 Last ned backup",
