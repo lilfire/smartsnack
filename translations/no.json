@@ -84,6 +84,8 @@
     "direction_higher": "↑ Høyere er bedre",
     "direction_lower_desc": "Lavere {label} → høyere score",
     "direction_higher_desc": "Høyere {label} → høyere score",
+    "formula_minmax": "MinMax (kategori)",
+    "formula_direct": "Direkte (fast maks)",
     "toast_image_too_large": "Bildet er for stort (maks 10MB)",
     "toast_image_saved": "Bilde lagret",
     "toast_image_upload_error": "Feil ved bildeopplasting",

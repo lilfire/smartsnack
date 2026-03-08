@@ -84,6 +84,8 @@
     "direction_higher": "↑ Higher is better",
     "direction_lower_desc": "Lower {label} → higher score",
     "direction_higher_desc": "Higher {label} → higher score",
+    "formula_minmax": "MinMax (category)",
+    "formula_direct": "Direct (fixed max)",
     "toast_image_too_large": "Image is too large (max 10MB)",
     "toast_image_saved": "Image saved",
     "toast_image_upload_error": "Error uploading image",
