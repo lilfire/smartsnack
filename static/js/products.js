@@ -61,7 +61,7 @@ export async function deleteProduct(id, name) {
     delete state.imageCache[id];
     state.expandedId = null;
     state.editingId = null;
-    showToast(t('toast_product_deleted', { name: name }), 'error');
+    showToast(t('toast_product_deleted', { name: name }), 'success');
     loadData();
   } catch(e) {
     console.error(e);
