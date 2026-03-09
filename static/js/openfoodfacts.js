@@ -511,17 +511,12 @@ export async function submitToOff(ean) {
       method: 'POST',
       body: JSON.stringify(body)
     });
-    if (res.error) {
-      const msg = t(res.error) !== res.error ? t(res.error) : res.error;
-      showToast(msg, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
-      return;
-    }
     closeOffAddReview();
     closeOffPicker();
     showToast(t('toast_off_product_added'), 'success');
   } catch(e) {
-    showToast(t('toast_network_error'), 'error');
+    const msg = e.message && t(e.message) !== e.message ? t(e.message) : (e.message || t('toast_network_error'));
+    showToast(msg, 'error');
     if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
   }
 }
