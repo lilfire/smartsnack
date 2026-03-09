@@ -51,7 +51,7 @@ _OFF_SEARCH_FIELDS = (
     "code,product_name,product_name_no,brands,stores,stores_tags,"
     "nutriments,image_front_small_url,image_front_url,image_url,"
     "serving_size,product_quantity,ingredients_text,"
-    "ingredients_text_no,ingredients_text_en"
+    "ingredients_text_no,ingredients_text_en,completeness"
 )
 
 
@@ -68,7 +68,14 @@ def off_search(query: str) -> dict:
         "fields": _OFF_SEARCH_FIELDS,
     })
     url = f"{_OFF_SEARCH_BASE}?{params}"
-    return _off_get_json(url)
+    data = _off_get_json(url)
+    # Sort by completeness so most complete entries appear first
+    if "products" in data and isinstance(data["products"], list):
+        data["products"].sort(
+            key=lambda p: float(p.get("completeness") or 0),
+            reverse=True,
+        )
+    return data
 
 
 def off_product(code: str) -> dict:

@@ -280,6 +280,34 @@
   font-family: 'Space Mono', monospace;
 }
 
+.off-result-completeness {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
+
+.off-result-completeness-bar {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 2px;
+  max-width: 80px;
+  overflow: hidden;
+}
+
+.off-result-completeness-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s;
+}
+
+.off-result-completeness-pct {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.3);
+  font-family: 'Space Mono', monospace;
+}
+
 /* ── Category Move Modal ─────────────────────────── */
 .cat-move-modal .cat-move-select {
   margin-bottom: 16px;

@@ -187,6 +187,12 @@ function renderOffResults(products) {
     if (brand) h += '<div class="off-result-brand">' + esc(brand) + '</div>';
     h += '<div class="off-result-nutri">' + kcal + ' kcal \u00B7 ' + pro + 'g protein \u00B7 ' + carb + 'g carbs</div>';
     if (code) h += '<div class="off-result-ean">EAN: ' + esc(code) + '</div>';
+    const comp = Math.round((p.completeness || 0) * 100);
+    const compColor = comp >= 70 ? '#4caf50' : comp >= 40 ? '#ff9800' : '#f44336';
+    h += '<div class="off-result-completeness">';
+    h += '<div class="off-result-completeness-bar"><div class="off-result-completeness-fill" style="width:' + comp + '%;background:' + compColor + '"></div></div>';
+    h += '<span class="off-result-completeness-pct">' + comp + '%</span>';
+    h += '</div>';
     h += '</div></div>';
   });
   return h;
