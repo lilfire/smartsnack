@@ -8,7 +8,7 @@ export function t(key, params) {
   var text = translations[key] || key;
   if (params) {
     Object.keys(params).forEach(function(k) {
-      text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), params[k]);
+      text = text.replace(new RegExp('\\{' + k + '\\}', 'g'), function() { return params[k]; });
     });
   }
   return text;
@@ -63,9 +63,9 @@ export async function changeLanguage(lang) {
   // Reload dynamic content — use lazy imports to avoid circular deps
   if (state.currentView === 'settings') {
     var { loadSettings } = await import('./settings.js');
-    loadSettings();
+    await loadSettings();
   } else {
     var { loadData } = await import('./products.js');
-    loadData();
+    await loadData();
   }
 }

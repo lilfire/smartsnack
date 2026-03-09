@@ -1,8 +1,7 @@
 // ── OpenFoodFacts Lookup & Protein Quality Estimation ─
-import { state, api, esc, safeDataUri } from './state.js';
+import { state, api, esc, safeDataUri, showToast } from './state.js';
 import { t } from './i18n.js';
 import { resizeImage } from './images.js';
-import { showToast } from './state.js';
 
 export function isValidEan(v) {
   if (!v) return false;
@@ -302,7 +301,7 @@ async function applyOffProduct(prod, prefix, productId) {
     } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
   }
 
-  showToast('Fetched from OFF: ' + filled.join(', '), 'success');
+  showToast(t('toast_off_fetched', { fields: filled.join(', ') }), 'success');
   if (ing) { setTimeout(function() { estimateProteinQuality(prefix); }, 300); }
 }
 
@@ -503,7 +502,7 @@ export async function estimateProteinQuality(prefix) {
   var sourcesEl = document.getElementById(prefix + '-pq-sources');
   var hiddenPd = document.getElementById(prefix + '-est_pdcaas');
   var hiddenDi = document.getElementById(prefix + '-est_diaas');
-  if (!ingEl || !ingEl.value.trim()) { showToast('Ingredients missing', 'error'); return; }
+  if (!ingEl || !ingEl.value.trim()) { showToast(t('toast_ingredients_missing') || 'Ingredients missing', 'error'); return; }
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
   try {
     var res = await fetch('/api/estimate-protein-quality', {
@@ -520,6 +519,7 @@ export async function estimateProteinQuality(prefix) {
     if (resultEl) resultEl.style.display = '';
     if (!data.est_pdcaas && !data.est_diaas) showToast(t('toast_no_protein_sources'), 'error');
     else showToast(t('toast_protein_estimated'), 'success');
-  } catch(e) { showToast(t('toast_network_error'), 'error'); }
-  if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+  } catch(e) { showToast(t('toast_network_error'), 'error'); } finally {
+    if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+  }
 }

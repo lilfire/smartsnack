@@ -8,7 +8,7 @@ import { isValidEan } from './openfoodfacts.js';
 // Re-export showToast so existing importers continue to work
 export { showToast };
 
-function numOrNull(id) { var v = document.getElementById(id).value; return v === '' ? null : +v; }
+function numOrNull(id) { var el = document.getElementById(id); if (!el) return null; var v = el.value; return v === '' ? null : +v; }
 
 export function startEdit(id) { state.editingId = id; rerender(); }
 

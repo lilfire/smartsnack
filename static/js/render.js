@@ -206,7 +206,7 @@ export function renderResults(results, search) {
           + '<input type="hidden" id="ed-est_diaas" value="' + (p.est_diaas != null ? p.est_diaas : '') + '">'
           + '<div style="display:flex;gap:8px">'
           + '<button class="btn-sm btn-green" onclick="event.stopPropagation();saveProduct(' + p.id + ')">' + t('btn_save') + '</button>'
-          + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();editingId=null;rerender()">' + t('btn_cancel') + '</button>'
+          + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();window.editingId=null;rerender()">' + t('btn_cancel') + '</button>'
           + '</div></div>';
       } else {
         h += '<div class="expanded-actions">'
