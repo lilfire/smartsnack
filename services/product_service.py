@@ -177,7 +177,7 @@ def add_product(data: dict) -> dict:
         raise ValueError("Category does not exist")
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
-        (data["type"], data["name"].strip(), data.get("ean", "").strip(),
+        (data["type"].strip(), data["name"].strip(), data.get("ean", "").strip(),
          data.get("brand", "").strip(), data.get("stores", "").strip(), data.get("ingredients", "").strip(),
          _num(data, "taste_score"), _num(data, "kcal"),
          _num(data, "energy_kj"), _num(data, "carbs"),

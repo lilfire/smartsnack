@@ -93,8 +93,8 @@ def delete_category(name: str, move_to: str = None) -> int:
         conn.execute(
             "UPDATE products SET type = ? WHERE type = ?", (move_to, name)
         )
-    # Delete translation first (less critical if it fails)
-    _delete_translation_key(_category_key(name))
     conn.execute("DELETE FROM categories WHERE name = ?", (name,))
     conn.commit()
+    # Translation cleanup is best-effort (file-based, not transactional)
+    _delete_translation_key(_category_key(name))
     return count

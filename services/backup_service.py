@@ -86,11 +86,14 @@ def _pick_emoji_for_category(name):
     return "\U0001F4E6"  # 📦 default
 
 
+def _opt_float(v):
+    """Convert a value to float, returning None for None values."""
+    if v is None:
+        return None
+    return _safe_float(v, "product field")
+
+
 def _restore_product(cur, p):
-    def _n(v):
-        if v is None:
-            return None
-        return _safe_float(v, "product field")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
         val = p.get(tf, "")
         if isinstance(val, str) and len(val) > max_len:
@@ -99,12 +102,12 @@ def _restore_product(cur, p):
         INSERT_WITH_IMAGE_SQL,
         (p.get("type",""), p.get("name",""), p.get("ean",""),
          p.get("brand",""), p.get("stores",""), p.get("ingredients",""),
-         _n(p.get("taste_score")), _n(p.get("kcal")), _n(p.get("energy_kj")),
-         _n(p.get("carbs")), _n(p.get("sugar")), _n(p.get("fat")),
-         _n(p.get("saturated_fat")), _n(p.get("protein")), _n(p.get("fiber")),
-         _n(p.get("salt")), _n(p.get("volume")), _n(p.get("price")),
-         _n(p.get("weight")), _n(p.get("portion")),
-         _n(p.get("est_pdcaas")), _n(p.get("est_diaas")), p.get("image","")))
+         _opt_float(p.get("taste_score")), _opt_float(p.get("kcal")), _opt_float(p.get("energy_kj")),
+         _opt_float(p.get("carbs")), _opt_float(p.get("sugar")), _opt_float(p.get("fat")),
+         _opt_float(p.get("saturated_fat")), _opt_float(p.get("protein")), _opt_float(p.get("fiber")),
+         _opt_float(p.get("salt")), _opt_float(p.get("volume")), _opt_float(p.get("price")),
+         _opt_float(p.get("weight")), _opt_float(p.get("portion")),
+         _opt_float(p.get("est_pdcaas")), _opt_float(p.get("est_diaas")), p.get("image","")))
 
 
 def create_backup(include_images: bool = True):
