@@ -207,6 +207,7 @@
     "off_err_no_name": "Produktnamn krävs",
     "off_err_api": "Fel från Open Food Facts",
     "off_err_network": "Kunde inte kontakta Open Food Facts",
+    "toast_encryption_not_configured": "Krypteringsnyckel saknas. Ange SMARTSNACK_SECRET_KEY som miljövariabel.",
     "toast_off_credentials_saved": "OFF-inloggning sparad",
     "settings_off_title": "Open Food Facts",
     "settings_off_desc": "Inloggning för att lägga till produkter på Open Food Facts",

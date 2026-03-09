@@ -52,5 +52,8 @@ def set_off_credentials():
     password = data.get("off_password", "")
     if len(password) > _MAX_PASSWORD_LEN:
         return jsonify({"error": "Password too long"}), 400
-    settings_service.set_off_credentials(user_id, password)
+    try:
+        settings_service.set_off_credentials(user_id, password)
+    except RuntimeError:
+        return jsonify({"error": "encryption_not_configured"}), 500
     return jsonify({"ok": True})

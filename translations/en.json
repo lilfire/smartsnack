@@ -207,6 +207,7 @@
     "off_err_no_name": "Product name is required",
     "off_err_api": "Error from Open Food Facts",
     "off_err_network": "Could not connect to Open Food Facts",
+    "toast_encryption_not_configured": "Encryption key missing. Set SMARTSNACK_SECRET_KEY environment variable.",
     "toast_off_credentials_saved": "OFF credentials saved",
     "settings_off_title": "Open Food Facts",
     "settings_off_desc": "Credentials for adding products to Open Food Facts",
