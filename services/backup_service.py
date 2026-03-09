@@ -1,19 +1,14 @@
 """Service for backup, restore, and import of the full database."""
 
+import math
 import re
 import sqlite3
 import logging
 from datetime import datetime, timezone
 
-from db import get_db
 from config import (
     APP_VERSION, SUPPORTED_LANGUAGES, SCORE_CONFIG_MAP,
     INSERT_WITH_IMAGE_SQL, _TEXT_FIELD_LIMITS,
-)
-from helpers import _safe_float
-from translations import (
-    _category_label, _category_key, _pq_label, _pq_keywords,
-    _set_translation_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,7 +84,13 @@ def _opt_float(v):
     """Convert a value to float, returning None for None values."""
     if v is None:
         return None
-    return _safe_float(v, "product field")
+    try:
+        result = float(v)
+    except (ValueError, TypeError) as e:
+        raise ValueError("Invalid numeric value for product field") from e
+    if not math.isfinite(result):
+        raise ValueError("Non-finite numeric value for product field")
+    return result
 
 
 def _restore_product(cur, p):
@@ -110,6 +111,8 @@ def _restore_product(cur, p):
 
 
 def create_backup(include_images: bool = True):
+    from db import get_db
+    from translations import _category_label, _pq_label, _pq_keywords
     conn = get_db()
     if include_images:
         products = [dict(r) for r in conn.execute("SELECT * FROM products ORDER BY id").fetchall()]
@@ -174,6 +177,7 @@ def _validate_backup(data: dict) -> None:
 
 def _restore_score_weights(cur: object, weights: list) -> None:
     """Restore score weights from backup data."""
+    from helpers import _safe_float
     cur.execute("DELETE FROM score_weights")
     for w in weights:
         field = w.get("field")
@@ -204,6 +208,7 @@ def _restore_score_weights(cur: object, weights: list) -> None:
 
 def _restore_categories(cur: object, categories: list) -> list:
     """Restore categories from backup data. Returns pending translation ops."""
+    from translations import _category_key
     pending_translations = []
     cur.execute("DELETE FROM categories")
     for c in categories:
@@ -225,6 +230,7 @@ def _restore_categories(cur: object, categories: list) -> list:
 
 def _restore_protein_quality(cur: object, pq_list: list) -> list:
     """Restore protein quality entries from backup. Returns pending translation ops."""
+    from helpers import _safe_float
     pending_translations = []
     cur.execute("DELETE FROM protein_quality")
     for pq in pq_list:
@@ -279,12 +285,14 @@ def _restore_protein_quality(cur: object, pq_list: list) -> list:
 
 def _apply_pending_translations(pending: list) -> None:
     """Apply deferred translation writes after DB commit succeeds."""
+    from translations import _set_translation_key
     for key, values_by_lang in pending:
         _set_translation_key(key, values_by_lang)
 
 
 def restore_backup(data: dict) -> str:
     """Restore a full backup, replacing all existing data."""
+    from db import get_db
     _validate_backup(data)
     conn = get_db()
     cur = conn.cursor()
@@ -315,6 +323,8 @@ def restore_backup(data: dict) -> str:
 
 def import_products(data: dict) -> str:
     """Import products (and optionally categories) without deleting existing data."""
+    from db import get_db
+    from translations import _category_key
     if not data or "products" not in data:
         raise ValueError("Invalid import file")
     conn = get_db()
