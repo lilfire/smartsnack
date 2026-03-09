@@ -170,9 +170,13 @@ describe('toggleSettingsSection', () => {
 
 describe('downloadBackup', () => {
   it('sets window.location.href', () => {
-    const origHref = window.location.href;
+    const origLocation = window.location;
+    delete window.location;
+    window.location = { href: '' };
     downloadBackup();
+    expect(window.location.href).toBe('/api/backup');
     expect(showToast).toHaveBeenCalledWith('toast_backup_downloaded', 'success');
+    window.location = origLocation;
   });
 });
 
