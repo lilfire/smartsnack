@@ -163,13 +163,10 @@ function updateOffPickerResults(products, errorMsg, ean) {
 export async function searchOFF(query) {
   const params = new URLSearchParams({
     search_terms: query,
-    search_simple: '1',
-    action: 'process',
-    json: '1',
     page_size: '20',
     fields: 'code,product_name,product_name_no,brands,stores,stores_tags,nutriments,image_front_small_url,image_front_url,image_url,serving_size,product_quantity,ingredients_text,ingredients_text_no,ingredients_text_en'
   });
-  const url = 'https://world.openfoodfacts.org/cgi/search.pl?' + params;
+  const url = 'https://world.openfoodfacts.org/api/v2/search?' + params;
   const res = await fetchWithTimeout(url);
   if (!res.ok) throw new Error('Search failed: ' + res.status);
   const data = await res.json();

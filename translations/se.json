@@ -189,6 +189,8 @@
     "off_searching_ean": "Söker efter EAN {ean}...",
     "off_searching_name": "Söker efter \"{name}\"...",
     "off_search_btn": "Sök",
+    "off_search_placeholder": "Sök efter produkt...",
+    "off_no_results_try_different": "Inga resultat. Prova ett annat sökord.",
     "off_zero_results": "0 resultat",
     "off_result_count": "{count} resultat",
     "off_add_to_off": "Lägg till denna produkt på Open Food Facts",
