@@ -36,21 +36,41 @@ export function esc(s) {
 export function safeDataUri(uri) {
   if (typeof uri !== 'string') return '';
   if (/^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/.test(uri)) return uri;
-  if (/^https?:\/\//.test(uri)) return esc(uri);
+  if (/^https?:\/\//.test(uri)) {
+    // Encode for safe use in HTML src attributes
+    try { return esc(new URL(uri).href); } catch(e) { return ''; }
+  }
   return '';
 }
 
 export function fmtNum(v) {
   if (v == null) return '-';
-  return parseFloat(v).toFixed(v % 1 ? 1 : 0);
+  var n = parseFloat(v);
+  if (isNaN(n)) return '-';
+  return n.toFixed(n % 1 ? 1 : 0);
+}
+
+export function showToast(msg, type) {
+  var toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast ' + type + ' show';
+  setTimeout(function() { toast.classList.remove('show'); }, 3000);
 }
 
 export async function api(path, opts) {
   opts = opts || {};
-  var res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
-  var data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Request failed');
-  return data;
+  var controller = new AbortController();
+  var timeoutId = setTimeout(function() { controller.abort(); }, 15000);
+  try {
+    var res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' }, signal: controller.signal }, opts));
+    var text = await res.text();
+    var data;
+    try { data = JSON.parse(text); } catch(e) { data = {}; }
+    if (!res.ok) throw new Error(data.error || 'Request failed: ' + res.status);
+    return data;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function fetchProducts(search, types) {
@@ -72,18 +92,34 @@ export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel
   return new Promise(function(resolve) {
     var bg = document.createElement('div');
     bg.className = 'scan-modal-bg';
-    bg.innerHTML = '<div class="scan-modal">'
-      + '<div class="scan-modal-icon">' + icon + '</div>'
-      + '<h3>' + title + '</h3>'
-      + '<p>' + message + '</p>'
-      + '<div class="scan-modal-actions">'
-      + '<button class="scan-modal-btn-register confirm-yes">' + confirmLabel + '</button>'
-      + '<button class="scan-modal-btn-cancel confirm-no">' + cancelLabel + '</button>'
-      + '</div></div>';
+    var modal = document.createElement('div');
+    modal.className = 'scan-modal';
+    var iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.innerHTML = icon;
+    modal.appendChild(iconDiv);
+    var h3 = document.createElement('h3');
+    h3.textContent = title;
+    modal.appendChild(h3);
+    var pEl = document.createElement('p');
+    pEl.textContent = message;
+    modal.appendChild(pEl);
+    var actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    var yesBtn = document.createElement('button');
+    yesBtn.className = 'scan-modal-btn-register confirm-yes';
+    yesBtn.textContent = confirmLabel;
+    actions.appendChild(yesBtn);
+    var noBtn = document.createElement('button');
+    noBtn.className = 'scan-modal-btn-cancel confirm-no';
+    noBtn.textContent = cancelLabel;
+    actions.appendChild(noBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
     document.body.appendChild(bg);
     function close(val) { bg.remove(); resolve(val); }
-    bg.querySelector('.confirm-no').onclick = function() { close(false); };
-    bg.querySelector('.confirm-yes').onclick = function() { close(true); };
+    noBtn.onclick = function() { close(false); };
+    yesBtn.onclick = function() { close(true); };
     bg.addEventListener('click', function(e) { if (e.target === bg) close(false); });
   });
 }
@@ -91,6 +127,7 @@ export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel
 // Wraps a native <select> with a styled custom dropdown.
 // onSelect is called with the chosen value after selection.
 // Supports re-calling to refresh options when the native <select> is repopulated.
+var _docClickRegistered = false;
 export function upgradeSelect(sel, onSelect) {
   if (!sel || window.innerWidth < 640) return;
 
@@ -190,7 +227,11 @@ export function upgradeSelect(sel, onSelect) {
       }
     });
 
-    document.addEventListener('click', function() { _close(); });
+    // Single delegated document listener instead of one per select
+    if (!_docClickRegistered) {
+      _docClickRegistered = true;
+      document.addEventListener('click', function() { _closeAllCustomSelects(); });
+    }
   }
 
   function _close() {
@@ -222,8 +263,8 @@ function _closeAllCustomSelects(except) {
   document.querySelectorAll('.custom-select-wrap.open').forEach(function(w) {
     if (w !== except) {
       w.classList.remove('open');
-      var t = w.querySelector('.custom-select-trigger');
-      if (t) t.setAttribute('aria-expanded', 'false');
+      var triggerEl = w.querySelector('.custom-select-trigger');
+      if (triggerEl) triggerEl.setAttribute('aria-expanded', 'false');
     }
   });
 }

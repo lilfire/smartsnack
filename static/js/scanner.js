@@ -21,9 +21,22 @@ export function openScanner(prefix, productId) {
   bg.className = 'scanner-bg';
   bg.id = 'scanner-bg';
   document.body.style.overflow = 'hidden';
-  bg.innerHTML = '<div class="scanner-header"><h3>\u{1F4F7} Scan barcode</h3><button class="scanner-close" onclick="closeScanner()">&times;</button></div>'
-    + '<div class="scanner-video-wrap"><div id="scanner-reader"></div>'
-    + '<div class="scanner-hint">Hold the barcode within the frame</div></div>';
+
+  var header = document.createElement('div');
+  header.className = 'scanner-header';
+  header.innerHTML = '<h3>\u{1F4F7} Scan barcode</h3>';
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'scanner-close';
+  closeBtn.textContent = '\u00D7';
+  closeBtn.addEventListener('click', function() { closeScanner(); });
+  header.appendChild(closeBtn);
+  bg.appendChild(header);
+
+  var wrap = document.createElement('div');
+  wrap.className = 'scanner-video-wrap';
+  wrap.innerHTML = '<div id="scanner-reader"></div><div class="scanner-hint">Hold the barcode within the frame</div>';
+  bg.appendChild(wrap);
+
   document.body.appendChild(bg);
 
   _scanner = new Html5Qrcode('scanner-reader');
@@ -45,8 +58,20 @@ export function openScanner(prefix, productId) {
     function onError() {}
   ).catch(function(err) {
     showToast(t('toast_scanner_load_error'), 'error');
-    var wrap = document.querySelector('.scanner-video-wrap');
-    if (wrap) wrap.innerHTML = '<div class="scanner-error"><div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p><button class="btn-sm btn-outline" style="margin-top:16px" onclick="closeScanner()">Close</button></div>';
+    var videoWrap = document.querySelector('.scanner-video-wrap');
+    if (videoWrap) {
+      videoWrap.innerHTML = '';
+      var errDiv = document.createElement('div');
+      errDiv.className = 'scanner-error';
+      errDiv.innerHTML = '<div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p>';
+      var errBtn = document.createElement('button');
+      errBtn.className = 'btn-sm btn-outline';
+      errBtn.style.marginTop = '16px';
+      errBtn.textContent = 'Close';
+      errBtn.addEventListener('click', function() { closeScanner(); });
+      errDiv.appendChild(errBtn);
+      videoWrap.appendChild(errDiv);
+    }
   });
 }
 
@@ -77,6 +102,11 @@ export function closeScanner() {
 // ── Search Scanner (scan to find product in DB) ─────
 var _searchScanMode = false;
 
+function closeSearchScanner() {
+  _searchScanMode = false;
+  closeScanner();
+}
+
 export function openSearchScanner() {
   _searchScanMode = true;
   _scannerCtx = { prefix: 'search', productId: null };
@@ -90,9 +120,22 @@ export function openSearchScanner() {
   bg.className = 'scanner-bg';
   bg.id = 'scanner-bg';
   document.body.style.overflow = 'hidden';
-  bg.innerHTML = '<div class="scanner-header"><h3>\u{1F50D} Scan to find product</h3><button class="scanner-close" onclick="closeScanner();window._searchScanMode=false;">&times;</button></div>'
-    + '<div class="scanner-video-wrap"><div id="scanner-reader"></div>'
-    + '<div class="scanner-hint">Scan the barcode on the product</div></div>';
+
+  var header = document.createElement('div');
+  header.className = 'scanner-header';
+  header.innerHTML = '<h3>\u{1F50D} Scan to find product</h3>';
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'scanner-close';
+  closeBtn.textContent = '\u00D7';
+  closeBtn.addEventListener('click', function() { closeSearchScanner(); });
+  header.appendChild(closeBtn);
+  bg.appendChild(header);
+
+  var wrap = document.createElement('div');
+  wrap.className = 'scanner-video-wrap';
+  wrap.innerHTML = '<div id="scanner-reader"></div><div class="scanner-hint">Scan the barcode on the product</div>';
+  bg.appendChild(wrap);
+
   document.body.appendChild(bg);
 
   _scanner = new Html5Qrcode('scanner-reader');
@@ -117,8 +160,20 @@ export function openSearchScanner() {
     function onError() {}
   ).catch(function(err) {
     showToast(t('toast_scanner_load_error'), 'error');
-    var wrap = document.querySelector('.scanner-video-wrap');
-    if (wrap) wrap.innerHTML = '<div class="scanner-error"><div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p><button class="btn-sm btn-outline" style="margin-top:16px" onclick="closeScanner();window._searchScanMode=false;">Close</button></div>';
+    var videoWrap = document.querySelector('.scanner-video-wrap');
+    if (videoWrap) {
+      videoWrap.innerHTML = '';
+      var errDiv = document.createElement('div');
+      errDiv.className = 'scanner-error';
+      errDiv.innerHTML = '<div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p>';
+      var errBtn = document.createElement('button');
+      errBtn.className = 'btn-sm btn-outline';
+      errBtn.style.marginTop = '16px';
+      errBtn.textContent = 'Close';
+      errBtn.addEventListener('click', function() { closeSearchScanner(); });
+      errDiv.appendChild(errBtn);
+      videoWrap.appendChild(errDiv);
+    }
   });
 }
 
@@ -127,42 +182,47 @@ async function onSearchScanDetected(code) {
   closeScanner();
   showToast(t('toast_barcode_scanned', { code: code }), 'success');
 
-  if (state.currentView !== 'search') switchView('search');
+  try {
+    if (state.currentView !== 'search') switchView('search');
 
-  var allProducts = await fetchProducts('', []);
+    var allProducts = await fetchProducts('', []);
 
-  var found = null;
-  for (var i = 0; i < allProducts.length; i++) {
-    if (allProducts[i].ean === code) { found = allProducts[i]; break; }
-  }
+    var found = null;
+    for (var i = 0; i < allProducts.length; i++) {
+      if (allProducts[i].ean === code) { found = allProducts[i]; break; }
+    }
 
-  if (found) {
-    state.currentFilter = [found.type];
-    buildFilters();
+    if (found) {
+      state.currentFilter = [found.type];
+      buildFilters();
 
-    state.sortCol = 'total_score';
-    state.sortDir = 'desc';
+      state.sortCol = 'total_score';
+      state.sortDir = 'desc';
 
-    var filtered = await fetchProducts('', state.currentFilter);
-    renderResults(filtered, '');
+      var filtered = await fetchProducts('', state.currentFilter);
+      renderResults(filtered, '');
 
-    document.getElementById('search-input').value = '';
-    document.getElementById('search-clear').classList.remove('visible');
+      document.getElementById('search-input').value = '';
+      document.getElementById('search-clear').classList.remove('visible');
 
-    var filterRow = document.getElementById('filter-row');
-    var filterTog = document.getElementById('filter-toggle');
-    if (!filterRow.classList.contains('open')) { filterRow.classList.add('open'); filterTog.classList.add('open'); }
+      var filterRow = document.getElementById('filter-row');
+      var filterTog = document.getElementById('filter-toggle');
+      if (filterRow && !filterRow.classList.contains('open')) { filterRow.classList.add('open'); if (filterTog) filterTog.classList.add('open'); }
 
-    setTimeout(function() {
-      var rowEl = document.querySelector('.table-row[onclick="toggleExpand(' + found.id + ')"]');
-      if (rowEl) {
-        rowEl.classList.add('scan-highlight');
-        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        setTimeout(function() { rowEl.classList.remove('scan-highlight'); }, 5000);
-      }
-    }, 150);
-  } else {
-    showScanNotFoundModal(code);
+      setTimeout(function() {
+        var rowEl = document.querySelector('.table-row[data-product-id="' + found.id + '"]');
+        if (rowEl) {
+          rowEl.classList.add('scan-highlight');
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(function() { rowEl.classList.remove('scan-highlight'); }, 5000);
+        }
+      }, 150);
+    } else {
+      showScanNotFoundModal(code);
+    }
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
   }
 }
 
@@ -171,16 +231,36 @@ export function showScanNotFoundModal(ean) {
   bg.className = 'scan-modal-bg';
   bg.id = 'scan-modal-bg';
   bg.onclick = function(e) { if (e.target === bg) closeScanModal(); };
-  bg.innerHTML = '<div class="scan-modal">'
-    + '<div class="scan-modal-icon">\u{1F50D}</div>'
+
+  var modal = document.createElement('div');
+  modal.className = 'scan-modal';
+  modal.innerHTML = '<div class="scan-modal-icon">\u{1F50D}</div>'
     + '<h3>Product not found</h3>'
-    + '<div class="scan-modal-ean">EAN: ' + ean + '</div>'
+    + '<div class="scan-modal-ean">EAN: ' + esc(ean) + '</div>'
     + '<p>This barcode is not in the database. What would you like to do?</p>'
-    + '<div class="scan-modal-actions">'
-    + '<button class="scan-modal-btn-register" onclick="scanRegisterNew(\'' + ean + '\')">+ Register new product</button>'
-    + '<button class="scan-modal-btn-update" onclick="scanUpdateExisting(\'' + ean + '\')">\u270E Update existing product</button>'
-    + '<button class="scan-modal-btn-cancel" onclick="closeScanModal()">Cancel</button>'
-    + '</div></div>';
+    + '<div class="scan-modal-actions"></div>';
+
+  var actions = modal.querySelector('.scan-modal-actions');
+
+  var regBtn = document.createElement('button');
+  regBtn.className = 'scan-modal-btn-register';
+  regBtn.textContent = '+ Register new product';
+  regBtn.addEventListener('click', function() { scanRegisterNew(ean); });
+  actions.appendChild(regBtn);
+
+  var updBtn = document.createElement('button');
+  updBtn.className = 'scan-modal-btn-update';
+  updBtn.textContent = '\u270E Update existing product';
+  updBtn.addEventListener('click', function() { scanUpdateExisting(ean); });
+  actions.appendChild(updBtn);
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.className = 'scan-modal-btn-cancel';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', function() { closeScanModal(); });
+  actions.appendChild(cancelBtn);
+
+  bg.appendChild(modal);
   document.body.appendChild(bg);
   document.body.style.overflow = 'hidden';
 }
@@ -217,12 +297,48 @@ export function showScanProductPicker(ean) {
   bg.className = 'off-modal-bg';
   bg.id = 'scan-picker-bg';
   bg.onclick = function(e) { if (e.target === bg) closeScanPicker(); };
-  bg.innerHTML = '<div class="off-modal"><div class="off-modal-head"><h3>\u270E ' + t('off_search_btn') + ' — EAN ' + ean + '</h3><button class="off-modal-close" onclick="closeScanPicker()">&times;</button></div>'
-    + '<div class="off-modal-search"><input id="scan-picker-input" placeholder="' + t('search_placeholder') + '" onkeydown="if(event.key===\'Enter\')scanPickerSearch()"><button onclick="scanPickerSearch()">' + t('off_search_btn') + '</button></div>'
-    + '<div class="off-modal-count" id="scan-picker-count">' + t('search_placeholder') + '</div>'
-    + '<div class="off-modal-body" id="scan-picker-body"><div class="off-modal-empty">\u{1F50D} ' + t('search_placeholder') + '</div></div></div>';
+
+  var modal = document.createElement('div');
+  modal.className = 'off-modal';
+
+  var head = document.createElement('div');
+  head.className = 'off-modal-head';
+  head.innerHTML = '<h3>\u270E ' + esc(t('off_search_btn')) + ' — EAN ' + esc(ean) + '</h3>';
+  var headClose = document.createElement('button');
+  headClose.className = 'off-modal-close';
+  headClose.textContent = '\u00D7';
+  headClose.addEventListener('click', function() { closeScanPicker(); });
+  head.appendChild(headClose);
+  modal.appendChild(head);
+
+  var searchDiv = document.createElement('div');
+  searchDiv.className = 'off-modal-search';
+  var searchInput = document.createElement('input');
+  searchInput.id = 'scan-picker-input';
+  searchInput.placeholder = t('search_placeholder');
+  searchInput.addEventListener('keydown', function(event) { if (event.key === 'Enter') scanPickerSearch(); });
+  searchDiv.appendChild(searchInput);
+  var searchBtn = document.createElement('button');
+  searchBtn.textContent = t('off_search_btn');
+  searchBtn.addEventListener('click', function() { scanPickerSearch(); });
+  searchDiv.appendChild(searchBtn);
+  modal.appendChild(searchDiv);
+
+  var countDiv = document.createElement('div');
+  countDiv.className = 'off-modal-count';
+  countDiv.id = 'scan-picker-count';
+  countDiv.textContent = t('search_placeholder');
+  modal.appendChild(countDiv);
+
+  var bodyDiv = document.createElement('div');
+  bodyDiv.className = 'off-modal-body';
+  bodyDiv.id = 'scan-picker-body';
+  bodyDiv.innerHTML = '<div class="off-modal-empty">\u{1F50D} ' + esc(t('search_placeholder')) + '</div>';
+  modal.appendChild(bodyDiv);
+
+  bg.appendChild(modal);
   document.body.appendChild(bg);
-  setTimeout(function() { var inp = document.getElementById('scan-picker-input'); if (inp) inp.focus(); }, 100);
+  setTimeout(function() { if (searchInput) searchInput.focus(); }, 100);
 }
 
 export function closeScanPicker() {
@@ -249,28 +365,33 @@ export async function scanPickerSearch() {
     }
     if (cnt) cnt.textContent = results.length + ' resultat' + (results.length !== 1 ? 'er' : '');
     var h = '';
-    results.forEach(function(p, idx) {
+    results.forEach(function(p) {
       var imgTag = p.has_image ? '<div class="off-result-img" id="scan-pick-img-' + p.id + '" style="background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center"><span style="opacity:0.2">' + catEmoji(p.type) + '</span></div>'
         : '<div class="off-result-img" style="display:flex;align-items:center;justify-content:center"><span style="font-size:20px">' + catEmoji(p.type) + '</span></div>';
       var eanInfo = p.ean ? '<span class="off-result-ean">EAN: ' + esc(p.ean) + '</span>' : '<span class="off-result-ean" style="color:rgba(255,100,100,0.5)">No EAN</span>';
-      h += '<div class="off-result" onclick="scanPickerSelect(' + p.id + ')">'
+      h += '<div class="off-result" data-action="pick" data-id="' + p.id + '">'
         + imgTag
         + '<div class="off-result-info"><div class="off-result-name">' + esc(p.name) + '</div>'
         + '<div class="off-result-brand">' + catLabel(p.type) + (p.brand ? ' \u00B7 ' + esc(p.brand) : '') + '</div>'
         + eanInfo + '</div></div>';
     });
     body.innerHTML = h;
+    // Attach click handlers via event delegation
+    body.addEventListener('click', function(e) {
+      var row = e.target.closest('[data-action="pick"]');
+      if (row) scanPickerSelect(parseInt(row.dataset.id, 10));
+    });
     results.forEach(function(p) {
       if (p.has_image) {
         loadProductImage(p.id).then(function(dataUri) {
           if (!dataUri) return;
-          var el = document.getElementById('scan-pick-img-' + p.id);
-          if (el) { var safe = safeDataUri(dataUri); if (safe) el.innerHTML = '<img src="' + safe + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px">'; }
+          var imgEl = document.getElementById('scan-pick-img-' + p.id);
+          if (imgEl) { var safe = safeDataUri(dataUri); if (safe) imgEl.innerHTML = '<img src="' + safe + '" style="width:100%;height:100%;object-fit:cover;border-radius:8px">'; }
         });
       }
     });
   } catch(e) {
-    body.innerHTML = '<div class="off-modal-empty">' + t('toast_save_error') + '</div>';
+    body.innerHTML = '<div class="off-modal-empty">' + esc(t('toast_save_error')) + '</div>';
     if (cnt) cnt.textContent = t('toast_save_error');
   }
 }
@@ -300,15 +421,30 @@ export function showScanOffConfirm(ean, productId) {
   bg.className = 'scan-modal-bg';
   bg.id = 'scan-off-confirm-bg';
   bg.onclick = function(e) { if (e.target === bg) closeScanOffConfirm(); };
-  bg.innerHTML = '<div class="scan-modal">'
-    + '<div class="scan-modal-icon">\u{1F30E}</div>'
+
+  var modal = document.createElement('div');
+  modal.className = 'scan-modal';
+  modal.innerHTML = '<div class="scan-modal-icon">\u{1F30E}</div>'
     + '<h3>Fetch data from OpenFoodFacts?</h3>'
-    + '<div class="scan-modal-ean">EAN: ' + ean + '</div>'
+    + '<div class="scan-modal-ean">EAN: ' + esc(ean) + '</div>'
     + '<p>Look up nutrition and product info from OpenFoodFacts for this barcode?</p>'
-    + '<div class="scan-modal-actions">'
-    + '<button class="scan-modal-btn-register" onclick="scanOffFetch(\'' + ean + '\',' + productId + ')">\u{1F30E} Yes, fetch data</button>'
-    + '<button class="scan-modal-btn-cancel" onclick="closeScanOffConfirm();loadData();">No, skip</button>'
-    + '</div></div>';
+    + '<div class="scan-modal-actions"></div>';
+
+  var actions = modal.querySelector('.scan-modal-actions');
+
+  var fetchBtn = document.createElement('button');
+  fetchBtn.className = 'scan-modal-btn-register';
+  fetchBtn.textContent = '\u{1F30E} Yes, fetch data';
+  fetchBtn.addEventListener('click', function() { scanOffFetch(ean, productId); });
+  actions.appendChild(fetchBtn);
+
+  var skipBtn = document.createElement('button');
+  skipBtn.className = 'scan-modal-btn-cancel';
+  skipBtn.textContent = 'No, skip';
+  skipBtn.addEventListener('click', function() { closeScanOffConfirm(); loadData(); });
+  actions.appendChild(skipBtn);
+
+  bg.appendChild(modal);
   document.body.appendChild(bg);
 }
 

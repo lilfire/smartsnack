@@ -34,8 +34,12 @@ export function initEmojiPicker(triggerEl, inputEl, onSelect) {
     e.preventDefault();
     e.stopPropagation();
 
-    // Toggle: close if already open
-    if (activePopup) { closePopup(); return; }
+    // Toggle: close if already open from this trigger
+    if (activePopup) {
+      var wasThisTrigger = (activePopup._triggerEl === triggerEl);
+      closePopup();
+      if (wasThisTrigger) return;
+    }
 
     // Build popup
     var popup = document.createElement('div');
@@ -99,6 +103,7 @@ export function initEmojiPicker(triggerEl, inputEl, onSelect) {
     var container = triggerEl.closest('.cat-add-grid') || triggerEl.parentNode;
     container.insertAdjacentElement('afterend', popup);
 
+    popup._triggerEl = triggerEl;
     activePopup = popup;
 
     // Focus search
