@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock state.js to avoid side effects from the _escDiv singleton
-vi.mock('../state.js', () => ({
-  state: {
+vi.mock('../state.js', () => {
+  const _state = {
     currentView: 'search',
     currentFilter: [],
     expandedId: null,
@@ -14,9 +14,22 @@ vi.mock('../state.js', () => ({
     sortDir: 'desc',
     categories: [],
     imageCache: {},
-  },
-  api: vi.fn(),
-}));
+  };
+  return {
+    state: _state,
+    api: vi.fn(),
+    fetchStats: vi.fn().mockImplementation(async () => {
+      _state.cachedStats = { total: 0, types: 0, categories: [] };
+      return _state.cachedStats;
+    }),
+    fetchProducts: vi.fn().mockResolvedValue([]),
+    NUTRI_IDS: [],
+    showConfirmModal: vi.fn(),
+    showToast: vi.fn(),
+    upgradeSelect: vi.fn(),
+    esc: (s) => String(s),
+  };
+});
 
 import { t, getCurrentLang, initLanguage, applyStaticTranslations, changeLanguage } from '../i18n.js';
 import { state, api } from '../state.js';
