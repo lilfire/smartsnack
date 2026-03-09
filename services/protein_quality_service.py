@@ -1,8 +1,11 @@
+"""Service for managing protein quality entries and ingredient estimation."""
+
 import re
 import sqlite3
 
 from db import get_db
 from config import _PQ_MAX_LABEL_LEN
+from exceptions import ConflictError
 from helpers import _safe_float, _validate_keywords
 from translations import (
     _pq_label, _pq_keywords, _pq_all_keywords,
@@ -10,9 +13,12 @@ from translations import (
 )
 
 
-def list_entries():
+def list_entries() -> list:
+    """Return all protein quality entries with labels and keywords."""
     conn = get_db()
-    rows = conn.execute("SELECT id, name, pdcaas, diaas FROM protein_quality ORDER BY id").fetchall()
+    rows = conn.execute(
+        "SELECT id, name, pdcaas, diaas FROM protein_quality ORDER BY id"
+    ).fetchall()
     result = []
     for r in rows:
         keywords = _pq_keywords(r["name"])
@@ -27,7 +33,8 @@ def list_entries():
     return result
 
 
-def add_entry(data):
+def add_entry(data: dict) -> dict:
+    """Add a new protein quality entry."""
     name = data.get("name", "").strip()
     keywords = data.get("keywords", [])
     pdcaas = data.get("pdcaas")
@@ -50,11 +57,15 @@ def add_entry(data):
     conn = get_db()
     cur = conn.cursor()
     try:
-        cur.execute("INSERT INTO protein_quality (name, pdcaas, diaas) VALUES (?,?,?)",
-                    (name, pdcaas_f, diaas_f))
+        cur.execute(
+            "INSERT INTO protein_quality (name, pdcaas, diaas) VALUES (?,?,?)",
+            (name, pdcaas_f, diaas_f),
+        )
         conn.commit()
     except sqlite3.IntegrityError:
-        raise ValueError("Protein quality entry with this name already exists")
+        raise ConflictError(
+            "Protein quality entry with this name already exists"
+        ) from None
     new_id = cur.lastrowid
     lang = _get_current_lang()
     if label:
@@ -105,17 +116,25 @@ def delete_entry(pid):
     _delete_translation_key(f"pq_{pq_name}_keywords")
 
 
-def _load_protein_quality_table():
+def _load_protein_quality_table() -> list:
+    """Load PQ table with pre-compiled keyword regex patterns."""
     conn = get_db()
-    rows = conn.execute("SELECT name, pdcaas, diaas FROM protein_quality ORDER BY id").fetchall()
+    rows = conn.execute(
+        "SELECT name, pdcaas, diaas FROM protein_quality ORDER BY id"
+    ).fetchall()
     table = []
     for r in rows:
         keywords = _pq_all_keywords(r["name"])
-        table.append((r["name"], keywords, r["pdcaas"], r["diaas"]))
+        patterns = [
+            re.compile(r'\b' + re.escape(kw) + r'\b')
+            for kw in keywords
+        ]
+        table.append((r["name"], patterns, r["pdcaas"], r["diaas"]))
     return table
 
 
-def estimate(ingredients):
+def estimate(ingredients: str) -> dict:
+    """Estimate protein quality scores from an ingredients string."""
     if not ingredients:
         return {"est_pdcaas": None, "est_diaas": None, "sources": []}
 
@@ -126,9 +145,9 @@ def estimate(ingredients):
     pq_table = _load_protein_quality_table()
     matched = []
     for pos, token in enumerate(tokens):
-        for pq_name, keywords, pdcaas, diaas in pq_table:
-            for kw in keywords:
-                if re.search(r'\b' + re.escape(kw) + r'\b', token):
+        for pq_name, patterns, pdcaas, diaas in pq_table:
+            for pattern in patterns:
+                if pattern.search(token):
                     matched.append((pos, pdcaas, diaas, pq_name))
                     break
 
@@ -146,11 +165,15 @@ def estimate(ingredients):
     total_w = sum(1.0 / (pos + 1) for pos, *_ in deduped)
     if total_w == 0:
         return {"est_pdcaas": None, "est_diaas": None, "sources": []}
-    w_pdcaas = sum((1.0 / (pos + 1)) * pdcaas for pos, pdcaas, diaas, _ in deduped) / total_w
-    w_diaas  = sum((1.0 / (pos + 1)) * diaas  for pos, pdcaas, diaas, _ in deduped) / total_w
+    w_pdcaas = sum(
+        (1.0 / (pos + 1)) * pdcaas for pos, pdcaas, diaas, _ in deduped
+    ) / total_w
+    w_diaas = sum(
+        (1.0 / (pos + 1)) * diaas for pos, pdcaas, diaas, _ in deduped
+    ) / total_w
 
     return {
         "est_pdcaas": round(min(w_pdcaas, 1.0), 3),
-        "est_diaas":  round(min(w_diaas, 1.2), 3),
+        "est_diaas": round(min(w_diaas, 1.2), 3),
         "sources": [_pq_label(pq_name) for _, _, _, pq_name in deduped],
     }

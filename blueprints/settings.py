@@ -1,9 +1,13 @@
+"""Blueprint for user settings (language, OFF credentials)."""
+
 from flask import Blueprint, jsonify
 
 from helpers import _require_json
 from services import settings_service
 
 bp = Blueprint("settings", __name__)
+
+_MAX_PASSWORD_LEN = 500
 
 
 @bp.route("/api/settings/language")
@@ -14,8 +18,11 @@ def get_language():
 
 @bp.route("/api/settings/language", methods=["PUT"])
 def set_language():
-    data = _require_json()
-    if not data or "language" not in data:
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    if "language" not in data:
         return jsonify({"error": "language is required"}), 400
     try:
         lang = settings_service.set_language(data["language"])
@@ -32,10 +39,13 @@ def get_off_credentials():
 
 @bp.route("/api/settings/off-credentials", methods=["PUT"])
 def set_off_credentials():
-    data = _require_json()
-    if not data:
-        return jsonify({"error": "JSON body required"}), 400
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     user_id = data.get("off_user_id", "").strip()
     password = data.get("off_password", "")
+    if len(password) > _MAX_PASSWORD_LEN:
+        return jsonify({"error": "Password too long"}), 400
     settings_service.set_off_credentials(user_id, password)
     return jsonify({"ok": True})

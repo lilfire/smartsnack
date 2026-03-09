@@ -1,21 +1,18 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc, showConfirmModal, upgradeSelect } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, esc, showConfirmModal, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults } from './render.js';
 import { isValidEan } from './openfoodfacts.js';
 
-export function showToast(msg, type) {
-  var toast = document.getElementById('toast');
-  toast.textContent = msg;
-  toast.className = 'toast ' + type + ' show';
-  setTimeout(function() { toast.classList.remove('show'); }, 3000);
-}
+// Re-export showToast so existing importers continue to work
+export { showToast };
+
+function numOrNull(id) { var v = document.getElementById(id).value; return v === '' ? null : +v; }
 
 export function startEdit(id) { state.editingId = id; rerender(); }
 
 export async function saveProduct(id) {
-  function numOrNull(id) { var v = document.getElementById(id).value; return v === '' ? null : +v; }
   var data = {
     name: document.getElementById('ed-name').value.trim(),
     type: document.getElementById('ed-type').value,
@@ -42,20 +39,34 @@ export async function saveProduct(id) {
   };
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
-  await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
-  state.editingId = null;
-  showToast(t('toast_product_updated'), 'success');
-  loadData();
+  try {
+    await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    state.editingId = null;
+    showToast(t('toast_product_updated'), 'success');
+    loadData();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_save_error'), 'error');
+  }
 }
 
 export async function deleteProduct(id, name) {
-  if (!await showConfirmModal('&#128465;', esc(name), t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'))) return;
-  await api('/api/products/' + id, { method: 'DELETE' });
-  delete state.imageCache[id];
-  state.expandedId = null;
-  state.editingId = null;
-  showToast(t('toast_product_deleted', { name: name }), 'error');
-  loadData();
+  if (!name) {
+    var product = state.cachedResults && state.cachedResults.find(function(p) { return p.id === id; });
+    name = product ? product.name : '';
+  }
+  if (!await showConfirmModal('&#128465;', esc(name), t('confirm_delete_product', { name: esc(name) }), t('btn_delete'), t('btn_cancel'))) return;
+  try {
+    await api('/api/products/' + id, { method: 'DELETE' });
+    delete state.imageCache[id];
+    state.expandedId = null;
+    state.editingId = null;
+    showToast(t('toast_product_deleted', { name: name }), 'error');
+    loadData();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+  }
 }
 
 export async function loadData() {
@@ -69,6 +80,7 @@ export async function loadData() {
     var results = await fetchProducts(search, state.currentFilter);
     renderResults(results, search);
   } catch (e) {
+    console.error(e);
     showToast(t('toast_load_error'), 'error');
   }
 }
@@ -77,7 +89,7 @@ export function switchView(v) {
   state.currentView = v;
   state.expandedId = null;
   state.editingId = null;
-  document.querySelectorAll('.nav-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.view === v); });
+  document.querySelectorAll('.nav-tab').forEach(function(tab) { tab.classList.toggle('active', tab.dataset.view === v); });
   document.getElementById('view-search').style.display = v === 'search' ? '' : 'none';
   document.getElementById('view-register').style.display = v === 'register' ? '' : 'none';
   document.getElementById('view-settings').style.display = v === 'settings' ? '' : 'none';
@@ -133,7 +145,6 @@ export async function registerProduct() {
   var btn = document.getElementById('btn-submit');
   btn.disabled = true;
   btn.textContent = t('toast_saving');
-  function numOrNull(id) { var v = document.getElementById(id).value; return v === '' ? null : +v; }
   try {
     var body = {
       type: document.getElementById('f-type').value,
@@ -200,24 +211,19 @@ export async function registerProduct() {
     // Clear search input
     document.getElementById('search-input').value = '';
     document.getElementById('search-clear').classList.remove('visible');
-    // Wait for data to load, then scroll to and highlight the new product
-    await fetchStats();
-    buildFilters();
-    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-    buildTypeSelect();
-    var filtered = await fetchProducts('', state.currentFilter);
-    renderResults(filtered, '');
+    // switchView already calls loadData() which fetches and renders.
+    // Wait for DOM to settle, then scroll to and highlight the new product.
     if (newProductId) {
       setTimeout(function() {
-        var rowEl = document.querySelector('.table-row[onclick="toggleExpand(' + newProductId + ')"]');
+        var rowEl = document.querySelector('.table-row[data-product-id="' + newProductId + '"]');
         if (rowEl) {
           rowEl.classList.add('scan-highlight');
           rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
           setTimeout(function() { rowEl.classList.remove('scan-highlight'); }, 5000);
         }
-      }, 200);
+      }, 500);
     }
-  } catch(e) { showToast(t('toast_save_error'), 'error'); }
+  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
   btn.disabled = false;
   btn.textContent = t('btn_register_product');
 }

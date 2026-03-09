@@ -1,8 +1,11 @@
 // ── Weights, Categories, Protein Quality, Backup ────
-import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal } from './state.js';
+import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal, showToast } from './state.js';
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
-import { showToast, loadData } from './products.js';
+import { loadData } from './products.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
+
+// Re-export showToast so existing importers continue to work
+export { showToast };
 
 // ── Score config (shared with render.js) ────────────
 export var SCORE_COLORS = {
@@ -15,43 +18,51 @@ export var SCORE_COLORS = {
 export var SCORE_CFG_MAP = {};
 export var weightData = [];
 
+var _settingsLoading = false;
+
 export async function loadSettings() {
-  document.getElementById('settings-loading').style.display = '';
-  document.getElementById('settings-content').style.display = 'none';
+  if (_settingsLoading) return;
+  _settingsLoading = true;
   try {
-    weightData.length = 0;
-    var wd = await api('/api/weights');
-    wd.forEach(function(w) { weightData.push(w); });
-    // Reset and rebuild SCORE_CFG_MAP
-    Object.keys(SCORE_CFG_MAP).forEach(function(k) { delete SCORE_CFG_MAP[k]; });
-    weightData.forEach(function(w) {
-      SCORE_CFG_MAP[w.field] = { label: w.label, direction: w.direction, formula: w.formula, formula_min: w.formula_min, formula_max: w.formula_max };
-    });
-    renderWeightItems();
-  } catch(e) { showToast(t('toast_load_error'), 'error'); }
-  document.getElementById('settings-loading').style.display = 'none';
-  document.getElementById('settings-content').style.display = '';
-  // Populate language dropdown dynamically
-  var langSelect = document.getElementById('language-select');
-  if (langSelect) {
+    document.getElementById('settings-loading').style.display = '';
+    document.getElementById('settings-content').style.display = 'none';
     try {
-      var langs = await api('/api/languages');
-      langSelect.innerHTML = '';
-      langs.sort(function(a, b) { return a.label.localeCompare(b.label); });
-      langs.forEach(function(l) {
-        var opt = document.createElement('option');
-        opt.value = l.code;
-        opt.textContent = (l.flag ? l.flag + ' ' : '') + l.label;
-        langSelect.appendChild(opt);
+      weightData.length = 0;
+      var wd = await api('/api/weights');
+      wd.forEach(function(w) { weightData.push(w); });
+      // Reset and rebuild SCORE_CFG_MAP
+      Object.keys(SCORE_CFG_MAP).forEach(function(k) { delete SCORE_CFG_MAP[k]; });
+      weightData.forEach(function(w) {
+        SCORE_CFG_MAP[w.field] = { label: w.label, direction: w.direction, formula: w.formula, formula_min: w.formula_min, formula_max: w.formula_max };
       });
+      renderWeightItems();
     } catch(e) { showToast(t('toast_load_error'), 'error'); }
-    langSelect.value = getCurrentLang();
-    upgradeSelect(langSelect, function(val) { changeLanguage(val); });
+    document.getElementById('settings-loading').style.display = 'none';
+    document.getElementById('settings-content').style.display = '';
+    // Populate language dropdown dynamically
+    var langSelect = document.getElementById('language-select');
+    if (langSelect) {
+      try {
+        var langs = await api('/api/languages');
+        langSelect.innerHTML = '';
+        langs.sort(function(a, b) { return a.label.localeCompare(b.label); });
+        langs.forEach(function(l) {
+          var opt = document.createElement('option');
+          opt.value = l.code;
+          opt.textContent = (l.flag ? l.flag + ' ' : '') + l.label;
+          langSelect.appendChild(opt);
+        });
+      } catch(e) { showToast(t('toast_load_error'), 'error'); }
+      langSelect.value = getCurrentLang();
+      upgradeSelect(langSelect, function(val) { changeLanguage(val); });
+    }
+    loadCategories();
+    initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
+    loadPq();
+    loadOffCredentials();
+  } finally {
+    _settingsLoading = false;
   }
-  loadCategories();
-  initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
-  loadPq();
-  loadOffCredentials();
 }
 
 
@@ -179,40 +190,60 @@ export async function saveWeights() {
   _weightSaving = true;
   try {
     var payload = weightData.map(function(w) {
+      if (!w.enabled) {
+        // For disabled weights, preserve existing values from weightData
+        return { field: w.field, enabled: w.enabled, weight: w.weight, direction: w.direction, formula: w.formula, formula_min: w.formula_min || 0, formula_max: w.formula_max || 0 };
+      }
       var minEl = document.getElementById('wn-' + w.field);
       var maxEl = document.getElementById('wm-' + w.field);
       var sliderEl = document.getElementById('w-' + w.field);
-      var obj = { field: w.field, enabled: w.enabled, weight: parseFloat(sliderEl ? sliderEl.value : w.weight), direction: w.direction, formula: w.formula, formula_min: parseFloat(minEl ? minEl.value : 0) || 0, formula_max: parseFloat(maxEl ? maxEl.value : 0) || 0 };
-      return obj;
+      return { field: w.field, enabled: w.enabled, weight: parseFloat(sliderEl ? sliderEl.value : w.weight), direction: w.direction, formula: w.formula, formula_min: parseFloat(minEl ? minEl.value : 0) || 0, formula_max: parseFloat(maxEl ? maxEl.value : 0) || 0 };
     });
     await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
     showToast(t('toast_weights_saved'), 'success');
     loadData();
   } catch(e) { showToast(t('toast_save_error'), 'error'); }
-  _weightSaving = false;
+  finally { _weightSaving = false; }
 }
 
 
 // ── Categories ──────────────────────────────────────
 export async function loadCategories() {
-  var cats = await api('/api/categories');
-  var list = document.getElementById('cat-list');
-  if (!cats.length) { list.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px">No categories</p>'; return; }
-  var h = '';
-  cats.forEach(function(c) {
-    h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
-      + '<input class="cat-item-label-input" value="' + esc(c.label) + '" onchange="updateCategoryLabel(\'' + esc(c.name).replace(/'/g, "\\'") + '\',this.value)" title="' + t('label_display_name') + '">'
-      + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
-      + '<button class="btn-sm btn-red" onclick="deleteCategory(\'' + esc(c.name).replace(/'/g, "\\'") + '\',\'' + esc(c.label).replace(/'/g, "\\'") + '\','+c.count+')">&#128465;</button></div>';
-  });
-  list.innerHTML = h;
-  // Init emoji pickers on each category emoji
-  list.querySelectorAll('.cat-item-emoji-edit').forEach(function(el) {
-    var catName = el.getAttribute('data-cat');
-    initEmojiPicker(el, null, function(emoji) {
-      updateCategoryEmoji(catName, emoji);
+  try {
+    var cats = await api('/api/categories');
+    var list = document.getElementById('cat-list');
+    if (!cats.length) { list.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px">No categories</p>'; return; }
+    var h = '';
+    cats.forEach(function(c) {
+      h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
+        + '<input class="cat-item-label-input" data-cat-name="' + esc(c.name) + '" value="' + esc(c.label) + '" title="' + t('label_display_name') + '">'
+        + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
+        + '<button class="btn-sm btn-red" data-action="delete-cat" data-cat-name="' + esc(c.name) + '" data-cat-label="' + esc(c.label) + '" data-cat-count="' + c.count + '">&#128465;</button></div>';
     });
-  });
+    list.innerHTML = h;
+    // Attach change handlers to label inputs
+    list.querySelectorAll('input.cat-item-label-input[data-cat-name]').forEach(function(inp) {
+      inp.addEventListener('change', function() {
+        updateCategoryLabel(inp.dataset.catName, inp.value);
+      });
+    });
+    // Attach click handlers to delete buttons
+    list.querySelectorAll('[data-action="delete-cat"]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        deleteCategory(btn.dataset.catName, btn.dataset.catLabel, parseInt(btn.dataset.catCount, 10));
+      });
+    });
+    // Init emoji pickers on each category emoji
+    list.querySelectorAll('.cat-item-emoji-edit').forEach(function(el) {
+      var catName = el.getAttribute('data-cat');
+      initEmojiPicker(el, null, function(emoji) {
+        updateCategoryEmoji(catName, emoji);
+      });
+    });
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_load_error'), 'error');
+  }
 }
 
 export async function updateCategoryLabel(name, val) {
@@ -249,55 +280,65 @@ export async function addCategory() {
 }
 
 export async function deleteCategory(name, label, count) {
-  if (!count) {
-    // No products – show confirmation modal
-    if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_category', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
-    var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
-    if (res.error) { showToast(res.error, 'error'); return; }
-    showToast(t('toast_category_deleted', { name: label }), 'success');
-    await fetchStats();
-    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-    loadCategories();
-    return;
+  try {
+    if (!count) {
+      // No products – show confirmation modal
+      if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_category', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
+      var res = await api('/api/categories/' + encodeURIComponent(name), { method: 'DELETE' });
+      if (res.error) { showToast(res.error, 'error'); return; }
+      showToast(t('toast_category_deleted', { name: label }), 'success');
+      await fetchStats();
+      document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+      loadCategories();
+      return;
+    }
+    // Has products – show reassignment modal
+    var cats = await api('/api/categories');
+    var others = cats.filter(function(c) { return c.name !== name; });
+    if (!others.length) { showToast(t('toast_cannot_delete_only_category'), 'error'); return; }
+    var bg = document.createElement('div');
+    bg.className = 'scan-modal-bg cat-move-modal-bg';
+    var options = others.map(function(c) {
+      return '<option value="' + esc(c.name) + '">' + esc(c.emoji) + ' ' + esc(c.label) + '</option>';
+    }).join('');
+    bg.innerHTML = '<div class="scan-modal cat-move-modal">'
+      + '<div class="scan-modal-icon">&#128465;</div>'
+      + '<h3>' + esc(label) + '</h3>'
+      + '<p>' + t('confirm_move_products', { count: count }) + '</p>'
+      + '<select class="field-select cat-move-select">' + options + '</select>'
+      + '<div class="scan-modal-actions">'
+      + '<button class="scan-modal-btn-register cat-move-confirm">' + t('btn_move_and_delete') + '</button>'
+      + '<button class="scan-modal-btn-cancel cat-move-cancel">' + t('btn_cancel') + '</button>'
+      + '</div></div>';
+    document.body.appendChild(bg);
+    var sel = bg.querySelector('.cat-move-select');
+    upgradeSelect(sel);
+    function close() { bg.remove(); }
+    bg.querySelector('.cat-move-cancel').onclick = close;
+    bg.addEventListener('click', function(e) { if (e.target === bg) close(); });
+    bg.querySelector('.cat-move-confirm').onclick = async function() {
+      var moveTo = sel.value;
+      var target = others.find(function(c) { return c.name === moveTo; });
+      close();
+      try {
+        var delRes = await api('/api/categories/' + encodeURIComponent(name), {
+          method: 'DELETE',
+          body: JSON.stringify({ move_to: moveTo })
+        });
+        if (delRes.error) { showToast(delRes.error, 'error'); return; }
+        showToast(t('toast_category_moved_deleted', { count: count, target: target ? target.label : moveTo, name: label }), 'success');
+        await fetchStats();
+        document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+        loadCategories();
+      } catch(e2) {
+        console.error(e2);
+        showToast(t('toast_network_error'), 'error');
+      }
+    };
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
   }
-  // Has products – show reassignment modal
-  var cats = await api('/api/categories');
-  var others = cats.filter(function(c) { return c.name !== name; });
-  if (!others.length) { showToast(t('toast_cannot_delete_only_category'), 'error'); return; }
-  var bg = document.createElement('div');
-  bg.className = 'scan-modal-bg cat-move-modal-bg';
-  var options = others.map(function(c) {
-    return '<option value="' + esc(c.name) + '">' + esc(c.emoji) + ' ' + esc(c.label) + '</option>';
-  }).join('');
-  bg.innerHTML = '<div class="scan-modal cat-move-modal">'
-    + '<div class="scan-modal-icon">&#128465;</div>'
-    + '<h3>' + esc(label) + '</h3>'
-    + '<p>' + t('confirm_move_products', { count: count }) + '</p>'
-    + '<select class="field-select cat-move-select">' + options + '</select>'
-    + '<div class="scan-modal-actions">'
-    + '<button class="scan-modal-btn-register cat-move-confirm">' + t('btn_move_and_delete') + '</button>'
-    + '<button class="scan-modal-btn-cancel cat-move-cancel">' + t('btn_cancel') + '</button>'
-    + '</div></div>';
-  document.body.appendChild(bg);
-  var sel = bg.querySelector('.cat-move-select');
-  upgradeSelect(sel);
-  function close() { bg.remove(); }
-  bg.querySelector('.cat-move-cancel').onclick = close;
-  bg.addEventListener('click', function(e) { if (e.target === bg) close(); });
-  bg.querySelector('.cat-move-confirm').onclick = async function() {
-    var moveTo = sel.value;
-    var target = others.find(function(c) { return c.name === moveTo; });
-    close();
-    var res = await api('/api/categories/' + encodeURIComponent(name), {
-      method: 'DELETE',
-      body: JSON.stringify({ move_to: moveTo })
-    });
-    if (res.error) { showToast(res.error, 'error'); return; }
-    showToast(t('toast_category_moved_deleted', { count: count, target: target ? target.label : moveTo, name: label }), 'success');
-    await fetchStats();
-    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-    loadCategories();
-  };
 }
 
 // ── Protein Quality Settings ────────────────────────
@@ -315,18 +356,34 @@ export function renderPqTable() {
   pqData.forEach(function(row) {
     h += '<div class="pq-card">'
       + '<div class="pq-card-top">'
-      + '<input class="cat-item-label-input" id="pqe-label-' + row.id + '" value="' + esc(row.label || row.keywords[0]) + '" onchange="autosavePq(' + row.id + ')" title="Name">'
+      + '<input class="cat-item-label-input" id="pqe-label-' + row.id + '" value="' + esc(row.label || row.keywords[0]) + '" title="Name">'
       + '<span class="pq-badges"><span class="pq-badge"><span class="pq-badge-label">P </span>'
-      + '<input class="pq-inline-num mono" id="pqe-pdcaas-' + row.id + '" type="number" step="0.01" min="0" max="1" value="' + row.pdcaas + '" onchange="autosavePq(' + row.id + ')">'
+      + '<input class="pq-inline-num mono" id="pqe-pdcaas-' + row.id + '" type="number" step="0.01" min="0" max="1" value="' + row.pdcaas + '">'
       + '</span><span class="pq-badge"><span class="pq-badge-label">D </span>'
-      + '<input class="pq-inline-num mono" id="pqe-diaas-' + row.id + '" type="number" step="0.01" min="0" max="1.2" value="' + row.diaas + '" onchange="autosavePq(' + row.id + ')">'
+      + '<input class="pq-inline-num mono" id="pqe-diaas-' + row.id + '" type="number" step="0.01" min="0" max="1.2" value="' + row.diaas + '">'
       + '</span></span>'
-      + '<button class="btn-sm btn-red" onclick="deletePq(' + row.id + ',\'' + esc(row.label || row.keywords[0]).replace(/'/g, "\\'") + '\')">&#128465;</button>'
+      + '<button class="btn-sm btn-red" data-action="delete-pq" data-pq-id="' + row.id + '" data-pq-label="' + esc(row.label || row.keywords[0]) + '">&#128465;</button>'
       + '</div>'
-      + '<input class="pq-kw-input" id="pqe-kw-' + row.id + '" value="' + esc(row.keywords.join(', ')) + '" onchange="autosavePq(' + row.id + ')" placeholder="Keywords (comma separated)">'
+      + '<input class="pq-kw-input" id="pqe-kw-' + row.id + '" value="' + esc(row.keywords.join(', ')) + '" placeholder="Keywords (comma separated)">'
       + '</div>';
   });
   container.innerHTML = h;
+  // Attach change handlers for autosave
+  pqData.forEach(function(row) {
+    var labelEl = document.getElementById('pqe-label-' + row.id);
+    var pdcaasEl = document.getElementById('pqe-pdcaas-' + row.id);
+    var diaasEl = document.getElementById('pqe-diaas-' + row.id);
+    var kwEl = document.getElementById('pqe-kw-' + row.id);
+    [labelEl, pdcaasEl, diaasEl, kwEl].forEach(function(el) {
+      if (el) el.addEventListener('change', function() { autosavePq(row.id); });
+    });
+  });
+  // Attach delete handlers
+  container.querySelectorAll('[data-action="delete-pq"]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      deletePq(parseInt(btn.dataset.pqId, 10), btn.dataset.pqLabel);
+    });
+  });
 }
 
 var _pqSaveTimers = {};

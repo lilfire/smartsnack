@@ -1,8 +1,10 @@
+"""Service for product statistics and category summaries."""
+
 from db import get_db
 from translations import _category_label
 
 
-def get_stats():
+def get_stats() -> dict:
     conn = get_db()
     cur = conn.cursor()
     total = cur.execute("SELECT COUNT(*) FROM products").fetchone()[0]

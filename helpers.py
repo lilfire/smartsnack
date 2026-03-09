@@ -1,3 +1,5 @@
+"""Request parsing and validation helpers used across blueprints."""
+
 import math
 import re
 
@@ -6,14 +8,15 @@ from flask import request
 from config import _PQ_MAX_KEYWORDS, _PQ_MAX_KEYWORD_LEN
 
 
-def _require_json():
+def _require_json() -> dict:
+    """Parse JSON from request body, raising ValueError on failure."""
     data = request.get_json(silent=True)
     if data is None:
-        return None
+        raise ValueError("Invalid or missing JSON body")
     return data
 
 
-def _num(data, field):
+def _num(data: dict, field: str) -> float | None:
     v = data.get(field)
     if v is None or v == "":
         return None
@@ -26,14 +29,17 @@ def _num(data, field):
     return result
 
 
-def _safe_float(v, label="value"):
-    result = float(v)
+def _safe_float(v, label: str = "value") -> float:
+    try:
+        result = float(v)
+    except (ValueError, TypeError):
+        raise ValueError(f"Invalid numeric value for {label}")
     if not math.isfinite(result):
         raise ValueError(f"Non-finite numeric value for {label}")
     return result
 
 
-def _validate_keywords(keywords):
+def _validate_keywords(keywords) -> tuple[list | None, str | None]:
     if isinstance(keywords, str):
         keywords = [k.strip() for k in keywords.split(",") if k.strip()]
     if not isinstance(keywords, list):
@@ -50,9 +56,9 @@ _MAX_CATEGORY_NAME_LEN = 100
 _CATEGORY_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
 
 
-def _validate_category_name(n):
-    if not n or len(n) > _MAX_CATEGORY_NAME_LEN:
+def _validate_category_name(name: str) -> str | None:
+    if not name or len(name) > _MAX_CATEGORY_NAME_LEN:
         return "Invalid category name"
-    if not _CATEGORY_NAME_RE.match(n):
+    if not _CATEGORY_NAME_RE.match(name):
         return "Invalid category name"
     return None

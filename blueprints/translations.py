@@ -1,3 +1,5 @@
+"""Blueprint for translation and language endpoints."""
+
 from flask import Blueprint, jsonify
 
 from services import translation_service

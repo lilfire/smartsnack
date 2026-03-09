@@ -1,3 +1,6 @@
+"""Service for interacting with the Open Food Facts API."""
+
+import json
 import logging
 import urllib.request
 import urllib.error
@@ -10,7 +13,7 @@ logger = logging.getLogger(__name__)
 OFF_API_URL = "https://world.openfoodfacts.org/cgi/product_jqm2.pl"
 
 
-def add_product_to_off(product_data):
+def add_product_to_off(product_data: dict) -> dict:
     creds = get_off_credentials()
     if not creds["off_user_id"] or not creds["off_password"]:
         raise ValueError("off_err_no_credentials")
@@ -68,7 +71,6 @@ def add_product_to_off(product_data):
 
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            import json
             body = resp.read().decode("utf-8")
             data = json.loads(body)
             if data.get("status") != 1:
@@ -76,8 +78,8 @@ def add_product_to_off(product_data):
             return data
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
-        logger.error(f"OFF API HTTP error {e.code}: {body}")
+        logger.error("OFF API HTTP error %s: %s", e.code, body)
         raise RuntimeError("off_err_api")
     except urllib.error.URLError as e:
-        logger.error(f"OFF API URL error: {e.reason}")
+        logger.error("OFF API URL error: %s", e.reason)
         raise RuntimeError("off_err_network")
