@@ -4,6 +4,32 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.4.0] - 2026-03-09
+
+### Added
+
+- Comprehensive backend unit tests for all Python functions (pytest)
+- Comprehensive frontend unit tests for all JavaScript functions (Vitest)
+- `pyproject.toml` with pytest configuration and dev dependencies
+- Node.js >= 18 engine requirement for Vitest 3.x compatibility
+- PowerShell test wrapper for Windows development
+
+### Changed
+
+- Taste score input replaced with range slider in edit form
+
+### Fixed
+
+- XSS: escape quotes in `esc()` for safe use in HTML attributes
+- Unescaped labels in innerHTML and wrong toast type on delete
+- Multiple security, quality, and maintainability issues across all Python files (32 files reviewed)
+- Multiple security and quality issues across all JavaScript files (12 files reviewed)
+- Search result product expand not working on click (duplicate event listeners)
+- Docker entrypoint "no such file or directory" on Windows
+- Database locked error on Docker startup
+- Tests failing in VSCode when Flask is not installed
+- Deferred Flask-dependent imports in backup_service for pytest compatibility
+
 ## [0.3.0] - 2026-03-08
 
 ### Added
