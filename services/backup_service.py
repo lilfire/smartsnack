@@ -6,15 +6,9 @@ import sqlite3
 import logging
 from datetime import datetime, timezone
 
-from db import get_db
 from config import (
     APP_VERSION, SUPPORTED_LANGUAGES, SCORE_CONFIG_MAP,
     INSERT_WITH_IMAGE_SQL, _TEXT_FIELD_LIMITS,
-)
-from helpers import _safe_float
-from translations import (
-    _category_label, _category_key, _pq_label, _pq_keywords,
-    _set_translation_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -90,7 +84,13 @@ def _opt_float(v):
     """Convert a value to float, returning None for None values."""
     if v is None:
         return None
-    return _safe_float(v, "product field")
+    try:
+        result = float(v)
+    except (ValueError, TypeError) as e:
+        raise ValueError("Invalid numeric value for product field") from e
+    if not math.isfinite(result):
+        raise ValueError("Non-finite numeric value for product field")
+    return result
 
 
 def _restore_product(cur, p):
@@ -111,6 +111,8 @@ def _restore_product(cur, p):
 
 
 def create_backup(include_images: bool = True):
+    from db import get_db
+    from translations import _category_label, _pq_label, _pq_keywords
     conn = get_db()
     if include_images:
         products = [dict(r) for r in conn.execute("SELECT * FROM products ORDER BY id").fetchall()]
@@ -175,6 +177,7 @@ def _validate_backup(data: dict) -> None:
 
 def _restore_score_weights(cur: object, weights: list) -> None:
     """Restore score weights from backup data."""
+    from helpers import _safe_float
     cur.execute("DELETE FROM score_weights")
     for w in weights:
         field = w.get("field")
@@ -203,8 +206,10 @@ def _restore_score_weights(cur: object, weights: list) -> None:
         )
 
 
-def _restore_categories(cur: object, categories: list) -> None:
-    """Restore categories and their translations from backup data."""
+def _restore_categories(cur: object, categories: list) -> list:
+    """Restore categories from backup data. Returns pending translation ops."""
+    from translations import _category_key
+    pending_translations = []
     cur.execute("DELETE FROM categories")
     for c in categories:
         cur.execute(
@@ -217,11 +222,16 @@ def _restore_categories(cur: object, categories: list) -> None:
                 lang: c["label"] for lang in SUPPORTED_LANGUAGES
             }
         if translations:
-            _set_translation_key(_category_key(c["name"]), translations)
+            pending_translations.append(
+                (_category_key(c["name"]), translations)
+            )
+    return pending_translations
 
 
-def _restore_protein_quality(cur: object, pq_list: list) -> None:
-    """Restore protein quality entries and translations from backup data."""
+def _restore_protein_quality(cur: object, pq_list: list) -> list:
+    """Restore protein quality entries from backup. Returns pending translation ops."""
+    from helpers import _safe_float
+    pending_translations = []
     cur.execute("DELETE FROM protein_quality")
     for pq in pq_list:
         name = pq.get("name", "").strip()
@@ -244,8 +254,8 @@ def _restore_protein_quality(cur: object, pq_list: list) -> None:
         if translations:
             for lang, lang_data in translations.items():
                 if lang_data.get("label"):
-                    _set_translation_key(
-                        f"pq_{name}_label", {lang: lang_data["label"]}
+                    pending_translations.append(
+                        (f"pq_{name}_label", {lang: lang_data["label"]})
                     )
                 if lang_data.get("keywords"):
                     kw_str = (
@@ -253,55 +263,74 @@ def _restore_protein_quality(cur: object, pq_list: list) -> None:
                         if isinstance(lang_data["keywords"], list)
                         else lang_data["keywords"]
                     )
-                    _set_translation_key(
-                        f"pq_{name}_keywords", {lang: kw_str}
+                    pending_translations.append(
+                        (f"pq_{name}_keywords", {lang: kw_str})
                     )
         elif pq.get("label") or pq.get("keywords"):
             if pq.get("label"):
-                _set_translation_key(
+                pending_translations.append((
                     f"pq_{name}_label",
                     {lang: pq["label"] for lang in SUPPORTED_LANGUAGES},
-                )
+                ))
             kws = pq.get("keywords", [])
             if isinstance(kws, str):
                 kws = [k.strip() for k in kws.split(",") if k.strip()]
             if kws:
-                _set_translation_key(
+                pending_translations.append((
                     f"pq_{name}_keywords",
                     {lang: ", ".join(kws) for lang in SUPPORTED_LANGUAGES},
-                )
+                ))
+    return pending_translations
+
+
+def _apply_pending_translations(pending: list) -> None:
+    """Apply deferred translation writes after DB commit succeeds."""
+    from translations import _set_translation_key
+    for key, values_by_lang in pending:
+        _set_translation_key(key, values_by_lang)
 
 
 def restore_backup(data: dict) -> str:
     """Restore a full backup, replacing all existing data."""
+    from db import get_db
     _validate_backup(data)
     conn = get_db()
     cur = conn.cursor()
+    pending_translations = []
     try:
         if "score_weights" in data:
             _restore_score_weights(cur, data["score_weights"])
         if "categories" in data:
-            _restore_categories(cur, data["categories"])
+            pending_translations.extend(
+                _restore_categories(cur, data["categories"])
+            )
         if "protein_quality" in data:
-            _restore_protein_quality(cur, data["protein_quality"])
+            pending_translations.extend(
+                _restore_protein_quality(cur, data["protein_quality"])
+            )
         cur.execute("DELETE FROM products")
         for p in data["products"]:
             _restore_product(cur, p)
         conn.commit()
-        return f"Restored {len(data['products'])} products successfully"
     except Exception as e:
         conn.rollback()
         logger.error("Restore failed: %s", e)
         raise
+    # Apply translation file writes only after DB commit succeeds
+    _apply_pending_translations(pending_translations)
+    return f"Restored {len(data['products'])} products successfully"
 
 
 def import_products(data: dict) -> str:
     """Import products (and optionally categories) without deleting existing data."""
+    from db import get_db
+    from translations import _category_key
     if not data or "products" not in data:
         raise ValueError("Invalid import file")
     conn = get_db()
     cur = conn.cursor()
     added = 0
+    pending_translations = []
     try:
         if "categories" in data:
             for c in data["categories"]:
@@ -316,8 +345,8 @@ def import_products(data: dict) -> str:
                             lang: c["label"] for lang in SUPPORTED_LANGUAGES
                         }
                     if translations:
-                        _set_translation_key(
-                            _category_key(c["name"]), translations
+                        pending_translations.append(
+                            (_category_key(c["name"]), translations)
                         )
                 except sqlite3.IntegrityError:
                     pass
@@ -334,18 +363,20 @@ def import_products(data: dict) -> str:
                         "INSERT INTO categories (name, emoji) VALUES (?,?)",
                         (cat, emoji),
                     )
-                    _set_translation_key(
+                    pending_translations.append((
                         _category_key(cat),
                         {lang: cat for lang in SUPPORTED_LANGUAGES},
-                    )
+                    ))
                     existing_cats.add(cat)
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
             _restore_product(cur, p)
             added += 1
         conn.commit()
-        return f"Imported {added} products"
     except Exception as e:
         conn.rollback()
         logger.error("Import failed: %s", e)
         raise
+    # Apply translation file writes only after DB commit succeeds
+    _apply_pending_translations(pending_translations)
+    return f"Imported {added} products"

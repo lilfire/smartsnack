@@ -2,14 +2,11 @@
 
 import os
 import sqlite3
-import logging
 
 from flask import g
 
 from config import DB_PATH, SCORE_CONFIG, DEFAULT_WEIGHTS, PQ_SEED, DEFAULT_LANGUAGE
 from migrations import run_migrations
-
-logger = logging.getLogger(__name__)
 
 
 def get_db():
@@ -17,6 +14,7 @@ def get_db():
         g.db = sqlite3.connect(DB_PATH)
         g.db.row_factory = sqlite3.Row
         g.db.execute("PRAGMA foreign_keys = ON")
+        g.db.execute("PRAGMA busy_timeout = 5000")
     return g.db
 
 
@@ -32,6 +30,7 @@ def init_db():
         os.makedirs(db_dir, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute("PRAGMA journal_mode=WAL")
     cur = conn.cursor()
 

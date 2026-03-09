@@ -10,9 +10,7 @@ from config import (
 )
 from helpers import _num, _safe_float
 
-_TEXT_FIELD_SET = frozenset(
-    {"type", "name", "ean", "brand", "stores", "ingredients"}
-)
+_TEXT_FIELD_SET = frozenset(_TEXT_FIELD_LIMITS.keys())
 
 
 def _load_weight_config(cur: object) -> tuple:
@@ -224,7 +222,9 @@ def update_product(pid: int, data: dict) -> None:
         if not cat_exists:
             raise ValueError("Category does not exist")
     vals.append(pid)
-    conn.execute(f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals)
+    cur = conn.execute(f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals)
+    if cur.rowcount == 0:
+        raise LookupError("Product not found")
     conn.commit()
 
 

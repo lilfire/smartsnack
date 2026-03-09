@@ -4,6 +4,7 @@ import logging
 import sys
 
 from flask import Flask, jsonify
+from werkzeug.exceptions import HTTPException
 
 from db import init_db, close_db
 from blueprints import register_blueprints
@@ -26,6 +27,10 @@ def create_app() -> Flask:
     app.teardown_appcontext(close_db)
 
     register_blueprints(app)
+
+    @app.errorhandler(HTTPException)
+    def handle_http_error(e):
+        return jsonify({"error": e.description}), e.code
 
     @app.errorhandler(Exception)
     def handle_error(e):

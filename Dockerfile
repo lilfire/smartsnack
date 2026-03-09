@@ -21,7 +21,7 @@ COPY templates/ templates/
 COPY translations/ translations/
 COPY static/ static/
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 RUN mkdir -p /data /app/certs
 

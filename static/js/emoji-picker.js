@@ -2,8 +2,8 @@
 import { EMOJI_DATA } from './emoji-data.js';
 import { t } from './i18n.js';
 
-var activePopup = null;
-var activeCleanup = null;
+let activePopup = null;
+let activeCleanup = null;
 
 function closePopup() {
   if (activePopup) {
@@ -16,55 +16,59 @@ function closePopup() {
   }
 }
 
+// Cache search terms per entry to avoid recomputing on every keystroke
+const _searchTermsCache = new WeakMap();
 function getSearchTerms(entry) {
-  // Combine: translation keywords (comma-separated) + name (underscore-split)
-  var key = 'emoji_' + entry.name;
-  var translated = t(key);
-  var terms = entry.name.replace(/_/g, ' ');
+  if (_searchTermsCache.has(entry)) return _searchTermsCache.get(entry);
+  const key = 'emoji_' + entry.name;
+  const translated = t(key);
+  let terms = entry.name.replace(/_/g, ' ');
   if (translated !== key) {
     terms += ',' + translated;
   }
-  return terms.toLowerCase();
+  const result = terms.toLowerCase();
+  _searchTermsCache.set(entry, result);
+  return result;
 }
 
 export function initEmojiPicker(triggerEl, inputEl, onSelect) {
   if (!triggerEl) return;
 
-  triggerEl.addEventListener('click', function(e) {
+  triggerEl.addEventListener('click', (e) => {
     e.preventDefault();
     e.stopPropagation();
 
     // Toggle: close if already open from this trigger
     if (activePopup) {
-      var wasThisTrigger = (activePopup._triggerEl === triggerEl);
+      const wasThisTrigger = (activePopup._triggerEl === triggerEl);
       closePopup();
       if (wasThisTrigger) return;
     }
 
     // Build popup
-    var popup = document.createElement('div');
+    const popup = document.createElement('div');
     popup.className = 'emoji-picker-popup';
 
-    var search = document.createElement('input');
+    const search = document.createElement('input');
     search.className = 'emoji-picker-search';
     search.type = 'text';
     search.placeholder = t('emoji_search_placeholder') !== 'emoji_search_placeholder'
       ? t('emoji_search_placeholder') : 'Search...';
     popup.appendChild(search);
 
-    var grid = document.createElement('div');
+    const grid = document.createElement('div');
     grid.className = 'emoji-picker-grid';
     popup.appendChild(grid);
 
     // Build emoji buttons
-    var buttons = [];
-    EMOJI_DATA.forEach(function(entry) {
-      var btn = document.createElement('button');
+    const buttons = [];
+    EMOJI_DATA.forEach((entry) => {
+      const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'emoji-picker-item';
       btn.textContent = entry.emoji;
       btn.title = entry.name.replace(/_/g, ' ');
-      btn.addEventListener('click', function() {
+      btn.addEventListener('click', () => {
         if (inputEl) inputEl.value = entry.emoji;
         triggerEl.textContent = entry.emoji;
         closePopup();
@@ -75,23 +79,23 @@ export function initEmojiPicker(triggerEl, inputEl, onSelect) {
     });
 
     // Search filtering
-    var emptyMsg = document.createElement('div');
+    const emptyMsg = document.createElement('div');
     emptyMsg.className = 'emoji-picker-empty';
     emptyMsg.textContent = t('emoji_no_results') !== 'emoji_no_results'
       ? t('emoji_no_results') : 'No matches';
     emptyMsg.style.display = 'none';
     grid.appendChild(emptyMsg);
 
-    search.addEventListener('input', function() {
-      var q = search.value.trim().toLowerCase();
-      var anyVisible = false;
-      buttons.forEach(function(item) {
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      let anyVisible = false;
+      buttons.forEach((item) => {
         if (!q) {
           item.btn.style.display = '';
           anyVisible = true;
         } else {
-          var terms = getSearchTerms(item.entry);
-          var match = terms.indexOf(q) !== -1;
+          const terms = getSearchTerms(item.entry);
+          const match = terms.indexOf(q) !== -1;
           item.btn.style.display = match ? '' : 'none';
           if (match) anyVisible = true;
         }
@@ -100,7 +104,7 @@ export function initEmojiPicker(triggerEl, inputEl, onSelect) {
     });
 
     // Insert popup inline after the .cat-add-grid container
-    var container = triggerEl.closest('.cat-add-grid') || triggerEl.parentNode;
+    const container = triggerEl.closest('.cat-add-grid') || triggerEl.parentNode;
     container.insertAdjacentElement('afterend', popup);
 
     popup._triggerEl = triggerEl;
@@ -109,25 +113,25 @@ export function initEmojiPicker(triggerEl, inputEl, onSelect) {
     // Focus search
     search.focus();
 
-    // Close on outside click
-    function onDocClick(ev) {
-      if (!popup.contains(ev.target) && ev.target !== triggerEl) {
+    // Close on outside click — use contains() to handle child elements of trigger
+    const onDocClick = (ev) => {
+      if (!popup.contains(ev.target) && !triggerEl.contains(ev.target)) {
         closePopup();
       }
-    }
+    };
     // Close on Escape
-    function onKeyDown(ev) {
+    const onKeyDown = (ev) => {
       if (ev.key === 'Escape') {
         closePopup();
       }
-    }
+    };
 
-    setTimeout(function() {
+    setTimeout(() => {
       document.addEventListener('click', onDocClick);
       document.addEventListener('keydown', onKeyDown);
     }, 0);
 
-    activeCleanup = function() {
+    activeCleanup = () => {
       document.removeEventListener('click', onDocClick);
       document.removeEventListener('keydown', onKeyDown);
     };

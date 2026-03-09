@@ -19,6 +19,9 @@ _no_redirect_opener = urllib.request.build_opener(_NoRedirectHandler)
 def proxy_image(url: str) -> tuple[bytes, str]:
     if not url or not url.startswith(("http://", "https://")):
         raise ValueError("Invalid URL")
+    # Upgrade HTTP to HTTPS to prevent plaintext requests
+    if url.startswith("http://"):
+        url = "https://" + url[7:]
     parsed = urlparse(url)
     allowed_domains = (".openfoodfacts.org", ".openfoodfacts.net")
     if not parsed.hostname or not any(parsed.hostname == d.lstrip(".") or parsed.hostname.endswith(d) for d in allowed_domains):
@@ -38,4 +41,4 @@ def proxy_image(url: str) -> tuple[bytes, str]:
         raise
     except Exception as e:
         logger.error("Image proxy error: %s", e)
-        raise RuntimeError("Failed to fetch image")
+        raise RuntimeError("Failed to fetch image") from e

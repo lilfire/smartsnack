@@ -23,7 +23,7 @@ def add_protein_quality():
         return jsonify({"error": str(e)}), 409
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(result)
+    return jsonify(result), 201
 
 
 @bp.route("/api/protein-quality/<int:pid>", methods=["PUT"])
@@ -56,5 +56,8 @@ def estimate_protein_quality():
     ingredients = (data.get("ingredients") or "").strip()
     if not ingredients:
         return jsonify({"error": "ingredients required"}), 400
-    result = protein_quality_service.estimate(ingredients)
+    try:
+        result = protein_quality_service.estimate(ingredients)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     return jsonify(result)

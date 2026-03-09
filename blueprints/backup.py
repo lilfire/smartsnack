@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request, Response
 
-from helpers import _require_json
+from helpers import _require_json, _check_api_key
 from services import backup_service
 
 logger = logging.getLogger(__name__)
@@ -16,6 +16,9 @@ bp = Blueprint("backup", __name__)
 
 @bp.route("/api/backup")
 def backup_db():
+    denied = _check_api_key()
+    if denied:
+        return denied
     include_images = request.args.get("images", "true").lower() == "true"
     payload = backup_service.create_backup(include_images=include_images)
     json_str = json.dumps(payload, ensure_ascii=False, indent=2)
@@ -31,12 +34,15 @@ def backup_db():
 
 @bp.route("/api/restore", methods=["POST"])
 def restore_db():
+    denied = _check_api_key()
+    if denied:
+        return denied
     try:
         data = _require_json()
         message = backup_service.restore_backup(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception:
+    except (OSError, RuntimeError):
         logger.exception("Restore failed")
         return jsonify({"error": "Restore failed"}), 500
     return jsonify({"ok": True, "message": message})
@@ -44,12 +50,15 @@ def restore_db():
 
 @bp.route("/api/import", methods=["POST"])
 def import_products():
+    denied = _check_api_key()
+    if denied:
+        return denied
     try:
         data = _require_json()
         message = backup_service.import_products(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception:
+    except (OSError, RuntimeError):
         logger.exception("Import failed")
         return jsonify({"error": "Import failed"}), 500
     return jsonify({"ok": True, "message": message})
