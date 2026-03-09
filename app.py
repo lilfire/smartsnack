@@ -17,7 +17,7 @@ def create_app() -> Flask:
     try:
         init_db()
     except Exception as e:
-        logger.error("Failed to initialize database: %s", e)
+        logger.error("Failed to initialize database: %s", e, exc_info=True)
         sys.exit(1)
 
     app = Flask(__name__)

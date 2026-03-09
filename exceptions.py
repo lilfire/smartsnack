@@ -3,4 +3,3 @@
 
 class ConflictError(ValueError):
     """Raised when an operation conflicts with existing state (e.g., duplicates)."""
-    pass

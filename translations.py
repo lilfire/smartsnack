@@ -129,7 +129,7 @@ def _atomic_write_json(filepath: str, data: dict) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
         os.replace(tmp_path, filepath)
-    except BaseException:
+    except Exception:
         try:
             os.unlink(tmp_path)
         except OSError:
