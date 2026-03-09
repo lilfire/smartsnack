@@ -59,7 +59,7 @@ _OFF_SEARCH_FIELDS = (
 
 def _clean_search_query(query: str) -> str:
     """Remove special characters that break OFF search."""
-    cleaned = re.sub(r'[&+#@!?*]', ' ', query)
+    cleaned = re.sub(r'[+#@!?*]', ' ', query)
     return re.sub(r'\s+', ' ', cleaned).strip()
 
 
@@ -76,23 +76,42 @@ def _sort_by_completeness(data: dict) -> dict:
 def off_search(query: str) -> dict:
     """Proxy a product name search to the OpenFoodFacts API.
 
-    Tries the search-a-licious API first (Elasticsearch-based, better fuzzy
-    matching), then falls back to the classic search.pl endpoint.
+    Queries both search-a-licious (Elasticsearch) and classic search.pl,
+    then combines and deduplicates results sorted by completeness.
     """
     if not query or len(query.strip()) < 2:
         raise ValueError("Query too short")
     cleaned = _clean_search_query(query)
 
-    # Try search-a-licious first (better fuzzy/multi-field search)
+    products_a = []
+    products_c = []
+
+    # Search-a-licious (better fuzzy/multi-field search)
     try:
         data = _off_search_a_licious(cleaned)
-        if data.get("count", 0) > 0:
-            return _sort_by_completeness(data)
+        products_a = data.get("products") or data.get("hits") or []
     except Exception:
-        logger.info("search-a-licious unavailable, falling back to search.pl")
+        logger.info("search-a-licious unavailable")
 
-    # Fallback to classic search.pl
-    return _sort_by_completeness(_off_search_classic(cleaned))
+    # Classic search.pl
+    try:
+        data = _off_search_classic(cleaned)
+        products_c = data.get("products") or []
+    except Exception:
+        logger.info("search.pl unavailable")
+
+    # Combine and deduplicate by barcode (code), keeping first occurrence
+    seen = set()
+    combined = []
+    for p in products_a + products_c:
+        code = p.get("code", "")
+        key = code if code else id(p)
+        if key not in seen:
+            seen.add(key)
+            combined.append(p)
+
+    result = {"products": combined, "count": len(combined)}
+    return _sort_by_completeness(result)
 
 
 def _off_search_a_licious(query: str) -> dict:
