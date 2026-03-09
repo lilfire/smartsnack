@@ -2,14 +2,11 @@
 
 import os
 import sqlite3
-import logging
 
 from flask import g
 
 from config import DB_PATH, SCORE_CONFIG, DEFAULT_WEIGHTS, PQ_SEED, DEFAULT_LANGUAGE
 from migrations import run_migrations
-
-logger = logging.getLogger(__name__)
 
 
 def get_db():

@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request
 
 from exceptions import ConflictError
-from helpers import _require_json
+from helpers import _require_json, _validate_category_name
 from services import category_service
 
 bp = Blueprint("categories", __name__)
@@ -31,6 +31,9 @@ def add_category():
 
 @bp.route("/api/categories/<name>", methods=["PUT"])
 def update_category(name):
+    err = _validate_category_name(name)
+    if err:
+        return jsonify({"error": err}), 400
     try:
         data = _require_json()
         label = data.get("label", "").strip()
@@ -43,10 +46,14 @@ def update_category(name):
 
 @bp.route("/api/categories/<name>", methods=["DELETE"])
 def delete_category(name):
+    err = _validate_category_name(name)
+    if err:
+        return jsonify({"error": err}), 400
     move_to = None
     body = request.get_json(silent=True)
     if body:
-        move_to = (body.get("move_to") or "").strip() or None
+        raw = body.get("move_to")
+        move_to = raw.strip() if isinstance(raw, str) and raw.strip() else None
     try:
         count = category_service.delete_category(name, move_to=move_to)
     except ValueError as e:

@@ -34,6 +34,8 @@ def update_product(pid):
     try:
         data = _require_json()
         product_service.update_product(pid, data)
+    except LookupError:
+        return jsonify({"error": "Product not found"}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "message": "Product updated"})
