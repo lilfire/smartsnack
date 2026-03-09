@@ -242,10 +242,12 @@ export function renderResults(results, search) {
       case 'sort':
         window.setSort(target.dataset.col);
         break;
-      case 'toggle-expand':
+      case 'toggle-expand': {
         // Don't expand if clicking inside expanded area or on buttons
         if (e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
-        window.toggleExpand(id);
+        const rowId = target.dataset.productId ? parseInt(target.dataset.productId, 10) : id;
+        window.toggleExpand(rowId);
+      }
         break;
       case 'trigger-image':
         e.stopPropagation();
