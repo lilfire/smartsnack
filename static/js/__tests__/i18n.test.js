@@ -31,6 +31,10 @@ vi.mock('../state.js', () => {
   };
 });
 
+// Mock dynamic imports used by changeLanguage()
+vi.mock('../products.js', () => ({ loadData: vi.fn() }));
+vi.mock('../settings.js', () => ({ loadSettings: vi.fn() }));
+
 import { t, getCurrentLang, initLanguage, applyStaticTranslations, changeLanguage } from '../i18n.js';
 import { state, api } from '../state.js';
 

@@ -205,12 +205,14 @@ describe('loadCategories', () => {
   });
 
   it('shows error on API failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const list = document.createElement('div');
     list.id = 'cat-list';
     document.body.appendChild(list);
     api.mockRejectedValueOnce(new Error('fail'));
     await loadCategories();
     expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
+    console.error.mockRestore();
   });
 });
 
