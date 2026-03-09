@@ -6,6 +6,8 @@ services:
       - "5001:5001"
     volumes:
       - smartsnack-data:/data
+    environment:
+      - SMARTSNACK_SECRET_KEY=changeme
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
