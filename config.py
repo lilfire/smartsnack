@@ -16,21 +16,24 @@ except OSError:
     SUPPORTED_LANGUAGES = [DEFAULT_LANGUAGE]
 
 # ── All product numeric fields (excluding type, name, ean, image) ─────
-NUTRITION_FIELDS = [
+NUTRITION_FIELDS = (
     "kcal", "energy_kj", "carbs", "sugar",
     "fat", "saturated_fat", "protein", "fiber", "salt",
-    "volume", "price", "weight", "portion"
-]
-ALL_PRODUCT_FIELDS = ["taste_score", "est_pdcaas", "est_diaas", "type", "name", "ean", "brand", "stores", "ingredients"] + NUTRITION_FIELDS
+    "volume", "price", "weight", "portion",
+)
+ALL_PRODUCT_FIELDS = ("taste_score", "est_pdcaas", "est_diaas", "type", "name", "ean", "brand", "stores", "ingredients") + NUTRITION_FIELDS
 
 # Whitelist of valid column names for dynamic SQL construction
-_VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ["id", "image"])
+_VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
 
 # Maximum lengths for text fields
 _TEXT_FIELD_LIMITS = {
     "type": 100, "name": 200, "ean": 50, "brand": 200,
     "stores": 500, "ingredients": 10000,
 }
+
+_MAX_CATEGORY_NAME_LEN = 100
+_MAX_PASSWORD_LEN = 500
 
 # Protein quality keyword/label limits
 _PQ_MAX_KEYWORDS = 50

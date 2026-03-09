@@ -3,11 +3,10 @@
 from flask import Blueprint, jsonify
 
 from helpers import _require_json
+from config import _MAX_PASSWORD_LEN
 from services import settings_service
 
 bp = Blueprint("settings", __name__)
-
-_MAX_PASSWORD_LEN = 500
 
 
 @bp.route("/api/settings/language")

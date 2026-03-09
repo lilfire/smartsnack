@@ -36,7 +36,7 @@ def restore_db():
         message = backup_service.restore_backup(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception:
+    except (OSError, RuntimeError):
         logger.exception("Restore failed")
         return jsonify({"error": "Restore failed"}), 500
     return jsonify({"ok": True, "message": message})
@@ -49,7 +49,7 @@ def import_products():
         message = backup_service.import_products(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    except Exception:
+    except (OSError, RuntimeError):
         logger.exception("Import failed")
         return jsonify({"error": "Import failed"}), 500
     return jsonify({"ok": True, "message": message})

@@ -47,7 +47,8 @@ def _decrypt(stored: str) -> str:
         encrypted = base64.b64decode(stored)
         decrypted = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(encrypted))
         return decrypted.decode("utf-8")
-    except Exception:
+    except (ValueError, UnicodeDecodeError):
+        logger.warning("Failed to decrypt legacy value, returning as-is")
         return stored
 
 
@@ -86,8 +87,9 @@ def get_off_credentials() -> dict:
     if pass_row and pass_row["value"]:
         try:
             password = _decrypt(pass_row["value"])
-        except (InvalidToken, Exception):
-            password = pass_row["value"]
+        except InvalidToken:
+            logger.warning("Failed to decrypt OFF password")
+            password = ""
     return {
         "off_user_id": user_row["value"] if user_row else "",
         "off_password": password,
