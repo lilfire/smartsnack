@@ -80,6 +80,24 @@ The SQLite database is created automatically at startup. Set the `DB_PATH` envir
 └── requirements.txt        # Python dependencies
 ```
 
+## Testing
+
+### Backend (Python)
+
+```bash
+pip install -e ".[dev]"
+pytest
+```
+
+### Frontend (JavaScript)
+
+Requires Node.js 18+.
+
+```bash
+npm install
+npm test
+```
+
 ## Usage
 
 1. Open the app in a browser and go to the **Registrer** (Register) tab.

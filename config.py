@@ -2,7 +2,7 @@
 
 import os
 
-APP_VERSION = "0.3"
+APP_VERSION = "0.4"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 TRANSLATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translations")
