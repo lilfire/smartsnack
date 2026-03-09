@@ -51,7 +51,7 @@ def add_category(name: str, label: str, emoji: str) -> None:
     _set_translation_key(_category_key(name), {lang: label})
 
 
-def update_category(name, label, emoji):
+def update_category(name: str, label: str, emoji: str) -> None:
     err = _validate_category_name(name)
     if err:
         raise ValueError(err)

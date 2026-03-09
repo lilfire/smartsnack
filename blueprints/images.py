@@ -18,16 +18,14 @@ def get_product_image(pid):
 
 @bp.route("/api/products/<int:pid>/image", methods=["PUT"])
 def set_product_image(pid):
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
+        data = _require_json()
         found = image_service.set_image(pid, data.get("image", ""))
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     if not found:
         return jsonify({"error": "Product not found"}), 404
-    return jsonify({"message": "Image saved"})
+    return jsonify({"ok": True, "message": "Image saved"})
 
 
 @bp.route("/api/products/<int:pid>/image", methods=["DELETE"])
@@ -35,4 +33,4 @@ def delete_product_image(pid):
     found = image_service.delete_image(pid)
     if not found:
         return jsonify({"error": "Product not found"}), 404
-    return jsonify({"message": "Image removed"})
+    return jsonify({"ok": True, "message": "Image removed"})

@@ -16,7 +16,7 @@ class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
 _no_redirect_opener = urllib.request.build_opener(_NoRedirectHandler)
 
 
-def proxy_image(url):
+def proxy_image(url: str) -> tuple[bytes, str]:
     if not url or not url.startswith(("http://", "https://")):
         raise ValueError("Invalid URL")
     parsed = urlparse(url)

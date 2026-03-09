@@ -9,7 +9,7 @@ _VALID_DIRECTIONS = frozenset({"lower", "higher"})
 _VALID_FORMULAS = frozenset({"minmax", "direct"})
 
 
-def get_weights():
+def get_weights() -> list:
     conn = get_db()
     rows = conn.execute("SELECT field, enabled, weight, direction, formula, formula_min, formula_max FROM score_weights ORDER BY field").fetchall()
     db_map = {r["field"]: {"enabled": bool(r["enabled"]), "weight": r["weight"], "direction": r["direction"], "formula": r["formula"], "formula_min": r["formula_min"], "formula_max": r["formula_max"]} for r in rows}
@@ -32,7 +32,7 @@ def get_weights():
     return result
 
 
-def update_weights(data):
+def update_weights(data: list) -> None:
     if not isinstance(data, list):
         raise ValueError("Expected array of weights")
     conn = get_db()

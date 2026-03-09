@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 OFF_API_URL = "https://world.openfoodfacts.org/cgi/product_jqm2.pl"
 
 
-def add_product_to_off(product_data):
+def add_product_to_off(product_data: dict) -> dict:
     creds = get_off_credentials()
     if not creds["off_user_id"] or not creds["off_password"]:
         raise ValueError("off_err_no_credentials")

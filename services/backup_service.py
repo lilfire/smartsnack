@@ -90,10 +90,7 @@ def _restore_product(cur, p):
     def _n(v):
         if v is None:
             return None
-        result = float(v)
-        if not math.isfinite(result):
-            raise ValueError(f"Non-finite numeric value in product: {v}")
-        return result
+        return _safe_float(v, "product field")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
         val = p.get(tf, "")
         if isinstance(val, str) and len(val) > max_len:
@@ -110,9 +107,17 @@ def _restore_product(cur, p):
          _n(p.get("est_pdcaas")), _n(p.get("est_diaas")), p.get("image","")))
 
 
-def create_backup():
+def create_backup(include_images: bool = True):
     conn = get_db()
-    products = [dict(r) for r in conn.execute("SELECT * FROM products ORDER BY id").fetchall()]
+    if include_images:
+        products = [dict(r) for r in conn.execute("SELECT * FROM products ORDER BY id").fetchall()]
+    else:
+        products = [dict(r) for r in conn.execute(
+            "SELECT id, type, name, ean, brand, stores, ingredients, taste_score, "
+            "kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, "
+            "salt, volume, price, weight, portion, est_pdcaas, est_diaas "
+            "FROM products ORDER BY id"
+        ).fetchall()]
     cat_rows = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     categories = []
     for c in cat_rows:

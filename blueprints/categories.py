@@ -16,43 +16,39 @@ def get_categories():
 
 @bp.route("/api/categories", methods=["POST"])
 def add_category():
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
-    name = data.get("name", "").strip()
-    label = data.get("label", "").strip()
-    emoji = data.get("emoji", "\U0001F4E6").strip()
     try:
+        data = _require_json()
+        name = data.get("name", "").strip()
+        label = data.get("label", "").strip()
+        emoji = data.get("emoji", "\U0001F4E6").strip()
         category_service.add_category(name, label, emoji)
     except ConflictError as e:
         return jsonify({"error": str(e)}), 409
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"message": "Category added"}), 201
+    return jsonify({"ok": True, "message": "Category added"}), 201
 
 
-@bp.route("/api/categories/<n>", methods=["PUT"])
-def update_category(n):
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
-    label = data.get("label", "").strip()
-    emoji = data.get("emoji", "").strip()
+@bp.route("/api/categories/<name>", methods=["PUT"])
+def update_category(name):
     try:
-        category_service.update_category(n, label, emoji)
+        data = _require_json()
+        label = data.get("label", "").strip()
+        emoji = data.get("emoji", "").strip()
+        category_service.update_category(name, label, emoji)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"message": "Category updated"})
+    return jsonify({"ok": True, "message": "Category updated"})
 
 
-@bp.route("/api/categories/<n>", methods=["DELETE"])
-def delete_category(n):
+@bp.route("/api/categories/<name>", methods=["DELETE"])
+def delete_category(name):
     move_to = None
     body = request.get_json(silent=True)
     if body:
         move_to = (body.get("move_to") or "").strip() or None
     try:
-        count = category_service.delete_category(n, move_to=move_to)
+        count = category_service.delete_category(name, move_to=move_to)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"message": "Category deleted", "moved": count or 0})
+    return jsonify({"ok": True, "message": "Category deleted", "moved": count or 0})

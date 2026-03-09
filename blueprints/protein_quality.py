@@ -16,10 +16,8 @@ def list_protein_quality():
 
 @bp.route("/api/protein-quality", methods=["POST"])
 def add_protein_quality():
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
+        data = _require_json()
         result = protein_quality_service.add_entry(data)
     except ConflictError as e:
         return jsonify({"error": str(e)}), 409
@@ -30,10 +28,8 @@ def add_protein_quality():
 
 @bp.route("/api/protein-quality/<int:pid>", methods=["PUT"])
 def update_protein_quality(pid):
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
+        data = _require_json()
         protein_quality_service.update_entry(pid, data)
     except LookupError:
         return jsonify({"error": "Not found"}), 404
@@ -53,9 +49,10 @@ def delete_protein_quality(pid):
 
 @bp.route("/api/estimate-protein-quality", methods=["POST"])
 def estimate_protein_quality():
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     ingredients = (data.get("ingredients") or "").strip()
     if not ingredients:
         return jsonify({"error": "ingredients required"}), 400
