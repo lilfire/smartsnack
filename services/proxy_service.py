@@ -46,6 +46,7 @@ def proxy_image(url: str) -> tuple[bytes, str]:
 
 
 _OFF_API_BASE = "https://world.openfoodfacts.org/api/v2"
+_OFF_SEARCH_BASE = "https://world.openfoodfacts.org/cgi/search.pl"
 _OFF_SEARCH_FIELDS = (
     "code,product_name,product_name_no,brands,stores,stores_tags,"
     "nutriments,image_front_small_url,image_front_url,image_url,"
@@ -60,10 +61,13 @@ def off_search(query: str) -> dict:
         raise ValueError("Query too short")
     params = urlencode({
         "search_terms": query,
+        "search_simple": "1",
+        "action": "process",
+        "json": "1",
         "page_size": "20",
         "fields": _OFF_SEARCH_FIELDS,
     })
-    url = f"{_OFF_API_BASE}/search?{params}"
+    url = f"{_OFF_SEARCH_BASE}?{params}"
     return _off_get_json(url)
 
 
