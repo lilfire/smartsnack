@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "pretest": "node -e \"if(+process.versions.node.split('.')[0]<18){console.error('Node 18+ required. Run: nvm use 22');process.exit(1)}\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
