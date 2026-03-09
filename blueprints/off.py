@@ -9,11 +9,9 @@ bp = Blueprint("off", __name__)
 
 
 @bp.route("/api/off/add-product", methods=["POST"])
-def add_product():
-    data = _require_json()
-    if not data:
-        return jsonify({"error": "JSON body required"}), 400
+def add_product_to_off():
     try:
+        data = _require_json()
         result = off_service.add_product_to_off(data)
         return jsonify({"ok": True, "status_verbose": result.get("status_verbose", "fields saved")})
     except ValueError as e:

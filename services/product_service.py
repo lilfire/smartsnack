@@ -160,7 +160,7 @@ def list_products(search: str | None, type_filter: str | None) -> list:
     return results
 
 
-def add_product(data):
+def add_product(data: dict) -> dict:
     if not data.get("type", "").strip() or not data.get("name", "").strip():
         raise ValueError("type and name are required")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
@@ -177,7 +177,7 @@ def add_product(data):
         raise ValueError("Category does not exist")
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
-        (data["type"], data["name"].strip(), data.get("ean", "").strip(),
+        (data["type"].strip(), data["name"].strip(), data.get("ean", "").strip(),
          data.get("brand", "").strip(), data.get("stores", "").strip(), data.get("ingredients", "").strip(),
          _num(data, "taste_score"), _num(data, "kcal"),
          _num(data, "energy_kj"), _num(data, "carbs"),
@@ -228,7 +228,7 @@ def update_product(pid: int, data: dict) -> None:
     conn.commit()
 
 
-def delete_product(pid):
+def delete_product(pid: int) -> bool:
     conn = get_db()
     cur = conn.cursor()
     cur.execute("DELETE FROM products WHERE id = ?", (pid,))

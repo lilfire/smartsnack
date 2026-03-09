@@ -128,5 +128,5 @@ PRODUCT_COLS_NO_IMAGE = (
 )
 
 INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
-INSERT_PLACEHOLDERS = ",".join(["?"] * 22)
+INSERT_PLACEHOLDERS = ",".join(["?"] * len(INSERT_FIELDS.split(",")))
 INSERT_WITH_IMAGE_SQL = f"INSERT INTO products ({INSERT_FIELDS}, image) VALUES ({INSERT_PLACEHOLDERS}, ?)"

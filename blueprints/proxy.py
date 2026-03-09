@@ -18,8 +18,7 @@ def proxy_image():
         return jsonify({"error": str(e)}), 403
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
-    origin = request.headers.get("Origin", "")
-    cors_origin = origin if origin else request.host_url.rstrip("/")
+    cors_origin = request.host_url.rstrip("/")
     return Response(data, mimetype=content_type, headers={
         "Cache-Control": "public, max-age=86400",
         "Access-Control-Allow-Origin": cors_origin})

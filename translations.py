@@ -1,6 +1,5 @@
 """Internationalization system for translations stored as JSON files."""
 
-import fcntl
 import logging
 import os
 import re
@@ -9,12 +8,18 @@ import sqlite3
 import tempfile
 import threading
 
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
+
 from config import TRANSLATIONS_DIR, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 from db import get_db
 
 logger = logging.getLogger(__name__)
 
 _translations_cache = {}
+_cache_mtimes = {}
 _cache_lock = threading.Lock()
 _file_locks = {}
 _file_locks_lock = threading.Lock()
@@ -29,18 +34,23 @@ def _get_file_lock(filepath: str) -> threading.Lock:
 
 
 def _load_translations(lang: str) -> dict:
-    """Load translations for a language, with caching."""
+    """Load translations for a language, with mtime-based cache invalidation."""
     if lang not in SUPPORTED_LANGUAGES:
         return {}
-    with _cache_lock:
-        if lang in _translations_cache:
-            return _translations_cache[lang]
     filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
+    try:
+        current_mtime = os.path.getmtime(filepath)
+    except OSError:
+        return {}
+    with _cache_lock:
+        if lang in _translations_cache and _cache_mtimes.get(lang) == current_mtime:
+            return _translations_cache[lang]
     try:
         with open(filepath, "r", encoding="utf-8") as f:
             data = json.load(f)
         with _cache_lock:
             _translations_cache[lang] = data
+            _cache_mtimes[lang] = current_mtime
         return data
     except (OSError, json.JSONDecodeError) as e:
         logger.warning("Failed to load translations for %s: %s", lang, e)
@@ -119,7 +129,7 @@ def _atomic_write_json(filepath: str, data: dict) -> None:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
         os.replace(tmp_path, filepath)
-    except BaseException:
+    except Exception:
         try:
             os.unlink(tmp_path)
         except OSError:
@@ -139,7 +149,8 @@ def _set_translation_key(key: str, values_by_lang: dict) -> None:
         with file_lock:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    fcntl.flock(f, fcntl.LOCK_SH)
+                    if fcntl:
+                        fcntl.flock(f, fcntl.LOCK_SH)
                     data = json.load(f)
             except (OSError, json.JSONDecodeError):
                 data = {}
@@ -157,7 +168,8 @@ def _delete_translation_key(key: str) -> None:
         with file_lock:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    fcntl.flock(f, fcntl.LOCK_SH)
+                    if fcntl:
+                        fcntl.flock(f, fcntl.LOCK_SH)
                     data = json.load(f)
             except (OSError, json.JSONDecodeError):
                 continue

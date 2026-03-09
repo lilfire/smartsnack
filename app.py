@@ -17,11 +17,11 @@ def create_app() -> Flask:
     try:
         init_db()
     except Exception as e:
-        logger.error("Failed to initialize database: %s", e)
+        logger.error("Failed to initialize database: %s", e, exc_info=True)
         sys.exit(1)
 
     app = Flask(__name__)
-    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024
+    app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
 
     app.teardown_appcontext(close_db)
 

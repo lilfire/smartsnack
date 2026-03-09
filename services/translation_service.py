@@ -9,7 +9,7 @@ from config import SUPPORTED_LANGUAGES, TRANSLATIONS_DIR
 logger = logging.getLogger(__name__)
 
 
-def get_available_languages():
+def get_available_languages() -> list:
     languages = []
     for lang in SUPPORTED_LANGUAGES:
         filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
@@ -29,7 +29,7 @@ def get_available_languages():
     return languages
 
 
-def get_translations(lang):
+def get_translations(lang: str) -> dict:
     if lang not in SUPPORTED_LANGUAGES:
         raise LookupError("Unsupported language")
     filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")

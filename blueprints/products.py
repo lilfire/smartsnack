@@ -21,10 +21,8 @@ def get_products():
 
 @bp.route("/api/products", methods=["POST"])
 def add_product():
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
+        data = _require_json()
         result = product_service.add_product(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -33,14 +31,12 @@ def add_product():
 
 @bp.route("/api/products/<int:pid>", methods=["PUT"])
 def update_product(pid):
-    data = _require_json()
-    if data is None:
-        return jsonify({"error": "Invalid or missing JSON body"}), 400
     try:
+        data = _require_json()
         product_service.update_product(pid, data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"message": "Product updated"})
+    return jsonify({"ok": True, "message": "Product updated"})
 
 
 @bp.route("/api/products/<int:pid>", methods=["DELETE"])
@@ -48,4 +44,4 @@ def delete_product(pid):
     found = product_service.delete_product(pid)
     if not found:
         return jsonify({"error": "Product not found"}), 404
-    return jsonify({"message": "Deleted"})
+    return jsonify({"ok": True, "message": "Deleted"})
