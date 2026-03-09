@@ -1,6 +1,6 @@
 # SmartSnack
 
-A mobile-first web app for tracking and scoring Norwegian food products. Search by name or scan barcodes, pull nutrition data from OpenFoodFacts, and compare products using a fully configurable weighted scoring system.
+A mobile-first web app for tracking and scoring food products. Search by name or scan barcodes, pull nutrition data from OpenFoodFacts, and compare products using a fully configurable weighted scoring system.
 
 ## Features
 
