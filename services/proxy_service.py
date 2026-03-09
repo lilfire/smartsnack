@@ -79,7 +79,7 @@ def _off_get_json(url: str) -> dict:
     """Fetch JSON from the OpenFoodFacts API."""
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "SmartSnack/1.0"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             data = resp.read(2 * 1024 * 1024)  # 2 MB max
             return json.loads(data)
     except Exception as e:

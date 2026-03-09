@@ -3,7 +3,7 @@ import { state, api, esc, safeDataUri, showToast } from './state.js';
 import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
-const OFF_FETCH_TIMEOUT = 15000;
+const OFF_FETCH_TIMEOUT = 45000;
 
 function fetchWithTimeout(url, opts) {
   const controller = new AbortController();
