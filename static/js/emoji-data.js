@@ -3,7 +3,7 @@
 // name = translation key suffix (emoji_{name}) and fallback search term
 // Food & drink first (primary use case), then general-purpose
 
-export var EMOJI_DATA = [
+export const EMOJI_DATA = [
   // ── Fruits ──
   { emoji: "🍎", name: "red_apple" },
   { emoji: "🍏", name: "green_apple" },
@@ -97,7 +97,6 @@ export var EMOJI_DATA = [
 
   // ── Snacks ──
   { emoji: "🍿", name: "popcorn" },
-  { emoji: "🥜", name: "nuts" },
   { emoji: "🍪", name: "cookie" },
   { emoji: "🍩", name: "donut" },
   { emoji: "🧁", name: "cupcake" },
@@ -133,8 +132,6 @@ export var EMOJI_DATA = [
 
   // ── Condiments & Ingredients ──
   { emoji: "🫙", name: "jar" },
-  { emoji: "🍶", name: "bottle" },
-  { emoji: "🫚", name: "ginger" },
 
   // ── Kitchen & Cooking ──
   { emoji: "🍴", name: "fork_and_knife" },
@@ -142,7 +139,6 @@ export var EMOJI_DATA = [
   { emoji: "🔪", name: "knife" },
   { emoji: "🍽️", name: "plate" },
   { emoji: "🥣", name: "bowl" },
-  { emoji: "🫕", name: "cooking_pot" },
 
   // ── Health & Fitness ──
   { emoji: "💪", name: "muscle" },

@@ -27,6 +27,7 @@ export function triggerImageUpload(id) {
     var file = inp.files[0];
     if (file.size > 10 * 1024 * 1024) { showToast(t('toast_image_too_large'), 'error'); return; }
     var reader = new FileReader();
+    reader.onerror = function() { showToast(t('toast_image_upload_error'), 'error'); };
     reader.onload = async function(e) {
       var resized = await resizeImage(e.target.result, 400);
       try {

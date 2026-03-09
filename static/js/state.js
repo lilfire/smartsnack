@@ -15,7 +15,7 @@ export const state = {
 };
 
 // All nutrition field IDs used in register/edit forms
-export var NUTRI_IDS = ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'];
+export const NUTRI_IDS = ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'];
 
 export function catEmoji(typeName) {
   var c = state.categories.find(function(x) { return x.name === typeName; });
@@ -30,7 +30,7 @@ export function catLabel(typeName) {
 export function esc(s) {
   var d = document.createElement('div');
   d.textContent = s;
-  return d.innerHTML;
+  return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 export function safeDataUri(uri) {
@@ -50,11 +50,13 @@ export function fmtNum(v) {
   return n.toFixed(n % 1 ? 1 : 0);
 }
 
+var _toastTimer = null;
 export function showToast(msg, type) {
   var toast = document.getElementById('toast');
   toast.textContent = msg;
   toast.className = 'toast ' + type + ' show';
-  setTimeout(function() { toast.classList.remove('show'); }, 3000);
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function() { toast.classList.remove('show'); _toastTimer = null; }, 3000);
 }
 
 export async function api(path, opts) {

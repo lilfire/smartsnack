@@ -70,9 +70,14 @@ Object.assign(window, {
   selectOffResult, estimateProteinQuality, updateEstimateBtn,
   showOffAddReview, closeOffAddReview, submitToOff,
   // state access for inline handlers
-  get editingId() { return state.editingId; },
-  set editingId(v) { state.editingId = v; },
   loadData,
+});
+
+// Object.assign does not copy getters/setters — use defineProperty instead
+Object.defineProperty(window, 'editingId', {
+  get() { return state.editingId; },
+  set(v) { state.editingId = v; },
+  configurable: true,
 });
 
 // ── Init ─────────────────────────────────────────────
@@ -81,10 +86,14 @@ Object.assign(window, {
   try {
     var wc = await api('/api/weights');
     weightData.length = 0;
-    wc.forEach(function(w) { weightData.push(w); });
-    wc.forEach(function(w) { SCORE_CFG_MAP[w.field] = { label: w.label, desc: w.desc, direction: w.direction }; });
+    Object.keys(SCORE_CFG_MAP).forEach(function(k) { delete SCORE_CFG_MAP[k]; });
+    wc.forEach(function(w) {
+      weightData.push(w);
+      SCORE_CFG_MAP[w.field] = { label: w.label, desc: w.desc, direction: w.direction };
+    });
   } catch(e) { showToast(t('toast_load_error'), 'error'); }
   initRestoreDragDrop();
   loadData();
-  document.getElementById('search-input').focus();
+  var searchInput = document.getElementById('search-input');
+  if (searchInput) searchInput.focus();
 })();

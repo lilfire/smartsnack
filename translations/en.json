@@ -198,6 +198,8 @@
     "off_review_empty": "Missing fields",
     "off_submit_btn": "Add to OFF",
     "toast_off_product_added": "Product added to Open Food Facts!",
+    "toast_off_fetched": "Fetched from OFF: {fields}",
+    "toast_ingredients_missing": "Ingredients missing",
     "off_err_no_credentials": "OFF credentials not configured. Set them in Settings.",
     "off_err_no_ean": "EAN/barcode is required",
     "off_err_no_name": "Product name is required",
@@ -537,5 +539,14 @@
     "emoji_soap": "soap,clean,wash",
     "emoji_toothbrush": "toothbrush,dental,hygiene",
     "emoji_sleep": "sleep,zzz,rest",
-    "emoji_bed": "bed,sleep,rest"
+    "emoji_bed": "bed,sleep,rest",
+    "scan_barcode_title": "Scan barcode",
+    "scan_camera_error": "Could not open the camera. Check that you have granted camera permission.",
+    "scan_product_not_found": "Product not found",
+    "scan_not_in_database": "This barcode is not in the database. What would you like to do?",
+    "scan_register_new": "Register new product",
+    "scan_update_existing": "Update existing product",
+    "scan_searching": "Searching for \"{query}\"...",
+    "scan_fetch_data": "Yes, fetch data",
+    "scan_no_skip": "No, skip"
 }

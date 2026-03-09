@@ -9,7 +9,8 @@ export function buildFilters() {
   state.categories.forEach(function(c) {
     var n = state.cachedStats.type_counts[c.name] || 0;
     var active = state.currentFilter.indexOf(c.name) >= 0;
-    h += '<button class="pill ' + (active ? 'active' : '') + '" onclick="setFilter(\'' + esc(c.name) + '\')">' + esc(c.emoji) + ' ' + esc(c.label) + ' (' + n + ')</button>';
+    var safeName = esc(c.name).replace(/'/g, '&#39;');
+    h += '<button class="pill ' + (active ? 'active' : '') + '" onclick="setFilter(\'' + safeName + '\')">' + esc(c.emoji) + ' ' + esc(c.label) + ' (' + n + ')</button>';
   });
   row.innerHTML = h;
   updateFilterToggle();
@@ -35,8 +36,8 @@ export function updateFilterToggle() {
 export function toggleFilters() {
   var row = document.getElementById('filter-row');
   var tog = document.getElementById('filter-toggle');
-  row.classList.toggle('open');
-  tog.classList.toggle('open');
+  if (row) row.classList.toggle('open');
+  if (tog) tog.classList.toggle('open');
 }
 
 export function buildTypeSelect() {
@@ -89,6 +90,7 @@ export function applySorting(res) {
 export function rerender() {
   // Lazy import to avoid circular dependency
   import('./render.js').then(function(mod) {
-    mod.renderResults(state.cachedResults, document.getElementById('search-input').value.trim());
+    var searchEl = document.getElementById('search-input');
+    mod.renderResults(state.cachedResults, searchEl ? searchEl.value.trim() : '');
   });
 }

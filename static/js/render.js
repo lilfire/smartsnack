@@ -113,7 +113,7 @@ export function renderResults(results, search) {
   var gridTpl = getGridTemplate(cols);
   var h = '<div class="table-wrap"><div class="table-head" style="grid-template-columns:' + gridTpl + '">';
   cols.forEach(function(c, i) {
-    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" onclick="setSort(\'' + c.key + '\')"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + c.label + ' ' + sortIndicator(c.key) + '</span>';
+    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" onclick="setSort(\'' + c.key + '\')"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
   });
   h += '</div>';
   sorted.forEach(function(p) {
@@ -123,7 +123,7 @@ export function renderResults(results, search) {
     var brandHtml = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
     h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" onclick="toggleExpand(' + p.id + ')">'
       + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + catEmoji(p.type) + '</span>' + thumbHtml + '<span class="prod-name">' + esc(p.name) + '</span></div>'
-      + '<div class="prod-meta"><span>' + catLabel(p.type) + '</span>' + brandHtml + eanHtml + '</div></div>';
+      + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandHtml + eanHtml + '</div></div>';
     for (var ci = 1; ci < cols.length; ci++) {
       var c = cols[ci];
       if (c.key === 'total_score') {
@@ -148,7 +148,7 @@ export function renderResults(results, search) {
         var sv = sc[sf];
         var pct = Math.min(sv, 100);
         var col = SCORE_COLORS[sf] || '#888';
-        h += '<div><div class="score-label">' + scfg.label + '</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div><span class="score-val">' + sv.toFixed(1) + '</span></div>';
+        h += '<div><div class="score-label">' + esc(scfg.label) + '</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div><span class="score-val">' + sv.toFixed(1) + '</span></div>';
       });
       if (!Object.keys(sc).length) h += '<div style="color:rgba(255,255,255,0.3);font-size:12px;grid-column:1/-1">' + t('expanded_no_weights') + '</div>';
       h += '</div>';
@@ -206,7 +206,7 @@ export function renderResults(results, search) {
           + '<input type="hidden" id="ed-est_diaas" value="' + (p.est_diaas != null ? p.est_diaas : '') + '">'
           + '<div style="display:flex;gap:8px">'
           + '<button class="btn-sm btn-green" onclick="event.stopPropagation();saveProduct(' + p.id + ')">' + t('btn_save') + '</button>'
-          + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();editingId=null;rerender()">' + t('btn_cancel') + '</button>'
+          + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();window.editingId=null;rerender()">' + t('btn_cancel') + '</button>'
           + '</div></div>';
       } else {
         h += '<div class="expanded-actions">'

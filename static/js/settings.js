@@ -75,25 +75,26 @@ export function renderWeightItems() {
     var col = SCORE_COLORS[w.field] || '#888';
     var dirLower = w.direction === 'lower';
     var isDirect = w.formula === 'direct';
-    h += '<div class="weight-item enabled" id="wi-' + w.field + '" style="margin-bottom:10px;border-left:3px solid ' + col + '">'
+    var sf = esc(w.field);
+    h += '<div class="weight-item enabled" id="wi-' + sf + '" style="margin-bottom:10px;border-left:3px solid ' + col + '">'
       + '<div class="weight-header">'
       + '<div class="weight-top">'
       + '<label class="field-label" style="margin:0">' + esc(w.label) + '</label></div>'
-      + '<span class="weight-val mono accent" id="wv-' + w.field + '">' + w.weight.toFixed(1) + '</span>'
-      + '<button class="weight-cfg-btn" onclick="toggleWeightConfig(\'' + w.field + '\')" title="Advanced">&#9881;</button>'
-      + '<button class="btn-sm btn-red" onclick="removeWeight(\'' + w.field + '\')" title="Remove">&#128465;</button></div>'
-      + '<div class="weight-config" id="wcfg-' + w.field + '" style="display:none">'
+      + '<span class="weight-val mono accent" id="wv-' + sf + '">' + w.weight.toFixed(1) + '</span>'
+      + '<button class="weight-cfg-btn" onclick="toggleWeightConfig(\'' + sf + '\')" title="Advanced">&#9881;</button>'
+      + '<button class="btn-sm btn-red" onclick="removeWeight(\'' + sf + '\')" title="Remove">&#128465;</button></div>'
+      + '<div class="weight-config" id="wcfg-' + sf + '" style="display:none">'
       + '<div class="wc-row">'
-      + '<select class="wc-select" id="wd-' + w.field + '" onchange="onWeightDirection(\'' + w.field + '\')">'
+      + '<select class="wc-select" id="wd-' + sf + '" onchange="onWeightDirection(\'' + sf + '\')">'
       + '<option value="lower" ' + (dirLower ? 'selected' : '') + '>' + t('direction_lower') + '</option>'
       + '<option value="higher" ' + (!dirLower ? 'selected' : '') + '>' + t('direction_higher') + '</option></select>'
-      + '<select class="wc-select" id="wf-' + w.field + '" onchange="onWeightFormula(\'' + w.field + '\')">'
+      + '<select class="wc-select" id="wf-' + sf + '" onchange="onWeightFormula(\'' + sf + '\')">'
       + '<option value="minmax" ' + (!isDirect ? 'selected' : '') + '>' + t('formula_minmax') + '</option>'
       + '<option value="direct" ' + (isDirect ? 'selected' : '') + '>' + t('formula_direct') + '</option></select>'
-      + '<input type="number" class="wc-max" id="wn-' + w.field + '" value="' + (w.formula_min != null ? w.formula_min : '') + '" placeholder="Min" step="0.01" oninput="onWeightMin(\'' + w.field + '\')" style="' + (isDirect ? '' : 'display:none') + '">'
-      + '<input type="number" class="wc-max" id="wm-' + w.field + '" value="' + (w.formula_max != null ? w.formula_max : '') + '" placeholder="Max" step="0.01" oninput="onWeightMax(\'' + w.field + '\')" style="' + (isDirect ? '' : 'display:none') + '">'
+      + '<input type="number" class="wc-max" id="wn-' + sf + '" value="' + (w.formula_min != null ? w.formula_min : '') + '" placeholder="Min" step="0.01" oninput="onWeightMin(\'' + sf + '\')" style="' + (isDirect ? '' : 'display:none') + '">'
+      + '<input type="number" class="wc-max" id="wm-' + sf + '" value="' + (w.formula_max != null ? w.formula_max : '') + '" placeholder="Max" step="0.01" oninput="onWeightMax(\'' + sf + '\')" style="' + (isDirect ? '' : 'display:none') + '">'
       + '</div></div>'
-      + '<input type="range" min="0" max="100" step="1" value="' + w.weight + '" id="w-' + w.field + '" class="weight-slider" oninput="onWeightSlider(\'' + w.field + '\')">'
+      + '<input type="range" min="0" max="100" step="1" value="' + w.weight + '" id="w-' + sf + '" class="weight-slider" oninput="onWeightSlider(\'' + sf + '\')">'
       + '</div>';
   });
   // Dropdown to add disabled weights
@@ -248,18 +249,22 @@ export async function loadCategories() {
 
 export async function updateCategoryLabel(name, val) {
   if (!val.trim()) { showToast(t('toast_display_name_empty'), 'error'); loadCategories(); return; }
-  await api('/api/categories/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ label: val.trim() }) });
-  showToast(t('toast_category_updated'), 'success');
-  await fetchStats();
-  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+  try {
+    await api('/api/categories/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ label: val.trim() }) });
+    showToast(t('toast_category_updated'), 'success');
+    await fetchStats();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
 }
 
 export async function updateCategoryEmoji(name, emoji) {
-  await api('/api/categories/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ emoji: emoji }) });
-  showToast(t('toast_category_updated'), 'success');
-  await fetchStats();
-  document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
-  loadCategories();
+  try {
+    await api('/api/categories/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ emoji: emoji }) });
+    showToast(t('toast_category_updated'), 'success');
+    await fetchStats();
+    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    loadCategories();
+  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
 }
 
 export async function addCategory() {
@@ -400,11 +405,13 @@ export async function savePqField(id) {
   var diVal = parseFloat(diaas.value);
   if (!kwVal || isNaN(pdVal) || isNaN(diVal)) return;
   var keywords = kwVal.split(',').map(function(k) { return k.trim(); }).filter(Boolean);
-  var res = await api('/api/protein-quality/' + id, { method: 'PUT', body: JSON.stringify({ label: label.value.trim(), keywords: keywords, pdcaas: pdVal, diaas: diVal }) });
-  if (res.error) { showToast(res.error, 'error'); return; }
-  showToast(t('toast_updated'), 'success');
-  var item = pqData.find(function(r) { return r.id === id; });
-  if (item) { item.label = label.value.trim(); item.keywords = keywords; item.pdcaas = pdVal; item.diaas = diVal; }
+  try {
+    var res = await api('/api/protein-quality/' + id, { method: 'PUT', body: JSON.stringify({ label: label.value.trim(), keywords: keywords, pdcaas: pdVal, diaas: diVal }) });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    showToast(t('toast_updated'), 'success');
+    var item = pqData.find(function(r) { return r.id === id; });
+    if (item) { item.label = label.value.trim(); item.keywords = keywords; item.pdcaas = pdVal; item.diaas = diVal; }
+  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
 }
 
 export async function addPq() {
@@ -426,9 +433,11 @@ export async function addPq() {
 
 export async function deletePq(id, label) {
   if (!await showConfirmModal('&#128465;', esc(label), t('confirm_delete_product', { name: label }), t('btn_delete'), t('btn_cancel'))) return;
-  await api('/api/protein-quality/' + id, { method: 'DELETE' });
-  showToast(t('toast_pq_deleted', { name: label }), 'success');
-  loadPq();
+  try {
+    await api('/api/protein-quality/' + id, { method: 'DELETE' });
+    showToast(t('toast_pq_deleted', { name: label }), 'success');
+    loadPq();
+  } catch(e) { console.error(e); showToast(t('toast_network_error'), 'error'); }
 }
 
 // ── Backup / Restore / Import ───────────────────────
@@ -480,6 +489,7 @@ export function toggleSettingsSection(header) {
 // Drag-and-drop for restore
 export function initRestoreDragDrop() {
   var drop = document.getElementById('restore-drop');
+  if (!drop) return;
   drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('dragover'); });
   drop.addEventListener('dragleave', function() { drop.classList.remove('dragover'); });
   drop.addEventListener('drop', function(e) {
