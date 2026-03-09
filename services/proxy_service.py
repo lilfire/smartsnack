@@ -96,14 +96,26 @@ def off_search(query: str) -> dict:
 
 
 def _off_search_a_licious(query: str) -> dict:
-    """Search via the search-a-licious Elasticsearch API."""
-    params = urlencode({
-        "q": query,
-        "page_size": "20",
-        "fields": _OFF_SEARCH_FIELDS,
-    })
-    url = f"{_OFF_SEARCH_A_LICIOUS}?{params}"
-    return _off_get_json(url, timeout=10)
+    """Search via the search-a-licious Elasticsearch API (POST with JSON body)."""
+    body = json.dumps({"q": query, "page_size": 20}).encode()
+    req = urllib.request.Request(
+        _OFF_SEARCH_A_LICIOUS,
+        data=body,
+        headers={
+            "User-Agent": "SmartSnack/1.0",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read(2 * 1024 * 1024))
+    except Exception as e:
+        logger.error("search-a-licious error: %s", e)
+        raise RuntimeError("Failed to fetch from search-a-licious") from e
+    # Normalize: search-a-licious returns "hits", frontend expects "products"
+    if "hits" in data and "products" not in data:
+        data["products"] = data["hits"]
+    return data
 
 
 def _off_search_classic(query: str) -> dict:
