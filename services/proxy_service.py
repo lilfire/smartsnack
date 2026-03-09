@@ -156,7 +156,13 @@ def off_product(code: str) -> dict:
     if not code or not code.strip().isdigit():
         raise ValueError("Invalid product code")
     url = f"{_OFF_API_BASE}/product/{code.strip()}.json"
-    return _off_get_json(url)
+    try:
+        return _off_get_json(url)
+    except RuntimeError:
+        # OFF API v2 returns 404 for unknown products;
+        # return a "not found" payload so the frontend shows
+        # "No products found" instead of "Network error".
+        return {"status": 0, "status_verbose": "product not found"}
 
 
 def _off_get_json(url: str, timeout: int = 30) -> dict:
