@@ -36,7 +36,7 @@ export async function lookupOFF(prefix, productId) {
   if (isValidEan(ean)) {
     showOffPickerLoading(t('off_searching_ean', { ean: ean }));
     try {
-      const res = await fetchWithTimeout('https://world.openfoodfacts.org/api/v2/product/' + ean + '.json');
+      const res = await fetchWithTimeout('/api/off/product/' + ean);
       if (!res.ok) { updateOffPickerResults([], t('toast_network_error')); return; }
       const data = await res.json();
       if (data.status !== 1 || !data.product) {
@@ -161,12 +161,7 @@ function updateOffPickerResults(products, errorMsg, ean) {
 }
 
 export async function searchOFF(query) {
-  const params = new URLSearchParams({
-    search_terms: query,
-    page_size: '20',
-    fields: 'code,product_name,product_name_no,brands,stores,stores_tags,nutriments,image_front_small_url,image_front_url,image_url,serving_size,product_quantity,ingredients_text,ingredients_text_no,ingredients_text_en'
-  });
-  const url = 'https://world.openfoodfacts.org/api/v2/search?' + params;
+  const url = '/api/off/search?q=' + encodeURIComponent(query);
   const res = await fetchWithTimeout(url);
   if (!res.ok) throw new Error('Search failed: ' + res.status);
   const data = await res.json();
@@ -236,7 +231,7 @@ export async function selectOffResult(idx, ctxSnapshot) {
 
   try {
     if (code) {
-      const res = await fetchWithTimeout('https://world.openfoodfacts.org/api/v2/product/' + code + '.json');
+      const res = await fetchWithTimeout('/api/off/product/' + code);
       if (res.ok) {
         const data = await res.json();
         if (data.status === 1 && data.product) {
