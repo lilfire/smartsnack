@@ -666,5 +666,10 @@ export async function saveOffCredentials() {
   try {
     await api('/api/settings/off-credentials', { method: 'PUT', body: JSON.stringify(body) });
     showToast(t('toast_off_credentials_saved'), 'success');
-  } catch(e) { showToast(t('toast_save_error'), 'error'); }
+  } catch(e) {
+    const msg = e.message === 'encryption_not_configured'
+      ? t('toast_encryption_not_configured')
+      : t('toast_save_error');
+    showToast(msg, 'error');
+  }
 }

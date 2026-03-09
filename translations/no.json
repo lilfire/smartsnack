@@ -207,6 +207,7 @@
     "off_err_no_name": "Produktnavn er påkrevd",
     "off_err_api": "Feil fra Open Food Facts",
     "off_err_network": "Kunne ikke kontakte Open Food Facts",
+    "toast_encryption_not_configured": "Krypteringsnøkkel mangler. Sett SMARTSNACK_SECRET_KEY i miljøvariabler.",
     "toast_off_credentials_saved": "OFF-pålogging lagret",
     "settings_off_title": "Open Food Facts",
     "settings_off_desc": "Pålogging for å legge til produkter på Open Food Facts",
