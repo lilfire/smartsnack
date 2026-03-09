@@ -7,6 +7,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
   },
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "devDependencies": {
     "vitest": "^3.0.0",
     "jsdom": "^25.0.0"
