@@ -8,11 +8,6 @@ import sqlite3
 import tempfile
 import threading
 
-try:
-    import fcntl
-except ImportError:
-    fcntl = None
-
 from config import TRANSLATIONS_DIR, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 from db import get_db
 
@@ -146,11 +141,11 @@ def _set_translation_key(key: str, values_by_lang: dict) -> None:
             continue
         filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
         file_lock = _get_file_lock(filepath)
+        # Thread lock protects against concurrent access within this process.
+        # Cross-process safety relies on atomic file writes (temp + rename).
         with file_lock:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    if fcntl:
-                        fcntl.flock(f, fcntl.LOCK_SH)
                     data = json.load(f)
             except (OSError, json.JSONDecodeError):
                 data = {}
@@ -168,8 +163,6 @@ def _delete_translation_key(key: str) -> None:
         with file_lock:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    if fcntl:
-                        fcntl.flock(f, fcntl.LOCK_SH)
                     data = json.load(f)
             except (OSError, json.JSONDecodeError):
                 continue

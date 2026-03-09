@@ -18,9 +18,6 @@ def proxy_image():
         return jsonify({"error": str(e)}), 403
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
-    scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
-    host = request.host
-    cors_origin = f"{scheme}://{host}"
     return Response(data, mimetype=content_type, headers={
         "Cache-Control": "public, max-age=86400",
-        "Access-Control-Allow-Origin": cors_origin})
+        "Access-Control-Allow-Origin": "*"})

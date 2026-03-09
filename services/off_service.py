@@ -79,7 +79,7 @@ def add_product_to_off(product_data: dict) -> dict:
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         logger.error("OFF API HTTP error %s: %s", e.code, body)
-        raise RuntimeError("off_err_api")
+        raise RuntimeError("off_err_api") from e
     except urllib.error.URLError as e:
         logger.error("OFF API URL error: %s", e.reason)
-        raise RuntimeError("off_err_network")
+        raise RuntimeError("off_err_network") from e

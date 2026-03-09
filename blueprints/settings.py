@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify
 
-from helpers import _require_json
+from helpers import _require_json, _check_api_key
 from config import _MAX_PASSWORD_LEN
 from services import settings_service
 
@@ -32,12 +32,18 @@ def set_language():
 
 @bp.route("/api/settings/off-credentials")
 def get_off_credentials():
+    denied = _check_api_key()
+    if denied:
+        return denied
     creds = settings_service.get_off_credentials()
     return jsonify({"off_user_id": creds["off_user_id"], "has_password": bool(creds["off_password"])})
 
 
 @bp.route("/api/settings/off-credentials", methods=["PUT"])
 def set_off_credentials():
+    denied = _check_api_key()
+    if denied:
+        return denied
     try:
         data = _require_json()
     except ValueError as e:

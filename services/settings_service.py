@@ -19,10 +19,10 @@ def _get_fernet() -> Fernet:
     """Return a Fernet instance using a key derived from the environment secret."""
     secret = os.environ.get("SMARTSNACK_SECRET_KEY", "")
     if not secret:
-        logger.warning(
-            "SMARTSNACK_SECRET_KEY not set; using insecure default key"
+        raise RuntimeError(
+            "SMARTSNACK_SECRET_KEY environment variable is required "
+            "for credential encryption. Set it before starting the app."
         )
-        secret = "smartsnack-default-key-change-me"
     key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
     return Fernet(key)
 
@@ -38,15 +38,29 @@ def _decrypt(stored: str) -> str:
     if stored.startswith(_FERNET_PREFIX):
         token = stored[len(_FERNET_PREFIX):].encode("ascii")
         return _get_fernet().decrypt(token).decode("utf-8")
-    # Legacy XOR fallback for existing data
+    # Legacy XOR fallback for existing data -- migrate to Fernet on read
     try:
         key = os.environ.get("SMARTSNACK_SECRET_KEY", "")
-        if not key:
-            key = "smartsnack-default-key-change-me"
         key_bytes = key.encode("utf-8")[:32].ljust(32, b"\0")
         encrypted = base64.b64decode(stored)
-        decrypted = bytes(b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(encrypted))
-        return decrypted.decode("utf-8")
+        decrypted = bytes(
+            b ^ key_bytes[i % len(key_bytes)]
+            for i, b in enumerate(encrypted)
+        )
+        plaintext = decrypted.decode("utf-8")
+        # Re-encrypt with Fernet so legacy XOR encoding is replaced
+        try:
+            re_encrypted = _encrypt(plaintext)
+            conn = get_db()
+            conn.execute(
+                "UPDATE user_settings SET value = ? WHERE value = ?",
+                (re_encrypted, stored),
+            )
+            conn.commit()
+            logger.info("Migrated legacy XOR-encrypted value to Fernet")
+        except Exception:
+            logger.warning("Failed to re-encrypt legacy value with Fernet")
+        return plaintext
     except (ValueError, UnicodeDecodeError):
         logger.warning("Failed to decrypt legacy value, returning as-is")
         return stored
