@@ -6,6 +6,7 @@ import { loadProductImage } from './images.js';
 import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings.js';
 import { isValidEan } from './openfoodfacts.js';
 
+let _resultsAbort = null;
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
@@ -226,6 +227,10 @@ export function renderResults(results, search) {
   h += '</div>';
   container.innerHTML = h;
 
+  // Abort previous delegated listeners to avoid duplicate handlers
+  if (_resultsAbort) _resultsAbort.abort();
+  _resultsAbort = new AbortController();
+
   // Attach all event handlers via delegation instead of inline onclick
   container.addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
@@ -280,7 +285,7 @@ export function renderResults(results, search) {
         window.estimateProteinQuality('ed');
         break;
     }
-  });
+  }, { signal: _resultsAbort.signal });
 
   // Attach input handlers for validation
   const edName = document.getElementById('ed-name');
