@@ -539,5 +539,14 @@
     "emoji_soap": "såpe,ren,vask",
     "emoji_toothbrush": "tannbørste,tannhygiene",
     "emoji_sleep": "søvn,hvile",
-    "emoji_bed": "seng,sove,hvile"
+    "emoji_bed": "seng,sove,hvile",
+    "scan_barcode_title": "Skann strekkode",
+    "scan_camera_error": "Kunne ikke åpne kameraet. Sjekk at du har gitt kameratillatelse.",
+    "scan_product_not_found": "Produkt ikke funnet",
+    "scan_not_in_database": "Denne strekkoden finnes ikke i databasen. Hva vil du gjøre?",
+    "scan_register_new": "Registrer nytt produkt",
+    "scan_update_existing": "Oppdater eksisterende produkt",
+    "scan_searching": "Søker etter \"{query}\"...",
+    "scan_fetch_data": "Ja, hent data",
+    "scan_no_skip": "Nei, hopp over"
 }

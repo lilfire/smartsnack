@@ -131,9 +131,12 @@ function updateOffPickerResults(products, errorMsg, ean) {
     return;
   }
   _offPickerProducts = products;
-  body.innerHTML = renderOffResults(products);
+  // Replace body element to clear old event listeners
+  var newBody = body.cloneNode(false);
+  newBody.innerHTML = renderOffResults(products);
+  body.parentNode.replaceChild(newBody, body);
   // Attach click handlers via event delegation
-  body.addEventListener('click', function(e) {
+  newBody.addEventListener('click', function(e) {
     var row = e.target.closest('[data-action="off-select"]');
     if (row) selectOffResult(parseInt(row.dataset.idx, 10), ctxSnapshot);
   });
@@ -186,7 +189,7 @@ export async function offModalSearch() {
   try {
     var products = await searchOFF(query);
     updateOffPickerResults(products);
-  } catch(e) { updateOffPickerResults([], t('toast_save_error')); }
+  } catch(e) { updateOffPickerResults([], t('toast_network_error')); }
 }
 
 export function closeOffPicker() {

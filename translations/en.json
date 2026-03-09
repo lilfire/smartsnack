@@ -539,5 +539,14 @@
     "emoji_soap": "soap,clean,wash",
     "emoji_toothbrush": "toothbrush,dental,hygiene",
     "emoji_sleep": "sleep,zzz,rest",
-    "emoji_bed": "bed,sleep,rest"
+    "emoji_bed": "bed,sleep,rest",
+    "scan_barcode_title": "Scan barcode",
+    "scan_camera_error": "Could not open the camera. Check that you have granted camera permission.",
+    "scan_product_not_found": "Product not found",
+    "scan_not_in_database": "This barcode is not in the database. What would you like to do?",
+    "scan_register_new": "Register new product",
+    "scan_update_existing": "Update existing product",
+    "scan_searching": "Searching for \"{query}\"...",
+    "scan_fetch_data": "Yes, fetch data",
+    "scan_no_skip": "No, skip"
 }

@@ -24,7 +24,7 @@ export function openScanner(prefix, productId) {
 
   var header = document.createElement('div');
   header.className = 'scanner-header';
-  header.innerHTML = '<h3>\u{1F4F7} Scan barcode</h3>';
+  header.innerHTML = '<h3>\u{1F4F7} ' + esc(t('scan_barcode_title')) + '</h3>';
   var closeBtn = document.createElement('button');
   closeBtn.className = 'scanner-close';
   closeBtn.textContent = '\u00D7';
@@ -63,11 +63,11 @@ export function openScanner(prefix, productId) {
       videoWrap.innerHTML = '';
       var errDiv = document.createElement('div');
       errDiv.className = 'scanner-error';
-      errDiv.innerHTML = '<div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p>';
+      errDiv.innerHTML = '<div class="scanner-error-icon">\u{1F4F7}</div><p>' + esc(t('scan_camera_error')) + '</p>';
       var errBtn = document.createElement('button');
       errBtn.className = 'btn-sm btn-outline';
       errBtn.style.marginTop = '16px';
-      errBtn.textContent = 'Close';
+      errBtn.textContent = t('btn_cancel');
       errBtn.addEventListener('click', function() { closeScanner(); });
       errDiv.appendChild(errBtn);
       videoWrap.appendChild(errDiv);
@@ -165,11 +165,11 @@ export function openSearchScanner() {
       videoWrap.innerHTML = '';
       var errDiv = document.createElement('div');
       errDiv.className = 'scanner-error';
-      errDiv.innerHTML = '<div class="scanner-error-icon">\u{1F4F7}</div><p>Could not open the camera. Check that you have granted camera permission.</p>';
+      errDiv.innerHTML = '<div class="scanner-error-icon">\u{1F4F7}</div><p>' + esc(t('scan_camera_error')) + '</p>';
       var errBtn = document.createElement('button');
       errBtn.className = 'btn-sm btn-outline';
       errBtn.style.marginTop = '16px';
-      errBtn.textContent = 'Close';
+      errBtn.textContent = t('btn_cancel');
       errBtn.addEventListener('click', function() { closeSearchScanner(); });
       errDiv.appendChild(errBtn);
       videoWrap.appendChild(errDiv);
@@ -235,28 +235,28 @@ export function showScanNotFoundModal(ean) {
   var modal = document.createElement('div');
   modal.className = 'scan-modal';
   modal.innerHTML = '<div class="scan-modal-icon">\u{1F50D}</div>'
-    + '<h3>Product not found</h3>'
+    + '<h3>' + esc(t('scan_product_not_found')) + '</h3>'
     + '<div class="scan-modal-ean">EAN: ' + esc(ean) + '</div>'
-    + '<p>This barcode is not in the database. What would you like to do?</p>'
+    + '<p>' + esc(t('scan_not_in_database')) + '</p>'
     + '<div class="scan-modal-actions"></div>';
 
   var actions = modal.querySelector('.scan-modal-actions');
 
   var regBtn = document.createElement('button');
   regBtn.className = 'scan-modal-btn-register';
-  regBtn.textContent = '+ Register new product';
+  regBtn.textContent = '+ ' + t('scan_register_new');
   regBtn.addEventListener('click', function() { scanRegisterNew(ean); });
   actions.appendChild(regBtn);
 
   var updBtn = document.createElement('button');
   updBtn.className = 'scan-modal-btn-update';
-  updBtn.textContent = '\u270E Update existing product';
+  updBtn.textContent = '\u270E ' + t('scan_update_existing');
   updBtn.addEventListener('click', function() { scanUpdateExisting(ean); });
   actions.appendChild(updBtn);
 
   var cancelBtn = document.createElement('button');
   cancelBtn.className = 'scan-modal-btn-cancel';
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('btn_cancel');
   cancelBtn.addEventListener('click', function() { closeScanModal(); });
   actions.appendChild(cancelBtn);
 
@@ -355,7 +355,7 @@ export async function scanPickerSearch() {
   var body = document.getElementById('scan-picker-body');
   var cnt = document.getElementById('scan-picker-count');
   body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
-  if (cnt) cnt.textContent = 'Searching for "' + query + '"...';
+  if (cnt) cnt.textContent = t('scan_searching', { query: query });
   try {
     var results = await fetchProducts(query, []);
     if (!results.length) {
@@ -391,8 +391,8 @@ export async function scanPickerSearch() {
       }
     });
   } catch(e) {
-    body.innerHTML = '<div class="off-modal-empty">' + esc(t('toast_save_error')) + '</div>';
-    if (cnt) cnt.textContent = t('toast_save_error');
+    body.innerHTML = '<div class="off-modal-empty">' + esc(t('toast_network_error')) + '</div>';
+    if (cnt) cnt.textContent = t('toast_network_error');
   }
 }
 
@@ -434,13 +434,13 @@ export function showScanOffConfirm(ean, productId) {
 
   var fetchBtn = document.createElement('button');
   fetchBtn.className = 'scan-modal-btn-register';
-  fetchBtn.textContent = '\u{1F30E} Yes, fetch data';
+  fetchBtn.textContent = '\u{1F30E} ' + t('scan_fetch_data');
   fetchBtn.addEventListener('click', function() { scanOffFetch(ean, productId); });
   actions.appendChild(fetchBtn);
 
   var skipBtn = document.createElement('button');
   skipBtn.className = 'scan-modal-btn-cancel';
-  skipBtn.textContent = 'No, skip';
+  skipBtn.textContent = t('scan_no_skip');
   skipBtn.addEventListener('click', function() { closeScanOffConfirm(); loadData(); });
   actions.appendChild(skipBtn);
 

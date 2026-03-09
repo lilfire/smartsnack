@@ -539,5 +539,14 @@
     "emoji_soap": "tvål,ren,tvätt",
     "emoji_toothbrush": "tandborste,tandhygien",
     "emoji_sleep": "sömn,vila",
-    "emoji_bed": "säng,sova,vila"
+    "emoji_bed": "säng,sova,vila",
+    "scan_barcode_title": "Skanna streckkod",
+    "scan_camera_error": "Kunde inte öppna kameran. Kontrollera att du har gett kamerabehörighet.",
+    "scan_product_not_found": "Produkt hittades inte",
+    "scan_not_in_database": "Denna streckkod finns inte i databasen. Vad vill du göra?",
+    "scan_register_new": "Registrera ny produkt",
+    "scan_update_existing": "Uppdatera befintlig produkt",
+    "scan_searching": "Söker efter \"{query}\"...",
+    "scan_fetch_data": "Ja, hämta data",
+    "scan_no_skip": "Nej, hoppa över"
 }
