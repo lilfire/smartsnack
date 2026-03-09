@@ -5,7 +5,7 @@ import re
 
 from flask import request
 
-from config import _PQ_MAX_KEYWORDS, _PQ_MAX_KEYWORD_LEN
+from config import _PQ_MAX_KEYWORDS, _PQ_MAX_KEYWORD_LEN, _MAX_CATEGORY_NAME_LEN
 
 
 def _require_json() -> dict:
@@ -22,8 +22,8 @@ def _num(data: dict, field: str) -> float | None:
         return None
     try:
         result = float(v)
-    except (ValueError, TypeError):
-        raise ValueError(f"Invalid numeric value for {field}")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid numeric value for {field}") from e
     if not math.isfinite(result):
         raise ValueError(f"Invalid numeric value for {field}")
     return result
@@ -32,8 +32,8 @@ def _num(data: dict, field: str) -> float | None:
 def _safe_float(v, label: str = "value") -> float:
     try:
         result = float(v)
-    except (ValueError, TypeError):
-        raise ValueError(f"Invalid numeric value for {label}")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid numeric value for {label}") from e
     if not math.isfinite(result):
         raise ValueError(f"Non-finite numeric value for {label}")
     return result
@@ -52,7 +52,6 @@ def _validate_keywords(keywords) -> tuple[list | None, str | None]:
     return keywords, None
 
 
-_MAX_CATEGORY_NAME_LEN = 100
 _CATEGORY_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
 
 
