@@ -13,10 +13,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def _patch_db_path(monkeypatch, db_file):
     """Patch DB_PATH in all modules that import it by value."""
     import config
-    import db as db_mod
     monkeypatch.setenv("DB_PATH", db_file)
     monkeypatch.setattr(config, "DB_PATH", db_file)
-    monkeypatch.setattr(db_mod, "DB_PATH", db_file)
+    try:
+        import db as db_mod
+        monkeypatch.setattr(db_mod, "DB_PATH", db_file)
+    except ImportError:
+        pass
 
 
 @pytest.fixture(autouse=True)
