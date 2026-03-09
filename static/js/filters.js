@@ -4,25 +4,35 @@ import { t } from './i18n.js';
 
 export function buildFilters() {
   if (!state.cachedStats) return;
-  var row = document.getElementById('filter-row');
-  var h = '<button class="pill ' + (state.currentFilter.length === 0 ? 'active' : '') + '" onclick="setFilter(\'all\')">' + t('filter_all') + ' (' + state.cachedStats.total + ')</button>';
-  state.categories.forEach(function(c) {
-    var n = state.cachedStats.type_counts[c.name] || 0;
-    var active = state.currentFilter.indexOf(c.name) >= 0;
-    var safeName = esc(c.name).replace(/'/g, '&#39;');
-    h += '<button class="pill ' + (active ? 'active' : '') + '" onclick="setFilter(\'' + safeName + '\')">' + esc(c.emoji) + ' ' + esc(c.label) + ' (' + n + ')</button>';
+  const row = document.getElementById('filter-row');
+  if (!row) return;
+  // Build filter pills using DOM to avoid XSS from category names in onclick
+  row.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.className = 'pill' + (state.currentFilter.length === 0 ? ' active' : '');
+  allBtn.textContent = t('filter_all') + ' (' + state.cachedStats.total + ')';
+  allBtn.addEventListener('click', () => window.setFilter('all'));
+  row.appendChild(allBtn);
+
+  state.categories.forEach((c) => {
+    const n = state.cachedStats.type_counts[c.name] || 0;
+    const active = state.currentFilter.indexOf(c.name) >= 0;
+    const btn = document.createElement('button');
+    btn.className = 'pill' + (active ? ' active' : '');
+    btn.textContent = c.emoji + ' ' + c.label + ' (' + n + ')';
+    btn.addEventListener('click', () => window.setFilter(c.name));
+    row.appendChild(btn);
   });
-  row.innerHTML = h;
   updateFilterToggle();
 }
 
 export function updateFilterToggle() {
-  var tog = document.getElementById('filter-toggle');
-  var label = document.getElementById('filter-toggle-label');
+  const tog = document.getElementById('filter-toggle');
+  const label = document.getElementById('filter-toggle-label');
   if (!tog || !label) return;
   if (state.currentFilter.length > 0) {
-    var names = state.currentFilter.map(function(f) {
-      var cat = state.categories.find(function(c) { return c.name === f; });
+    const names = state.currentFilter.map((f) => {
+      const cat = state.categories.find((c) => c.name === f);
       return cat ? (cat.emoji + ' ' + cat.label) : f;
     });
     label.textContent = names.length <= 2 ? names.join(', ') : t('filter_count', { count: names.length });
@@ -34,24 +44,25 @@ export function updateFilterToggle() {
 }
 
 export function toggleFilters() {
-  var row = document.getElementById('filter-row');
-  var tog = document.getElementById('filter-toggle');
+  const row = document.getElementById('filter-row');
+  const tog = document.getElementById('filter-toggle');
   if (row) row.classList.toggle('open');
   if (tog) tog.classList.toggle('open');
 }
 
 export function buildTypeSelect() {
-  var sel = document.getElementById('f-type');
-  var prev = sel.value;
+  const sel = document.getElementById('f-type');
+  if (!sel) return;
+  const prev = sel.value;
   sel.innerHTML = '';
-  state.categories.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(c) {
-    var o = document.createElement('option');
+  state.categories.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach((c) => {
+    const o = document.createElement('option');
     o.value = c.name;
     o.textContent = c.emoji + ' ' + c.label;
     sel.appendChild(o);
   });
   if (prev) {
-    for (var i = 0; i < sel.options.length; i++) {
+    for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === prev) { sel.value = prev; break; }
     }
   }
@@ -74,8 +85,8 @@ export function setSort(col) {
 }
 
 export function applySorting(res) {
-  return res.slice().sort(function(a, b) {
-    var va = a[state.sortCol], vb = b[state.sortCol];
+  return res.slice().sort((a, b) => {
+    let va = a[state.sortCol], vb = b[state.sortCol];
     if (typeof va === 'string' || typeof vb === 'string') {
       va = (va || '').toLowerCase();
       vb = (vb || '').toLowerCase();
@@ -89,8 +100,8 @@ export function applySorting(res) {
 
 export function rerender() {
   // Lazy import to avoid circular dependency
-  import('./render.js').then(function(mod) {
-    var searchEl = document.getElementById('search-input');
+  import('./render.js').then((mod) => {
+    const searchEl = document.getElementById('search-input');
     mod.renderResults(state.cachedResults, searchEl ? searchEl.value.trim() : '');
-  });
+  }).catch((e) => { console.error('Failed to load render module:', e); });
 }

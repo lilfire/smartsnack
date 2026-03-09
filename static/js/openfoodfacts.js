@@ -3,32 +3,42 @@ import { state, api, esc, safeDataUri, showToast } from './state.js';
 import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
+const OFF_FETCH_TIMEOUT = 15000;
+
+function fetchWithTimeout(url, opts) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OFF_FETCH_TIMEOUT);
+  return fetch(url, Object.assign({ signal: controller.signal }, opts))
+    .finally(() => clearTimeout(timeoutId));
+}
+
 export function isValidEan(v) {
   if (!v) return false;
-  var s = v.replace(/\s/g, '');
+  const s = v.replace(/\s/g, '');
   return /^\d{8,13}$/.test(s);
 }
 
 export function validateOffBtn(prefix) {
-  var ean = document.getElementById(prefix + '-ean').value.trim();
-  var name = document.getElementById(prefix + '-name').value.trim();
-  var btn = document.getElementById(prefix + '-off-btn');
+  const ean = document.getElementById(prefix + '-ean').value.trim();
+  const name = document.getElementById(prefix + '-name').value.trim();
+  const btn = document.getElementById(prefix + '-off-btn');
   if (btn) btn.disabled = !(isValidEan(ean) || name.length >= 2);
 }
 
-var _offCtx = { prefix: null, productId: null };
-var _offPickerProducts = null;
+let _offCtx = { prefix: null, productId: null };
+let _offPickerProducts = null;
 
 export async function lookupOFF(prefix, productId) {
-  var ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
-  var name = document.getElementById(prefix + '-name').value.trim();
+  const ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
+  const name = document.getElementById(prefix + '-name').value.trim();
   _offCtx = { prefix: prefix, productId: productId || null };
 
   if (isValidEan(ean)) {
     showOffPickerLoading(t('off_searching_ean', { ean: ean }));
     try {
-      var res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + ean + '.json');
-      var data = await res.json();
+      const res = await fetchWithTimeout('https://world.openfoodfacts.org/api/v2/product/' + ean + '.json');
+      if (!res.ok) { updateOffPickerResults([], t('toast_network_error')); return; }
+      const data = await res.json();
       if (data.status !== 1 || !data.product) {
         updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
@@ -39,9 +49,9 @@ export async function lookupOFF(prefix, productId) {
   } else if (name.length >= 2) {
     showOffPickerLoading(t('off_searching_name', { name: name }));
     try {
-      var products = await searchOFF(name);
+      const products = await searchOFF(name);
       updateOffPickerResults(products);
-      var si = document.getElementById('off-search-input');
+      const si = document.getElementById('off-search-input');
       if (si) si.value = name;
     } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   }
@@ -50,47 +60,50 @@ export async function lookupOFF(prefix, productId) {
 function showOffPickerLoading(msg) {
   closeOffPicker();
   document.body.style.overflow = 'hidden';
-  var bg = document.createElement('div');
+  const bg = document.createElement('div');
   bg.className = 'off-modal-bg';
   bg.id = 'off-modal-bg';
-  bg.onclick = function(e) { if (e.target === bg) closeOffPicker(); };
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
+  bg.onclick = (e) => { if (e.target === bg) closeOffPicker(); };
 
-  var modal = document.createElement('div');
+  const modal = document.createElement('div');
   modal.className = 'off-modal';
 
-  var head = document.createElement('div');
+  const head = document.createElement('div');
   head.className = 'off-modal-head';
   head.innerHTML = '<h3>&#127758; OpenFoodFacts</h3>';
-  var closeBtn = document.createElement('button');
+  const closeBtn = document.createElement('button');
   closeBtn.className = 'off-modal-close';
   closeBtn.textContent = '\u00D7';
-  closeBtn.addEventListener('click', function() { closeOffPicker(); });
+  closeBtn.setAttribute('aria-label', t('btn_close'));
+  closeBtn.addEventListener('click', closeOffPicker);
   head.appendChild(closeBtn);
   modal.appendChild(head);
 
-  var searchDiv = document.createElement('div');
+  const searchDiv = document.createElement('div');
   searchDiv.className = 'off-modal-search';
-  var searchInput = document.createElement('input');
+  const searchInput = document.createElement('input');
   searchInput.id = 'off-search-input';
-  searchInput.placeholder = 'Search OpenFoodFacts...';
+  searchInput.placeholder = t('off_search_placeholder');
   searchInput.disabled = true;
-  searchInput.addEventListener('keydown', function(event) { if (event.key === 'Enter') offModalSearch(); });
+  searchInput.addEventListener('keydown', (event) => { if (event.key === 'Enter') offModalSearch(); });
   searchDiv.appendChild(searchInput);
-  var searchBtn = document.createElement('button');
+  const searchBtn = document.createElement('button');
   searchBtn.id = 'off-search-btn';
   searchBtn.disabled = true;
-  searchBtn.textContent = 'Search';
-  searchBtn.addEventListener('click', function() { offModalSearch(); });
+  searchBtn.textContent = t('off_search_btn');
+  searchBtn.addEventListener('click', offModalSearch);
   searchDiv.appendChild(searchBtn);
   modal.appendChild(searchDiv);
 
-  var countDiv = document.createElement('div');
+  const countDiv = document.createElement('div');
   countDiv.className = 'off-modal-count';
   countDiv.id = 'off-result-count';
   countDiv.textContent = msg || t('off_searching');
   modal.appendChild(countDiv);
 
-  var bodyDiv = document.createElement('div');
+  const bodyDiv = document.createElement('div');
   bodyDiv.className = 'off-modal-body';
   bodyDiv.id = 'off-results-body';
   bodyDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
@@ -101,27 +114,27 @@ function showOffPickerLoading(msg) {
 }
 
 function updateOffPickerResults(products, errorMsg, ean) {
-  var body = document.getElementById('off-results-body');
-  var count = document.getElementById('off-result-count');
-  var si = document.getElementById('off-search-input');
-  var sb = document.getElementById('off-search-btn');
+  const body = document.getElementById('off-results-body');
+  const count = document.getElementById('off-result-count');
+  const si = document.getElementById('off-search-input');
+  const sb = document.getElementById('off-search-btn');
   if (si) si.disabled = false;
   if (sb) { sb.disabled = false; sb.textContent = t('off_search_btn'); }
   if (!body) return;
   // Capture context snapshot at render time to avoid race conditions
-  var ctxSnapshot = { prefix: _offCtx.prefix, productId: _offCtx.productId };
+  const ctxSnapshot = { prefix: _offCtx.prefix, productId: _offCtx.productId };
   if (errorMsg) {
-    var errDiv = document.createElement('div');
+    const errDiv = document.createElement('div');
     errDiv.className = 'off-modal-empty';
     errDiv.textContent = errorMsg;
     if (ean) {
-      var addDiv = document.createElement('div');
+      const addDiv = document.createElement('div');
       addDiv.style.marginTop = '16px';
-      var addBtn = document.createElement('button');
+      const addBtn = document.createElement('button');
       addBtn.className = 'btn-off';
       addBtn.style.cssText = 'padding:8px 16px;font-size:13px';
       addBtn.textContent = '\u{1F30E} ' + t('off_add_to_off');
-      addBtn.addEventListener('click', function() { showOffAddReview(ean); });
+      addBtn.addEventListener('click', () => { showOffAddReview(ean); });
       addDiv.appendChild(addBtn);
       errDiv.appendChild(addDiv);
     }
@@ -132,39 +145,51 @@ function updateOffPickerResults(products, errorMsg, ean) {
   }
   _offPickerProducts = products;
   // Replace body element to clear old event listeners
-  var newBody = body.cloneNode(false);
+  const newBody = body.cloneNode(false);
   newBody.innerHTML = renderOffResults(products);
   body.parentNode.replaceChild(newBody, body);
+  // Fix inline onerror: attach via JS after innerHTML
+  newBody.querySelectorAll('.off-result-img-el').forEach((img) => {
+    img.addEventListener('error', () => { img.style.display = 'none'; });
+  });
   // Attach click handlers via event delegation
-  newBody.addEventListener('click', function(e) {
-    var row = e.target.closest('[data-action="off-select"]');
+  newBody.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-action="off-select"]');
     if (row) selectOffResult(parseInt(row.dataset.idx, 10), ctxSnapshot);
   });
   if (count) count.textContent = t('off_result_count', { count: products.length });
 }
 
 export async function searchOFF(query) {
-  var q = encodeURIComponent(query);
-  var url = 'https://world.openfoodfacts.org/cgi/search.pl?search_terms=' + q + '&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,product_name_no,brands,stores,stores_tags,nutriments,image_front_small_url,image_front_url,image_url,serving_size,product_quantity,ingredients_text,ingredients_text_no,ingredients_text_en';
-  var res = await fetch(url);
-  var data = await res.json();
-  return (data.products || []).filter(function(p) { return p.product_name || p.product_name_no; });
+  const params = new URLSearchParams({
+    search_terms: query,
+    search_simple: '1',
+    action: 'process',
+    json: '1',
+    page_size: '20',
+    fields: 'code,product_name,product_name_no,brands,stores,stores_tags,nutriments,image_front_small_url,image_front_url,image_url,serving_size,product_quantity,ingredients_text,ingredients_text_no,ingredients_text_en'
+  });
+  const url = 'https://world.openfoodfacts.org/cgi/search.pl?' + params;
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) throw new Error('Search failed: ' + res.status);
+  const data = await res.json();
+  return (data.products || []).filter((p) => p.product_name || p.product_name_no);
 }
 
 function renderOffResults(products) {
-  if (!products.length) return '<div class="off-modal-empty">No results. Try different search terms.</div>';
-  var h = '';
-  products.forEach(function(p, i) {
-    var name = p.product_name_no || p.product_name || 'Ukjent';
-    var brand = p.brands || '';
-    var img = p.image_front_small_url || '';
-    var n = p.nutriments || {};
-    var kcal = Math.round(n['energy-kcal_100g'] || n['energy-kcal'] || 0);
-    var pro = parseFloat(n['proteins_100g'] || n['proteins'] || 0).toFixed(1);
-    var carb = parseFloat(n['carbohydrates_100g'] || n['carbohydrates'] || 0).toFixed(1);
-    var code = p.code || '';
+  if (!products.length) return '<div class="off-modal-empty">' + esc(t('off_no_results_try_different')) + '</div>';
+  let h = '';
+  products.forEach((p, i) => {
+    const name = p.product_name_no || p.product_name || t('off_unknown_product');
+    const brand = p.brands || '';
+    const img = p.image_front_small_url || '';
+    const n = p.nutriments || {};
+    const kcal = Math.round(n['energy-kcal_100g'] ?? n['energy-kcal'] ?? 0);
+    const pro = parseFloat(n['proteins_100g'] ?? n['proteins'] ?? 0).toFixed(1);
+    const carb = parseFloat(n['carbohydrates_100g'] ?? n['carbohydrates'] ?? 0).toFixed(1);
+    const code = p.code || '';
     h += '<div class="off-result" data-action="off-select" data-idx="' + i + '">';
-    if (img) h += '<img class="off-result-img" src="' + esc(img) + '" onerror="this.style.display=\'none\'">';
+    if (img) h += '<img class="off-result-img off-result-img-el" src="' + esc(img) + '">';
     else h += '<div class="off-result-img" style="display:flex;align-items:center;justify-content:center;font-size:20px;opacity:0.2">&#127828;</div>';
     h += '<div class="off-result-info"><div class="off-result-name">' + esc(name) + '</div>';
     if (brand) h += '<div class="off-result-brand">' + esc(brand) + '</div>';
@@ -176,50 +201,54 @@ function renderOffResults(products) {
 }
 
 export async function offModalSearch() {
-  var input = document.getElementById('off-search-input');
-  var btn = document.getElementById('off-search-btn');
-  var query = (input ? input.value : '').trim();
+  const input = document.getElementById('off-search-input');
+  const btn = document.getElementById('off-search-btn');
+  const query = (input ? input.value : '').trim();
   if (query.length < 2) return;
   if (input) input.disabled = true;
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
-  var bodyEl = document.getElementById('off-results-body');
-  var cnt = document.getElementById('off-result-count');
+  const bodyEl = document.getElementById('off-results-body');
+  const cnt = document.getElementById('off-result-count');
   if (bodyEl) bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('off_searching_name', { name: query });
   try {
-    var products = await searchOFF(query);
+    const products = await searchOFF(query);
     updateOffPickerResults(products);
   } catch(e) { updateOffPickerResults([], t('toast_network_error')); }
 }
 
 export function closeOffPicker() {
-  var el = document.getElementById('off-modal-bg');
+  const el = document.getElementById('off-modal-bg');
   if (el) el.remove();
   document.body.style.overflow = '';
   _offPickerProducts = null;
 }
 
 export async function selectOffResult(idx, ctxSnapshot) {
-  var products = _offPickerProducts;
+  const products = _offPickerProducts;
   if (!products || !products[idx]) return;
-  var selected = products[idx];
+  const selected = products[idx];
   closeOffPicker();
 
-  var code = selected.code;
-  var ctx = ctxSnapshot || _offCtx;
-  var prefix = ctx.prefix;
-  var productId = ctx.productId;
-  var btn = document.getElementById(prefix + '-off-btn');
+  const code = selected.code;
+  const ctx = ctxSnapshot || _offCtx;
+  const prefix = ctx.prefix;
+  const productId = ctx.productId;
+  const btn = document.getElementById(prefix + '-off-btn');
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
 
   try {
     if (code) {
-      var res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + code + '.json');
-      var data = await res.json();
-      if (data.status === 1 && data.product) {
-        var eanEl = document.getElementById(prefix + '-ean');
-        if (eanEl) eanEl.value = code;
-        await applyOffProduct(data.product, prefix, productId);
+      const res = await fetchWithTimeout('https://world.openfoodfacts.org/api/v2/product/' + code + '.json');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 1 && data.product) {
+          const eanEl = document.getElementById(prefix + '-ean');
+          if (eanEl) eanEl.value = code;
+          await applyOffProduct(data.product, prefix, productId);
+        } else {
+          await applyOffProduct(selected, prefix, productId);
+        }
       } else {
         await applyOffProduct(selected, prefix, productId);
       }
@@ -235,67 +264,67 @@ export async function selectOffResult(idx, ctxSnapshot) {
 }
 
 async function applyOffProduct(prod, prefix, productId) {
-  var n = prod.nutriments || {};
-  var offMap = {
-    kcal: n['energy-kcal_100g'] != null ? n['energy-kcal_100g'] : n['energy-kcal'] != null ? n['energy-kcal'] : null,
-    energy_kj: n['energy-kj_100g'] != null ? n['energy-kj_100g'] : n['energy-kj'] != null ? n['energy-kj'] : n['energy_100g'] != null ? n['energy_100g'] : null,
-    fat: n['fat_100g'] != null ? n['fat_100g'] : n['fat'] != null ? n['fat'] : null,
-    saturated_fat: n['saturated-fat_100g'] != null ? n['saturated-fat_100g'] : n['saturated-fat'] != null ? n['saturated-fat'] : null,
-    carbs: n['carbohydrates_100g'] != null ? n['carbohydrates_100g'] : n['carbohydrates'] != null ? n['carbohydrates'] : null,
-    sugar: n['sugars_100g'] != null ? n['sugars_100g'] : n['sugars'] != null ? n['sugars'] : null,
-    protein: n['proteins_100g'] != null ? n['proteins_100g'] : n['proteins'] != null ? n['proteins'] : null,
-    fiber: n['fiber_100g'] != null ? n['fiber_100g'] : n['fiber'] != null ? n['fiber'] : null,
-    salt: n['salt_100g'] != null ? n['salt_100g'] : n['salt'] != null ? n['salt'] : null,
+  const n = prod.nutriments || {};
+  const offMap = {
+    kcal: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? null,
+    energy_kj: n['energy-kj_100g'] ?? n['energy-kj'] ?? n['energy_100g'] ?? null,
+    fat: n['fat_100g'] ?? n['fat'] ?? null,
+    saturated_fat: n['saturated-fat_100g'] ?? n['saturated-fat'] ?? null,
+    carbs: n['carbohydrates_100g'] ?? n['carbohydrates'] ?? null,
+    sugar: n['sugars_100g'] ?? n['sugars'] ?? null,
+    protein: n['proteins_100g'] ?? n['proteins'] ?? null,
+    fiber: n['fiber_100g'] ?? n['fiber'] ?? null,
+    salt: n['salt_100g'] ?? n['salt'] ?? null,
   };
 
-  var filled = [];
-  Object.keys(offMap).forEach(function(key) {
-    var val = offMap[key];
+  const filled = [];
+  Object.keys(offMap).forEach((key) => {
+    const val = offMap[key];
     if (val == null) return;
-    var fieldEl = document.getElementById(prefix + '-' + key);
+    const fieldEl = document.getElementById(prefix + '-' + key);
     if (fieldEl) {
       fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
       filled.push(key);
     }
   });
 
-  var serving = prod.serving_size || '';
-  var servMatch = serving.match(/([\d.]+)\s*g/);
-  if (servMatch) { var portionEl = document.getElementById(prefix + '-portion'); if (portionEl) { portionEl.value = Math.round(parseFloat(servMatch[1])); filled.push('portion'); } }
+  const serving = prod.serving_size || '';
+  const servMatch = serving.match(/([\d.]+)\s*g/);
+  if (servMatch) { const portionEl = document.getElementById(prefix + '-portion'); if (portionEl) { portionEl.value = Math.round(parseFloat(servMatch[1])); filled.push('portion'); } }
 
-  var qty = prod.product_quantity || 0;
-  if (qty) { var weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
+  const qty = prod.product_quantity || 0;
+  if (qty) { const weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
 
-  var nameEl = document.getElementById(prefix + '-name');
-  if (nameEl) { var pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
+  const nameEl = document.getElementById(prefix + '-name');
+  if (nameEl) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
 
   if (prod.code) {
-    var codeEl = document.getElementById(prefix + '-ean');
+    const codeEl = document.getElementById(prefix + '-ean');
     if (codeEl && !codeEl.value.trim()) { codeEl.value = prod.code; filled.push('ean'); }
   }
 
-  var brand = prod.brands || '';
-  if (brand) { var brandEl = document.getElementById(prefix + '-brand'); if (brandEl) { brandEl.value = brand; filled.push('brand'); } }
+  const brand = prod.brands || '';
+  if (brand) { const brandEl = document.getElementById(prefix + '-brand'); if (brandEl) { brandEl.value = brand; filled.push('brand'); } }
 
-  var stores = '';
+  let stores = '';
   if (prod.stores) stores = prod.stores;
-  else if (prod.stores_tags && prod.stores_tags.length) stores = prod.stores_tags.map(function(s) { return s.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); }); }).join(', ');
-  if (stores) { var storesEl = document.getElementById(prefix + '-stores'); if (storesEl) { storesEl.value = stores; filled.push('stores'); } }
+  else if (prod.stores_tags?.length) stores = prod.stores_tags.map((s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())).join(', ');
+  if (stores) { const storesEl = document.getElementById(prefix + '-stores'); if (storesEl) { storesEl.value = stores; filled.push('stores'); } }
 
-  var ing = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
-  if (ing) { var ingEl = document.getElementById(prefix + '-ingredients'); if (ingEl) { ingEl.value = ing; filled.push('ingredients'); updateEstimateBtn(prefix); } }
+  const ing = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
+  if (ing) { const ingEl = document.getElementById(prefix + '-ingredients'); if (ingEl) { ingEl.value = ing; filled.push('ingredients'); updateEstimateBtn(prefix); } }
 
-  var imgUrl = prod.image_front_url || prod.image_url || prod.image_front_small_url || '';
-  if (imgUrl) {
+  const imgUrl = prod.image_front_url || prod.image_url || prod.image_front_small_url || '';
+  if (imgUrl && isValidImageUrl(imgUrl)) {
     try {
-      var imgDataUri = await fetchImageAsDataUri(imgUrl);
+      const imgDataUri = await fetchImageAsDataUri(imgUrl);
       if (imgDataUri) {
         if (productId) {
           await api('/api/products/' + productId + '/image', { method: 'PUT', body: JSON.stringify({ image: imgDataUri }) });
           state.imageCache[productId] = imgDataUri;
-          var imgEl = document.getElementById('prod-img-' + productId);
+          const imgEl = document.getElementById('prod-img-' + productId);
           if (imgEl) imgEl.src = imgDataUri;
-          else { var wrap = document.getElementById('prod-img-wrap-' + productId); if (wrap) { var safe = safeDataUri(imgDataUri); if (safe) wrap.innerHTML = '<img id="prod-img-' + productId + '" src="' + safe + '" style="width:100%;height:100%;object-fit:cover">'; } }
+          else { const wrap = document.getElementById('prod-img-wrap-' + productId); if (wrap) { const safe = safeDataUri(imgDataUri); if (safe) wrap.innerHTML = '<img id="prod-img-' + productId + '" src="' + safe + '" style="width:100%;height:100%;object-fit:cover">'; } }
         } else {
           window._pendingImage = imgDataUri;
         }
@@ -305,36 +334,46 @@ async function applyOffProduct(prod, prefix, productId) {
   }
 
   showToast(t('toast_off_fetched', { fields: filled.join(', ') }), 'success');
-  if (ing) { setTimeout(function() { estimateProteinQuality(prefix); }, 300); }
+  if (ing) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
+}
+
+// Validate image URLs to prevent SSRF via the proxy endpoint
+function isValidImageUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch(e) {
+    return false;
+  }
 }
 
 async function fetchImageAsDataUri(url) {
   try {
-    var r = await fetch(url);
+    const r = await fetchWithTimeout(url);
     if (!r.ok) throw new Error('Not ok');
-    var blob = await r.blob();
+    const blob = await r.blob();
     return await blobToResizedDataUri(blob);
   } catch(e) {
     try {
-      var r3 = await fetch('/api/proxy-image?url=' + encodeURIComponent(url));
+      const r3 = await fetchWithTimeout('/api/proxy-image?url=' + encodeURIComponent(url));
       if (!r3.ok) return null;
-      var blob3 = await r3.blob();
+      const blob3 = await r3.blob();
       return await blobToResizedDataUri(blob3);
     } catch(e3) { return null; }
   }
 }
 
 function blobToResizedDataUri(blob) {
-  return new Promise(function(resolve) {
-    var reader = new FileReader();
-    reader.onload = function(e) { resizeImage(e.target.result, 400).then(resolve); };
-    reader.onerror = function() { resolve(null); };
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => { resizeImage(e.target.result, 400).then(resolve).catch(() => resolve(null)); };
+    reader.onerror = () => { resolve(null); };
     reader.readAsDataURL(blob);
   });
 }
 
 // ── Add Product to OFF ──────────────────────────────
-var _offReviewFields = [
+const _offReviewFields = [
   { key: 'name', offKey: 'product_name', label: 'label_product_name', required: true },
   { key: 'brand', offKey: 'brands', label: 'label_brand' },
   { key: 'stores', offKey: 'stores', label: 'label_stores' },
@@ -353,13 +392,13 @@ var _offReviewFields = [
 ];
 
 export function showOffAddReview(ean) {
-  var prefix = _offCtx.prefix;
-  var filled = [];
-  var empty = [];
-  _offReviewFields.forEach(function(f) {
-    var fieldEl = document.getElementById(prefix + '-' + f.key);
-    var val = fieldEl ? fieldEl.value.trim() : '';
-    var label = t(f.label);
+  const prefix = _offCtx.prefix;
+  const filled = [];
+  const empty = [];
+  _offReviewFields.forEach((f) => {
+    const fieldEl = document.getElementById(prefix + '-' + f.key);
+    const val = fieldEl ? fieldEl.value.trim() : '';
+    const label = t(f.label);
     if (val) {
       filled.push({ label: label, value: val, required: f.required });
     } else {
@@ -367,14 +406,14 @@ export function showOffAddReview(ean) {
     }
   });
 
-  var hasName = filled.some(function(f) { return f.required; });
-  var h = '<div style="text-align:left;max-height:60vh;overflow-y:auto;padding:4px">';
+  const hasName = filled.some((f) => f.required);
+  let h = '<div style="text-align:left;max-height:60vh;overflow-y:auto;padding:4px">';
   h += '<div style="font-weight:600;margin-bottom:4px">EAN: ' + esc(ean) + '</div>';
 
   if (filled.length) {
     h += '<div style="margin:12px 0 6px;font-size:12px;opacity:0.5;text-transform:uppercase">' + esc(t('off_review_filled')) + '</div>';
-    filled.forEach(function(f) {
-      var display = f.value.length > 50 ? f.value.substring(0, 50) + '...' : f.value;
+    filled.forEach((f) => {
+      const display = f.value.length > 50 ? f.value.substring(0, 50) + '...' : f.value;
       h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">';
       h += '<span style="color:#4caf50">&#10003;</span>';
       h += '<span style="opacity:0.6;min-width:100px">' + esc(f.label) + '</span>';
@@ -385,7 +424,7 @@ export function showOffAddReview(ean) {
 
   if (empty.length) {
     h += '<div style="margin:12px 0 6px;font-size:12px;opacity:0.5;text-transform:uppercase">' + esc(t('off_review_empty')) + '</div>';
-    empty.forEach(function(f) {
+    empty.forEach((f) => {
       h += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:13px">';
       h += '<span style="color:' + (f.required ? '#f44336' : '#ff9800') + '">' + (f.required ? '&#10007;' : '&#9888;') + '</span>';
       h += '<span style="opacity:0.6">' + esc(f.label) + (f.required ? ' *' : '') + '</span>';
@@ -399,47 +438,47 @@ export function showOffAddReview(ean) {
 
   h += '</div>';
 
-  var bg = document.getElementById('off-add-review-bg');
+  let bg = document.getElementById('off-add-review-bg');
   if (!bg) {
     bg = document.createElement('div');
     bg.className = 'off-modal-bg';
     bg.id = 'off-add-review-bg';
-    bg.onclick = function(e) { if (e.target === bg) closeOffAddReview(); };
+    bg.onclick = (e) => { if (e.target === bg) closeOffAddReview(); };
     document.body.appendChild(bg);
   }
 
-  var modalDiv = document.createElement('div');
+  const modalDiv = document.createElement('div');
   modalDiv.className = 'off-modal';
 
-  var headDiv = document.createElement('div');
+  const headDiv = document.createElement('div');
   headDiv.className = 'off-modal-head';
   headDiv.innerHTML = '<h3>\u{1F30E} ' + esc(t('off_add_to_off')) + '</h3>';
-  var headClose = document.createElement('button');
+  const headClose = document.createElement('button');
   headClose.className = 'off-modal-close';
   headClose.textContent = '\u00D7';
-  headClose.addEventListener('click', function() { closeOffAddReview(); });
+  headClose.addEventListener('click', closeOffAddReview);
   headDiv.appendChild(headClose);
   modalDiv.appendChild(headDiv);
 
-  var bodyDiv = document.createElement('div');
+  const bodyDiv = document.createElement('div');
   bodyDiv.className = 'off-modal-body';
   bodyDiv.style.padding = '16px';
   bodyDiv.innerHTML = h;
 
-  var btnRow = document.createElement('div');
+  const btnRow = document.createElement('div');
   btnRow.style.cssText = 'display:flex;gap:8px;margin-top:16px;justify-content:flex-end';
-  var cancelBtn = document.createElement('button');
+  const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn-off';
   cancelBtn.style.cssText = 'padding:8px 16px;font-size:13px;opacity:0.7';
   cancelBtn.textContent = t('btn_cancel');
-  cancelBtn.addEventListener('click', function() { closeOffAddReview(); });
+  cancelBtn.addEventListener('click', closeOffAddReview);
   btnRow.appendChild(cancelBtn);
-  var submitBtn = document.createElement('button');
+  const submitBtn = document.createElement('button');
   submitBtn.className = 'btn-register';
   submitBtn.id = 'off-submit-btn';
   submitBtn.style.cssText = 'padding:8px 20px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '');
   submitBtn.textContent = '\u{1F30E} ' + t('off_submit_btn');
-  submitBtn.addEventListener('click', function() { submitToOff(ean); });
+  submitBtn.addEventListener('click', () => { submitToOff(ean); });
   btnRow.appendChild(submitBtn);
   bodyDiv.appendChild(btnRow);
 
@@ -449,19 +488,19 @@ export function showOffAddReview(ean) {
 }
 
 export function closeOffAddReview() {
-  var el = document.getElementById('off-add-review-bg');
+  const el = document.getElementById('off-add-review-bg');
   if (el) el.remove();
 }
 
 export async function submitToOff(ean) {
-  var prefix = _offCtx.prefix;
-  var btn = document.getElementById('off-submit-btn');
+  const prefix = _offCtx.prefix;
+  const btn = document.getElementById('off-submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
-  var body = { code: ean };
-  _offReviewFields.forEach(function(f) {
-    var fieldEl = document.getElementById(prefix + '-' + f.key);
-    var val = fieldEl ? fieldEl.value.trim() : '';
+  const body = { code: ean };
+  _offReviewFields.forEach((f) => {
+    const fieldEl = document.getElementById(prefix + '-' + f.key);
+    const val = fieldEl ? fieldEl.value.trim() : '';
     if (val) body[f.offKey] = val;
   });
 
@@ -470,12 +509,12 @@ export async function submitToOff(ean) {
   if (body.serving_size) body.serving_size = body.serving_size + ' g';
 
   try {
-    var res = await api('/api/off/add-product', {
+    const res = await api('/api/off/add-product', {
       method: 'POST',
       body: JSON.stringify(body)
     });
     if (res.error) {
-      var msg = t(res.error) !== res.error ? t(res.error) : res.error;
+      const msg = t(res.error) !== res.error ? t(res.error) : res.error;
       showToast(msg, 'error');
       if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
       return;
@@ -491,31 +530,32 @@ export async function submitToOff(ean) {
 
 // ── Protein Quality Estimation ─────────────────────
 export function updateEstimateBtn(prefix) {
-  var ing = document.getElementById(prefix + '-ingredients');
-  var wrap = document.getElementById(prefix + '-protein-quality-wrap');
+  const ing = document.getElementById(prefix + '-ingredients');
+  const wrap = document.getElementById(prefix + '-protein-quality-wrap');
   if (ing && wrap) wrap.style.display = ing.value.trim() ? '' : 'none';
 }
 
 export async function estimateProteinQuality(prefix) {
-  var ingEl = document.getElementById(prefix + '-ingredients');
-  var btn = document.getElementById(prefix + '-estimate-btn');
-  var resultEl = document.getElementById(prefix + '-pq-result');
-  var pdcaasEl = document.getElementById(prefix + '-pdcaas-val');
-  var diEl = document.getElementById(prefix + '-diaas-val');
-  var sourcesEl = document.getElementById(prefix + '-pq-sources');
-  var hiddenPd = document.getElementById(prefix + '-est_pdcaas');
-  var hiddenDi = document.getElementById(prefix + '-est_diaas');
-  if (!ingEl || !ingEl.value.trim()) { showToast(t('toast_ingredients_missing') || 'Ingredients missing', 'error'); return; }
+  const ingEl = document.getElementById(prefix + '-ingredients');
+  const btn = document.getElementById(prefix + '-estimate-btn');
+  const resultEl = document.getElementById(prefix + '-pq-result');
+  const pdcaasEl = document.getElementById(prefix + '-pdcaas-val');
+  const diEl = document.getElementById(prefix + '-diaas-val');
+  const sourcesEl = document.getElementById(prefix + '-pq-sources');
+  const hiddenPd = document.getElementById(prefix + '-est_pdcaas');
+  const hiddenDi = document.getElementById(prefix + '-est_diaas');
+  if (!ingEl || !ingEl.value.trim()) { showToast(t('toast_ingredients_missing'), 'error'); return; }
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
   try {
-    var res = await fetch('/api/estimate-protein-quality', {
+    const res = await fetch('/api/estimate-protein-quality', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ingredients: ingEl.value })
     });
-    var data = await res.json();
+    if (!res.ok) { showToast(t('toast_network_error'), 'error'); return; }
+    const data = await res.json();
     if (data.error) { showToast(t('toast_error_prefix', { msg: data.error }), 'error'); return; }
-    if (pdcaasEl) pdcaasEl.textContent = data.est_pdcaas.toFixed(2);
-    if (diEl) diEl.textContent = data.est_diaas.toFixed(2);
+    if (pdcaasEl) pdcaasEl.textContent = data.est_pdcaas != null ? Number(data.est_pdcaas).toFixed(2) : '\u2013';
+    if (diEl) diEl.textContent = data.est_diaas != null ? Number(data.est_diaas).toFixed(2) : '\u2013';
     if (sourcesEl && data.sources && data.sources.length) sourcesEl.textContent = t('sources_label', { sources: data.sources.join(', ') });
     if (hiddenPd) hiddenPd.value = data.est_pdcaas != null ? data.est_pdcaas : '';
     if (hiddenDi) hiddenDi.value = data.est_diaas != null ? data.est_diaas : '';

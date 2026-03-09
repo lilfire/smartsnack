@@ -6,11 +6,11 @@ import { loadProductImage } from './images.js';
 import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings.js';
 import { isValidEan } from './openfoodfacts.js';
 
-var _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
+const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
 export function renderNutriTable(p) {
-  var rows = [
+  const rows = [
     [t('nutri_energy') + ' (kcal)', p.kcal, 'kcal'],
     [t('nutri_energy') + ' (kJ)', p.energy_kj, 'kJ'],
     [t('nutri_fat'), p.fat, 'g'],
@@ -21,11 +21,11 @@ export function renderNutriTable(p) {
     [t('nutri_fiber'), p.fiber, 'g'],
     [t('nutri_salt'), p.salt, 'g'],
   ];
-  var h = '<table class="nutri-table">';
-  rows.forEach(function(r) {
-    var isSub = r[3];
-    var val = r[1];
-    var display = (val != null) ? parseFloat(val).toFixed(r[2] === 'g' ? 1 : 0) + ' ' + r[2] : '-';
+  let h = '<table class="nutri-table">';
+  rows.forEach((r) => {
+    const isSub = r[3];
+    const val = r[1];
+    const display = (val != null) ? parseFloat(val).toFixed(r[2] === 'g' ? 1 : 0) + ' ' + r[2] : '-';
     h += '<tr' + (isSub ? ' class="sub"' : '') + '><td>' + r[0] + '</td><td>' + display + '</td></tr>';
   });
   if (p.est_pdcaas || p.est_diaas) {
@@ -33,7 +33,7 @@ export function renderNutriTable(p) {
     if (p.est_diaas) h += '<tr><td style="color:#00bfff">DIAAS <span style="font-size:9px;opacity:0.5">(est.)</span></td><td style="color:#00bfff;font-family:\'Space Mono\',monospace">' + parseFloat(p.est_diaas).toFixed(2) + '</td></tr>';
   }
   h += '</table>';
-  var extras = [];
+  const extras = [];
   if (p.weight) extras.push(t('extra_weight', { val: p.weight }));
   if (p.portion) extras.push(t('extra_portion', { val: p.portion }));
   if (p.price) extras.push(t('extra_price', { val: p.price }));
@@ -43,45 +43,47 @@ export function renderNutriTable(p) {
 }
 
 // ── Dynamic column helpers ──────────────────────────
-var COL_UNITS = { kcal: '', energy_kj: '', carbs: 'g', sugar: 'g', fat: 'g', saturated_fat: 'g', protein: 'g', fiber: 'g', salt: 'g', taste_score: '', volume: '', price: 'kr', pct_protein_cal: '%', pct_fat_cal: '%', pct_carb_cal: '%' };
+const COL_UNITS = { kcal: '', energy_kj: '', carbs: 'g', sugar: 'g', fat: 'g', saturated_fat: 'g', protein: 'g', fiber: 'g', salt: 'g', taste_score: '', volume: '', price: 'kr', pct_protein_cal: '%', pct_fat_cal: '%', pct_carb_cal: '%' };
 
 export function fmtCell(field, val) {
   if (val == null) return '-';
   if (field === 'volume') return volumeLabel(val);
   if (field === 'taste_score') {
-    var st = '\u2605'.repeat(Math.round(val)), dm = '\u2605'.repeat(6 - Math.round(val));
+    const clamped = Math.max(0, Math.min(6, Math.round(val)));
+    const st = '\u2605'.repeat(clamped);
+    const dm = '\u2605'.repeat(6 - clamped);
     return '<span class="stars">' + st + '<span class="stars-dim">' + dm + '</span></span>';
   }
-  if (field === 'price') return val ? val.toFixed(0) + 'kr' : '-';
+  if (field === 'price') return val ? Number(val).toFixed(0) + 'kr' : '-';
   if (field === 'pct_protein_cal' || field === 'pct_fat_cal' || field === 'pct_carb_cal') return parseFloat(val).toFixed(1) + '%';
-  var u = COL_UNITS[field] || '';
-  if (field === 'salt') return val.toFixed(2) + u;
-  if (field === 'kcal' || field === 'energy_kj') return Math.round(val) + u;
+  const u = COL_UNITS[field] || '';
+  if (field === 'salt') return Number(val).toFixed(2) + u;
+  if (field === 'kcal' || field === 'energy_kj') return Math.round(Number(val)) + u;
   return parseFloat(val).toFixed(1) + u;
 }
 
 export function getActiveCols() {
-  var cols = [{ key: 'name', label: t('col_product'), width: '2.4fr' }];
-  var enabled = weightData.filter(function(w) { return w.enabled; });
-  var isMobile = window.innerWidth < 640;
+  const cols = [{ key: 'name', label: t('col_product'), width: '2.4fr' }];
+  const enabled = weightData.filter((w) => w.enabled);
+  const isMobile = window.innerWidth < 640;
   if (!isMobile) {
-    enabled.forEach(function(w) { cols.push({ key: w.field, label: w.label, width: '0.7fr' }); });
+    enabled.forEach((w) => { cols.push({ key: w.field, label: w.label, width: '0.7fr' }); });
   }
   cols.push({ key: 'total_score', label: t('col_score'), width: '0.9fr' });
   return cols;
 }
 
 export function getGridTemplate(cols) {
-  return cols.map(function(c) { return c.width; }).join(' ');
+  return cols.map((c) => c.width).join(' ');
 }
 
 // Re-render on resize (debounced)
-var _resizeTimer = null;
-window.addEventListener('resize', function() {
+let _resizeTimer = null;
+window.addEventListener('resize', () => {
   clearTimeout(_resizeTimer);
-  _resizeTimer = setTimeout(function() {
+  _resizeTimer = setTimeout(() => {
     if (state.editingId === null) {
-      import('./filters.js').then(function(mod) { mod.rerender(); });
+      import('./filters.js').then((mod) => { mod.rerender(); });
     }
   }, 200);
 });
@@ -91,44 +93,47 @@ export function renderResults(results, search) {
   document.getElementById('result-count').textContent = search
     ? (results.length !== 1 ? t('result_count_search_plural', { count: results.length, query: search }) : t('result_count_search', { count: results.length, query: search }))
     : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
-  var container = document.getElementById('results-container');
+  const container = document.getElementById('results-container');
   if (!results.length) {
     container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p>'
-      + (search ? '<button class="btn-create-from-search" onclick="window._createFromSearch()">' + t('create_product') + '</button>' : '')
+      + (search ? '<button class="btn-create-from-search" data-action="create-from-search">' + t('create_product') + '</button>' : '')
       + '</div>';
     if (search) {
-      window._createFromSearch = function() {
-        if (isValidEan(search)) {
-          document.getElementById('f-ean').value = search;
-        } else {
-          document.getElementById('f-name').value = search;
-        }
-        window.switchView('register');
-      };
+      const createBtn = container.querySelector('[data-action="create-from-search"]');
+      if (createBtn) {
+        createBtn.addEventListener('click', () => {
+          if (isValidEan(search)) {
+            document.getElementById('f-ean').value = search;
+          } else {
+            document.getElementById('f-name').value = search;
+          }
+          window.switchView('register');
+        });
+      }
     }
     return;
   }
-  var sorted = applySorting(results);
-  var cols = getActiveCols();
-  var gridTpl = getGridTemplate(cols);
-  var h = '<div class="table-wrap"><div class="table-head" style="grid-template-columns:' + gridTpl + '">';
-  cols.forEach(function(c, i) {
-    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" onclick="setSort(\'' + c.key + '\')"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
+  const sorted = applySorting(results);
+  const cols = getActiveCols();
+  const gridTpl = getGridTemplate(cols);
+  let h = '<div class="table-wrap"><div class="table-head" style="grid-template-columns:' + gridTpl + '">';
+  cols.forEach((c, i) => {
+    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" data-action="sort" data-col="' + esc(c.key) + '"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
   });
   h += '</div>';
-  sorted.forEach(function(p) {
-    var hasImg = p.has_image;
-    var thumbHtml = hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '';
-    var eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
-    var brandHtml = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
-    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" onclick="toggleExpand(' + p.id + ')">'
+  sorted.forEach((p) => {
+    const hasImg = p.has_image;
+    const thumbHtml = hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '';
+    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
+    const brandHtml = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
       + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + catEmoji(p.type) + '</span>' + thumbHtml + '<span class="prod-name">' + esc(p.name) + '</span></div>'
       + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandHtml + eanHtml + '</div></div>';
-    for (var ci = 1; ci < cols.length; ci++) {
-      var c = cols[ci];
+    for (let ci = 1; ci < cols.length; ci++) {
+      const c = cols[ci];
       if (c.key === 'total_score') {
-        var scoreDisplay = (p.total_score != null) ? p.total_score.toFixed(1) : '-';
-        h += '<span class="cell-score">' + scoreDisplay + (p.has_missing_scores ? '<span style="color:#f5a623;margin-left:1px" title="Score based on incomplete data — some values are 0 or missing">*</span>' : '') + '</span>';
+        const scoreDisplay = (p.total_score != null) ? Number(p.total_score).toFixed(1) : '-';
+        h += '<span class="cell-score">' + scoreDisplay + (p.has_missing_scores ? '<span style="color:#f5a623;margin-left:1px" title="Score based on incomplete data \u2014 some values are 0 or missing">*</span>' : '') + '</span>';
       } else {
         h += '<span class="cell-right">' + fmtCell(c.key, p[c.key]) + '</span>';
       }
@@ -136,25 +141,25 @@ export function renderResults(results, search) {
     h += '</div>';
     if (state.expandedId === p.id) {
       h += '<div class="expanded"><div class="expanded-top">'
-        + '<div class="expanded-img-area" onclick="event.stopPropagation();triggerImageUpload(' + p.id + ')">'
+        + '<div class="expanded-img-area" data-action="trigger-image" data-id="' + p.id + '">'
         + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
         + '<div class="expanded-img-overlay">' + (hasImg ? t('expanded_change_image') : t('expanded_upload_image')) + '</div></div>'
         + '<div class="expanded-right">';
       h += '<p class="expanded-title">' + t('expanded_score_breakdown') + '</p><div class="score-grid">';
-      var sc = p.scores || {};
-      Object.keys(sc).forEach(function(sf) {
-        var scfg = SCORE_CFG_MAP[sf];
+      const sc = p.scores || {};
+      Object.keys(sc).forEach((sf) => {
+        const scfg = SCORE_CFG_MAP[sf];
         if (!scfg) return;
-        var sv = sc[sf];
-        var pct = Math.min(sv, 100);
-        var col = SCORE_COLORS[sf] || '#888';
-        h += '<div><div class="score-label">' + esc(scfg.label) + '</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div><span class="score-val">' + sv.toFixed(1) + '</span></div>';
+        const sv = sc[sf];
+        const pct = Math.min(sv, 100);
+        const col = SCORE_COLORS[sf] || '#888';
+        h += '<div><div class="score-label">' + esc(scfg.label) + '</div><div class="score-bar-bg"><div class="score-bar-fill" style="width:' + pct + '%;background:' + col + '"></div></div><span class="score-val">' + Number(sv).toFixed(1) + '</span></div>';
       });
       if (!Object.keys(sc).length) h += '<div style="color:rgba(255,255,255,0.3);font-size:12px;grid-column:1/-1">' + t('expanded_no_weights') + '</div>';
       h += '</div>';
       if (p.has_missing_scores && p.missing_fields && p.missing_fields.length) {
-        var mLabels = p.missing_fields.map(function(f) { var c = SCORE_CFG_MAP[f]; return c ? c.label : f; }).join(', ');
-        h += '<div style="margin-top:8px;padding:8px 10px;border-radius:7px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.18);font-size:11px;color:rgba(245,166,35,0.85)"><span style="margin-right:4px">⚠</span> ' + t('expanded_missing_data', { fields: esc(mLabels) }) + '</div>';
+        const mLabels = p.missing_fields.map((f) => { const c = SCORE_CFG_MAP[f]; return c ? c.label : f; }).join(', ');
+        h += '<div style="margin-top:8px;padding:8px 10px;border-radius:7px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.18);font-size:11px;color:rgba(245,166,35,0.85)"><span style="margin-right:4px">\u26A0</span> ' + t('expanded_missing_data', { fields: esc(mLabels) }) + '</div>';
       }
       // Nutrition table
       h += '<p class="nutri-section-title">' + t('expanded_nutrition_title') + '</p>';
@@ -168,16 +173,16 @@ export function renderResults(results, search) {
       h += '</div></div>';
 
       if (state.editingId === p.id) {
-        var opts = '';
-        state.categories.slice().sort(function(a, b) { return a.label.localeCompare(b.label); }).forEach(function(c) { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
-        var ev = function(v) { return v == null ? '' : v; };
+        let opts = '';
+        state.categories.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach((c) => { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
+        const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
-          + '<div class="edit-grid-2"><label>' + t('edit_label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '" oninput="validateOffBtn(\'ed\')"></div>'
-          + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '" oninput="validateOffBtn(\'ed\')"></div><button class="btn-scan" onclick="event.stopPropagation();openScanner(\'ed\',' + p.id + ')" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' onclick="event.stopPropagation();lookupOFF(\'ed\',' + p.id + ')"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'
+          + '<div class="edit-grid-2"><label>' + t('edit_label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
+          + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"></div><button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'
           + '<div><label>' + t('edit_label_category') + '</label><select id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('edit_label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('edit_label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
-          + '<div class="edit-grid-2"><label>' + t('edit_label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none" oninput="updateEstimateBtn(\'ed\')">' + esc(p.ingredients || '') + '</textarea></div>';
+          + '<div class="edit-grid-2"><label>' + t('edit_label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>';
         h += '<div><label>' + t('edit_label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
           + '<div><label>' + t('edit_label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
@@ -195,23 +200,23 @@ export function renderResults(results, search) {
           + '</div>'
           + (p.ingredients
             ? '<div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 4px">'
-              + '<span style="font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.06em;font-family:\'Space Mono\',monospace">Protein quality (estimated)</span>'
-              + '<button type="button" class="btn-off" id="ed-estimate-btn" onclick="event.stopPropagation();estimateProteinQuality(\'ed\')" style="font-size:11px;padding:5px 10px"><span class="off-spin"></span><span class="off-label">&#9881; Estimate</span></button></div>'
+              + '<span style="font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.06em;font-family:\'Space Mono\',monospace">' + t('protein_quality_estimated') + '</span>'
+              + '<button type="button" class="btn-off" id="ed-estimate-btn" data-action="estimate-protein" style="font-size:11px;padding:5px 10px"><span class="off-spin"></span><span class="off-label">&#9881; ' + t('btn_estimate') + '</span></button></div>'
               + '<div id="ed-pq-result" style="' + (p.est_pdcaas || p.est_diaas ? '' : 'display:none;') + 'padding:10px;border-radius:8px;background:rgba(0,229,204,0.06);border:1px solid rgba(0,229,204,0.15);margin-bottom:8px">'
-              + '<div style="display:flex;gap:16px;margin-bottom:4px"><span style="font-size:11px;color:rgba(255,255,255,0.4)">PDCAAS: <span id="ed-pdcaas-val" style="color:#00e5cc;font-weight:700;font-family:\'Space Mono\',monospace">' + (p.est_pdcaas ? parseFloat(p.est_pdcaas).toFixed(2) : '–') + '</span></span>'
-              + '<span style="font-size:11px;color:rgba(255,255,255,0.4)">DIAAS: <span id="ed-diaas-val" style="color:#00bfff;font-weight:700;font-family:\'Space Mono\',monospace">' + (p.est_diaas ? parseFloat(p.est_diaas).toFixed(2) : '–') + '</span></span></div>'
+              + '<div style="display:flex;gap:16px;margin-bottom:4px"><span style="font-size:11px;color:rgba(255,255,255,0.4)">PDCAAS: <span id="ed-pdcaas-val" style="color:#00e5cc;font-weight:700;font-family:\'Space Mono\',monospace">' + (p.est_pdcaas ? parseFloat(p.est_pdcaas).toFixed(2) : '\u2013') + '</span></span>'
+              + '<span style="font-size:11px;color:rgba(255,255,255,0.4)">DIAAS: <span id="ed-diaas-val" style="color:#00bfff;font-weight:700;font-family:\'Space Mono\',monospace">' + (p.est_diaas ? parseFloat(p.est_diaas).toFixed(2) : '\u2013') + '</span></span></div>'
               + '<div id="ed-pq-sources" style="font-size:10px;color:rgba(255,255,255,0.3)"></div></div>'
             : '')
           + '<input type="hidden" id="ed-est_pdcaas" value="' + (p.est_pdcaas != null ? p.est_pdcaas : '') + '">'
           + '<input type="hidden" id="ed-est_diaas" value="' + (p.est_diaas != null ? p.est_diaas : '') + '">'
           + '<div style="display:flex;gap:8px">'
-          + '<button class="btn-sm btn-green" onclick="event.stopPropagation();saveProduct(' + p.id + ')">' + t('btn_save') + '</button>'
-          + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();window.editingId=null;rerender()">' + t('btn_cancel') + '</button>'
+          + '<button class="btn-sm btn-green" data-action="save-product" data-id="' + p.id + '">' + t('btn_save') + '</button>'
+          + '<button class="btn-sm btn-outline" data-action="cancel-edit">' + t('btn_cancel') + '</button>'
           + '</div></div>';
       } else {
         h += '<div class="expanded-actions">'
-          + '<button class="btn-sm btn-outline" onclick="event.stopPropagation();startEdit(' + p.id + ')">' + t('btn_edit') + '</button>';
-        if (hasImg) h += '<button class="btn-sm btn-outline" onclick="event.stopPropagation();removeProductImage(' + p.id + ')">' + t('btn_remove_image') + '</button>';
+          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>';
+        if (hasImg) h += '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>';
         h += '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
           + '</div>';
       }
@@ -220,23 +225,80 @@ export function renderResults(results, search) {
   });
   h += '</div>';
   container.innerHTML = h;
-  // Attach delete handlers via event delegation (avoids XSS from embedding names in onclick)
-  container.querySelectorAll('[data-action="delete"]').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      var id = parseInt(btn.dataset.id);
-      window.deleteProduct(id);
-    });
+
+  // Attach all event handlers via delegation instead of inline onclick
+  container.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-action]');
+    if (!target) return;
+    const action = target.dataset.action;
+    const id = target.dataset.id ? parseInt(target.dataset.id, 10) : null;
+
+    switch (action) {
+      case 'sort':
+        window.setSort(target.dataset.col);
+        break;
+      case 'toggle-expand':
+        // Don't expand if clicking inside expanded area or on buttons
+        if (e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
+        window.toggleExpand(id);
+        break;
+      case 'trigger-image':
+        e.stopPropagation();
+        window.triggerImageUpload(id);
+        break;
+      case 'save-product':
+        e.stopPropagation();
+        window.saveProduct(id);
+        break;
+      case 'cancel-edit':
+        e.stopPropagation();
+        state.editingId = null;
+        import('./filters.js').then((mod) => mod.rerender());
+        break;
+      case 'start-edit':
+        e.stopPropagation();
+        window.startEdit(id);
+        break;
+      case 'remove-image':
+        e.stopPropagation();
+        window.removeProductImage(id);
+        break;
+      case 'delete':
+        e.stopPropagation();
+        window.deleteProduct(id);
+        break;
+      case 'open-scanner':
+        e.stopPropagation();
+        window.openScanner('ed', id);
+        break;
+      case 'lookup-off':
+        e.stopPropagation();
+        window.lookupOFF('ed', id);
+        break;
+      case 'estimate-protein':
+        e.stopPropagation();
+        window.estimateProteinQuality('ed');
+        break;
+    }
   });
-  var edVol = document.getElementById('ed-volume');
+
+  // Attach input handlers for validation
+  const edName = document.getElementById('ed-name');
+  const edEan = document.getElementById('ed-ean');
+  const edIngredients = document.getElementById('ed-ingredients');
+  if (edName) edName.addEventListener('input', () => window.validateOffBtn('ed'));
+  if (edEan) edEan.addEventListener('input', () => window.validateOffBtn('ed'));
+  if (edIngredients) edIngredients.addEventListener('input', () => window.updateEstimateBtn('ed'));
+
+  const edVol = document.getElementById('ed-volume');
   if (edVol) upgradeSelect(edVol);
-  sorted.forEach(function(p) {
+  sorted.forEach((p) => {
     if (p.has_image) {
-      loadProductImage(p.id).then(function(dataUri) {
+      loadProductImage(p.id).then((dataUri) => {
         if (!dataUri) return;
-        var thumb = document.getElementById('thumb-' + p.id);
+        const thumb = document.getElementById('thumb-' + p.id);
         if (thumb) thumb.src = dataUri;
-        var full = document.getElementById('prod-img-' + p.id);
+        const full = document.getElementById('prod-img-' + p.id);
         if (full) full.src = dataUri;
       });
     }
