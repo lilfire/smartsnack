@@ -70,8 +70,11 @@
                 </div>
               </div>
               <button class="btn-register" style="margin-top:12px" onclick="addPq()" data-i18n="btn_add_protein_source">+ Add protein source</button>
+              <hr style="border-color:rgba(255,255,255,0.08);margin:16px 0 12px">
+              <button class="btn-register" id="btn-estimate-all-pq" onclick="estimateAllPq()" data-i18n="btn_estimate_all_pq">&#9881; Estimate PQ for all products</button>
+              <p id="estimate-pq-status" class="form-sub" style="margin-top:6px;display:none"></p>
             </div>
-          </div>         
+          </div>
           <!-- Language -->
           <div>
             <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)">
@@ -97,6 +100,9 @@
                 <div><label class="field-label" data-i18n="settings_off_password">Password</label><input class="field-input" id="off-password" type="password" data-i18n-placeholder="ph_off_password" placeholder="OFF-passord" autocomplete="current-password"></div>
                 <button class="btn-register" style="margin-top:4px" onclick="saveOffCredentials()" data-i18n="btn_save_off_credentials">&#128190; Save</button>
               </div>
+              <hr style="border-color:rgba(255,255,255,0.08);margin:16px 0 12px">
+              <button class="btn-register" id="btn-refresh-all-off" onclick="refreshAllFromOff()" data-i18n="btn_refresh_all_off">&#128260; Refresh all products from OFF</button>
+              <p id="refresh-off-status" class="form-sub" style="margin-top:6px;display:none"></p>
             </div>
           </div>
           <!-- Database -->

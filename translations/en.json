@@ -618,5 +618,13 @@
     "toast_flag_updated": "Flag updated",
     "toast_flag_deleted": "{name} deleted",
     "confirm_delete_flag_body": "Delete \"{name}\"? It will be removed from {count} products.",
-    "confirm_delete_flag_body_empty": "Delete \"{name}\"?"
+    "confirm_delete_flag_body_empty": "Delete \"{name}\"?",
+    "btn_refresh_all_off": "🔄 Refresh all products from OFF",
+    "btn_estimate_all_pq": "⚙ Estimate PQ for all products",
+    "btn_start": "Start",
+    "bulk_running": "Running… this may take a while.",
+    "bulk_refresh_off_title": "Refresh from Open Food Facts",
+    "bulk_refresh_off_confirm": "This will re-fetch data from Open Food Facts for all products with an EAN barcode. Existing values will be updated (empty OFF values will not overwrite local data). Continue?",
+    "bulk_refresh_off_result": "{total} products checked — {updated} updated, {skipped} skipped, {errors} errors",
+    "bulk_estimate_pq_result": "{total} products checked — {updated} estimated, {skipped} skipped (no match)"
 }

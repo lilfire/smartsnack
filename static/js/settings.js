@@ -734,6 +734,51 @@ export function initRestoreDragDrop() {
   });
 }
 
+// ── Bulk: Refresh all from OFF ───────────────────────
+export async function refreshAllFromOff() {
+  if (!await showConfirmModal('🔄', t('bulk_refresh_off_title'), t('bulk_refresh_off_confirm'), t('btn_start'), t('btn_cancel'))) return;
+  const btn = document.getElementById('btn-refresh-all-off');
+  const status = document.getElementById('refresh-off-status');
+  if (btn) btn.disabled = true;
+  if (status) { status.style.display = ''; status.textContent = t('bulk_running'); }
+  try {
+    const res = await api('/api/bulk/refresh-off');
+    if (res.error) { showToast(res.error, 'error'); return; }
+    const msg = t('bulk_refresh_off_result', { total: res.total, updated: res.updated, skipped: res.skipped, errors: res.errors });
+    if (status) status.textContent = msg;
+    showToast(msg, 'success');
+    loadData();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+    if (status) status.style.display = 'none';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Bulk: Estimate PQ for all ────────────────────────
+export async function estimateAllPq() {
+  const btn = document.getElementById('btn-estimate-all-pq');
+  const status = document.getElementById('estimate-pq-status');
+  if (btn) btn.disabled = true;
+  if (status) { status.style.display = ''; status.textContent = t('bulk_running'); }
+  try {
+    const res = await api('/api/bulk/estimate-pq');
+    if (res.error) { showToast(res.error, 'error'); return; }
+    const msg = t('bulk_estimate_pq_result', { total: res.total, updated: res.updated, skipped: res.skipped });
+    if (status) status.textContent = msg;
+    showToast(msg, 'success');
+    loadData();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+    if (status) status.style.display = 'none';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ── OFF Credentials ─────────────────────────────────
 async function loadOffCredentials() {
   try {
