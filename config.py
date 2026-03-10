@@ -103,6 +103,8 @@ SCORE_CONFIG_MAP = {c["field"]: c for c in SCORE_CONFIG}
 # Computed/derived fields — not stored in DB, calculated on-the-fly
 # ── Advanced filter configuration ─────────────────────
 ADVANCED_FILTER_OPS = {"=": "=", "!=": "!=", "<": "<", ">": ">", "<=": "<=", ">=": ">=", "contains": "LIKE"}
+MAX_FILTER_DEPTH = 4
+MAX_FILTER_CONDITIONS = 20
 TEXT_FIELDS = frozenset(_TEXT_FIELD_LIMITS.keys())  # type, name, ean, brand, stores, ingredients
 NUMERIC_FIELDS = frozenset(NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas"))
 POST_QUERY_FIELDS = frozenset(("total_score",))

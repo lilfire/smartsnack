@@ -176,7 +176,18 @@
   border-radius: 10px;
   padding: 10px;
   margin-bottom: 8px;
-  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Depth-based background for visual nesting */
+.adv-group-depth-0 { background: rgba(255, 255, 255, 0.02); }
+.adv-group-depth-1 { background: rgba(255, 255, 255, 0.04); }
+.adv-group-depth-2 { background: rgba(255, 255, 255, 0.06); }
+.adv-group-depth-3 { background: rgba(255, 255, 255, 0.08); }
+
+/* Nested groups: indentation + left border rail */
+.adv-group .adv-group {
+  margin-left: 12px;
+  border-left: 2px solid rgba(232, 184, 75, 0.2);
 }
 
 .adv-group-header {
@@ -225,6 +236,13 @@
   color: #E8B84B;
 }
 
+/* Group footer with add buttons side by side */
+.adv-group-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
 .adv-top-logic-wrap {
   text-align: center;
   margin: 4px 0;
@@ -247,5 +265,9 @@
   }
   .adv-value-input {
     flex: 1 1 100%;
+  }
+  /* Reduce nesting indent on mobile */
+  .adv-group .adv-group {
+    margin-left: 6px;
   }
 }
