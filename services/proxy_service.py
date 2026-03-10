@@ -85,11 +85,9 @@ def _nutrition_field_similarity(local_val: float, off_val: float) -> float:
     if denominator == 0:
         return 1.0
     diff = abs(local_val - off_val) / denominator
-    if diff <= 0.05:
-        return 1.0
     if diff >= 0.50:
         return 0.0
-    return 1.0 - (diff - 0.05) / 0.45
+    return 1.0 - diff / 0.50
 
 
 def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
