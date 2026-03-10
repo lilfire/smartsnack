@@ -60,9 +60,22 @@ _OFF_SEARCH_FIELDS = (
 )
 
 
+def _normalize_text(s: str) -> str:
+    """Normalize Unicode punctuation for consistent text comparison.
+
+    Replaces smart/curly quotes, dashes, and other variants with their
+    ASCII equivalents so that e.g. \u2019 (right single quote) matches '.
+    """
+    s = s.replace('\u2019', "'").replace('\u2018', "'")   # curly single quotes
+    s = s.replace('\u201c', '"').replace('\u201d', '"')    # curly double quotes
+    s = s.replace('\u2013', '-').replace('\u2014', '-')    # en-dash, em-dash
+    return s.lower().strip()
+
+
 def _clean_search_query(query: str) -> str:
     """Remove special characters that break OFF search."""
-    cleaned = re.sub(r'[+#@!?*]', ' ', query)
+    cleaned = _normalize_text(query)
+    cleaned = re.sub(r'[+#@!?*]', ' ', cleaned)
     return re.sub(r'\s+', ' ', cleaned).strip()
 
 
@@ -130,7 +143,7 @@ def _compute_certainty(
     Based on name word overlap, brand match, optional category boost,
     and optionally nutrition similarity.
     """
-    query_lower = query.lower().strip()
+    query_lower = _normalize_text(query)
     query_words = query_lower.split()
     if not query_words:
         return 0
@@ -144,11 +157,11 @@ def _compute_certainty(
         brand_max = 20
 
     # Collect all product name variants dynamically (no hardcoded language codes)
-    brand = (product.get("brands") or "").lower()
+    brand = _normalize_text(product.get("brands") or "")
     names = []
     for key, val in product.items():
         if key.startswith("product_name") and isinstance(val, str) and val.strip():
-            names.append(val.strip().lower())
+            names.append(_normalize_text(val))
 
     # Also try brand + name combinations so queries like
     # "Dave & Jon's Chokladboll" match product_name="Chokladboll" brand="Dave & Jon's"
