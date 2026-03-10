@@ -21,7 +21,8 @@ import {
   autosavePq, deletePq, addPq,
   downloadBackup, handleRestore, handleImport,
   initRestoreDragDrop,
-  saveOffCredentials
+  saveOffCredentials,
+  refreshAllFromOff, estimateAllPq
 } from './settings.js';
 import {
   openScanner, closeScanner, openSearchScanner,
@@ -64,6 +65,8 @@ Object.assign(window, {
   downloadBackup, handleRestore, handleImport,
   // settings — OFF credentials
   saveOffCredentials,
+  // settings — bulk operations
+  refreshAllFromOff, estimateAllPq,
   // scanner
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,

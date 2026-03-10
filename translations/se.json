@@ -618,5 +618,13 @@
     "toast_flag_updated": "Flagga uppdaterad",
     "toast_flag_deleted": "{name} borttagen",
     "confirm_delete_flag_body": "Ta bort \"{name}\"? Den tas bort från {count} produkter.",
-    "confirm_delete_flag_body_empty": "Ta bort \"{name}\"?"
+    "confirm_delete_flag_body_empty": "Ta bort \"{name}\"?",
+    "btn_refresh_all_off": "🔄 Uppdatera alla produkter från OFF",
+    "btn_estimate_all_pq": "⚙ Uppskatta PQ för alla produkter",
+    "btn_start": "Starta",
+    "bulk_running": "Kör… detta kan ta en stund.",
+    "bulk_refresh_off_title": "Uppdatera från Open Food Facts",
+    "bulk_refresh_off_confirm": "Detta hämtar data från Open Food Facts för alla produkter med EAN-streckkod. Befintliga värden uppdateras (tomma OFF-värden skriver inte över lokala data). Fortsätta?",
+    "bulk_refresh_off_result": "{total} produkter kontrollerade — {updated} uppdaterade, {skipped} hoppade över, {errors} fel",
+    "bulk_estimate_pq_result": "{total} produkter kontrollerade — {updated} uppskattade, {skipped} hoppade över (ingen träff)"
 }
