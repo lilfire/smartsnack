@@ -7,6 +7,8 @@ import urllib.request
 import urllib.error
 from urllib.parse import urlparse, urlencode
 
+from config import OFF_NUTRITION_COMPARE_MAP
+
 logger = logging.getLogger(__name__)
 
 
@@ -73,15 +75,66 @@ def _sort_by_completeness(data: dict) -> dict:
     return data
 
 
-def _compute_certainty(query: str, product: dict) -> int:
+def _nutrition_field_similarity(local_val: float, off_val: float) -> float:
+    """Compute similarity (0.0-1.0) between two nutrition values."""
+    if abs(local_val - off_val) < 0.1:
+        return 1.0
+    if local_val == 0 and off_val == 0:
+        return 1.0
+    denominator = max(abs(local_val), abs(off_val))
+    if denominator == 0:
+        return 1.0
+    diff = abs(local_val - off_val) / denominator
+    if diff <= 0.05:
+        return 1.0
+    if diff >= 0.50:
+        return 0.0
+    return 1.0 - (diff - 0.05) / 0.45
+
+
+def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
+    """Compute nutrition similarity score (0-25) between local and OFF data."""
+    nutriments = product.get("nutriments") or {}
+    if not nutriments:
+        return 0
+
+    similarities = []
+    for local_key, off_key in OFF_NUTRITION_COMPARE_MAP.items():
+        local_val = nutrition.get(local_key)
+        off_val = nutriments.get(off_key)
+        if local_val is None or off_val is None:
+            continue
+        try:
+            local_val = float(local_val)
+            off_val = float(off_val)
+        except (TypeError, ValueError):
+            continue
+        similarities.append(_nutrition_field_similarity(local_val, off_val))
+
+    if not similarities:
+        return 0
+    return (sum(similarities) / len(similarities)) * 25
+
+
+def _compute_certainty(query: str, product: dict, nutrition: dict | None = None) -> int:
     """Compute a 0-100 certainty score for how well a product matches the query.
 
-    Based on name word overlap (up to 80 pts) and brand match (up to 20 pts).
+    Based on name word overlap, brand match, and optionally nutrition similarity.
+    With nutrition: name up to 60, brand up to 15, nutrition up to 25.
+    Without nutrition: name up to 80, brand up to 20 (preserves original behavior).
     """
     query_lower = query.lower().strip()
     query_words = query_lower.split()
     if not query_words:
         return 0
+
+    has_nutrition = bool(nutrition)
+    if has_nutrition:
+        name_word_max, name_exact_bonus, name_all_bonus = 45, 15, 8
+        brand_max = 15
+    else:
+        name_word_max, name_exact_bonus, name_all_bonus = 60, 20, 10
+        brand_max = 20
 
     # Check both name fields, take the best score
     names = [
@@ -93,35 +146,38 @@ def _compute_certainty(query: str, product: dict) -> int:
     for name in names:
         if not name:
             continue
-        # Word overlap: fraction of query words found in the product name
         matches = sum(1 for w in query_words if w in name)
-        word_score = (matches / len(query_words)) * 60
+        word_score = (matches / len(query_words)) * name_word_max
 
-        # Exact substring bonus: full query appears as substring
         if query_lower in name:
-            word_score += 20
+            word_score += name_exact_bonus
         elif matches == len(query_words):
-            # All words present but not as exact substring — smaller bonus
-            word_score += 10
+            word_score += name_all_bonus
 
         best_name_score = max(best_name_score, word_score)
 
-    # Brand match: any query word in the brands field
+    # Brand match
     brand = (product.get("brands") or "").lower()
     brand_score = 0
     if brand and query_words:
         brand_matches = sum(1 for w in query_words if w in brand)
-        brand_score = (brand_matches / len(query_words)) * 20
+        brand_score = (brand_matches / len(query_words)) * brand_max
 
-    score = int(min(100, best_name_score + brand_score))
+    # Nutrition similarity
+    nutri_score = 0
+    if has_nutrition:
+        nutri_score = _compute_nutrition_similarity(nutrition, product)
+
+    score = int(min(100, best_name_score + brand_score + nutri_score))
     return max(0, score)
 
 
-def off_search(query: str) -> dict:
+def off_search(query: str, nutrition: dict | None = None) -> dict:
     """Proxy a product name search to the OpenFoodFacts API.
 
     Queries both search-a-licious (Elasticsearch) and classic search.pl,
     then combines and deduplicates results sorted by completeness.
+    Optionally accepts local nutrition data to improve certainty scoring.
     """
     if not query or len(query.strip()) < 2:
         raise ValueError("Query too short")
@@ -165,7 +221,7 @@ def off_search(query: str) -> dict:
     # Compute certainty score for each product and sort by it
     for p in combined:
         try:
-            p["certainty"] = _compute_certainty(cleaned, p)
+            p["certainty"] = _compute_certainty(cleaned, p, nutrition)
         except Exception:
             p["certainty"] = 0
     combined.sort(key=lambda p: p.get("certainty", 0), reverse=True)

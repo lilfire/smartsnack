@@ -28,6 +28,20 @@ export function validateOffBtn(prefix) {
 let _offCtx = { prefix: null, productId: null };
 let _offPickerProducts = null;
 
+const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
+
+function _gatherNutrition(prefix) {
+  const nutrition = {};
+  _nutritionCompareFields.forEach((f) => {
+    const el = document.getElementById(prefix + '-' + f);
+    if (el && el.value.trim()) {
+      const v = parseFloat(el.value);
+      if (!isNaN(v)) nutrition[f] = v;
+    }
+  });
+  return Object.keys(nutrition).length > 0 ? nutrition : null;
+}
+
 export async function lookupOFF(prefix, productId) {
   const ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
   const name = document.getElementById(prefix + '-name').value.trim();
@@ -49,7 +63,7 @@ export async function lookupOFF(prefix, productId) {
   } else if (name.length >= 2) {
     showOffPickerLoading(t('off_searching_name', { name: name }));
     try {
-      const products = await searchOFF(name);
+      const products = await searchOFF(name, _gatherNutrition(prefix));
       updateOffPickerResults(products);
       const si = document.getElementById('off-search-input');
       if (si) si.value = name;
@@ -160,9 +174,14 @@ function updateOffPickerResults(products, errorMsg, ean) {
   if (count) count.textContent = t('off_result_count', { count: products.length });
 }
 
-export async function searchOFF(query) {
-  const url = '/api/off/search?q=' + encodeURIComponent(query);
-  const res = await fetchWithTimeout(url);
+export async function searchOFF(query, nutrition) {
+  const body = { q: query };
+  if (nutrition) body.nutrition = nutrition;
+  const res = await fetchWithTimeout('/api/off/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) throw new Error('Search failed: ' + res.status);
   const data = await res.json();
   return (data.products || []).filter((p) => p.product_name || p.product_name_no);
@@ -218,7 +237,7 @@ export async function offModalSearch() {
   if (bodyEl) bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('off_searching_name', { name: query });
   try {
-    const products = await searchOFF(query);
+    const products = await searchOFF(query, _gatherNutrition(_offCtx.prefix));
     updateOffPickerResults(products);
   } catch(e) { updateOffPickerResults([], t('toast_network_error')); }
 }

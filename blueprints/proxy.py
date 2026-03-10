@@ -23,11 +23,26 @@ def proxy_image():
         "Access-Control-Allow-Origin": "*"})
 
 
-@bp.route("/api/off/search")
+@bp.route("/api/off/search", methods=["GET", "POST"])
 def off_search():
-    query = request.args.get("q", "")
+    nutrition = None
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        query = body.get("q", "")
+        raw_nutrition = body.get("nutrition")
+        if isinstance(raw_nutrition, dict):
+            nutrition = {}
+            for k, v in raw_nutrition.items():
+                try:
+                    nutrition[k] = float(v)
+                except (TypeError, ValueError):
+                    continue
+            if not nutrition:
+                nutrition = None
+    else:
+        query = request.args.get("q", "")
     try:
-        data = proxy_service.off_search(query)
+        data = proxy_service.off_search(query, nutrition)
         return jsonify(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
