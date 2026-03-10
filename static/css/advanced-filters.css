@@ -1,0 +1,149 @@
+/* ── Advanced Filters ──────────────────────────────── */
+.adv-filters {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.adv-logic-wrap {
+  margin-bottom: 10px;
+}
+
+.adv-logic-btn {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(232, 184, 75, 0.3);
+  background: rgba(232, 184, 75, 0.08);
+  color: #E8B84B;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.adv-logic-btn:hover {
+  background: rgba(232, 184, 75, 0.15);
+}
+
+.adv-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.adv-field-select,
+.adv-op-select {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8e6e3;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+.adv-field-select {
+  flex: 0 0 auto;
+  min-width: 120px;
+  max-width: 160px;
+}
+
+.adv-op-select {
+  flex: 0 0 auto;
+  min-width: 64px;
+  max-width: 90px;
+}
+
+.adv-field-select option,
+.adv-op-select option {
+  background: #1a1a1e;
+  color: #e8e6e3;
+}
+
+.adv-field-select optgroup {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: normal;
+  font-size: 11px;
+}
+
+.adv-value-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e8e6e3;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+
+.adv-value-input:focus,
+.adv-field-select:focus,
+.adv-op-select:focus {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.adv-remove-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 80, 80, 0.1);
+  color: rgba(255, 80, 80, 0.7);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.adv-remove-btn:hover {
+  background: rgba(255, 80, 80, 0.2);
+  color: #ff5050;
+}
+
+.adv-add-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.adv-add-btn:hover {
+  border-color: rgba(232, 184, 75, 0.3);
+  color: #E8B84B;
+}
+
+/* Mobile: stack rows vertically */
+@media (max-width: 480px) {
+  .adv-row {
+    flex-wrap: wrap;
+  }
+  .adv-field-select {
+    flex: 1 1 45%;
+    min-width: 0;
+    max-width: none;
+  }
+  .adv-op-select {
+    flex: 0 0 auto;
+    min-width: 50px;
+    max-width: none;
+  }
+  .adv-value-input {
+    flex: 1 1 100%;
+  }
+}
