@@ -198,6 +198,7 @@
     "off_no_results_try_different": "Ingen resultater. Prøv et annet søkeord.",
     "off_zero_results": "0 resultater",
     "off_result_count": "{count} resultater",
+    "off_certainty_label": "Treff:",
     "off_add_to_off": "Legg til dette produktet på Open Food Facts",
     "off_add_to_off_tip": "Fyll gjerne inn produktnavn, merke, næringsverdier og bilde før du legger til.",
     "off_add_name_required": "Produktnavn må fylles inn før du kan legge til på Open Food Facts.",

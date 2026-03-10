@@ -73,6 +73,50 @@ def _sort_by_completeness(data: dict) -> dict:
     return data
 
 
+def _compute_certainty(query: str, product: dict) -> int:
+    """Compute a 0-100 certainty score for how well a product matches the query.
+
+    Based on name word overlap (up to 80 pts) and brand match (up to 20 pts).
+    """
+    query_lower = query.lower().strip()
+    query_words = query_lower.split()
+    if not query_words:
+        return 0
+
+    # Check both name fields, take the best score
+    names = [
+        (product.get("product_name_no") or "").lower(),
+        (product.get("product_name") or "").lower(),
+    ]
+
+    best_name_score = 0
+    for name in names:
+        if not name:
+            continue
+        # Word overlap: fraction of query words found in the product name
+        matches = sum(1 for w in query_words if w in name)
+        word_score = (matches / len(query_words)) * 60
+
+        # Exact substring bonus: full query appears as substring
+        if query_lower in name:
+            word_score += 20
+        elif matches == len(query_words):
+            # All words present but not as exact substring — smaller bonus
+            word_score += 10
+
+        best_name_score = max(best_name_score, word_score)
+
+    # Brand match: any query word in the brands field
+    brand = (product.get("brands") or "").lower()
+    brand_score = 0
+    if brand and query_words:
+        brand_matches = sum(1 for w in query_words if w in brand)
+        brand_score = (brand_matches / len(query_words)) * 20
+
+    score = int(min(100, best_name_score + brand_score))
+    return max(0, score)
+
+
 def off_search(query: str) -> dict:
     """Proxy a product name search to the OpenFoodFacts API.
 
@@ -110,8 +154,12 @@ def off_search(query: str) -> dict:
             seen.add(key)
             combined.append(p)
 
-    result = {"products": combined, "count": len(combined)}
-    return _sort_by_completeness(result)
+    # Compute certainty score for each product and sort by it
+    for p in combined:
+        p["certainty"] = _compute_certainty(cleaned, p)
+    combined.sort(key=lambda p: p["certainty"], reverse=True)
+
+    return {"products": combined, "count": len(combined)}
 
 
 def _off_search_a_licious(query: str) -> dict:
