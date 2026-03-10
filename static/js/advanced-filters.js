@@ -55,14 +55,25 @@ export function toggleAdvancedFilters() {
   const toggle = document.getElementById('adv-filter-toggle');
   if (!panel) return;
   const visible = panel.style.display !== 'none';
+  const searchRow = document.querySelector('.search-row');
+  const filterToggle = document.getElementById('filter-toggle');
+  const filterRow = document.getElementById('filter-row');
+
   if (visible) {
     panel.style.display = 'none';
     toggle.classList.remove('has-filter');
     state.advancedFilters = null;
+    // Restore normal search UI
+    if (searchRow) searchRow.style.display = '';
+    if (filterToggle) filterToggle.style.display = '';
     _triggerReload();
   } else {
     panel.style.display = '';
     toggle.classList.add('has-filter');
+    // Hide normal search UI
+    if (searchRow) searchRow.style.display = 'none';
+    if (filterToggle) filterToggle.style.display = 'none';
+    if (filterRow) filterRow.classList.remove('open');
     if (!panel.querySelector('.adv-group')) {
       _buildPanel(panel);
     }
