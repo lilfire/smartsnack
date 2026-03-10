@@ -1,6 +1,7 @@
 // ── Advanced Filters (Recursive Nested Groups) ─────────────────────────
 import { state, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
+import { updateFilterToggle } from './filters.js';
 
 // Field definitions: [field_key, i18n_key]
 const TEXT_FIELDS = [
@@ -54,29 +55,41 @@ export function toggleAdvancedFilters() {
   const panel = document.getElementById('advanced-filters');
   const toggle = document.getElementById('adv-filter-toggle');
   if (!panel) return;
-  const visible = panel.style.display !== 'none';
+  const visible = panel.classList.contains('open');
   const searchRow = document.querySelector('.search-row');
+  const searchInput = document.getElementById('search-input');
+  const searchClear = document.getElementById('search-clear');
   const filterToggle = document.getElementById('filter-toggle');
   const filterRow = document.getElementById('filter-row');
 
   if (visible) {
-    panel.style.display = 'none';
+    // ── Close advanced mode ──
+    panel.classList.remove('open');
     toggle.classList.remove('has-filter');
     state.advancedFilters = null;
     // Restore normal search UI
-    if (searchRow) searchRow.style.display = '';
+    if (searchRow) searchRow.classList.remove('advanced-active');
+    if (searchInput) searchInput.disabled = false;
     if (filterToggle) filterToggle.style.display = '';
     _triggerReload();
   } else {
-    panel.style.display = '';
-    toggle.classList.add('has-filter');
-    // Hide normal search UI
-    if (searchRow) searchRow.style.display = 'none';
+    // ── Open advanced mode ──
+    // Clear normal search state to prevent ghost filtering
+    if (searchInput) { searchInput.value = ''; searchInput.disabled = true; }
+    if (searchClear) searchClear.classList.remove('visible');
+    state.currentFilter = [];
+    updateFilterToggle();
+    // Dim search bar, hide category filters
+    if (searchRow) searchRow.classList.add('advanced-active');
     if (filterToggle) filterToggle.style.display = 'none';
     if (filterRow) filterRow.classList.remove('open');
+    // Slide panel open
     if (!panel.querySelector('.adv-group')) {
       _buildPanel(panel);
     }
+    requestAnimationFrame(() => panel.classList.add('open'));
+    toggle.classList.add('has-filter');
+    _triggerReload();
   }
 }
 
