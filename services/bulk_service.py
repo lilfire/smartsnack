@@ -351,8 +351,8 @@ def _run_refresh(options=None):
 
         # Phase 2: Search by name for products without EAN
         if options and options.get("search_missing"):
-            min_certainty = options.get("min_certainty", 50)
-            min_completeness = options.get("min_completeness", 50)
+            min_certainty = options.get("min_certainty", 100)
+            min_completeness = options.get("min_completeness", 75)
 
             missing_rows = conn.execute(
                 "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
@@ -390,12 +390,21 @@ def _run_refresh(options=None):
                     products = result.get("products") or []
 
                     best = None
+                    best_comp = -1
                     for p in products:
                         cert = p.get("certainty", 0)
                         comp = float(p.get("completeness") or 0) * 100
-                        if cert >= min_certainty and comp >= min_completeness:
+                        if cert < min_certainty or comp < min_completeness:
+                            continue
+                        if best is None:
                             best = p
-                            break  # sorted by certainty desc
+                            best_comp = comp
+                            best_cert = cert
+                        elif cert == best_cert and comp > best_comp:
+                            best = p
+                            best_comp = comp
+                        elif cert < best_cert:
+                            break  # sorted by certainty desc, no better match
 
                     if not best:
                         skipped += 1
