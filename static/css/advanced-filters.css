@@ -84,6 +84,15 @@
   outline: none;
 }
 
+.adv-value-input::-webkit-inner-spin-button,
+.adv-value-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.adv-value-input[type="number"] {
+  -moz-appearance: textfield;
+}
+
 .adv-value-input:focus,
 .adv-field-select:focus,
 .adv-op-select:focus {
