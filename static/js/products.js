@@ -34,6 +34,11 @@ function collectFormFields(prefix) {
     price: numOrNull(prefix + '-price'),
     est_pdcaas: numOrNull(prefix + '-est_pdcaas'),
     est_diaas: numOrNull(prefix + '-est_diaas'),
+    flags: ['is_discontinued'].reduce((acc, f) => {
+      const cb = document.getElementById(prefix + '-flag-' + f);
+      if (cb && cb.checked) acc.push(f);
+      return acc;
+    }, []),
   };
 }
 

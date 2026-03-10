@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from config import (
     APP_VERSION, SUPPORTED_LANGUAGES, SCORE_CONFIG_MAP,
-    INSERT_WITH_IMAGE_SQL, _TEXT_FIELD_LIMITS,
+    INSERT_WITH_IMAGE_SQL, _TEXT_FIELD_LIMITS, ALL_FLAG_NAMES,
 )
 
 logger = logging.getLogger(__name__)
@@ -108,6 +108,13 @@ def _restore_product(cur, p):
          _opt_float(p.get("salt")), _opt_float(p.get("volume")), _opt_float(p.get("price")),
          _opt_float(p.get("weight")), _opt_float(p.get("portion")),
          _opt_float(p.get("est_pdcaas")), _opt_float(p.get("est_diaas")), p.get("image","")))
+    new_id = cur.lastrowid
+    for flag in p.get("flags", []):
+        if flag in ALL_FLAG_NAMES:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+                (new_id, flag),
+            )
 
 
 def create_backup(include_images: bool = True):
@@ -123,6 +130,16 @@ def create_backup(include_images: bool = True):
             "salt, volume, price, weight, portion, est_pdcaas, est_diaas "
             "FROM products ORDER BY id"
         ).fetchall()]
+    # Attach flags to products
+    flag_rows = conn.execute(
+        "SELECT product_id, flag FROM product_flags ORDER BY product_id, flag"
+    ).fetchall()
+    flags_map = {}
+    for r in flag_rows:
+        flags_map.setdefault(r["product_id"], []).append(r["flag"])
+    for p in products:
+        p["flags"] = flags_map.get(p["id"], [])
+
     cat_rows = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     categories = []
     for c in cat_rows:

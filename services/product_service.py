@@ -10,11 +10,61 @@ from config import (
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
     SCORE_CONFIG_MAP, COMPUTED_FIELDS,
     ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS, POST_QUERY_FIELDS,
+    FLAG_FIELDS, ALL_FLAG_NAMES, USER_FLAGS,
     MAX_FILTER_DEPTH, MAX_FILTER_CONDITIONS,
 )
 from helpers import _num, _safe_float
 
 _TEXT_FIELD_SET = frozenset(_TEXT_FIELD_LIMITS.keys())
+_FLAG_FIELD_PREFIX = "flag:"
+
+
+def _get_product_flags(cur, product_ids: list) -> dict:
+    """Batch-fetch flags for a list of product IDs. Returns {pid: [flag, ...]}."""
+    if not product_ids:
+        return {}
+    placeholders = ",".join("?" * len(product_ids))
+    rows = cur.execute(
+        f"SELECT product_id, flag FROM product_flags WHERE product_id IN ({placeholders})",
+        product_ids,
+    ).fetchall()
+    result = {}
+    for r in rows:
+        result.setdefault(r["product_id"], []).append(r["flag"])
+    return result
+
+
+def _set_user_flags(conn, pid: int, flags: list) -> None:
+    """Replace all user flags for a product. Ignores unknown or system flags."""
+    valid_flags = [f for f in flags if f in USER_FLAGS]
+    # Delete existing user flags only
+    conn.execute(
+        f"DELETE FROM product_flags WHERE product_id = ? AND flag IN ({','.join('?' * len(USER_FLAGS))})",
+        [pid] + list(USER_FLAGS),
+    )
+    for flag in valid_flags:
+        conn.execute(
+            "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+            (pid, flag),
+        )
+
+
+def set_system_flag(pid: int, flag_name: str, value: bool) -> None:
+    """Set or clear a system flag for a product. For programmatic use only."""
+    if flag_name not in ALL_FLAG_NAMES:
+        raise ValueError(f"Unknown flag: {flag_name!r}")
+    conn = get_db()
+    if value:
+        conn.execute(
+            "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+            (pid, flag_name),
+        )
+    else:
+        conn.execute(
+            "DELETE FROM product_flags WHERE product_id = ? AND flag = ?",
+            (pid, flag_name),
+        )
+    conn.commit()
 
 
 def _load_weight_config(cur: object) -> tuple:
@@ -123,6 +173,7 @@ def _parse_condition(c: dict) -> tuple:
     """Parse and validate a single filter condition.
 
     Returns (field, op, value_str, sql_op) after validation.
+    For flag fields, op is always "=" and value is "true" or "false".
     """
     field = c.get("field", "")
     op = c.get("op", "")
@@ -130,6 +181,19 @@ def _parse_condition(c: dict) -> tuple:
 
     if field not in FILTERABLE_FIELDS:
         raise ValueError(f"Invalid filter field: {field}")
+
+    # Flag fields: only op "=" with value "true"/"false"
+    if field in FLAG_FIELDS:
+        flag_name = field[len(_FLAG_FIELD_PREFIX):]
+        if flag_name not in ALL_FLAG_NAMES:
+            raise ValueError(f"Unknown flag: {flag_name}")
+        if op != "=":
+            raise ValueError(f"Operator '{op}' not valid for flag field '{field}'")
+        val_str = str(value).strip().lower()
+        if val_str not in ("true", "false"):
+            raise ValueError(f"Flag value must be 'true' or 'false', got '{value}'")
+        return field, op, val_str, "="
+
     if op not in ADVANCED_FILTER_OPS:
         raise ValueError(f"Invalid filter operator: {op}")
     if value is None or str(value).strip() == "":
@@ -143,6 +207,14 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
 
     Returns (sql_fragment, param).
     """
+    if field in FLAG_FIELDS:
+        flag_name = field[len(_FLAG_FIELD_PREFIX):]
+        subquery = "SELECT 1 FROM product_flags pf WHERE pf.product_id = products.id AND pf.flag = ?"
+        if value == "true":
+            return f"EXISTS ({subquery})", flag_name
+        else:
+            return f"NOT EXISTS ({subquery})", flag_name
+
     if field in TEXT_FIELDS:
         if op == "contains":
             escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -409,6 +481,13 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
         results.append(p)
 
     results = _apply_post_filters(results, post_filter_spec)
+
+    # Attach flags
+    pids = [p["id"] for p in results]
+    flags_map = _get_product_flags(cur, pids)
+    for p in results:
+        p["flags"] = flags_map.get(p["id"], [])
+
     results.sort(key=lambda x: x["total_score"], reverse=True)
     return results
 
@@ -440,12 +519,18 @@ def add_product(data: dict) -> dict:
          _num(data, "volume"), _num(data, "price"),
          _num(data, "weight"), _num(data, "portion"),
          _num(data, "est_pdcaas"), _num(data, "est_diaas")))
+    new_id = cur.lastrowid
+    if "flags" in data and isinstance(data["flags"], list):
+        _set_user_flags(conn, new_id, data["flags"])
     conn.commit()
-    return {"id": cur.lastrowid, "message": "Product added"}
+    return {"id": new_id, "message": "Product added"}
 
 
 def update_product(pid: int, data: dict) -> None:
     """Update a product's fields by ID."""
+    # Extract flags before field validation loop
+    incoming_flags = data.pop("flags", None)
+
     updates, vals = [], []
     for f in data:
         if f in ("id", "image"):
@@ -469,17 +554,25 @@ def update_product(pid: int, data: dict) -> None:
                     v = _safe_float(v, f)
             updates.append(f"{f} = ?")
             vals.append(v)
-    if not updates:
+    if not updates and incoming_flags is None:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data:
         cat_exists = conn.execute("SELECT 1 FROM categories WHERE name = ?", (data["type"],)).fetchone()
         if not cat_exists:
             raise ValueError("Category does not exist")
-    vals.append(pid)
-    cur = conn.execute(f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals)
-    if cur.rowcount == 0:
-        raise LookupError("Product not found")
+    if updates:
+        vals.append(pid)
+        cur = conn.execute(f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals)
+        if cur.rowcount == 0:
+            raise LookupError("Product not found")
+    else:
+        # Only flags are being updated — verify product exists
+        exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
+        if not exists:
+            raise LookupError("Product not found")
+    if incoming_flags is not None and isinstance(incoming_flags, list):
+        _set_user_flags(conn, pid, incoming_flags)
     conn.commit()
 
 
