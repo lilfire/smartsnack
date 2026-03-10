@@ -46,7 +46,17 @@ const NUMERIC_OPS = [
   ['!=', 'adv_op_neq'],
 ];
 
+const FLAG_FIELDS = [
+  ['flag:is_discontinued', 'flag_is_discontinued'],
+  ['flag:is_synced_with_off', 'flag_is_synced_with_off'],
+];
+const FLAG_OPS = [
+  ['= true', 'adv_op_is_set'],
+  ['= false', 'adv_op_is_not_set'],
+];
+
 const _TEXT_FIELD_SET = new Set(TEXT_FIELDS.map(f => f[0]));
+const _FLAG_FIELD_SET = new Set(FLAG_FIELDS.map(f => f[0]));
 const MAX_DEPTH = 4;
 const MAX_CONDITIONS = 20;
 let _rowCounter = 0;
@@ -209,6 +219,15 @@ function _addRow(container) {
     numGroup.appendChild(o);
   });
   fieldSel.appendChild(numGroup);
+  const flagGroup = document.createElement('optgroup');
+  flagGroup.label = t('adv_group_flags');
+  FLAG_FIELDS.forEach(([val, key]) => {
+    const o = document.createElement('option');
+    o.value = val;
+    o.textContent = t(key);
+    flagGroup.appendChild(o);
+  });
+  fieldSel.appendChild(flagGroup);
   row.appendChild(fieldSel);
 
   // Operator select
@@ -248,21 +267,29 @@ function _addRow(container) {
 
   // Initialize ops for default field
   _updateOps(opSel, fieldSel.value);
-  valInput.type = _TEXT_FIELD_SET.has(fieldSel.value) ? 'text' : 'number';
-  valInput.step = 'any';
+  _syncValInput(valInput, fieldSel.value, opSel.value);
 
   // Upgrade to custom styled selects
   upgradeSelect(fieldSel, (val) => {
     _updateOps(opSel, val);
     upgradeSelect(opSel);
-    valInput.type = _TEXT_FIELD_SET.has(val) ? 'text' : 'number';
-    valInput.step = 'any';
+    _syncValInput(valInput, val, opSel.value);
   });
-  upgradeSelect(opSel, () => { _onFilterChange(); });
+  upgradeSelect(opSel, (val) => {
+    _syncValInput(valInput, fieldSel.value, val);
+    _onFilterChange();
+  });
 }
 
 function _updateOps(opSel, fieldValue) {
-  const ops = _TEXT_FIELD_SET.has(fieldValue) ? TEXT_OPS : NUMERIC_OPS;
+  let ops;
+  if (_FLAG_FIELD_SET.has(fieldValue)) {
+    ops = FLAG_OPS;
+  } else if (_TEXT_FIELD_SET.has(fieldValue)) {
+    ops = TEXT_OPS;
+  } else {
+    ops = NUMERIC_OPS;
+  }
   const prev = opSel.value;
   opSel.innerHTML = '';
   ops.forEach(([val, key]) => {
@@ -274,6 +301,18 @@ function _updateOps(opSel, fieldValue) {
   // Restore previous op if still valid
   for (let i = 0; i < opSel.options.length; i++) {
     if (opSel.options[i].value === prev) { opSel.value = prev; return; }
+  }
+}
+
+function _syncValInput(valInput, fieldValue, opValue) {
+  if (_FLAG_FIELD_SET.has(fieldValue)) {
+    // Flag fields: value is encoded in the operator, hide the input
+    valInput.style.display = 'none';
+    valInput.value = opValue === '= true' ? 'true' : 'false';
+  } else {
+    valInput.style.display = '';
+    valInput.type = _TEXT_FIELD_SET.has(fieldValue) ? 'text' : 'number';
+    valInput.step = 'any';
   }
 }
 
@@ -358,10 +397,17 @@ function _serializeGroup(groupEl) {
   for (const child of directChildren) {
     if (child.classList.contains('adv-row')) {
       const field = child.querySelector('.adv-field-select').value;
-      const op = child.querySelector('.adv-op-select').value;
-      const value = child.querySelector('.adv-value-input').value.trim();
-      if (field && op && value !== '') {
-        children.push({ field, op, value });
+      const opRaw = child.querySelector('.adv-op-select').value;
+      const valInput = child.querySelector('.adv-value-input');
+      if (_FLAG_FIELD_SET.has(field)) {
+        // Flag field: op encodes the boolean, serialize as op="=" value="true"/"false"
+        const value = opRaw === '= true' ? 'true' : 'false';
+        children.push({ field, op: '=', value });
+      } else {
+        const value = valInput.value.trim();
+        if (field && opRaw && value !== '') {
+          children.push({ field, op: opRaw, value });
+        }
       }
     } else if (child.classList.contains('adv-group')) {
       const sub = _serializeGroup(child);

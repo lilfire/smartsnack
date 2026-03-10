@@ -11,6 +11,17 @@ MIGRATIONS = [
             "WHERE field='volume' AND formula='minmax'",
         ],
     ),
+    (
+        "002_product_flags_table",
+        [
+            """CREATE TABLE IF NOT EXISTS product_flags (
+                product_id INTEGER NOT NULL,
+                flag TEXT NOT NULL,
+                PRIMARY KEY (product_id, flag),
+                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+            )""",
+        ],
+    ),
 ]
 
 

@@ -108,7 +108,18 @@ MAX_FILTER_CONDITIONS = 20
 TEXT_FIELDS = frozenset(_TEXT_FIELD_LIMITS.keys())  # type, name, ean, brand, stores, ingredients
 NUMERIC_FIELDS = frozenset(NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas"))
 POST_QUERY_FIELDS = frozenset(("total_score",))
-FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS
+
+# ── Product flags ──────────────────────────────────────
+PRODUCT_FLAGS = {
+    "is_discontinued": {"type": "user", "label_key": "flag_is_discontinued"},
+    "is_synced_with_off": {"type": "system", "label_key": "flag_is_synced_with_off"},
+}
+USER_FLAGS = frozenset(k for k, v in PRODUCT_FLAGS.items() if v["type"] == "user")
+SYSTEM_FLAGS = frozenset(k for k, v in PRODUCT_FLAGS.items() if v["type"] == "system")
+ALL_FLAG_NAMES = frozenset(PRODUCT_FLAGS.keys())
+FLAG_FIELDS = frozenset(f"flag:{k}" for k in PRODUCT_FLAGS)
+
+FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS | FLAG_FIELDS
 
 COMPUTED_FIELDS = {
     "pct_protein_cal": lambda p: (

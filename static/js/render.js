@@ -10,6 +10,13 @@ let _resultsAbort = null;
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
+// Flag definitions mirrored from config.py
+const _USER_FLAGS = ['is_discontinued'];
+const _ALL_FLAG_CFG = {
+  is_discontinued: { type: 'user', labelKey: 'flag_is_discontinued' },
+  is_synced_with_off: { type: 'system', labelKey: 'flag_is_synced_with_off' },
+};
+
 export function renderNutriTable(p) {
   const rows = [
     [t('nutri_energy') + ' (kcal)', p.kcal, 'kcal'],
@@ -171,6 +178,17 @@ export function renderResults(results, search) {
         if (p.stores) h += '<div style="margin-bottom:5px"><span style="font-size:10px;color:rgba(255,255,255,0.35)">' + t('expanded_label_stores') + '</span><span style="font-size:12px;color:rgba(255,255,255,0.7)">' + esc(p.stores) + '</span></div>';
         if (p.ingredients) h += '<div style="margin-top:4px"><span style="font-size:10px;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px">' + t('expanded_label_ingredients') + '</span><span style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5">' + esc(p.ingredients) + '</span></div>';
       }
+      // Flag badges
+      const flags = p.flags || [];
+      if (flags.length) {
+        h += '<div class="product-flags">';
+        flags.forEach(f => {
+          const cfg = _ALL_FLAG_CFG[f];
+          if (!cfg) return;
+          h += '<span class="flag-badge flag-' + cfg.type + '">' + esc(t(cfg.labelKey)) + '</span>';
+        });
+        h += '</div>';
+      }
       h += '</div></div>';
 
       if (state.editingId === p.id) {
@@ -210,6 +228,19 @@ export function renderResults(results, search) {
             : '')
           + '<input type="hidden" id="ed-est_pdcaas" value="' + (p.est_pdcaas != null ? p.est_pdcaas : '') + '">'
           + '<input type="hidden" id="ed-est_diaas" value="' + (p.est_diaas != null ? p.est_diaas : '') + '">'
+          + '<div class="edit-flags">'
+          + _USER_FLAGS.map(f => {
+              const cfg = _ALL_FLAG_CFG[f];
+              const checked = (p.flags || []).includes(f) ? ' checked' : '';
+              return '<label class="flag-toggle"><input type="checkbox" id="ed-flag-' + f + '"' + checked + '> ' + esc(t(cfg.labelKey)) + '</label>';
+            }).join('')
+          + ((() => {
+              const sysFlags = (p.flags || []).filter(f => _ALL_FLAG_CFG[f] && _ALL_FLAG_CFG[f].type === 'system');
+              return sysFlags.length
+                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(t(_ALL_FLAG_CFG[f].labelKey)) + '</span>').join(' ') + '</span>'
+                : '';
+            })())
+          + '</div>'
           + '<div style="display:flex;gap:8px">'
           + '<button class="btn-sm btn-green" data-action="save-product" data-id="' + p.id + '">' + t('btn_save') + '</button>'
           + '<button class="btn-sm btn-outline" data-action="cancel-edit">' + t('btn_cancel') + '</button>'
