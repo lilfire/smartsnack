@@ -738,23 +738,41 @@ export function initRestoreDragDrop() {
 export async function refreshAllFromOff() {
   if (!await showConfirmModal('🔄', t('bulk_refresh_off_title'), t('bulk_refresh_off_confirm'), t('btn_start'), t('btn_cancel'))) return;
   const btn = document.getElementById('btn-refresh-all-off');
+  const progressWrap = document.getElementById('refresh-off-progress');
+  const bar = document.getElementById('refresh-off-bar');
   const status = document.getElementById('refresh-off-status');
+
   if (btn) btn.disabled = true;
-  if (status) { status.style.display = ''; status.textContent = t('bulk_running'); }
-  try {
-    const res = await api('/api/bulk/refresh-off', { method: 'POST' });
-    if (res.error) { showToast(res.error, 'error'); return; }
-    const msg = t('bulk_refresh_off_result', { total: res.total, updated: res.updated, skipped: res.skipped, errors: res.errors });
-    if (status) status.textContent = msg;
-    showToast(msg, 'success');
-    loadData();
-  } catch(e) {
-    console.error(e);
+  if (progressWrap) progressWrap.style.display = '';
+  if (bar) bar.style.width = '0%';
+  if (status) status.textContent = t('bulk_running');
+
+  const evtSource = new EventSource('/api/bulk/refresh-off/stream');
+
+  evtSource.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.type === 'progress') {
+      const pct = Math.round((data.current / data.total) * 100);
+      if (bar) bar.style.width = pct + '%';
+      const label = data.name || data.ean;
+      if (status) status.textContent = t('bulk_refresh_off_progress', { current: data.current, total: data.total, name: label });
+    } else if (data.type === 'done') {
+      evtSource.close();
+      if (bar) bar.style.width = '100%';
+      const msg = t('bulk_refresh_off_result', { total: data.total, updated: data.updated, skipped: data.skipped, errors: data.errors });
+      if (status) status.textContent = msg;
+      showToast(msg, 'success');
+      if (btn) btn.disabled = false;
+      loadData();
+    }
+  };
+
+  evtSource.onerror = () => {
+    evtSource.close();
     showToast(t('toast_network_error'), 'error');
-    if (status) status.style.display = 'none';
-  } finally {
     if (btn) btn.disabled = false;
-  }
+    if (progressWrap) progressWrap.style.display = 'none';
+  };
 }
 
 // ── Bulk: Estimate PQ for all ────────────────────────

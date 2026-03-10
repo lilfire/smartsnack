@@ -626,5 +626,6 @@
     "bulk_refresh_off_title": "Uppdatera från Open Food Facts",
     "bulk_refresh_off_confirm": "Detta hämtar data från Open Food Facts för alla produkter med EAN-streckkod. Befintliga värden uppdateras (tomma OFF-värden skriver inte över lokala data). Fortsätta?",
     "bulk_refresh_off_result": "{total} produkter kontrollerade — {updated} uppdaterade, {skipped} hoppade över, {errors} fel",
+    "bulk_refresh_off_progress": "Uppdaterar {current} av {total}: {name}",
     "bulk_estimate_pq_result": "{total} produkter kontrollerade — {updated} uppskattade, {skipped} hoppade över (ingen träff)"
 }
