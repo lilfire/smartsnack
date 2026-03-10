@@ -94,3 +94,57 @@
   border-radius: 4px;
   transition: width 0.3s ease;
 }
+
+/* Refresh report */
+.refresh-report { margin-top: 10px; }
+.refresh-report-toggle {
+  color: rgba(255,255,255,0.6);
+  background: none;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-bottom: 6px;
+}
+.refresh-report-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.refresh-report-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 4px 0;
+}
+.refresh-report-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.refresh-report-row:last-child { border-bottom: none; }
+.refresh-report-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.refresh-report-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.refresh-report-badge.updated { background: rgba(0,200,100,0.2); color: #4f4; }
+.refresh-report-badge.skipped { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5); }
+.refresh-report-badge.error { background: rgba(255,60,60,0.2); color: #f66; }
+.refresh-report-detail {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

@@ -631,5 +631,15 @@
     "bulk_estimate_pq_result": "{total} produkter sjekket — {updated} estimert, {skipped} hoppet over (ingen treff)",
     "bulk_refresh_off_search_missing": "Søk manglende etter navn",
     "bulk_refresh_off_min_certainty": "Min. sikkerhet",
-    "bulk_refresh_off_min_completeness": "Min. fullstendighet"
+    "bulk_refresh_off_min_completeness": "Min. fullstendighet",
+    "bulk_report_show": "Vis detaljer ({count} produkter)",
+    "bulk_report_hide": "Skjul detaljer",
+    "bulk_report_updated": "Oppdatert",
+    "bulk_report_skipped": "Hoppet over",
+    "bulk_report_error": "Feil",
+    "bulk_report_not_found": "Ikke funnet i OFF",
+    "bulk_report_no_new_data": "Ingen nye data",
+    "bulk_report_no_results": "Ingen resultater fra OFF",
+    "bulk_report_below_threshold": "Under terskel",
+    "bulk_report_fields": "Felt: {fields}"
 }

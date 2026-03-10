@@ -738,6 +738,76 @@ export function initRestoreDragDrop() {
 // ── Bulk: Refresh all from OFF ───────────────────────
 let _refreshEvtSource = null;
 
+function _renderRefreshReport(report) {
+  const container = document.getElementById('refresh-off-progress');
+  if (!container) return;
+
+  // Remove any previous report
+  const prev = container.querySelector('.refresh-report');
+  if (prev) prev.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'refresh-report';
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'refresh-report-toggle';
+  toggleBtn.textContent = t('bulk_report_show', { count: report.length });
+  wrap.appendChild(toggleBtn);
+
+  const list = document.createElement('div');
+  list.className = 'refresh-report-list';
+  list.style.display = 'none';
+
+  const reasonKeys = {
+    not_found: 'bulk_report_not_found',
+    no_new_data: 'bulk_report_no_new_data',
+    no_results: 'bulk_report_no_results',
+    below_threshold: 'bulk_report_below_threshold',
+  };
+
+  for (const item of report) {
+    const row = document.createElement('div');
+    row.className = 'refresh-report-row';
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'refresh-report-name';
+    nameEl.textContent = item.name || item.ean || '—';
+    row.appendChild(nameEl);
+
+    const badge = document.createElement('span');
+    badge.className = 'refresh-report-badge ' + item.status;
+    badge.textContent = t('bulk_report_' + item.status);
+    row.appendChild(badge);
+
+    const detail = document.createElement('span');
+    detail.className = 'refresh-report-detail';
+    if (item.status === 'updated' && item.fields) {
+      detail.textContent = t('bulk_report_fields', { fields: item.fields.join(', ') });
+    } else if (item.reason) {
+      const key = reasonKeys[item.reason];
+      let text = key ? t(key) : item.reason;
+      if (item.detail) text += ' (' + item.detail + ')';
+      detail.textContent = text;
+    }
+    detail.title = detail.textContent;
+    row.appendChild(detail);
+
+    list.appendChild(row);
+  }
+
+  wrap.appendChild(list);
+
+  toggleBtn.addEventListener('click', () => {
+    const visible = list.style.display !== 'none';
+    list.style.display = visible ? 'none' : '';
+    toggleBtn.textContent = visible
+      ? t('bulk_report_show', { count: report.length })
+      : t('bulk_report_hide');
+  });
+
+  container.appendChild(wrap);
+}
+
 function _connectRefreshStream() {
   const btn = document.getElementById('btn-refresh-all-off');
   const progressWrap = document.getElementById('refresh-off-progress');
@@ -765,6 +835,7 @@ function _connectRefreshStream() {
       const msg = t('bulk_refresh_off_result', { total: data.total, updated: data.updated, skipped: data.skipped, errors: data.errors });
       if (status) status.textContent = msg;
       showToast(msg, 'success');
+      if (data.report) _renderRefreshReport(data.report);
       if (btn) btn.disabled = false;
       loadData();
     }
@@ -898,6 +969,9 @@ export async function refreshAllFromOff() {
   if (!opts) return;
   const bar = document.getElementById('refresh-off-bar');
   if (bar) bar.style.width = '0%';
+  // Clear previous report
+  const prevReport = document.querySelector('.refresh-report');
+  if (prevReport) prevReport.remove();
   try {
     const body = {};
     if (opts.searchMissing) {

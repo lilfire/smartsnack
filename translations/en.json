@@ -631,5 +631,15 @@
     "bulk_estimate_pq_result": "{total} products checked — {updated} estimated, {skipped} skipped (no match)",
     "bulk_refresh_off_search_missing": "Search missing by name",
     "bulk_refresh_off_min_certainty": "Min. certainty",
-    "bulk_refresh_off_min_completeness": "Min. completeness"
+    "bulk_refresh_off_min_completeness": "Min. completeness",
+    "bulk_report_show": "Show details ({count} products)",
+    "bulk_report_hide": "Hide details",
+    "bulk_report_updated": "Updated",
+    "bulk_report_skipped": "Skipped",
+    "bulk_report_error": "Error",
+    "bulk_report_not_found": "Not found in OFF",
+    "bulk_report_no_new_data": "No new data",
+    "bulk_report_no_results": "No results from OFF",
+    "bulk_report_below_threshold": "Below threshold",
+    "bulk_report_fields": "Fields: {fields}"
 }
