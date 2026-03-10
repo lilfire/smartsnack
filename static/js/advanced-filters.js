@@ -51,6 +51,7 @@ const FLAG_FIELDS = [
   ['flag:is_synced_with_off', 'flag_is_synced_with_off'],
 ];
 const FLAG_OPS = [
+  ['', 'adv_op_flag_select'],
   ['= true', 'adv_op_is_set'],
   ['= false', 'adv_op_is_not_set'],
 ];
@@ -308,7 +309,7 @@ function _syncValInput(valInput, fieldValue, opValue) {
   if (_FLAG_FIELD_SET.has(fieldValue)) {
     // Flag fields: value is encoded in the operator, hide the input
     valInput.style.display = 'none';
-    valInput.value = opValue === '= true' ? 'true' : 'false';
+    valInput.value = opValue === '= true' ? 'true' : opValue === '= false' ? 'false' : '';
   } else {
     valInput.style.display = '';
     valInput.type = _TEXT_FIELD_SET.has(fieldValue) ? 'text' : 'number';
@@ -401,6 +402,7 @@ function _serializeGroup(groupEl) {
       const valInput = child.querySelector('.adv-value-input');
       if (_FLAG_FIELD_SET.has(field)) {
         // Flag field: op encodes the boolean, serialize as op="=" value="true"/"false"
+        if (opRaw === '') continue; // no selection yet
         const value = opRaw === '= true' ? 'true' : 'false';
         children.push({ field, op: '=', value });
       } else {
