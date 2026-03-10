@@ -592,5 +592,6 @@
     "adv_placeholder_value": "Värde...",
     "adv_add_condition": "+ Lägg till villkor",
     "adv_add_group": "+ Lägg till grupp",
-    "adv_remove_group": "Ta bort grupp"
+    "adv_remove_group": "Ta bort grupp",
+    "adv_add_subgroup": "+ Lägg till undergrupp"
 }

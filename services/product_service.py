@@ -10,6 +10,7 @@ from config import (
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
     SCORE_CONFIG_MAP, COMPUTED_FIELDS,
     ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS, POST_QUERY_FIELDS,
+    MAX_FILTER_DEPTH, MAX_FILTER_CONDITIONS,
 )
 from helpers import _num, _safe_float
 
@@ -178,15 +179,131 @@ def _condition_to_post(field: str, op: str, value: str) -> tuple:
     return field, op, num_val
 
 
+def _convert_legacy_format(data: dict) -> dict:
+    """Convert legacy filter formats to the new recursive format.
+
+    Legacy flat:   {"logic": "and", "conditions": [...]}
+    Old grouped:   {"logic": "and", "groups": [{"logic": ..., "conditions": [...]}, ...]}
+    New recursive: {"logic": "and", "children": [...]}
+    """
+    if "children" in data:
+        return data  # already new format
+
+    logic = data.get("logic", "and")
+
+    if "conditions" in data and "groups" not in data:
+        # Legacy flat: single group with conditions as direct children
+        return {"logic": logic, "children": data["conditions"]}
+
+    if "groups" in data:
+        # Old grouped format: convert each group to a nested group node
+        children = []
+        for g in data["groups"]:
+            if isinstance(g, dict) and g.get("conditions"):
+                children.append({
+                    "logic": g.get("logic", "and"),
+                    "children": g["conditions"],
+                })
+        return {"logic": logic, "children": children}
+
+    raise ValueError("Unrecognised filter format")
+
+
+def _count_conditions(node: dict) -> int:
+    """Recursively count leaf conditions in a filter tree."""
+    if "field" in node:
+        return 1
+    return sum(_count_conditions(c) for c in node.get("children", []) if isinstance(c, dict))
+
+
+def _process_node(node: dict, depth: int = 0) -> tuple:
+    """Recursively process a filter node.
+
+    Returns (sql_fragment | None, sql_params, post_node | None).
+    - sql_fragment: SQL WHERE fragment for DB-filterable conditions
+    - sql_params: list of query parameters
+    - post_node: recursive post-filter spec for computed fields
+    """
+    if depth > MAX_FILTER_DEPTH:
+        raise ValueError(f"Filter nesting too deep (max {MAX_FILTER_DEPTH})")
+
+    # Leaf condition
+    if "field" in node:
+        field, op, value, sql_op = _parse_condition(node)
+        if field in POST_QUERY_FIELDS:
+            return None, [], {"field": field, "op": op, "val": _condition_to_post(field, op, value)[2]}
+        frag, param = _condition_to_sql(field, op, value, sql_op)
+        return f"({frag})", [param], None
+
+    # Group node
+    logic = node.get("logic", "and").upper()
+    if logic not in ("AND", "OR"):
+        raise ValueError("logic must be 'and' or 'or'")
+
+    children = node.get("children")
+    if not isinstance(children, list) or not children:
+        return None, [], None
+
+    sql_parts = []
+    all_params = []
+    post_parts = []
+
+    for child in children:
+        if not isinstance(child, dict):
+            raise ValueError("Each filter node must be a JSON object")
+        child_sql, child_params, child_post = _process_node(child, depth + 1)
+        if child_sql:
+            sql_parts.append(child_sql)
+            all_params.extend(child_params)
+        if child_post:
+            post_parts.append(child_post)
+
+    # If OR logic mixes SQL and post-query nodes, move everything to post-filter
+    if logic == "OR" and sql_parts and post_parts:
+        # Re-process all children as post-filter only
+        post_children = []
+        for child in children:
+            if not isinstance(child, dict):
+                continue
+            post_children.append(_node_to_post(child))
+        return None, [], {"logic": logic, "children": post_children}
+
+    # Build SQL fragment for this group
+    sql_fragment = None
+    if sql_parts:
+        combined = f" {logic} ".join(sql_parts)
+        sql_fragment = f"({combined})" if len(sql_parts) > 1 else sql_parts[0]
+
+    # Build post-filter node for this group
+    post_node = None
+    if post_parts:
+        post_node = {"logic": logic, "children": post_parts} if len(post_parts) > 1 else post_parts[0]
+
+    return sql_fragment, all_params, post_node
+
+
+def _node_to_post(node: dict) -> dict:
+    """Convert an entire filter node tree to a post-filter spec (no SQL)."""
+    if "field" in node:
+        field, op, value, _sql_op = _parse_condition(node)
+        return {"field": field, "op": op, "val": _condition_to_post(field, op, value)[2]}
+
+    logic = node.get("logic", "and").upper()
+    children = node.get("children", [])
+    post_children = [_node_to_post(c) for c in children if isinstance(c, dict)]
+    return {"logic": logic, "children": post_children}
+
+
 def _parse_advanced_filters(filters_json: str) -> tuple[str, list, dict | None]:
     """Parse advanced filter JSON and return (sql_fragment, params, post_filter_spec).
 
-    Supports two formats:
+    Supports three formats (auto-detected):
       Legacy flat:   {"logic": "and"|"or", "conditions": [...]}
-      Grouped:       {"logic": "and"|"or", "groups": [{"logic": ..., "conditions": [...]}, ...]}
+      Old grouped:   {"logic": "and"|"or", "groups": [{"logic": ..., "conditions": [...]}, ...]}
+      New recursive: {"logic": "and"|"or", "children": [<condition | group>, ...]}
 
-    post_filter_spec is None or a dict:
-      {"top_logic": "AND", "groups": [{"logic": "OR", "filters": [(field,op,val), ...]}]}
+    post_filter_spec is None or a recursive dict:
+      {"logic": "AND", "children": [{"field":..,"op":..,"val":..}, {"logic":..,"children":[...]}, ...]}
     """
     try:
         data = json.loads(filters_json)
@@ -196,88 +313,16 @@ def _parse_advanced_filters(filters_json: str) -> tuple[str, list, dict | None]:
     if not isinstance(data, dict):
         raise ValueError("Filters must be a JSON object")
 
-    top_logic = data.get("logic", "and").upper()
-    if top_logic not in ("AND", "OR"):
-        raise ValueError("logic must be 'and' or 'or'")
+    # Convert legacy formats to new recursive format
+    data = _convert_legacy_format(data)
 
-    # Normalise legacy flat format to grouped format
-    if "conditions" in data and "groups" not in data:
-        groups_raw = [{"logic": data.get("logic", "and"), "conditions": data["conditions"]}]
-    else:
-        groups_raw = data.get("groups")
+    # Validate total condition count
+    total = _count_conditions(data)
+    if total > MAX_FILTER_CONDITIONS:
+        raise ValueError(f"Too many filter conditions (max {MAX_FILTER_CONDITIONS})")
 
-    if not isinstance(groups_raw, list) or not groups_raw:
-        raise ValueError("groups must be a non-empty list")
-
-    # Count total conditions across all groups
-    total_conditions = sum(
-        len(g.get("conditions", [])) if isinstance(g, dict) else 0
-        for g in groups_raw
-    )
-    if total_conditions > 20:
-        raise ValueError("Too many filter conditions (max 20)")
-
-    all_group_sqls = []
-    all_params = []
-    post_groups = []
-
-    for g in groups_raw:
-        if not isinstance(g, dict):
-            raise ValueError("Each group must be a JSON object")
-        group_logic = g.get("logic", "and").upper()
-        if group_logic not in ("AND", "OR"):
-            raise ValueError("Group logic must be 'and' or 'or'")
-
-        conditions = g.get("conditions")
-        if not isinstance(conditions, list) or not conditions:
-            continue  # skip empty groups
-
-        # Parse all conditions in this group
-        parsed = [_parse_condition(c) for c in conditions]
-
-        # Separate SQL-filterable vs post-query conditions
-        sql_conds = [(f, o, v, so) for f, o, v, so in parsed if f not in POST_QUERY_FIELDS]
-        post_conds = [(f, o, v, so) for f, o, v, so in parsed if f in POST_QUERY_FIELDS]
-
-        # If group uses OR and has both SQL and post-query conditions,
-        # we can't partially evaluate in SQL — move everything to post-filtering
-        if group_logic == "OR" and sql_conds and post_conds:
-            post_filters = []
-            for field, op, value, sql_op in sql_conds:
-                post_filters.append(_condition_to_post(field, op, value))
-            for field, op, value, _sql_op in post_conds:
-                post_filters.append(_condition_to_post(field, op, value))
-            post_groups.append({"logic": group_logic, "filters": post_filters})
-        else:
-            # Build SQL for this group's SQL-filterable conditions
-            if sql_conds:
-                group_fragments = []
-                for field, op, value, sql_op in sql_conds:
-                    frag, param = _condition_to_sql(field, op, value, sql_op)
-                    group_fragments.append(f"({frag})")
-                    all_params.append(param)
-                group_sql = f" {group_logic} ".join(group_fragments)
-                all_group_sqls.append(f"({group_sql})")
-
-            # Collect post-query conditions for this group
-            if post_conds:
-                post_filters = []
-                for field, op, value, _sql_op in post_conds:
-                    post_filters.append(_condition_to_post(field, op, value))
-                post_groups.append({"logic": group_logic, "filters": post_filters})
-
-    # Combine group SQL fragments with top-level logic
-    if all_group_sqls:
-        sql = f" {top_logic} ".join(all_group_sqls)
-        sql = f"({sql})" if len(all_group_sqls) > 1 else all_group_sqls[0]
-    else:
-        sql = ""
-
-    post_filter_spec = None
-    if post_groups:
-        post_filter_spec = {"top_logic": top_logic, "groups": post_groups}
-
-    return sql, all_params, post_filter_spec
+    sql_fragment, params, post_node = _process_node(data, depth=0)
+    return sql_fragment or "", params, post_node
 
 
 _OP_FNS = {
@@ -290,37 +335,32 @@ _OP_FNS = {
 }
 
 
+def _evaluate_post_node(node: dict, product: dict) -> bool:
+    """Recursively evaluate a post-filter node against a product."""
+    if "field" in node:
+        pval = product.get(node["field"])
+        if pval is None:
+            return False
+        return _OP_FNS[node["op"]](float(pval), node["val"])
+
+    logic = node.get("logic", "AND")
+    children = node.get("children", [])
+    results = [_evaluate_post_node(c, product) for c in children]
+    if not results:
+        return True
+    return all(results) if logic == "AND" else any(results)
+
+
 def _apply_post_filters(results: list, post_filter_spec: dict | None) -> list:
     """Filter results in Python for computed fields like total_score.
 
-    post_filter_spec format:
-      {"top_logic": "AND", "groups": [{"logic": "OR", "filters": [(field,op,val), ...]}, ...]}
+    post_filter_spec is a recursive node tree:
+      {"logic": "AND", "children": [{"field":..,"op":..,"val":..}, ...]}
+    or a single leaf: {"field":..,"op":..,"val":..}
     """
     if not post_filter_spec:
         return results
-    top_logic = post_filter_spec["top_logic"]
-    groups = post_filter_spec["groups"]
-    filtered = []
-    for p in results:
-        group_results = []
-        for g in groups:
-            g_logic = g["logic"]
-            checks = []
-            for field, op, value in g["filters"]:
-                pval = p.get(field)
-                if pval is None:
-                    checks.append(False)
-                else:
-                    checks.append(_OP_FNS[op](float(pval), value))
-            if g_logic == "AND":
-                group_results.append(all(checks))
-            else:
-                group_results.append(any(checks))
-        if top_logic == "AND" and all(group_results):
-            filtered.append(p)
-        elif top_logic == "OR" and any(group_results):
-            filtered.append(p)
-    return filtered
+    return [p for p in results if _evaluate_post_node(post_filter_spec, p)]
 
 
 def list_products(search: str | None, type_filter: str | None, advanced_filters: str | None = None) -> list:

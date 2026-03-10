@@ -1,4 +1,4 @@
-// ── Advanced Filters (Grouped) ─────────────────────────
+// ── Advanced Filters (Recursive Nested Groups) ─────────────────────────
 import { state, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
@@ -46,6 +46,8 @@ const NUMERIC_OPS = [
 ];
 
 const _TEXT_FIELD_SET = new Set(TEXT_FIELDS.map(f => f[0]));
+const MAX_DEPTH = 4;
+const MAX_CONDITIONS = 20;
 let _rowCounter = 0;
 
 export function toggleAdvancedFilters() {
@@ -69,100 +71,92 @@ export function toggleAdvancedFilters() {
 
 function _buildPanel(panel) {
   panel.innerHTML = '';
-
-  // Top-level logic toggle (between groups) — hidden when only 1 group
-  const topLogicWrap = document.createElement('div');
-  topLogicWrap.className = 'adv-logic-wrap';
-  topLogicWrap.style.display = 'none';
-  const topLogicBtn = document.createElement('button');
-  topLogicBtn.className = 'adv-logic-btn adv-top-logic-btn';
-  topLogicBtn.textContent = t('adv_logic_and');
-  topLogicBtn.dataset.logic = 'and';
-  topLogicBtn.addEventListener('click', () => {
-    const next = topLogicBtn.dataset.logic === 'and' ? 'or' : 'and';
-    topLogicBtn.dataset.logic = next;
-    topLogicBtn.textContent = t(next === 'and' ? 'adv_logic_and' : 'adv_logic_or');
-    _onFilterChange();
-  });
-  topLogicWrap.appendChild(topLogicBtn);
-  panel.appendChild(topLogicWrap);
-
-  // Groups container
-  const groupsDiv = document.createElement('div');
-  groupsDiv.id = 'adv-groups';
-  panel.appendChild(groupsDiv);
-
-  // Add first group
-  _addGroup(groupsDiv);
-
-  // Add group button
-  const addGroupBtn = document.createElement('button');
-  addGroupBtn.className = 'adv-add-btn';
-  addGroupBtn.textContent = t('adv_add_group');
-  addGroupBtn.addEventListener('click', () => {
-    _addGroup(groupsDiv);
-    _updateVisibility();
-    _onFilterChange();
-  });
-  panel.appendChild(addGroupBtn);
+  // The panel itself hosts the root group
+  _addGroup(panel, 0, true);
 }
 
-function _addGroup(container) {
-  const group = document.createElement('div');
-  group.className = 'adv-group';
+// ── Group (recursive) ────────────────────────────────────
 
-  // Group header: logic toggle + remove button
+function _addGroup(container, depth, isRoot) {
+  const group = document.createElement('div');
+  group.className = `adv-group adv-group-depth-${depth}`;
+  group.dataset.depth = depth;
+  if (isRoot) group.dataset.root = '1';
+
+  // Header: logic toggle + remove button
   const header = document.createElement('div');
   header.className = 'adv-group-header';
 
-  const groupLogicBtn = document.createElement('button');
-  groupLogicBtn.className = 'adv-logic-btn adv-group-logic-btn';
-  groupLogicBtn.textContent = t('adv_logic_and');
-  groupLogicBtn.dataset.logic = 'and';
-  groupLogicBtn.style.visibility = 'hidden'; // hidden until 2+ conditions
-  groupLogicBtn.addEventListener('click', () => {
-    const next = groupLogicBtn.dataset.logic === 'and' ? 'or' : 'and';
-    groupLogicBtn.dataset.logic = next;
-    groupLogicBtn.textContent = t(next === 'and' ? 'adv_logic_and' : 'adv_logic_or');
+  const logicBtn = document.createElement('button');
+  logicBtn.className = 'adv-logic-btn adv-group-logic-btn';
+  logicBtn.textContent = t('adv_logic_and');
+  logicBtn.dataset.logic = 'and';
+  logicBtn.style.visibility = 'hidden'; // shown when 2+ children
+  logicBtn.addEventListener('click', () => {
+    const next = logicBtn.dataset.logic === 'and' ? 'or' : 'and';
+    logicBtn.dataset.logic = next;
+    logicBtn.textContent = t(next === 'and' ? 'adv_logic_and' : 'adv_logic_or');
     _onFilterChange();
   });
-  header.appendChild(groupLogicBtn);
+  header.appendChild(logicBtn);
 
-  const removeGroupBtn = document.createElement('button');
-  removeGroupBtn.className = 'adv-group-remove-btn';
-  removeGroupBtn.textContent = '\u00D7';
-  removeGroupBtn.title = t('adv_remove_group');
-  removeGroupBtn.addEventListener('click', () => {
-    group.remove();
-    _updateVisibility();
-    _onFilterChange();
-  });
-  header.appendChild(removeGroupBtn);
+  if (!isRoot) {
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'adv-group-remove-btn';
+    removeBtn.textContent = '\u00D7';
+    removeBtn.title = t('adv_remove_group');
+    removeBtn.addEventListener('click', () => {
+      const parentChildren = group.parentElement; // .adv-group-children
+      group.remove();
+      _handleEmptyParent(parentChildren);
+      _updateVisibilityAll();
+      _onFilterChange();
+    });
+    header.appendChild(removeBtn);
+  }
 
   group.appendChild(header);
 
-  // Rows container within group
-  const rowsDiv = document.createElement('div');
-  rowsDiv.className = 'adv-group-rows';
-  group.appendChild(rowsDiv);
+  // Children container (holds both condition rows and sub-groups)
+  const childrenDiv = document.createElement('div');
+  childrenDiv.className = 'adv-group-children';
+  group.appendChild(childrenDiv);
 
   // Add first condition row
-  _addRow(rowsDiv);
+  _addRow(childrenDiv);
 
-  // Add condition button within group
+  // Footer with add buttons
+  const footer = document.createElement('div');
+  footer.className = 'adv-group-footer';
+
   const addCondBtn = document.createElement('button');
   addCondBtn.className = 'adv-add-condition-btn';
   addCondBtn.textContent = t('adv_add_condition');
   addCondBtn.addEventListener('click', () => {
-    _addRow(rowsDiv);
-    _updateVisibility();
+    if (_countConditions() >= MAX_CONDITIONS) return;
+    _addRow(childrenDiv);
+    _updateVisibilityAll();
   });
-  group.appendChild(addCondBtn);
+  footer.appendChild(addCondBtn);
 
-  // Insert before the "between groups" logic separator if needed
+  if (depth < MAX_DEPTH - 1) {
+    const addSubBtn = document.createElement('button');
+    addSubBtn.className = 'adv-add-condition-btn';
+    addSubBtn.textContent = t('adv_add_subgroup');
+    addSubBtn.addEventListener('click', () => {
+      _addGroup(childrenDiv, depth + 1, false);
+      _updateVisibilityAll();
+      _onFilterChange();
+    });
+    footer.appendChild(addSubBtn);
+  }
+
+  group.appendChild(footer);
   container.appendChild(group);
-  _updateVisibility();
+  _updateVisibilityAll();
 }
+
+// ── Condition row ────────────────────────────────────────
 
 function _addRow(container) {
   const row = document.createElement('div');
@@ -211,20 +205,10 @@ function _addRow(container) {
   removeBtn.textContent = '\u00D7';
   removeBtn.title = t('adv_remove_filter');
   removeBtn.addEventListener('click', () => {
-    const groupRows = container;
+    const parentChildren = container;
     row.remove();
-    // If group has no rows left, remove the group (unless it's the only one)
-    if (groupRows.querySelectorAll('.adv-row').length === 0) {
-      const groupEl = groupRows.closest('.adv-group');
-      const allGroups = document.querySelectorAll('#adv-groups .adv-group');
-      if (allGroups.length > 1) {
-        groupEl.remove();
-      } else {
-        // Last group — add back an empty row
-        _addRow(groupRows);
-      }
-    }
-    _updateVisibility();
+    _handleEmptyParent(parentChildren);
+    _updateVisibilityAll();
     _onFilterChange();
   });
   row.appendChild(removeBtn);
@@ -269,56 +253,114 @@ function _updateOps(opSel, fieldValue) {
   }
 }
 
-function _updateVisibility() {
-  // Top-level logic toggle: visible only when 2+ groups
-  const topLogicWrap = document.querySelector('.adv-logic-wrap');
-  const groupCount = document.querySelectorAll('#adv-groups .adv-group').length;
-  if (topLogicWrap) {
-    topLogicWrap.style.display = groupCount >= 2 ? '' : 'none';
+// ── Cleanup ──────────────────────────────────────────────
+
+function _handleEmptyParent(childrenDiv) {
+  // If group's children container is empty and it's not root, remove the group
+  const directChildren = childrenDiv.querySelectorAll(':scope > .adv-row, :scope > .adv-group');
+  if (directChildren.length > 0) return;
+
+  const groupEl = childrenDiv.closest('.adv-group');
+  if (!groupEl) return;
+
+  if (groupEl.dataset.root === '1') {
+    // Root group: add back an empty row
+    _addRow(childrenDiv);
+  } else {
+    // Non-root empty group: remove it
+    const parentChildrenDiv = groupEl.parentElement;
+    groupEl.remove();
+    _handleEmptyParent(parentChildrenDiv);
+  }
+}
+
+// ── Visibility ───────────────────────────────────────────
+
+function _updateVisibilityAll() {
+  const rootGroup = document.querySelector('#advanced-filters > .adv-group');
+  if (rootGroup) _updateGroupVisibility(rootGroup);
+}
+
+function _updateGroupVisibility(groupEl) {
+  const childrenDiv = groupEl.querySelector(':scope > .adv-group-children');
+  if (!childrenDiv) return;
+
+  // Count direct children (rows + sub-groups)
+  const directChildren = childrenDiv.querySelectorAll(':scope > .adv-row, :scope > .adv-group');
+  const childCount = directChildren.length;
+
+  // Logic toggle: visible when 2+ direct children
+  const logicBtn = groupEl.querySelector(':scope > .adv-group-header > .adv-group-logic-btn');
+  if (logicBtn) {
+    logicBtn.style.visibility = childCount >= 2 ? 'visible' : 'hidden';
   }
 
-  // Group remove buttons: only visible when 2+ groups
-  document.querySelectorAll('.adv-group-remove-btn').forEach(btn => {
-    btn.style.display = groupCount >= 2 ? '' : 'none';
-  });
-
-  // Group-level logic toggles: visible only when group has 2+ conditions
-  document.querySelectorAll('#adv-groups .adv-group').forEach(group => {
-    const logicBtn = group.querySelector('.adv-group-logic-btn');
-    const rowCount = group.querySelectorAll('.adv-row').length;
-    if (logicBtn) {
-      logicBtn.style.visibility = rowCount >= 2 ? 'visible' : 'hidden';
+  // Remove button on non-root groups: visible when parent has 2+ children
+  if (groupEl.dataset.root !== '1') {
+    const removeBtn = groupEl.querySelector(':scope > .adv-group-header > .adv-group-remove-btn');
+    if (removeBtn) {
+      const parentChildrenDiv = groupEl.parentElement;
+      const siblingCount = parentChildrenDiv
+        ? parentChildrenDiv.querySelectorAll(':scope > .adv-row, :scope > .adv-group').length
+        : 1;
+      removeBtn.style.display = siblingCount >= 2 ? '' : 'none';
     }
-  });
+  }
+
+  // Recurse into sub-groups
+  const subGroups = childrenDiv.querySelectorAll(':scope > .adv-group');
+  subGroups.forEach(sub => _updateGroupVisibility(sub));
+}
+
+// ── Condition counting ───────────────────────────────────
+
+function _countConditions() {
+  const panel = document.getElementById('advanced-filters');
+  if (!panel) return 0;
+  return panel.querySelectorAll('.adv-row').length;
+}
+
+// ── Serialization ────────────────────────────────────────
+
+function _serializeGroup(groupEl) {
+  const logicBtn = groupEl.querySelector(':scope > .adv-group-header > .adv-group-logic-btn');
+  const logic = logicBtn ? logicBtn.dataset.logic : 'and';
+  const childrenDiv = groupEl.querySelector(':scope > .adv-group-children');
+  if (!childrenDiv) return null;
+
+  const children = [];
+  const directChildren = childrenDiv.querySelectorAll(':scope > .adv-row, :scope > .adv-group');
+
+  for (const child of directChildren) {
+    if (child.classList.contains('adv-row')) {
+      const field = child.querySelector('.adv-field-select').value;
+      const op = child.querySelector('.adv-op-select').value;
+      const value = child.querySelector('.adv-value-input').value.trim();
+      if (field && op && value !== '') {
+        children.push({ field, op, value });
+      }
+    } else if (child.classList.contains('adv-group')) {
+      const sub = _serializeGroup(child);
+      if (sub && sub.children.length > 0) {
+        children.push(sub);
+      }
+    }
+  }
+
+  return children.length > 0 ? { logic, children } : null;
 }
 
 function _onFilterChange() {
-  const topLogicBtn = document.querySelector('.adv-top-logic-btn');
-  const topLogic = topLogicBtn ? topLogicBtn.dataset.logic : 'and';
+  const rootGroup = document.querySelector('#advanced-filters > .adv-group');
+  if (!rootGroup) {
+    state.advancedFilters = null;
+    _triggerReload();
+    return;
+  }
 
-  const groupEls = document.querySelectorAll('#adv-groups .adv-group');
-  const groups = [];
-
-  groupEls.forEach(groupEl => {
-    const groupLogicBtn = groupEl.querySelector('.adv-group-logic-btn');
-    const groupLogic = groupLogicBtn ? groupLogicBtn.dataset.logic : 'and';
-    const rows = groupEl.querySelectorAll('.adv-row');
-    const conditions = [];
-    rows.forEach(row => {
-      const field = row.querySelector('.adv-field-select').value;
-      const op = row.querySelector('.adv-op-select').value;
-      const value = row.querySelector('.adv-value-input').value.trim();
-      if (field && op && value !== '') {
-        conditions.push({ field, op, value });
-      }
-    });
-    if (conditions.length > 0) {
-      groups.push({ logic: groupLogic, conditions });
-    }
-  });
-
-  if (groups.length > 0) {
-    state.advancedFilters = JSON.stringify({ logic: topLogic, groups });
+  const tree = _serializeGroup(rootGroup);
+  if (tree && tree.children.length > 0) {
+    state.advancedFilters = JSON.stringify(tree);
   } else {
     state.advancedFilters = null;
   }

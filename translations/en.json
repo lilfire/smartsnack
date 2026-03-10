@@ -592,5 +592,6 @@
     "adv_placeholder_value": "Value...",
     "adv_add_condition": "+ Add condition",
     "adv_add_group": "+ Add group",
-    "adv_remove_group": "Remove group"
+    "adv_remove_group": "Remove group",
+    "adv_add_subgroup": "+ Add sub-group"
 }
