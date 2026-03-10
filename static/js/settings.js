@@ -742,7 +742,7 @@ export async function refreshAllFromOff() {
   if (btn) btn.disabled = true;
   if (status) { status.style.display = ''; status.textContent = t('bulk_running'); }
   try {
-    const res = await api('/api/bulk/refresh-off');
+    const res = await api('/api/bulk/refresh-off', { method: 'POST' });
     if (res.error) { showToast(res.error, 'error'); return; }
     const msg = t('bulk_refresh_off_result', { total: res.total, updated: res.updated, skipped: res.skipped, errors: res.errors });
     if (status) status.textContent = msg;
