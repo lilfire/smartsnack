@@ -93,7 +93,10 @@ def _nutrition_field_similarity(local_val: float, off_val: float) -> float:
 
 
 def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
-    """Compute nutrition similarity score (0-25) between local and OFF data."""
+    """Compute nutrition similarity score (-25 to +25) between local and OFF data.
+
+    Matching nutrition boosts the score; mismatching nutrition penalizes it.
+    """
     nutriments = product.get("nutriments") or {}
     if not nutriments:
         return 0
@@ -118,14 +121,15 @@ def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
 
     if not similarities:
         return 0
-    return (sum(similarities) / len(similarities)) * 25
+    avg = sum(similarities) / len(similarities)
+    return (avg - 0.5) * 50
 
 
 def _compute_certainty(query: str, product: dict, nutrition: dict | None = None) -> int:
     """Compute a 0-100 certainty score for how well a product matches the query.
 
     Based on name word overlap, brand match, and optionally nutrition similarity.
-    With nutrition: name up to 60, brand up to 15, nutrition up to 25.
+    With nutrition: name up to 60, brand up to 15, nutrition -25 to +25.
     Without nutrition: name up to 80, brand up to 20 (preserves original behavior).
     """
     query_lower = query.lower().strip()
