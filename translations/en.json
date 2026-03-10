@@ -160,6 +160,7 @@
     "expanded_label_brand": "Brand: ",
     "expanded_label_stores": "Stores: ",
     "expanded_label_ingredients": "Ingredients: ",
+    "expanded_label_taste_score": "Taste score: ",
     "expanded_label_taste_note": "Taste note: ",
     "btn_save": "✓ Save",
     "btn_cancel": "Cancel",

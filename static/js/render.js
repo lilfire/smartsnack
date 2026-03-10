@@ -192,11 +192,12 @@ export function renderResults(results, search) {
       // Nutrition table
       h += '<p class="nutri-section-title">' + t('expanded_nutrition_title') + '</p>';
       h += renderNutriTable(p);
-      if (p.brand || p.stores || p.ingredients || p.taste_note) {
+      if (p.brand || p.stores || p.ingredients || p.taste_note || p.taste_score != null) {
         h += '<p class="nutri-section-title">' + t('expanded_product_info') + '</p>';
         if (p.brand) h += '<div style="margin-bottom:5px"><span style="font-size:10px;color:rgba(255,255,255,0.35)">' + t('expanded_label_brand') + '</span><span style="font-size:12px;color:rgba(255,255,255,0.7)">' + esc(p.brand) + '</span></div>';
         if (p.stores) h += '<div style="margin-bottom:5px"><span style="font-size:10px;color:rgba(255,255,255,0.35)">' + t('expanded_label_stores') + '</span><span style="font-size:12px;color:rgba(255,255,255,0.7)">' + esc(p.stores) + '</span></div>';
         if (p.ingredients) h += '<div style="margin-top:4px"><span style="font-size:10px;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px">' + t('expanded_label_ingredients') + '</span><span style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5">' + esc(p.ingredients) + '</span></div>';
+        if (p.taste_score != null) h += '<div style="margin-top:4px"><span style="font-size:10px;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px">' + t('expanded_label_taste_score') + '</span><span style="font-size:14px;color:#E8B84B;font-weight:700;font-family:\'Space Mono\',monospace">' + Number(p.taste_score).toFixed(1) + ' / 6</span></div>';
         if (p.taste_note) h += '<div style="margin-top:4px"><span style="font-size:10px;color:rgba(255,255,255,0.35);display:block;margin-bottom:3px">' + t('expanded_label_taste_note') + '</span><span style="font-size:11px;color:rgba(255,255,255,0.5);line-height:1.5">' + esc(p.taste_note) + '</span></div>';
       }
       // Flag badges
@@ -223,7 +224,6 @@ export function renderResults(results, search) {
           + '<div><label>' + t('edit_label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('edit_label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
           + '<div class="edit-grid-2"><label>' + t('edit_label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
-          + '<div class="edit-grid-2"><label>' + t('edit_label_taste_note') + '</label><textarea id="ed-taste_note" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.taste_note || '') + '</textarea></div>';
         h += '<div><label>' + t('edit_label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
           + '<div><label>' + t('edit_label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
@@ -238,6 +238,7 @@ export function renderResults(results, search) {
           + '<div><label>' + t('edit_label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume == 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume == 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume == 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
           + '<div><label>' + t('edit_label_price') + '</label><input type="number" step="1" id="ed-price" value="' + ev(p.price) + '"></div>'
           + '<div><label>' + t('edit_label_taste') + '</label><div class="range-row"><input type="range" min="0" max="6" step="0.5" value="' + (p.taste_score != null ? p.taste_score : 3) + '" id="ed-smak" oninput="document.getElementById(\'ed-smak-val\').textContent=this.value"><span class="range-val" id="ed-smak-val">' + (p.taste_score != null ? p.taste_score : 3) + '</span></div></div>'
+          + '<div class="edit-grid-2"><label>' + t('edit_label_taste_note') + '</label><textarea id="ed-taste_note" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.taste_note || '') + '</textarea></div>'
           + '</div>'
           + (p.ingredients
             ? '<div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 4px">'
