@@ -1040,7 +1040,7 @@ export async function estimateAllPq() {
   if (btn) btn.disabled = true;
   if (status) { status.style.display = ''; status.textContent = t('bulk_running'); }
   try {
-    const res = await api('/api/bulk/estimate-pq');
+    const res = await api('/api/bulk/estimate-pq', { method: 'POST' });
     if (res.error) { showToast(res.error, 'error'); return; }
     const msg = t('bulk_estimate_pq_result', { total: res.total, updated: res.updated, skipped: res.skipped });
     if (status) status.textContent = msg;
