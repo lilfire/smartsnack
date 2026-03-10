@@ -282,6 +282,21 @@ label.field-label {
   border-radius: 0 0 10px 10px;
 }
 
+.custom-select-group {
+  padding: 8px 13px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: 'Space Mono', monospace;
+  cursor: default;
+}
+.custom-select-group:not(:first-child) {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 2px;
+}
+
 /* On mobile: show native select, hide custom trigger/options */
 @media (max-width: 639px) {
   .custom-select-wrap .custom-select-trigger,

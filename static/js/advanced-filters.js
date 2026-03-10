@@ -1,5 +1,5 @@
 // ── Advanced Filters ─────────────────────────────────
-import { state } from './state.js';
+import { state, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
 // Field definitions: [field_key, i18n_key, type]
@@ -28,6 +28,7 @@ const NUMERIC_FIELDS = [
   ['taste_score', 'adv_field_taste_score'],
   ['est_pdcaas', 'adv_field_est_pdcaas'],
   ['est_diaas', 'adv_field_est_diaas'],
+  ['total_score', 'adv_field_total_score'],
 ];
 
 const TEXT_OPS = [
@@ -154,20 +155,12 @@ function _addRow(container) {
   });
   row.appendChild(removeBtn);
 
-  // Update operators when field changes
-  fieldSel.addEventListener('change', () => {
-    _updateOps(opSel, fieldSel.value);
-    valInput.type = _TEXT_FIELD_SET.has(fieldSel.value) ? 'text' : 'number';
-    valInput.step = 'any';
-  });
-
   // Trigger filter on value change (debounced)
   let valTimer = null;
   valInput.addEventListener('input', () => {
     clearTimeout(valTimer);
     valTimer = setTimeout(_onFilterChange, 300);
   });
-  opSel.addEventListener('change', _onFilterChange);
 
   container.appendChild(row);
 
@@ -175,6 +168,15 @@ function _addRow(container) {
   _updateOps(opSel, fieldSel.value);
   valInput.type = _TEXT_FIELD_SET.has(fieldSel.value) ? 'text' : 'number';
   valInput.step = 'any';
+
+  // Upgrade to custom styled selects
+  upgradeSelect(fieldSel, (val) => {
+    _updateOps(opSel, val);
+    upgradeSelect(opSel);
+    valInput.type = _TEXT_FIELD_SET.has(val) ? 'text' : 'number';
+    valInput.step = 'any';
+  });
+  upgradeSelect(opSel, () => { _onFilterChange(); });
 }
 
 function _updateOps(opSel, fieldValue) {
