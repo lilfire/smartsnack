@@ -102,7 +102,12 @@ def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
     for local_key, off_key in OFF_NUTRITION_COMPARE_MAP.items():
         local_val = nutrition.get(local_key)
         off_val = nutriments.get(off_key)
-        if local_val is None or off_val is None:
+        # Skip fields where the user didn't provide a value
+        if local_val is None:
+            continue
+        # User provided a value but OFF is missing it → mismatch
+        if off_val is None:
+            similarities.append(0.0)
             continue
         try:
             local_val = float(local_val)
@@ -153,6 +158,12 @@ def _compute_certainty(query: str, product: dict, nutrition: dict | None = None)
             word_score += name_exact_bonus
         elif matches == len(query_words):
             word_score += name_all_bonus
+
+        # Penalize product names that are much longer than the query
+        name_words = len(name.split())
+        if name_words > len(query_words):
+            length_ratio = len(query_words) / name_words
+            word_score *= (1 + length_ratio) / 2
 
         best_name_score = max(best_name_score, word_score)
 
