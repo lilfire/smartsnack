@@ -5,12 +5,30 @@ import io
 import json
 import logging
 import re
+import sqlite3
+import threading
 import time
 
+from config import DB_PATH
 from db import get_db
 from services import proxy_service, protein_quality_service, image_service
 
 logger = logging.getLogger(__name__)
+
+# ── In-memory refresh job state ──────────────────────
+_refresh_job = {
+    "running": False,
+    "current": 0,
+    "total": 0,
+    "name": "",
+    "ean": "",
+    "status": "",
+    "updated": 0,
+    "skipped": 0,
+    "errors": 0,
+    "done": False,
+}
+_refresh_lock = threading.Lock()
 
 
 def _parse_off_nutriment(nutriments, key):
@@ -230,94 +248,118 @@ def refresh_from_off():
     }
 
 
-def refresh_from_off_stream():
-    """Generator that yields SSE JSON events while refreshing products from OFF."""
-    conn = get_db()
-    rows = conn.execute(
-        "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
-        "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-        "weight, portion "
-        "FROM products WHERE ean IS NOT NULL AND ean != ''"
-    ).fetchall()
+def get_refresh_status():
+    """Return a snapshot of the current refresh job state."""
+    with _refresh_lock:
+        return dict(_refresh_job)
 
-    total = len(rows)
-    updated = 0
-    skipped = 0
-    errors = []
 
-    yield json.dumps({"type": "start", "total": total})
+def start_refresh_from_off():
+    """Start refresh in a background thread. Returns False if already running."""
+    with _refresh_lock:
+        if _refresh_job["running"]:
+            return False
+        _refresh_job.update(
+            running=True, current=0, total=0, name="", ean="",
+            status="", updated=0, skipped=0, errors=0, done=False,
+        )
+    t = threading.Thread(target=_run_refresh, daemon=True)
+    t.start()
+    return True
 
-    for i, row in enumerate(rows):
-        ean = row["ean"]
-        pid = row["id"]
-        name = row["name"] or ""
 
-        yield json.dumps({
-            "type": "progress", "current": i + 1, "total": total,
-            "ean": ean, "name": name, "status": "fetching",
-        })
+def _run_refresh():
+    """Background thread that refreshes all products from OFF."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA busy_timeout = 5000")
 
-        try:
-            data = proxy_service.off_product(ean)
-            if not data.get("product"):
-                skipped += 1
-                yield json.dumps({
-                    "type": "progress", "current": i + 1, "total": total,
-                    "ean": ean, "name": name, "status": "skipped",
-                })
-                time.sleep(0.5)
-                continue
+    try:
+        rows = conn.execute(
+            "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
+            "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
+            "weight, portion "
+            "FROM products WHERE ean IS NOT NULL AND ean != ''"
+        ).fetchall()
 
-            product = data["product"]
-            local = dict(row)
-            field_updates = _map_off_product(product, local)
-            image_uri = _fetch_off_image(product)
+        total = len(rows)
+        updated = 0
+        skipped = 0
+        errors = 0
 
-            if not field_updates and not image_uri:
-                skipped += 1
-                yield json.dumps({
-                    "type": "progress", "current": i + 1, "total": total,
-                    "ean": ean, "name": name, "status": "skipped",
-                })
-                time.sleep(0.5)
-                continue
+        with _refresh_lock:
+            _refresh_job["total"] = total
 
-            if field_updates:
-                set_clauses = [f"{f} = ?" for f in field_updates]
-                vals = list(field_updates.values()) + [pid]
-                conn.execute(
-                    f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                    vals,
+        for i, row in enumerate(rows):
+            ean = row["ean"]
+            pid = row["id"]
+            name = row["name"] or ""
+
+            with _refresh_lock:
+                _refresh_job.update(
+                    current=i + 1, ean=ean, name=name, status="fetching",
                 )
 
-            if image_uri:
-                conn.execute(
-                    "UPDATE products SET image = ? WHERE id = ?",
-                    (image_uri, pid),
-                )
+            try:
+                data = proxy_service.off_product(ean)
+                if not data.get("product"):
+                    skipped += 1
+                    with _refresh_lock:
+                        _refresh_job.update(status="skipped", skipped=skipped)
+                    time.sleep(0.5)
+                    continue
 
-            conn.commit()
-            updated += 1
+                product = data["product"]
+                local = dict(row)
+                field_updates = _map_off_product(product, local)
+                image_uri = _fetch_off_image(product)
 
-            yield json.dumps({
-                "type": "progress", "current": i + 1, "total": total,
-                "ean": ean, "name": name, "status": "updated",
-            })
+                if not field_updates and not image_uri:
+                    skipped += 1
+                    with _refresh_lock:
+                        _refresh_job.update(status="skipped", skipped=skipped)
+                    time.sleep(0.5)
+                    continue
 
-        except Exception as e:
-            logger.error("Error refreshing product %s (EAN %s): %s", pid, ean, e)
-            errors.append({"id": pid, "ean": ean, "error": str(e)})
-            yield json.dumps({
-                "type": "progress", "current": i + 1, "total": total,
-                "ean": ean, "name": name, "status": "error",
-            })
+                if field_updates:
+                    set_clauses = [f"{f} = ?" for f in field_updates]
+                    vals = list(field_updates.values()) + [pid]
+                    conn.execute(
+                        f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
+                        vals,
+                    )
 
-        time.sleep(0.5)
+                if image_uri:
+                    conn.execute(
+                        "UPDATE products SET image = ? WHERE id = ?",
+                        (image_uri, pid),
+                    )
 
-    yield json.dumps({
-        "type": "done", "total": total, "updated": updated,
-        "skipped": skipped, "errors": len(errors),
-    })
+                conn.commit()
+                updated += 1
+
+                with _refresh_lock:
+                    _refresh_job.update(status="updated", updated=updated)
+
+            except Exception as e:
+                logger.error("Error refreshing product %s (EAN %s): %s", pid, ean, e)
+                errors += 1
+                with _refresh_lock:
+                    _refresh_job.update(status="error", errors=errors)
+
+            time.sleep(0.5)
+
+        with _refresh_lock:
+            _refresh_job.update(
+                done=True, running=False,
+                updated=updated, skipped=skipped, errors=errors,
+            )
+    except Exception as e:
+        logger.error("Refresh thread crashed: %s", e, exc_info=True)
+        with _refresh_lock:
+            _refresh_job.update(done=True, running=False)
+    finally:
+        conn.close()
 
 
 def estimate_all_pq():

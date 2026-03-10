@@ -1,6 +1,9 @@
 """Blueprint for bulk operations (refresh from OFF, estimate PQ)."""
 
-from flask import Blueprint, Response, jsonify, stream_with_context
+import json
+import time
+
+from flask import Blueprint, Response, jsonify
 
 from services import bulk_service
 
@@ -16,14 +19,35 @@ def refresh_off():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/api/bulk/refresh-off/start", methods=["POST"])
+def refresh_off_start():
+    started = bulk_service.start_refresh_from_off()
+    if not started:
+        return jsonify({"error": "already_running"}), 409
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/bulk/refresh-off/status")
+def refresh_off_status():
+    return jsonify(bulk_service.get_refresh_status())
+
+
 @bp.route("/api/bulk/refresh-off/stream")
 def refresh_off_stream():
     def generate():
-        for event_json in bulk_service.refresh_from_off_stream():
-            yield f"data: {event_json}\n\n"
+        last_sent = None
+        while True:
+            status = bulk_service.get_refresh_status()
+            snapshot = json.dumps(status, sort_keys=True)
+            if snapshot != last_sent:
+                yield f"data: {snapshot}\n\n"
+                last_sent = snapshot
+            if status.get("done") or (not status.get("running") and not status.get("done")):
+                break
+            time.sleep(0.3)
 
     return Response(
-        stream_with_context(generate()),
+        generate(),
         content_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

@@ -68,6 +68,7 @@ export async function loadSettings() {
     loadFlags();
     loadPq();
     loadOffCredentials();
+    checkRefreshStatus();
   } finally {
     _settingsLoading = false;
   }
@@ -735,8 +736,9 @@ export function initRestoreDragDrop() {
 }
 
 // ── Bulk: Refresh all from OFF ───────────────────────
-export async function refreshAllFromOff() {
-  if (!await showConfirmModal('🔄', t('bulk_refresh_off_title'), t('bulk_refresh_off_confirm'), t('btn_start'), t('btn_cancel'))) return;
+let _refreshEvtSource = null;
+
+function _connectRefreshStream() {
   const btn = document.getElementById('btn-refresh-all-off');
   const progressWrap = document.getElementById('refresh-off-progress');
   const bar = document.getElementById('refresh-off-bar');
@@ -744,20 +746,21 @@ export async function refreshAllFromOff() {
 
   if (btn) btn.disabled = true;
   if (progressWrap) progressWrap.style.display = '';
-  if (bar) bar.style.width = '0%';
-  if (status) status.textContent = t('bulk_running');
 
-  const evtSource = new EventSource('/api/bulk/refresh-off/stream');
+  if (_refreshEvtSource) _refreshEvtSource.close();
+  _refreshEvtSource = new EventSource('/api/bulk/refresh-off/stream');
 
-  evtSource.onmessage = (e) => {
+  _refreshEvtSource.onmessage = (e) => {
     const data = JSON.parse(e.data);
-    if (data.type === 'progress') {
+    if (data.running && data.total > 0) {
       const pct = Math.round((data.current / data.total) * 100);
       if (bar) bar.style.width = pct + '%';
       const label = data.name || data.ean;
       if (status) status.textContent = t('bulk_refresh_off_progress', { current: data.current, total: data.total, name: label });
-    } else if (data.type === 'done') {
-      evtSource.close();
+    }
+    if (data.done) {
+      _refreshEvtSource.close();
+      _refreshEvtSource = null;
       if (bar) bar.style.width = '100%';
       const msg = t('bulk_refresh_off_result', { total: data.total, updated: data.updated, skipped: data.skipped, errors: data.errors });
       if (status) status.textContent = msg;
@@ -767,12 +770,37 @@ export async function refreshAllFromOff() {
     }
   };
 
-  evtSource.onerror = () => {
-    evtSource.close();
-    showToast(t('toast_network_error'), 'error');
+  _refreshEvtSource.onerror = () => {
+    _refreshEvtSource.close();
+    _refreshEvtSource = null;
     if (btn) btn.disabled = false;
     if (progressWrap) progressWrap.style.display = 'none';
   };
+}
+
+export async function checkRefreshStatus() {
+  try {
+    const status = await api('/api/bulk/refresh-off/status');
+    if (status.running) _connectRefreshStream();
+  } catch(e) { /* ignore */ }
+}
+
+export async function refreshAllFromOff() {
+  if (!await showConfirmModal('🔄', t('bulk_refresh_off_title'), t('bulk_refresh_off_confirm'), t('btn_start'), t('btn_cancel'))) return;
+  const bar = document.getElementById('refresh-off-bar');
+  if (bar) bar.style.width = '0%';
+  try {
+    const res = await api('/api/bulk/refresh-off/start', { method: 'POST' });
+    if (res.error === 'already_running') {
+      _connectRefreshStream();
+      return;
+    }
+    if (res.error) { showToast(res.error, 'error'); return; }
+    _connectRefreshStream();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+  }
 }
 
 // ── Bulk: Estimate PQ for all ────────────────────────
