@@ -2,7 +2,7 @@
 import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
-import { renderResults } from './render.js';
+import { renderResults, getFlagConfig } from './render.js';
 import { isValidEan } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
@@ -34,7 +34,7 @@ function collectFormFields(prefix) {
     price: numOrNull(prefix + '-price'),
     est_pdcaas: numOrNull(prefix + '-est_pdcaas'),
     est_diaas: numOrNull(prefix + '-est_diaas'),
-    flags: ['is_discontinued'].reduce((acc, f) => {
+    flags: Object.entries(getFlagConfig()).filter(([, v]) => v.type === 'user').reduce((acc, [f]) => {
       const cb = document.getElementById(prefix + '-flag-' + f);
       if (cb && cb.checked) acc.push(f);
       return acc;

@@ -5,7 +5,7 @@ import { state, api } from './state.js';
 import { initLanguage, changeLanguage, t } from './i18n.js';
 import { toggleFilters, setSort, rerender } from './filters.js';
 import { triggerImageUpload, removeProductImage } from './images.js';
-import { renderResults } from './render.js';
+import { renderResults, loadFlagConfig } from './render.js';
 import {
   showToast, startEdit, saveProduct, deleteProduct,
   loadData, switchView, setFilter, toggleExpand,
@@ -17,6 +17,7 @@ import {
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights,
   updateCategoryLabel, addCategory, deleteCategory,
+  addFlag, deleteFlag, updateFlagLabel,
   autosavePq, deletePq, addPq,
   downloadBackup, handleRestore, handleImport,
   initRestoreDragDrop,
@@ -55,6 +56,8 @@ Object.assign(window, {
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   // settings — categories
   updateCategoryLabel, addCategory, deleteCategory,
+  // settings — flags
+  addFlag, deleteFlag, updateFlagLabel,
   // settings — protein quality
   autosavePq, deletePq, addPq,
   // settings — backup
@@ -93,6 +96,7 @@ Object.defineProperty(window, 'editingId', {
       SCORE_CFG_MAP[w.field] = { label: w.label, desc: w.desc, direction: w.direction };
     });
   } catch(e) { showToast(t('toast_load_error'), 'error'); }
+  await loadFlagConfig();
   initRestoreDragDrop();
   loadData();
   var searchInput = document.getElementById('search-input');

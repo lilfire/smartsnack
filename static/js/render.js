@@ -10,12 +10,20 @@ let _resultsAbort = null;
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
-// Flag definitions mirrored from config.py
-const _USER_FLAGS = ['is_discontinued'];
-const _ALL_FLAG_CFG = {
-  is_discontinued: { type: 'user', labelKey: 'flag_is_discontinued' },
-  is_synced_with_off: { type: 'system', labelKey: 'flag_is_synced_with_off' },
-};
+// Flag definitions loaded dynamically from API
+let _flagConfig = {};
+
+export async function loadFlagConfig() {
+  try {
+    _flagConfig = await (await fetch('/api/flag-config')).json();
+  } catch(e) { console.error('Failed to load flag config', e); }
+}
+
+export function getFlagConfig() { return _flagConfig; }
+
+function _getUserFlags() {
+  return Object.keys(_flagConfig).filter(f => _flagConfig[f].type === 'user');
+}
 
 export function renderNutriTable(p) {
   const rows = [
@@ -183,7 +191,7 @@ export function renderResults(results, search) {
       if (flags.length) {
         h += '<div class="product-flags">';
         flags.forEach(f => {
-          const cfg = _ALL_FLAG_CFG[f];
+          const cfg = _flagConfig[f];
           if (!cfg) return;
           h += '<span class="flag-badge flag-' + cfg.type + '">' + esc(t(cfg.labelKey)) + '</span>';
         });
@@ -229,15 +237,16 @@ export function renderResults(results, search) {
           + '<input type="hidden" id="ed-est_pdcaas" value="' + (p.est_pdcaas != null ? p.est_pdcaas : '') + '">'
           + '<input type="hidden" id="ed-est_diaas" value="' + (p.est_diaas != null ? p.est_diaas : '') + '">'
           + '<div class="edit-flags">'
-          + _USER_FLAGS.map(f => {
-              const cfg = _ALL_FLAG_CFG[f];
+          + _getUserFlags().map(f => {
+              const cfg = _flagConfig[f];
+              if (!cfg) return '';
               const checked = (p.flags || []).includes(f) ? ' checked' : '';
               return '<label class="flag-toggle"><input type="checkbox" id="ed-flag-' + f + '"' + checked + '> ' + esc(t(cfg.labelKey)) + '</label>';
             }).join('')
           + ((() => {
-              const sysFlags = (p.flags || []).filter(f => _ALL_FLAG_CFG[f] && _ALL_FLAG_CFG[f].type === 'system');
+              const sysFlags = (p.flags || []).filter(f => _flagConfig[f] && _flagConfig[f].type === 'system');
               return sysFlags.length
-                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(t(_ALL_FLAG_CFG[f].labelKey)) + '</span>').join(' ') + '</span>'
+                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(t(_flagConfig[f].labelKey)) + '</span>').join(' ') + '</span>'
                 : '';
             })())
           + '</div>'

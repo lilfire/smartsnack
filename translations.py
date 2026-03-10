@@ -87,6 +87,21 @@ def _category_label(name: str, lang: str = None) -> str:
     return label
 
 
+def _flag_key(name: str) -> str:
+    """Generate a translation key for a flag name."""
+    slug = re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
+    return f"flag_{slug}"
+
+
+def _flag_label(name: str, lang: str = None) -> str:
+    """Get the translated label for a flag, falling back to the name."""
+    key = _flag_key(name)
+    label = _t(key, lang=lang)
+    if label == key:
+        return name
+    return label
+
+
 def _pq_label(name: str, lang: str = None) -> str:
     """Get the translated label for a protein quality entry."""
     label = _t(f"pq_{name}_label", lang=lang)

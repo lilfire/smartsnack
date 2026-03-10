@@ -110,16 +110,11 @@ NUMERIC_FIELDS = frozenset(NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est
 POST_QUERY_FIELDS = frozenset(("total_score",))
 
 # ── Product flags ──────────────────────────────────────
-PRODUCT_FLAGS = {
-    "is_discontinued": {"type": "user", "label_key": "flag_is_discontinued"},
-    "is_synced_with_off": {"type": "system", "label_key": "flag_is_synced_with_off"},
-}
-USER_FLAGS = frozenset(k for k, v in PRODUCT_FLAGS.items() if v["type"] == "user")
-SYSTEM_FLAGS = frozenset(k for k, v in PRODUCT_FLAGS.items() if v["type"] == "system")
-ALL_FLAG_NAMES = frozenset(PRODUCT_FLAGS.keys())
-FLAG_FIELDS = frozenset(f"flag:{k}" for k in PRODUCT_FLAGS)
+# System flags are managed programmatically; user flags are dynamic (stored in DB).
+SYSTEM_FLAGS = frozenset(("is_synced_with_off",))
 
-FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS | FLAG_FIELDS
+# FLAG_FIELDS is built dynamically in product_service from the flag_definitions table.
+FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS
 
 COMPUTED_FIELDS = {
     "pct_protein_cal": lambda p: (

@@ -10,9 +10,9 @@ from config import (
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
     SCORE_CONFIG_MAP, COMPUTED_FIELDS,
     ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS, POST_QUERY_FIELDS,
-    FLAG_FIELDS, ALL_FLAG_NAMES, USER_FLAGS,
     MAX_FILTER_DEPTH, MAX_FILTER_CONDITIONS,
 )
+from services import flag_service
 from helpers import _num, _safe_float
 
 _TEXT_FIELD_SET = frozenset(_TEXT_FIELD_LIMITS.keys())
@@ -36,12 +36,14 @@ def _get_product_flags(cur, product_ids: list) -> dict:
 
 def _set_user_flags(conn, pid: int, flags: list) -> None:
     """Replace all user flags for a product. Ignores unknown or system flags."""
-    valid_flags = [f for f in flags if f in USER_FLAGS]
+    user_flags = flag_service.get_user_flag_names()
+    valid_flags = [f for f in flags if f in user_flags]
     # Delete existing user flags only
-    conn.execute(
-        f"DELETE FROM product_flags WHERE product_id = ? AND flag IN ({','.join('?' * len(USER_FLAGS))})",
-        [pid] + list(USER_FLAGS),
-    )
+    if user_flags:
+        conn.execute(
+            f"DELETE FROM product_flags WHERE product_id = ? AND flag IN ({','.join('?' * len(user_flags))})",
+            [pid] + list(user_flags),
+        )
     for flag in valid_flags:
         conn.execute(
             "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
@@ -51,7 +53,7 @@ def _set_user_flags(conn, pid: int, flags: list) -> None:
 
 def set_system_flag(pid: int, flag_name: str, value: bool) -> None:
     """Set or clear a system flag for a product. For programmatic use only."""
-    if flag_name not in ALL_FLAG_NAMES:
+    if flag_name not in flag_service.get_all_flag_names():
         raise ValueError(f"Unknown flag: {flag_name!r}")
     conn = get_db()
     if value:
@@ -179,13 +181,18 @@ def _parse_condition(c: dict) -> tuple:
     op = c.get("op", "")
     value = c.get("value", "")
 
-    if field not in FILTERABLE_FIELDS:
+    # Build dynamic flag fields from DB
+    all_flag_names = flag_service.get_all_flag_names()
+    flag_fields = frozenset(f"flag:{n}" for n in all_flag_names)
+    filterable = FILTERABLE_FIELDS | flag_fields
+
+    if field not in filterable:
         raise ValueError(f"Invalid filter field: {field}")
 
     # Flag fields: only op "=" with value "true"/"false"
-    if field in FLAG_FIELDS:
+    if field in flag_fields:
         flag_name = field[len(_FLAG_FIELD_PREFIX):]
-        if flag_name not in ALL_FLAG_NAMES:
+        if flag_name not in all_flag_names:
             raise ValueError(f"Unknown flag: {flag_name}")
         if op != "=":
             raise ValueError(f"Operator '{op}' not valid for flag field '{field}'")
@@ -207,7 +214,7 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
 
     Returns (sql_fragment, param).
     """
-    if field in FLAG_FIELDS:
+    if field.startswith(_FLAG_FIELD_PREFIX):
         flag_name = field[len(_FLAG_FIELD_PREFIX):]
         subquery = "SELECT 1 FROM product_flags pf WHERE pf.product_id = products.id AND pf.flag = ?"
         if value == "true":

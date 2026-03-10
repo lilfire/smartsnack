@@ -12,6 +12,7 @@ from blueprints.settings import bp as settings_bp
 from blueprints.stats import bp as stats_bp
 from blueprints.translations import bp as translations_bp
 from blueprints.off import bp as off_bp
+from blueprints.flags import bp as flags_bp
 
 
 def register_blueprints(app):
@@ -27,3 +28,4 @@ def register_blueprints(app):
     app.register_blueprint(stats_bp)
     app.register_blueprint(translations_bp)
     app.register_blueprint(off_bp)
+    app.register_blueprint(flags_bp)
