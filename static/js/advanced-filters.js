@@ -65,6 +65,12 @@ const MAX_DEPTH = 4;
 const MAX_CONDITIONS = 20;
 let _rowCounter = 0;
 
+export function rebuildAdvancedFilters() {
+  const panel = document.getElementById('advanced-filters');
+  if (!panel || !panel.classList.contains('open')) return;
+  _buildPanel(panel);
+}
+
 export function toggleAdvancedFilters() {
   const panel = document.getElementById('advanced-filters');
   const toggle = document.getElementById('adv-filter-toggle');
