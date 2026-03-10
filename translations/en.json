@@ -198,6 +198,7 @@
     "off_no_results_try_different": "No results. Try a different search term.",
     "off_zero_results": "0 results",
     "off_result_count": "{count} results",
+    "off_certainty_label": "Match:",
     "off_add_to_off": "Add this product to Open Food Facts",
     "off_add_to_off_tip": "Consider filling in product name, brand, nutrition values and image before adding.",
     "off_add_name_required": "Product name must be filled in before adding to Open Food Facts.",
