@@ -49,7 +49,7 @@ const NUMERIC_OPS = [
 
 function _getFlagFields() {
   const cfg = getFlagConfig();
-  return Object.entries(cfg).map(([name, c]) => ['flag:' + name, c.labelKey]);
+  return Object.entries(cfg).map(([name, c]) => ['flag:' + name, c.label]);
 }
 const FLAG_OPS = [
   ['', 'adv_op_flag_select'],
@@ -226,10 +226,10 @@ function _addRow(container) {
   fieldSel.appendChild(numGroup);
   const flagGroup = document.createElement('optgroup');
   flagGroup.label = t('adv_group_flags');
-  _getFlagFields().forEach(([val, key]) => {
+  _getFlagFields().forEach(([val, label]) => {
     const o = document.createElement('option');
     o.value = val;
-    o.textContent = t(key);
+    o.textContent = label;
     flagGroup.appendChild(o);
   });
   fieldSel.appendChild(flagGroup);
