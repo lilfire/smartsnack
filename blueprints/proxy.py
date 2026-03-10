@@ -28,11 +28,13 @@ def off_search():
     query = request.args.get("q", "")
     try:
         data = proxy_service.off_search(query)
+        return jsonify(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
-    return jsonify(data)
+    except Exception:
+        return jsonify({"error": "Search failed"}), 500
 
 
 @bp.route("/api/off/product/<code>")
