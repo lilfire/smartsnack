@@ -847,8 +847,8 @@ function _showRefreshOffModal() {
       return range;
     }
 
-    const certSlider = makeSlider('bulk_refresh_off_min_certainty', 50);
-    const compSlider = makeSlider('bulk_refresh_off_min_completeness', 50);
+    const certSlider = makeSlider('bulk_refresh_off_min_certainty', 100);
+    const compSlider = makeSlider('bulk_refresh_off_min_completeness', 75);
     opts.appendChild(sliders);
     modal.appendChild(opts);
 
