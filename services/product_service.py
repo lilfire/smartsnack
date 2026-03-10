@@ -530,6 +530,14 @@ def add_product(data: dict) -> dict:
     cat_exists = cur.execute("SELECT 1 FROM categories WHERE name = ?", (data["type"].strip(),)).fetchone()
     if not cat_exists:
         raise ValueError("Category does not exist")
+    name = data["name"].strip()
+    if ean:
+        dup = cur.execute("SELECT id, name FROM products WHERE ean = ?", (ean,)).fetchone()
+        if dup:
+            raise ValueError(f"A product with EAN {ean} already exists: {dup[1]}")
+    dup_name = cur.execute("SELECT id FROM products WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
+    if dup_name:
+        raise ValueError(f"A product with name '{name}' already exists")
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
         (data["type"].strip(), data["name"].strip(), data.get("ean", "").strip(),
