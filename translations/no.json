@@ -599,5 +599,16 @@
     "adv_op_is_set": "er satt",
     "adv_op_is_not_set": "er ikke satt",
     "flag_is_discontinued": "Utgått",
-    "flag_is_synced_with_off": "Synkronisert med OFF"
+    "flag_is_synced_with_off": "Synkronisert med OFF",
+    "settings_flags_title": "Produktflagg",
+    "settings_flags_desc": "Administrer flagg for merking av produkter",
+    "label_flag_name": "Flaggnavn",
+    "ph_flag_name": "f.eks. is_organic",
+    "ph_flag_label": "f.eks. Økologisk",
+    "btn_add_flag": "+ Legg til flagg",
+    "toast_flag_added": "{name} lagt til",
+    "toast_flag_updated": "Flagg oppdatert",
+    "toast_flag_deleted": "{name} slettet",
+    "confirm_delete_flag_body": "Slette \"{name}\"? Det fjernes fra {count} produkter.",
+    "confirm_delete_flag_body_empty": "Slette \"{name}\"?"
 }

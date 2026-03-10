@@ -2,6 +2,7 @@
 import { state, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { updateFilterToggle } from './filters.js';
+import { getFlagConfig } from './render.js';
 
 // Field definitions: [field_key, i18n_key]
 const TEXT_FIELDS = [
@@ -46,10 +47,10 @@ const NUMERIC_OPS = [
   ['!=', 'adv_op_neq'],
 ];
 
-const FLAG_FIELDS = [
-  ['flag:is_discontinued', 'flag_is_discontinued'],
-  ['flag:is_synced_with_off', 'flag_is_synced_with_off'],
-];
+function _getFlagFields() {
+  const cfg = getFlagConfig();
+  return Object.entries(cfg).map(([name, c]) => ['flag:' + name, c.labelKey]);
+}
 const FLAG_OPS = [
   ['', 'adv_op_flag_select'],
   ['= true', 'adv_op_is_set'],
@@ -57,7 +58,9 @@ const FLAG_OPS = [
 ];
 
 const _TEXT_FIELD_SET = new Set(TEXT_FIELDS.map(f => f[0]));
-const _FLAG_FIELD_SET = new Set(FLAG_FIELDS.map(f => f[0]));
+function _getFlagFieldSet() {
+  return new Set(_getFlagFields().map(f => f[0]));
+}
 const MAX_DEPTH = 4;
 const MAX_CONDITIONS = 20;
 let _rowCounter = 0;
@@ -222,7 +225,7 @@ function _addRow(container) {
   fieldSel.appendChild(numGroup);
   const flagGroup = document.createElement('optgroup');
   flagGroup.label = t('adv_group_flags');
-  FLAG_FIELDS.forEach(([val, key]) => {
+  _getFlagFields().forEach(([val, key]) => {
     const o = document.createElement('option');
     o.value = val;
     o.textContent = t(key);
@@ -284,7 +287,7 @@ function _addRow(container) {
 
 function _updateOps(opSel, fieldValue) {
   let ops;
-  if (_FLAG_FIELD_SET.has(fieldValue)) {
+  if (_getFlagFieldSet().has(fieldValue)) {
     ops = FLAG_OPS;
   } else if (_TEXT_FIELD_SET.has(fieldValue)) {
     ops = TEXT_OPS;
@@ -306,7 +309,7 @@ function _updateOps(opSel, fieldValue) {
 }
 
 function _syncValInput(valInput, fieldValue, opValue) {
-  if (_FLAG_FIELD_SET.has(fieldValue)) {
+  if (_getFlagFieldSet().has(fieldValue)) {
     // Flag fields: value is encoded in the operator, hide the input
     valInput.style.display = 'none';
     valInput.value = opValue === '= true' ? 'true' : opValue === '= false' ? 'false' : '';
@@ -400,7 +403,7 @@ function _serializeGroup(groupEl) {
       const field = child.querySelector('.adv-field-select').value;
       const opRaw = child.querySelector('.adv-op-select').value;
       const valInput = child.querySelector('.adv-value-input');
-      if (_FLAG_FIELD_SET.has(field)) {
+      if (_getFlagFieldSet().has(field)) {
         // Flag field: op encodes the boolean, serialize as op="=" value="true"/"false"
         if (opRaw === '') continue; // no selection yet
         const value = opRaw === '= true' ? 'true' : 'false';

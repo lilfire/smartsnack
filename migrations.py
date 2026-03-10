@@ -22,6 +22,20 @@ MIGRATIONS = [
             )""",
         ],
     ),
+    (
+        "003_flag_definitions_table",
+        [
+            """CREATE TABLE IF NOT EXISTS flag_definitions (
+                name TEXT PRIMARY KEY,
+                type TEXT NOT NULL CHECK(type IN ('user', 'system')),
+                label_key TEXT NOT NULL
+            )""",
+            "INSERT OR IGNORE INTO flag_definitions (name, type, label_key) "
+            "VALUES ('is_discontinued', 'user', 'flag_is_discontinued')",
+            "INSERT OR IGNORE INTO flag_definitions (name, type, label_key) "
+            "VALUES ('is_synced_with_off', 'system', 'flag_is_synced_with_off')",
+        ],
+    ),
 ]
 
 
