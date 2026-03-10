@@ -21,7 +21,7 @@ NUTRITION_FIELDS = (
     "fat", "saturated_fat", "protein", "fiber", "salt",
     "volume", "price", "weight", "portion",
 )
-ALL_PRODUCT_FIELDS = ("taste_score", "est_pdcaas", "est_diaas", "type", "name", "ean", "brand", "stores", "ingredients") + NUTRITION_FIELDS
+ALL_PRODUCT_FIELDS = ("taste_score", "est_pdcaas", "est_diaas", "type", "name", "ean", "brand", "stores", "ingredients", "taste_note") + NUTRITION_FIELDS
 
 # Whitelist of valid column names for dynamic SQL construction
 _VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
@@ -29,7 +29,7 @@ _VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
 # Maximum lengths for text fields
 _TEXT_FIELD_LIMITS = {
     "type": 100, "name": 200, "ean": 50, "brand": 200,
-    "stores": 500, "ingredients": 10000,
+    "stores": 500, "ingredients": 10000, "taste_note": 2000,
 }
 
 _MAX_CATEGORY_NAME_LEN = 100
@@ -149,11 +149,11 @@ DEFAULT_WEIGHTS = {
 
 # ── SQL helpers ───────────────────────────────────────
 PRODUCT_COLS_NO_IMAGE = (
-    "id, type, name, ean, brand, stores, ingredients, taste_score, kcal, energy_kj, carbs, sugar, "
+    "id, type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "
     "fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas, "
     "CASE WHEN image != '' THEN 1 ELSE 0 END AS has_image"
 )
 
-INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
+INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
 INSERT_PLACEHOLDERS = ",".join(["?"] * len(INSERT_FIELDS.split(",")))
 INSERT_WITH_IMAGE_SQL = f"INSERT INTO products ({INSERT_FIELDS}, image) VALUES ({INSERT_PLACEHOLDERS}, ?)"
