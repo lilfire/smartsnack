@@ -105,7 +105,8 @@ SCORE_CONFIG_MAP = {c["field"]: c for c in SCORE_CONFIG}
 ADVANCED_FILTER_OPS = {"=": "=", "!=": "!=", "<": "<", ">": ">", "<=": "<=", ">=": ">=", "contains": "LIKE"}
 TEXT_FIELDS = frozenset(_TEXT_FIELD_LIMITS.keys())  # type, name, ean, brand, stores, ingredients
 NUMERIC_FIELDS = frozenset(NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas"))
-FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS
+POST_QUERY_FIELDS = frozenset(("total_score",))
+FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS
 
 COMPUTED_FIELDS = {
     "pct_protein_cal": lambda p: (

@@ -9,7 +9,7 @@ from config import (
     PRODUCT_COLS_NO_IMAGE, INSERT_FIELDS, INSERT_PLACEHOLDERS,
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
     SCORE_CONFIG_MAP, COMPUTED_FIELDS,
-    ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS,
+    ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS, POST_QUERY_FIELDS,
 )
 from helpers import _num, _safe_float
 
@@ -118,8 +118,11 @@ def _score_product(
     p["missing_fields"] = missing_fields
 
 
-def _parse_advanced_filters(filters_json: str) -> tuple[str, list]:
-    """Parse advanced filter JSON and return (sql_fragment, params).
+def _parse_advanced_filters(filters_json: str) -> tuple[str, list, list]:
+    """Parse advanced filter JSON and return (sql_fragment, params, post_filters).
+
+    post_filters is a list of (field, op, value, logic) for computed fields
+    that can't be filtered in SQL.
 
     Expected format:
       {"logic": "and"|"or", "conditions": [{"field": ..., "op": ..., "value": ...}, ...]}
@@ -142,7 +145,7 @@ def _parse_advanced_filters(filters_json: str) -> tuple[str, list]:
     if len(conditions) > 20:
         raise ValueError("Too many filter conditions (max 20)")
 
-    fragments, params = [], []
+    fragments, params, post_filters = [], [], []
     for c in conditions:
         field = c.get("field", "")
         op = c.get("op", "")
@@ -158,7 +161,17 @@ def _parse_advanced_filters(filters_json: str) -> tuple[str, list]:
         value = str(value).strip()
         sql_op = ADVANCED_FILTER_OPS[op]
 
-        if field in TEXT_FIELDS:
+        if field in POST_QUERY_FIELDS:
+            if op == "contains":
+                raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
+            try:
+                num_val = float(value)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid numeric value for {field}") from e
+            if not math.isfinite(num_val):
+                raise ValueError(f"Non-finite value for {field}")
+            post_filters.append((field, op, num_val, logic))
+        elif field in TEXT_FIELDS:
             if op == "contains":
                 escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
                 fragments.append(f"LOWER({field}) LIKE ? ESCAPE '\\'")
@@ -182,7 +195,39 @@ def _parse_advanced_filters(filters_json: str) -> tuple[str, list]:
             params.append(num_val)
 
     combined = f" {logic} ".join(f"({f})" for f in fragments)
-    return f"({combined})", params
+    sql = f"({combined})" if combined else ""
+    return sql, params, post_filters
+
+
+_OP_FNS = {
+    "=": lambda a, b: a == b,
+    "!=": lambda a, b: a != b,
+    "<": lambda a, b: a < b,
+    ">": lambda a, b: a > b,
+    "<=": lambda a, b: a <= b,
+    ">=": lambda a, b: a >= b,
+}
+
+
+def _apply_post_filters(results: list, post_filters: list) -> list:
+    """Filter results in Python for computed fields like total_score."""
+    if not post_filters:
+        return results
+    logic = post_filters[0][3]  # all share the same logic
+    filtered = []
+    for p in results:
+        checks = []
+        for field, op, value, _ in post_filters:
+            pval = p.get(field)
+            if pval is None:
+                checks.append(False)
+            else:
+                checks.append(_OP_FNS[op](float(pval), value))
+        if logic == "AND" and all(checks):
+            filtered.append(p)
+        elif logic == "OR" and any(checks):
+            filtered.append(p)
+    return filtered
 
 
 def list_products(search: str | None, type_filter: str | None, advanced_filters: str | None = None) -> list:
@@ -207,10 +252,12 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
             placeholders = ",".join("?" * len(types))
             conditions.append(f"type IN ({placeholders})")
             params.extend(types)
+    post_filters = []
     if advanced_filters:
-        af_sql, af_params = _parse_advanced_filters(advanced_filters)
-        conditions.append(af_sql)
-        params.extend(af_params)
+        af_sql, af_params, post_filters = _parse_advanced_filters(advanced_filters)
+        if af_sql:
+            conditions.append(af_sql)
+            params.extend(af_params)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = cur.execute(
@@ -228,6 +275,7 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
         )
         results.append(p)
 
+    results = _apply_post_filters(results, post_filters)
     results.sort(key=lambda x: x["total_score"], reverse=True)
     return results
 

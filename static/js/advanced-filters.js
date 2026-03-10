@@ -28,6 +28,7 @@ const NUMERIC_FIELDS = [
   ['taste_score', 'adv_field_taste_score'],
   ['est_pdcaas', 'adv_field_est_pdcaas'],
   ['est_diaas', 'adv_field_est_diaas'],
+  ['total_score', 'adv_field_total_score'],
 ];
 
 const TEXT_OPS = [

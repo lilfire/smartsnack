@@ -579,6 +579,7 @@
     "adv_field_taste_score": "Smak",
     "adv_field_est_pdcaas": "PDCAAS",
     "adv_field_est_diaas": "DIAAS",
+    "adv_field_total_score": "Total poäng",
     "adv_op_eq": "lika med",
     "adv_op_neq": "inte lika",
     "adv_op_lt": "mindre än",

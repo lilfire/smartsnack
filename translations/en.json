@@ -579,6 +579,7 @@
     "adv_field_taste_score": "Taste",
     "adv_field_est_pdcaas": "PDCAAS",
     "adv_field_est_diaas": "DIAAS",
+    "adv_field_total_score": "Total score",
     "adv_op_eq": "equals",
     "adv_op_neq": "not equal",
     "adv_op_lt": "less than",
