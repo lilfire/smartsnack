@@ -589,5 +589,8 @@
     "adv_op_contains": "innehåller",
     "adv_group_text": "Text",
     "adv_group_nutrition": "Näring",
-    "adv_placeholder_value": "Värde..."
+    "adv_placeholder_value": "Värde...",
+    "adv_add_condition": "+ Lägg till villkor",
+    "adv_add_group": "+ Lägg till grupp",
+    "adv_remove_group": "Ta bort grupp"
 }

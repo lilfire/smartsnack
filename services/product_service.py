@@ -118,14 +118,75 @@ def _score_product(
     p["missing_fields"] = missing_fields
 
 
-def _parse_advanced_filters(filters_json: str) -> tuple[str, list, list]:
-    """Parse advanced filter JSON and return (sql_fragment, params, post_filters).
+def _parse_condition(c: dict) -> tuple:
+    """Parse and validate a single filter condition.
 
-    post_filters is a list of (field, op, value, logic) for computed fields
-    that can't be filtered in SQL.
+    Returns (field, op, value_str, sql_op) after validation.
+    """
+    field = c.get("field", "")
+    op = c.get("op", "")
+    value = c.get("value", "")
 
-    Expected format:
-      {"logic": "and"|"or", "conditions": [{"field": ..., "op": ..., "value": ...}, ...]}
+    if field not in FILTERABLE_FIELDS:
+        raise ValueError(f"Invalid filter field: {field}")
+    if op not in ADVANCED_FILTER_OPS:
+        raise ValueError(f"Invalid filter operator: {op}")
+    if value is None or str(value).strip() == "":
+        raise ValueError(f"Filter value required for {field}")
+
+    return field, op, str(value).strip(), ADVANCED_FILTER_OPS[op]
+
+
+def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
+    """Convert a validated condition to a SQL fragment and param.
+
+    Returns (sql_fragment, param).
+    """
+    if field in TEXT_FIELDS:
+        if op == "contains":
+            escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            return f"LOWER({field}) LIKE ? ESCAPE '\\'", f"%{escaped.lower()}%"
+        elif op in ("=", "!="):
+            return f"LOWER({field}) {sql_op} LOWER(?)", value
+        else:
+            raise ValueError(f"Operator '{op}' not valid for text field '{field}'")
+    else:
+        if op == "contains":
+            raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
+        try:
+            num_val = float(value)
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid numeric value for {field}") from e
+        if not math.isfinite(num_val):
+            raise ValueError(f"Non-finite value for {field}")
+        return f"{field} {sql_op} ?", num_val
+
+
+def _condition_to_post(field: str, op: str, value: str) -> tuple:
+    """Convert a validated condition to a post-filter tuple.
+
+    Returns (field, op, num_val).
+    """
+    if op == "contains":
+        raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
+    try:
+        num_val = float(value)
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"Invalid numeric value for {field}") from e
+    if not math.isfinite(num_val):
+        raise ValueError(f"Non-finite value for {field}")
+    return field, op, num_val
+
+
+def _parse_advanced_filters(filters_json: str) -> tuple[str, list, dict | None]:
+    """Parse advanced filter JSON and return (sql_fragment, params, post_filter_spec).
+
+    Supports two formats:
+      Legacy flat:   {"logic": "and"|"or", "conditions": [...]}
+      Grouped:       {"logic": "and"|"or", "groups": [{"logic": ..., "conditions": [...]}, ...]}
+
+    post_filter_spec is None or a dict:
+      {"top_logic": "AND", "groups": [{"logic": "OR", "filters": [(field,op,val), ...]}]}
     """
     try:
         data = json.loads(filters_json)
@@ -135,68 +196,88 @@ def _parse_advanced_filters(filters_json: str) -> tuple[str, list, list]:
     if not isinstance(data, dict):
         raise ValueError("Filters must be a JSON object")
 
-    logic = data.get("logic", "and").upper()
-    if logic not in ("AND", "OR"):
+    top_logic = data.get("logic", "and").upper()
+    if top_logic not in ("AND", "OR"):
         raise ValueError("logic must be 'and' or 'or'")
 
-    conditions = data.get("conditions")
-    if not isinstance(conditions, list) or not conditions:
-        raise ValueError("conditions must be a non-empty list")
-    if len(conditions) > 20:
+    # Normalise legacy flat format to grouped format
+    if "conditions" in data and "groups" not in data:
+        groups_raw = [{"logic": data.get("logic", "and"), "conditions": data["conditions"]}]
+    else:
+        groups_raw = data.get("groups")
+
+    if not isinstance(groups_raw, list) or not groups_raw:
+        raise ValueError("groups must be a non-empty list")
+
+    # Count total conditions across all groups
+    total_conditions = sum(
+        len(g.get("conditions", [])) if isinstance(g, dict) else 0
+        for g in groups_raw
+    )
+    if total_conditions > 20:
         raise ValueError("Too many filter conditions (max 20)")
 
-    fragments, params, post_filters = [], [], []
-    for c in conditions:
-        field = c.get("field", "")
-        op = c.get("op", "")
-        value = c.get("value", "")
+    all_group_sqls = []
+    all_params = []
+    post_groups = []
 
-        if field not in FILTERABLE_FIELDS:
-            raise ValueError(f"Invalid filter field: {field}")
-        if op not in ADVANCED_FILTER_OPS:
-            raise ValueError(f"Invalid filter operator: {op}")
-        if value is None or str(value).strip() == "":
-            raise ValueError(f"Filter value required for {field}")
+    for g in groups_raw:
+        if not isinstance(g, dict):
+            raise ValueError("Each group must be a JSON object")
+        group_logic = g.get("logic", "and").upper()
+        if group_logic not in ("AND", "OR"):
+            raise ValueError("Group logic must be 'and' or 'or'")
 
-        value = str(value).strip()
-        sql_op = ADVANCED_FILTER_OPS[op]
+        conditions = g.get("conditions")
+        if not isinstance(conditions, list) or not conditions:
+            continue  # skip empty groups
 
-        if field in POST_QUERY_FIELDS:
-            if op == "contains":
-                raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
-            try:
-                num_val = float(value)
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"Invalid numeric value for {field}") from e
-            if not math.isfinite(num_val):
-                raise ValueError(f"Non-finite value for {field}")
-            post_filters.append((field, op, num_val, logic))
-        elif field in TEXT_FIELDS:
-            if op == "contains":
-                escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-                fragments.append(f"LOWER({field}) LIKE ? ESCAPE '\\'")
-                params.append(f"%{escaped.lower()}%")
-            elif op in ("=", "!="):
-                fragments.append(f"LOWER({field}) {sql_op} LOWER(?)")
-                params.append(value)
-            else:
-                raise ValueError(f"Operator '{op}' not valid for text field '{field}'")
+        # Parse all conditions in this group
+        parsed = [_parse_condition(c) for c in conditions]
+
+        # Separate SQL-filterable vs post-query conditions
+        sql_conds = [(f, o, v, so) for f, o, v, so in parsed if f not in POST_QUERY_FIELDS]
+        post_conds = [(f, o, v, so) for f, o, v, so in parsed if f in POST_QUERY_FIELDS]
+
+        # If group uses OR and has both SQL and post-query conditions,
+        # we can't partially evaluate in SQL — move everything to post-filtering
+        if group_logic == "OR" and sql_conds and post_conds:
+            post_filters = []
+            for field, op, value, sql_op in sql_conds:
+                post_filters.append(_condition_to_post(field, op, value))
+            for field, op, value, _sql_op in post_conds:
+                post_filters.append(_condition_to_post(field, op, value))
+            post_groups.append({"logic": group_logic, "filters": post_filters})
         else:
-            # Numeric field
-            if op == "contains":
-                raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
-            try:
-                num_val = float(value)
-            except (ValueError, TypeError) as e:
-                raise ValueError(f"Invalid numeric value for {field}") from e
-            if not math.isfinite(num_val):
-                raise ValueError(f"Non-finite value for {field}")
-            fragments.append(f"{field} {sql_op} ?")
-            params.append(num_val)
+            # Build SQL for this group's SQL-filterable conditions
+            if sql_conds:
+                group_fragments = []
+                for field, op, value, sql_op in sql_conds:
+                    frag, param = _condition_to_sql(field, op, value, sql_op)
+                    group_fragments.append(f"({frag})")
+                    all_params.append(param)
+                group_sql = f" {group_logic} ".join(group_fragments)
+                all_group_sqls.append(f"({group_sql})")
 
-    combined = f" {logic} ".join(f"({f})" for f in fragments)
-    sql = f"({combined})" if combined else ""
-    return sql, params, post_filters
+            # Collect post-query conditions for this group
+            if post_conds:
+                post_filters = []
+                for field, op, value, _sql_op in post_conds:
+                    post_filters.append(_condition_to_post(field, op, value))
+                post_groups.append({"logic": group_logic, "filters": post_filters})
+
+    # Combine group SQL fragments with top-level logic
+    if all_group_sqls:
+        sql = f" {top_logic} ".join(all_group_sqls)
+        sql = f"({sql})" if len(all_group_sqls) > 1 else all_group_sqls[0]
+    else:
+        sql = ""
+
+    post_filter_spec = None
+    if post_groups:
+        post_filter_spec = {"top_logic": top_logic, "groups": post_groups}
+
+    return sql, all_params, post_filter_spec
 
 
 _OP_FNS = {
@@ -209,23 +290,35 @@ _OP_FNS = {
 }
 
 
-def _apply_post_filters(results: list, post_filters: list) -> list:
-    """Filter results in Python for computed fields like total_score."""
-    if not post_filters:
+def _apply_post_filters(results: list, post_filter_spec: dict | None) -> list:
+    """Filter results in Python for computed fields like total_score.
+
+    post_filter_spec format:
+      {"top_logic": "AND", "groups": [{"logic": "OR", "filters": [(field,op,val), ...]}, ...]}
+    """
+    if not post_filter_spec:
         return results
-    logic = post_filters[0][3]  # all share the same logic
+    top_logic = post_filter_spec["top_logic"]
+    groups = post_filter_spec["groups"]
     filtered = []
     for p in results:
-        checks = []
-        for field, op, value, _ in post_filters:
-            pval = p.get(field)
-            if pval is None:
-                checks.append(False)
+        group_results = []
+        for g in groups:
+            g_logic = g["logic"]
+            checks = []
+            for field, op, value in g["filters"]:
+                pval = p.get(field)
+                if pval is None:
+                    checks.append(False)
+                else:
+                    checks.append(_OP_FNS[op](float(pval), value))
+            if g_logic == "AND":
+                group_results.append(all(checks))
             else:
-                checks.append(_OP_FNS[op](float(pval), value))
-        if logic == "AND" and all(checks):
+                group_results.append(any(checks))
+        if top_logic == "AND" and all(group_results):
             filtered.append(p)
-        elif logic == "OR" and any(checks):
+        elif top_logic == "OR" and any(group_results):
             filtered.append(p)
     return filtered
 
@@ -252,9 +345,9 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
             placeholders = ",".join("?" * len(types))
             conditions.append(f"type IN ({placeholders})")
             params.extend(types)
-    post_filters = []
+    post_filter_spec = None
     if advanced_filters:
-        af_sql, af_params, post_filters = _parse_advanced_filters(advanced_filters)
+        af_sql, af_params, post_filter_spec = _parse_advanced_filters(advanced_filters)
         if af_sql:
             conditions.append(af_sql)
             params.extend(af_params)
@@ -275,7 +368,7 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
         )
         results.append(p)
 
-    results = _apply_post_filters(results, post_filters)
+    results = _apply_post_filters(results, post_filter_spec)
     results.sort(key=lambda x: x["total_score"], reverse=True)
     return results
 

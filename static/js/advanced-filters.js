@@ -1,8 +1,8 @@
-// ── Advanced Filters ─────────────────────────────────
+// ── Advanced Filters (Grouped) ─────────────────────────
 import { state, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
-// Field definitions: [field_key, i18n_key, type]
+// Field definitions: [field_key, i18n_key]
 const TEXT_FIELDS = [
   ['name', 'adv_field_name'],
   ['brand', 'adv_field_brand'],
@@ -56,13 +56,12 @@ export function toggleAdvancedFilters() {
   if (visible) {
     panel.style.display = 'none';
     toggle.classList.remove('has-filter');
-    // Clear filters and reload
     state.advancedFilters = null;
     _triggerReload();
   } else {
     panel.style.display = '';
     toggle.classList.add('has-filter');
-    if (!panel.querySelector('.adv-row')) {
+    if (!panel.querySelector('.adv-group')) {
       _buildPanel(panel);
     }
   }
@@ -71,36 +70,98 @@ export function toggleAdvancedFilters() {
 function _buildPanel(panel) {
   panel.innerHTML = '';
 
-  // Logic toggle (AND/OR)
-  const logicWrap = document.createElement('div');
-  logicWrap.className = 'adv-logic-wrap';
-  const logicBtn = document.createElement('button');
-  logicBtn.className = 'adv-logic-btn';
-  logicBtn.textContent = t('adv_logic_and');
-  logicBtn.dataset.logic = 'and';
-  logicBtn.addEventListener('click', () => {
-    const next = logicBtn.dataset.logic === 'and' ? 'or' : 'and';
-    logicBtn.dataset.logic = next;
-    logicBtn.textContent = t(next === 'and' ? 'adv_logic_and' : 'adv_logic_or');
+  // Top-level logic toggle (between groups) — hidden when only 1 group
+  const topLogicWrap = document.createElement('div');
+  topLogicWrap.className = 'adv-logic-wrap';
+  topLogicWrap.style.display = 'none';
+  const topLogicBtn = document.createElement('button');
+  topLogicBtn.className = 'adv-logic-btn adv-top-logic-btn';
+  topLogicBtn.textContent = t('adv_logic_and');
+  topLogicBtn.dataset.logic = 'and';
+  topLogicBtn.addEventListener('click', () => {
+    const next = topLogicBtn.dataset.logic === 'and' ? 'or' : 'and';
+    topLogicBtn.dataset.logic = next;
+    topLogicBtn.textContent = t(next === 'and' ? 'adv_logic_and' : 'adv_logic_or');
     _onFilterChange();
   });
-  logicWrap.appendChild(logicBtn);
-  panel.appendChild(logicWrap);
+  topLogicWrap.appendChild(topLogicBtn);
+  panel.appendChild(topLogicWrap);
 
-  // Rows container
+  // Groups container
+  const groupsDiv = document.createElement('div');
+  groupsDiv.id = 'adv-groups';
+  panel.appendChild(groupsDiv);
+
+  // Add first group
+  _addGroup(groupsDiv);
+
+  // Add group button
+  const addGroupBtn = document.createElement('button');
+  addGroupBtn.className = 'adv-add-btn';
+  addGroupBtn.textContent = t('adv_add_group');
+  addGroupBtn.addEventListener('click', () => {
+    _addGroup(groupsDiv);
+    _updateVisibility();
+    _onFilterChange();
+  });
+  panel.appendChild(addGroupBtn);
+}
+
+function _addGroup(container) {
+  const group = document.createElement('div');
+  group.className = 'adv-group';
+
+  // Group header: logic toggle + remove button
+  const header = document.createElement('div');
+  header.className = 'adv-group-header';
+
+  const groupLogicBtn = document.createElement('button');
+  groupLogicBtn.className = 'adv-logic-btn adv-group-logic-btn';
+  groupLogicBtn.textContent = t('adv_logic_and');
+  groupLogicBtn.dataset.logic = 'and';
+  groupLogicBtn.style.visibility = 'hidden'; // hidden until 2+ conditions
+  groupLogicBtn.addEventListener('click', () => {
+    const next = groupLogicBtn.dataset.logic === 'and' ? 'or' : 'and';
+    groupLogicBtn.dataset.logic = next;
+    groupLogicBtn.textContent = t(next === 'and' ? 'adv_logic_and' : 'adv_logic_or');
+    _onFilterChange();
+  });
+  header.appendChild(groupLogicBtn);
+
+  const removeGroupBtn = document.createElement('button');
+  removeGroupBtn.className = 'adv-group-remove-btn';
+  removeGroupBtn.textContent = '\u00D7';
+  removeGroupBtn.title = t('adv_remove_group');
+  removeGroupBtn.addEventListener('click', () => {
+    group.remove();
+    _updateVisibility();
+    _onFilterChange();
+  });
+  header.appendChild(removeGroupBtn);
+
+  group.appendChild(header);
+
+  // Rows container within group
   const rowsDiv = document.createElement('div');
-  rowsDiv.id = 'adv-rows';
-  panel.appendChild(rowsDiv);
+  rowsDiv.className = 'adv-group-rows';
+  group.appendChild(rowsDiv);
 
-  // Add first row
+  // Add first condition row
   _addRow(rowsDiv);
 
-  // Add filter button
-  const addBtn = document.createElement('button');
-  addBtn.className = 'adv-add-btn';
-  addBtn.textContent = t('adv_add_filter');
-  addBtn.addEventListener('click', () => { _addRow(rowsDiv); });
-  panel.appendChild(addBtn);
+  // Add condition button within group
+  const addCondBtn = document.createElement('button');
+  addCondBtn.className = 'adv-add-condition-btn';
+  addCondBtn.textContent = t('adv_add_condition');
+  addCondBtn.addEventListener('click', () => {
+    _addRow(rowsDiv);
+    _updateVisibility();
+  });
+  group.appendChild(addCondBtn);
+
+  // Insert before the "between groups" logic separator if needed
+  container.appendChild(group);
+  _updateVisibility();
 }
 
 function _addRow(container) {
@@ -150,7 +211,20 @@ function _addRow(container) {
   removeBtn.textContent = '\u00D7';
   removeBtn.title = t('adv_remove_filter');
   removeBtn.addEventListener('click', () => {
+    const groupRows = container;
     row.remove();
+    // If group has no rows left, remove the group (unless it's the only one)
+    if (groupRows.querySelectorAll('.adv-row').length === 0) {
+      const groupEl = groupRows.closest('.adv-group');
+      const allGroups = document.querySelectorAll('#adv-groups .adv-group');
+      if (allGroups.length > 1) {
+        groupEl.remove();
+      } else {
+        // Last group — add back an empty row
+        _addRow(groupRows);
+      }
+    }
+    _updateVisibility();
     _onFilterChange();
   });
   row.appendChild(removeBtn);
@@ -195,23 +269,56 @@ function _updateOps(opSel, fieldValue) {
   }
 }
 
-function _onFilterChange() {
-  const rows = document.querySelectorAll('#adv-rows .adv-row');
-  const logicBtn = document.querySelector('.adv-logic-btn');
-  const logic = logicBtn ? logicBtn.dataset.logic : 'and';
+function _updateVisibility() {
+  // Top-level logic toggle: visible only when 2+ groups
+  const topLogicWrap = document.querySelector('.adv-logic-wrap');
+  const groupCount = document.querySelectorAll('#adv-groups .adv-group').length;
+  if (topLogicWrap) {
+    topLogicWrap.style.display = groupCount >= 2 ? '' : 'none';
+  }
 
-  const conditions = [];
-  rows.forEach(row => {
-    const field = row.querySelector('.adv-field-select').value;
-    const op = row.querySelector('.adv-op-select').value;
-    const value = row.querySelector('.adv-value-input').value.trim();
-    if (field && op && value !== '') {
-      conditions.push({ field, op, value });
+  // Group remove buttons: only visible when 2+ groups
+  document.querySelectorAll('.adv-group-remove-btn').forEach(btn => {
+    btn.style.display = groupCount >= 2 ? '' : 'none';
+  });
+
+  // Group-level logic toggles: visible only when group has 2+ conditions
+  document.querySelectorAll('#adv-groups .adv-group').forEach(group => {
+    const logicBtn = group.querySelector('.adv-group-logic-btn');
+    const rowCount = group.querySelectorAll('.adv-row').length;
+    if (logicBtn) {
+      logicBtn.style.visibility = rowCount >= 2 ? 'visible' : 'hidden';
+    }
+  });
+}
+
+function _onFilterChange() {
+  const topLogicBtn = document.querySelector('.adv-top-logic-btn');
+  const topLogic = topLogicBtn ? topLogicBtn.dataset.logic : 'and';
+
+  const groupEls = document.querySelectorAll('#adv-groups .adv-group');
+  const groups = [];
+
+  groupEls.forEach(groupEl => {
+    const groupLogicBtn = groupEl.querySelector('.adv-group-logic-btn');
+    const groupLogic = groupLogicBtn ? groupLogicBtn.dataset.logic : 'and';
+    const rows = groupEl.querySelectorAll('.adv-row');
+    const conditions = [];
+    rows.forEach(row => {
+      const field = row.querySelector('.adv-field-select').value;
+      const op = row.querySelector('.adv-op-select').value;
+      const value = row.querySelector('.adv-value-input').value.trim();
+      if (field && op && value !== '') {
+        conditions.push({ field, op, value });
+      }
+    });
+    if (conditions.length > 0) {
+      groups.push({ logic: groupLogic, conditions });
     }
   });
 
-  if (conditions.length > 0) {
-    state.advancedFilters = JSON.stringify({ logic, conditions });
+  if (groups.length > 0) {
+    state.advancedFilters = JSON.stringify({ logic: topLogic, groups });
   } else {
     state.advancedFilters = null;
   }
