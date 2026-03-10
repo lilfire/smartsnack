@@ -2,6 +2,7 @@
 
 import base64
 import io
+import json
 import logging
 import re
 import time
@@ -227,6 +228,96 @@ def refresh_from_off():
         "errors": len(errors),
         "error_details": errors[:10],  # Limit detail output
     }
+
+
+def refresh_from_off_stream():
+    """Generator that yields SSE JSON events while refreshing products from OFF."""
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
+        "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
+        "weight, portion "
+        "FROM products WHERE ean IS NOT NULL AND ean != ''"
+    ).fetchall()
+
+    total = len(rows)
+    updated = 0
+    skipped = 0
+    errors = []
+
+    yield json.dumps({"type": "start", "total": total})
+
+    for i, row in enumerate(rows):
+        ean = row["ean"]
+        pid = row["id"]
+        name = row["name"] or ""
+
+        yield json.dumps({
+            "type": "progress", "current": i + 1, "total": total,
+            "ean": ean, "name": name, "status": "fetching",
+        })
+
+        try:
+            data = proxy_service.off_product(ean)
+            if not data.get("product"):
+                skipped += 1
+                yield json.dumps({
+                    "type": "progress", "current": i + 1, "total": total,
+                    "ean": ean, "name": name, "status": "skipped",
+                })
+                time.sleep(0.5)
+                continue
+
+            product = data["product"]
+            local = dict(row)
+            field_updates = _map_off_product(product, local)
+            image_uri = _fetch_off_image(product)
+
+            if not field_updates and not image_uri:
+                skipped += 1
+                yield json.dumps({
+                    "type": "progress", "current": i + 1, "total": total,
+                    "ean": ean, "name": name, "status": "skipped",
+                })
+                time.sleep(0.5)
+                continue
+
+            if field_updates:
+                set_clauses = [f"{f} = ?" for f in field_updates]
+                vals = list(field_updates.values()) + [pid]
+                conn.execute(
+                    f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
+                    vals,
+                )
+
+            if image_uri:
+                conn.execute(
+                    "UPDATE products SET image = ? WHERE id = ?",
+                    (image_uri, pid),
+                )
+
+            conn.commit()
+            updated += 1
+
+            yield json.dumps({
+                "type": "progress", "current": i + 1, "total": total,
+                "ean": ean, "name": name, "status": "updated",
+            })
+
+        except Exception as e:
+            logger.error("Error refreshing product %s (EAN %s): %s", pid, ean, e)
+            errors.append({"id": pid, "ean": ean, "error": str(e)})
+            yield json.dumps({
+                "type": "progress", "current": i + 1, "total": total,
+                "ean": ean, "name": name, "status": "error",
+            })
+
+        time.sleep(0.5)
+
+    yield json.dumps({
+        "type": "done", "total": total, "updated": updated,
+        "skipped": skipped, "errors": len(errors),
+    })
 
 
 def estimate_all_pq():

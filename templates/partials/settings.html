@@ -102,7 +102,12 @@
               </div>
               <hr style="border-color:rgba(255,255,255,0.08);margin:16px 0 12px">
               <button class="btn-register" id="btn-refresh-all-off" onclick="refreshAllFromOff()" data-i18n="btn_refresh_all_off">&#128260; Refresh all products from OFF</button>
-              <p id="refresh-off-status" class="form-sub" style="margin-top:6px;display:none"></p>
+              <div id="refresh-off-progress" style="display:none;margin-top:10px">
+                <div class="progress-bar-track">
+                  <div class="progress-bar-fill" id="refresh-off-bar"></div>
+                </div>
+                <p id="refresh-off-status" class="form-sub" style="margin-top:6px"></p>
+              </div>
             </div>
           </div>
           <!-- Database -->

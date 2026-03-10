@@ -626,5 +626,6 @@
     "bulk_refresh_off_title": "Refresh from Open Food Facts",
     "bulk_refresh_off_confirm": "This will re-fetch data from Open Food Facts for all products with an EAN barcode. Existing values will be updated (empty OFF values will not overwrite local data). Continue?",
     "bulk_refresh_off_result": "{total} products checked — {updated} updated, {skipped} skipped, {errors} errors",
+    "bulk_refresh_off_progress": "Refreshing {current} of {total}: {name}",
     "bulk_estimate_pq_result": "{total} products checked — {updated} estimated, {skipped} skipped (no match)"
 }
