@@ -102,6 +102,7 @@ def _restore_product(cur, p, valid_flags=None):
         INSERT_WITH_IMAGE_SQL,
         (p.get("type",""), p.get("name",""), p.get("ean",""),
          p.get("brand",""), p.get("stores",""), p.get("ingredients",""),
+         p.get("taste_note", ""),
          _opt_float(p.get("taste_score")), _opt_float(p.get("kcal")), _opt_float(p.get("energy_kj")),
          _opt_float(p.get("carbs")), _opt_float(p.get("sugar")), _opt_float(p.get("fat")),
          _opt_float(p.get("saturated_fat")), _opt_float(p.get("protein")), _opt_float(p.get("fiber")),
