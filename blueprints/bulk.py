@@ -3,7 +3,7 @@
 import json
 import time
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, jsonify, request
 
 from services import bulk_service
 
@@ -21,7 +21,13 @@ def refresh_off():
 
 @bp.route("/api/bulk/refresh-off/start", methods=["POST"])
 def refresh_off_start():
-    started = bulk_service.start_refresh_from_off()
+    data = request.get_json(silent=True) or {}
+    options = {
+        "search_missing": bool(data.get("search_missing", False)),
+        "min_certainty": min(100, max(0, int(data.get("min_certainty", 50)))),
+        "min_completeness": min(100, max(0, int(data.get("min_completeness", 50)))),
+    }
+    started = bulk_service.start_refresh_from_off(options)
     if not started:
         return jsonify({"error": "already_running"}), 409
     return jsonify({"ok": True})

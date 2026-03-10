@@ -254,7 +254,7 @@ def get_refresh_status():
         return dict(_refresh_job)
 
 
-def start_refresh_from_off():
+def start_refresh_from_off(options=None):
     """Start refresh in a background thread. Returns False if already running."""
     with _refresh_lock:
         if _refresh_job["running"]:
@@ -263,12 +263,12 @@ def start_refresh_from_off():
             running=True, current=0, total=0, name="", ean="",
             status="", updated=0, skipped=0, errors=0, done=False,
         )
-    t = threading.Thread(target=_run_refresh, daemon=True)
+    t = threading.Thread(target=_run_refresh, args=(options or {},), daemon=True)
     t.start()
     return True
 
 
-def _run_refresh():
+def _run_refresh(options=None):
     """Background thread that refreshes all products from OFF."""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -348,6 +348,104 @@ def _run_refresh():
                     _refresh_job.update(status="error", errors=errors)
 
             time.sleep(0.5)
+
+        # Phase 2: Search by name for products without EAN
+        if options and options.get("search_missing"):
+            min_certainty = options.get("min_certainty", 50)
+            min_completeness = options.get("min_completeness", 50)
+
+            missing_rows = conn.execute(
+                "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
+                "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
+                "weight, portion "
+                "FROM products WHERE (ean IS NULL OR ean = '') "
+                "AND name IS NOT NULL AND name != ''"
+            ).fetchall()
+
+            phase2_total = len(missing_rows)
+            with _refresh_lock:
+                _refresh_job["total"] = total + phase2_total
+
+            for i, row in enumerate(missing_rows):
+                pid = row["id"]
+                name = row["name"] or ""
+
+                with _refresh_lock:
+                    _refresh_job.update(
+                        current=total + i + 1, ean="", name=name,
+                        status="searching",
+                    )
+
+                try:
+                    nutrition = {}
+                    for field in ("kcal", "fat", "saturated_fat", "carbs",
+                                  "sugar", "protein", "fiber", "salt"):
+                        val = row[field]
+                        if val is not None:
+                            nutrition[field] = float(val)
+
+                    result = proxy_service.off_search(
+                        name, nutrition if nutrition else None
+                    )
+                    products = result.get("products") or []
+
+                    best = None
+                    for p in products:
+                        cert = p.get("certainty", 0)
+                        comp = float(p.get("completeness") or 0) * 100
+                        if cert >= min_certainty and comp >= min_completeness:
+                            best = p
+                            break  # sorted by certainty desc
+
+                    if not best:
+                        skipped += 1
+                        with _refresh_lock:
+                            _refresh_job.update(status="skipped", skipped=skipped)
+                        time.sleep(1.0)
+                        continue
+
+                    local = dict(row)
+                    field_updates = _map_off_product(best, local)
+                    image_uri = _fetch_off_image(best)
+
+                    # Store matched EAN for future lookups
+                    matched_ean = best.get("code", "")
+                    if matched_ean:
+                        field_updates["ean"] = matched_ean
+
+                    if not field_updates and not image_uri:
+                        skipped += 1
+                        with _refresh_lock:
+                            _refresh_job.update(status="skipped", skipped=skipped)
+                        time.sleep(1.0)
+                        continue
+
+                    if field_updates:
+                        set_clauses = [f"{f} = ?" for f in field_updates]
+                        vals = list(field_updates.values()) + [pid]
+                        conn.execute(
+                            f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
+                            vals,
+                        )
+
+                    if image_uri:
+                        conn.execute(
+                            "UPDATE products SET image = ? WHERE id = ?",
+                            (image_uri, pid),
+                        )
+
+                    conn.commit()
+                    updated += 1
+                    with _refresh_lock:
+                        _refresh_job.update(status="updated", updated=updated)
+
+                except Exception as e:
+                    logger.error("Error searching product %s (%s): %s", pid, name, e)
+                    errors += 1
+                    with _refresh_lock:
+                        _refresh_job.update(status="error", errors=errors)
+
+                time.sleep(1.0)
 
         with _refresh_lock:
             _refresh_job.update(

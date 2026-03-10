@@ -628,5 +628,8 @@
     "bulk_refresh_off_confirm": "Dette henter data fra Open Food Facts for alle produkter med EAN-strekkode. Eksisterende verdier oppdateres (tomme OFF-verdier overskriver ikke lokale data). Fortsette?",
     "bulk_refresh_off_result": "{total} produkter sjekket — {updated} oppdatert, {skipped} hoppet over, {errors} feil",
     "bulk_refresh_off_progress": "Oppdaterer {current} av {total}: {name}",
-    "bulk_estimate_pq_result": "{total} produkter sjekket — {updated} estimert, {skipped} hoppet over (ingen treff)"
+    "bulk_estimate_pq_result": "{total} produkter sjekket — {updated} estimert, {skipped} hoppet over (ingen treff)",
+    "bulk_refresh_off_search_missing": "Søk manglende etter navn",
+    "bulk_refresh_off_min_certainty": "Min. sikkerhet",
+    "bulk_refresh_off_min_completeness": "Min. fullstendighet"
 }
