@@ -754,10 +754,6 @@ function _renderRefreshReport(report) {
   toggleBtn.textContent = t('bulk_report_show', { count: report.length });
   wrap.appendChild(toggleBtn);
 
-  const list = document.createElement('div');
-  list.className = 'refresh-report-list';
-  list.style.display = 'none';
-
   const reasonKeys = {
     not_found: 'bulk_report_not_found',
     no_new_data: 'bulk_report_no_new_data',
@@ -765,45 +761,87 @@ function _renderRefreshReport(report) {
     below_threshold: 'bulk_report_below_threshold',
   };
 
-  for (const item of report) {
-    const row = document.createElement('div');
-    row.className = 'refresh-report-row';
+  function buildReportList() {
+    const list = document.createElement('div');
+    list.className = 'refresh-report-list';
+    for (const item of report) {
+      const row = document.createElement('div');
+      row.className = 'refresh-report-row';
 
-    const nameEl = document.createElement('span');
-    nameEl.className = 'refresh-report-name';
-    nameEl.textContent = item.name || item.ean || '—';
-    row.appendChild(nameEl);
+      const nameEl = document.createElement('span');
+      nameEl.className = 'refresh-report-name';
+      nameEl.textContent = item.name || item.ean || '—';
+      nameEl.title = item.name || item.ean || '—';
+      row.appendChild(nameEl);
 
-    const badge = document.createElement('span');
-    badge.className = 'refresh-report-badge ' + item.status;
-    badge.textContent = t('bulk_report_' + item.status);
-    row.appendChild(badge);
+      const badge = document.createElement('span');
+      badge.className = 'refresh-report-badge ' + item.status;
+      badge.textContent = t('bulk_report_' + item.status);
+      row.appendChild(badge);
 
-    const detail = document.createElement('span');
-    detail.className = 'refresh-report-detail';
-    if (item.status === 'updated' && item.fields) {
-      detail.textContent = t('bulk_report_fields', { fields: item.fields.join(', ') });
-    } else if (item.reason) {
-      const key = reasonKeys[item.reason];
-      let text = key ? t(key) : item.reason;
-      if (item.detail) text += ' (' + item.detail + ')';
-      detail.textContent = text;
+      const detail = document.createElement('span');
+      detail.className = 'refresh-report-detail';
+      if (item.status === 'updated' && item.fields) {
+        detail.textContent = t('bulk_report_fields', { fields: item.fields.join(', ') });
+      } else if (item.reason) {
+        const key = reasonKeys[item.reason];
+        let text = key ? t(key) : item.reason;
+        if (item.detail) text += ' (' + item.detail + ')';
+        detail.textContent = text;
+      }
+      detail.title = detail.textContent;
+      row.appendChild(detail);
+
+      list.appendChild(row);
     }
-    detail.title = detail.textContent;
-    row.appendChild(detail);
-
-    list.appendChild(row);
+    return list;
   }
 
-  wrap.appendChild(list);
+  function openReportModal() {
+    const bg = document.createElement('div');
+    bg.className = 'off-modal-bg';
+    bg.id = 'refresh-report-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
 
-  toggleBtn.addEventListener('click', () => {
-    const visible = list.style.display !== 'none';
-    list.style.display = visible ? 'none' : '';
-    toggleBtn.textContent = visible
-      ? t('bulk_report_show', { count: report.length })
-      : t('bulk_report_hide');
-  });
+    const modal = document.createElement('div');
+    modal.className = 'off-modal';
+
+    const head = document.createElement('div');
+    head.className = 'off-modal-head';
+    const h3 = document.createElement('h3');
+    h3.textContent = t('bulk_report_show', { count: report.length });
+    head.appendChild(h3);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'off-modal-close';
+    closeBtn.textContent = '\u00D7';
+    closeBtn.setAttribute('aria-label', t('btn_close'));
+    head.appendChild(closeBtn);
+    modal.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'off-modal-body';
+    body.appendChild(buildReportList());
+    modal.appendChild(body);
+
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+    document.body.style.overflow = 'hidden';
+
+    function close() {
+      document.removeEventListener('keydown', onKeyDown);
+      bg.remove();
+      document.body.style.overflow = '';
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') close();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    closeBtn.addEventListener('click', close);
+    bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
+  }
+
+  toggleBtn.addEventListener('click', openReportModal);
 
   container.appendChild(wrap);
 }
