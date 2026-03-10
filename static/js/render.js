@@ -193,7 +193,7 @@ export function renderResults(results, search) {
         flags.forEach(f => {
           const cfg = _flagConfig[f];
           if (!cfg) return;
-          h += '<span class="flag-badge flag-' + cfg.type + '">' + esc(t(cfg.labelKey)) + '</span>';
+          h += '<span class="flag-badge flag-' + cfg.type + '">' + esc(cfg.label || t(cfg.labelKey)) + '</span>';
         });
         h += '</div>';
       }
@@ -241,12 +241,12 @@ export function renderResults(results, search) {
               const cfg = _flagConfig[f];
               if (!cfg) return '';
               const checked = (p.flags || []).includes(f) ? ' checked' : '';
-              return '<label class="flag-toggle"><input type="checkbox" id="ed-flag-' + f + '"' + checked + '> ' + esc(t(cfg.labelKey)) + '</label>';
+              return '<label class="flag-toggle"><input type="checkbox" id="ed-flag-' + f + '"' + checked + '> ' + esc(cfg.label || t(cfg.labelKey)) + '</label>';
             }).join('')
           + ((() => {
               const sysFlags = (p.flags || []).filter(f => _flagConfig[f] && _flagConfig[f].type === 'system');
               return sysFlags.length
-                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(t(_flagConfig[f].labelKey)) + '</span>').join(' ') + '</span>'
+                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(_flagConfig[f].label || t(_flagConfig[f].labelKey)) + '</span>').join(' ') + '</span>'
                 : '';
             })())
           + '</div>'
