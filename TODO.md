@@ -5,3 +5,5 @@
 * vertifisere at off sync ikke 0 verdier
 * masseoppdatering pq og off
 * smaks notat
+* complitness
+* markdown include TODO i readme 
