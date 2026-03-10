@@ -308,10 +308,11 @@ async function applyOffProduct(prod, prefix, productId) {
     const val = offMap[key];
     if (val == null) return;
     const fieldEl = document.getElementById(prefix + '-' + key);
-    if (fieldEl) {
-      fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
-      filled.push(key);
-    }
+    if (!fieldEl) return;
+    // Don't overwrite existing local values with 0 from OFF (likely missing data)
+    if (val === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
+    fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
+    filled.push(key);
   });
 
   const serving = prod.serving_size || '';
@@ -322,7 +323,7 @@ async function applyOffProduct(prod, prefix, productId) {
   if (qty) { const weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
 
   const nameEl = document.getElementById(prefix + '-name');
-  if (nameEl) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
+  if (nameEl && !nameEl.value.trim()) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
 
   if (prod.code) {
     const codeEl = document.getElementById(prefix + '-ean');
