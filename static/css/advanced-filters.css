@@ -16,6 +16,7 @@
   opacity: 1;
   padding: 14px;
   margin-bottom: 14px;
+  overflow: visible;
 }
 
 .adv-logic-wrap {
