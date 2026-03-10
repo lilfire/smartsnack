@@ -81,6 +81,7 @@ export function toggleAdvancedFilters() {
     panel.classList.remove('open');
     toggle.classList.remove('has-filter');
     state.advancedFilters = null;
+    panel.innerHTML = '';
     // Restore normal search UI
     if (searchRow) searchRow.classList.remove('advanced-active');
     if (searchInput) searchInput.disabled = false;
