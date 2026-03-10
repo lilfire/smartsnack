@@ -124,7 +124,9 @@ export function toggleExpand(id) {
 }
 
 export function onSearchInput() {
-  const v = document.getElementById('search-input').value;
+  const el = document.getElementById('search-input');
+  if (el.disabled) return;
+  const v = el.value;
   document.getElementById('search-clear').classList.toggle('visible', v.length > 0);
   state.expandedId = null;
   state.editingId = null;
