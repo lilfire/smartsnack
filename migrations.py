@@ -36,6 +36,12 @@ MIGRATIONS = [
             "VALUES ('is_synced_with_off', 'system', 'flag_is_synced_with_off')",
         ],
     ),
+    (
+        "004_add_taste_note",
+        [
+            "ALTER TABLE products ADD COLUMN taste_note TEXT NOT NULL DEFAULT ''",
+        ],
+    ),
 ]
 
 

@@ -18,6 +18,7 @@ function collectFormFields(prefix) {
     brand: (document.getElementById(prefix + '-brand') || { value: '' }).value.trim(),
     stores: (document.getElementById(prefix + '-stores') || { value: '' }).value.trim(),
     ingredients: (document.getElementById(prefix + '-ingredients') || { value: '' }).value.trim(),
+    taste_note: (document.getElementById(prefix + '-taste_note') || { value: '' }).value.trim(),
     taste_score: numOrNull(prefix + '-smak'),
     kcal: numOrNull(prefix + '-kcal'),
     energy_kj: numOrNull(prefix + '-energy_kj'),
@@ -171,6 +172,7 @@ export async function registerProduct() {
     document.getElementById('f-brand').value = '';
     document.getElementById('f-stores').value = '';
     document.getElementById('f-ingredients').value = '';
+    document.getElementById('f-taste_note').value = '';
     document.getElementById('f-est_pdcaas').value = '';
     document.getElementById('f-est_diaas').value = '';
     const pqw = document.getElementById('f-protein-quality-wrap');

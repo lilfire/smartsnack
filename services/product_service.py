@@ -534,6 +534,7 @@ def add_product(data: dict) -> dict:
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
         (data["type"].strip(), data["name"].strip(), data.get("ean", "").strip(),
          data.get("brand", "").strip(), data.get("stores", "").strip(), data.get("ingredients", "").strip(),
+         data.get("taste_note", "").strip(),
          _num(data, "taste_score"), _num(data, "kcal"),
          _num(data, "energy_kj"), _num(data, "carbs"),
          _num(data, "sugar"), _num(data, "fat"),

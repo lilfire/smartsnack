@@ -43,6 +43,7 @@
           <label class="field-label"><span id="smak-label-text" data-i18n="label_taste">Smakskarakter ({val}/6)</span></label>
           <div class="range-row"><input type="range" min="0" max="6" step="0.5" value="3" id="f-smak" oninput="document.getElementById('smak-display').textContent=this.value;document.getElementById('smak-val').textContent=this.value"><span class="range-val" id="smak-val">3</span></div>
         </div>
+        <div><label class="field-label" data-i18n="label_taste_note">Smaksnotat</label><textarea class="field-input" id="f-taste_note" data-i18n-placeholder="ph_taste_note" placeholder="e.g. Crispy, litt salt, god paprikasmak..." rows="2" style="resize:vertical;min-height:50px"></textarea></div>
         <div id="f-protein-quality-wrap" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
             <label class="field-label" style="margin:0" data-i18n="label_protein_quality_est">Protein quality (estimated)</label>
