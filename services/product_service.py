@@ -556,6 +556,7 @@ def update_product(pid: int, data: dict) -> None:
     """Update a product's fields by ID."""
     # Extract flags before field validation loop
     incoming_flags = data.pop("flags", None)
+    from_off = data.pop("from_off", False)
 
     updates, vals = [], []
     for f in data:
@@ -600,6 +601,8 @@ def update_product(pid: int, data: dict) -> None:
     if incoming_flags is not None and isinstance(incoming_flags, list):
         _set_user_flags(conn, pid, incoming_flags)
     conn.commit()
+    if from_off:
+        set_system_flag(pid, "is_synced_with_off", True)
 
 
 def delete_product(pid: int) -> bool:
