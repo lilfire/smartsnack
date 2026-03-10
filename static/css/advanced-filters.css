@@ -90,6 +90,39 @@
   border-color: rgba(232, 184, 75, 0.3);
 }
 
+/* Custom select overrides for advanced filter rows */
+.adv-row .custom-select-wrap {
+  width: auto;
+}
+.adv-row .adv-field-select + .custom-select-trigger {
+  min-width: 120px;
+  max-width: 160px;
+  padding: 8px 28px 8px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.adv-row .adv-op-select + .custom-select-trigger {
+  min-width: 64px;
+  max-width: 90px;
+  padding: 8px 28px 8px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.adv-row .custom-select-options {
+  min-width: 140px;
+  border-radius: 8px;
+}
+.adv-row .custom-select-option {
+  font-size: 13px;
+  padding: 8px 10px;
+}
+.adv-row .custom-select-option:first-child {
+  border-radius: 8px 8px 0 0;
+}
+.adv-row .custom-select-option:last-child {
+  border-radius: 0 0 8px 8px;
+}
+
 .adv-remove-btn {
   flex-shrink: 0;
   width: 28px;
