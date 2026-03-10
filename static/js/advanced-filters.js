@@ -31,6 +31,7 @@ const NUMERIC_FIELDS = [
   ['est_pdcaas', 'adv_field_est_pdcaas'],
   ['est_diaas', 'adv_field_est_diaas'],
   ['total_score', 'adv_field_total_score'],
+  ['completeness', 'adv_field_completeness'],
 ];
 
 const TEXT_OPS = [
