@@ -55,8 +55,8 @@
 
 .adv-op-select {
   flex: 0 0 auto;
-  min-width: 64px;
-  max-width: 90px;
+  min-width: 80px;
+  max-width: 130px;
 }
 
 .adv-field-select option,
@@ -102,8 +102,8 @@
   border-radius: 8px;
 }
 .adv-row .adv-op-select + .custom-select-trigger {
-  min-width: 64px;
-  max-width: 90px;
+  min-width: 80px;
+  max-width: 130px;
   padding: 8px 28px 8px 10px;
   font-size: 13px;
   border-radius: 8px;
