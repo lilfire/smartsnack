@@ -522,6 +522,8 @@ def add_product(data: dict) -> dict:
     new_id = cur.lastrowid
     if "flags" in data and isinstance(data["flags"], list):
         _set_user_flags(conn, new_id, data["flags"])
+    if data.get("from_off"):
+        set_system_flag(new_id, "is_synced_with_off", True)
     conn.commit()
     return {"id": new_id, "message": "Product added"}
 
