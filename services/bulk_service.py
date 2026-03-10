@@ -261,7 +261,10 @@ def refresh_from_off():
 def get_refresh_status():
     """Return a snapshot of the current refresh job state."""
     with _refresh_lock:
-        return dict(_refresh_job)
+        snapshot = dict(_refresh_job)
+    if not snapshot.get("done"):
+        snapshot.pop("report", None)
+    return snapshot
 
 
 def start_refresh_from_off(options=None):
@@ -273,6 +276,7 @@ def start_refresh_from_off(options=None):
             running=True, current=0, total=0, name="", ean="",
             status="", updated=0, skipped=0, errors=0, done=False,
         )
+        _refresh_job.pop("report", None)
     t = threading.Thread(target=_run_refresh, args=(options or {},), daemon=True)
     t.start()
     return True
@@ -296,6 +300,7 @@ def _run_refresh(options=None):
         updated = 0
         skipped = 0
         errors = 0
+        report = []
 
         with _refresh_lock:
             _refresh_job["total"] = total
@@ -314,6 +319,7 @@ def _run_refresh(options=None):
                 data = proxy_service.off_product(ean)
                 if not data.get("product"):
                     skipped += 1
+                    report.append({"name": name, "ean": ean, "status": "skipped", "reason": "not_found"})
                     with _refresh_lock:
                         _refresh_job.update(status="skipped", skipped=skipped)
                     time.sleep(0.5)
@@ -326,6 +332,7 @@ def _run_refresh(options=None):
 
                 if not field_updates and not image_uri:
                     skipped += 1
+                    report.append({"name": name, "ean": ean, "status": "skipped", "reason": "no_new_data"})
                     with _refresh_lock:
                         _refresh_job.update(status="skipped", skipped=skipped)
                     time.sleep(0.5)
@@ -348,6 +355,10 @@ def _run_refresh(options=None):
                 conn.commit()
                 updated += 1
                 _set_off_sync_flag(conn, pid)
+                updated_fields = list(field_updates.keys())
+                if image_uri:
+                    updated_fields.append("image")
+                report.append({"name": name, "ean": ean, "status": "updated", "fields": updated_fields})
 
                 with _refresh_lock:
                     _refresh_job.update(status="updated", updated=updated)
@@ -355,6 +366,7 @@ def _run_refresh(options=None):
             except Exception as e:
                 logger.error("Error refreshing product %s (EAN %s): %s", pid, ean, e)
                 errors += 1
+                report.append({"name": name, "ean": ean, "status": "error", "reason": str(e)})
                 with _refresh_lock:
                     _refresh_job.update(status="error", errors=errors)
 
@@ -419,6 +431,17 @@ def _run_refresh(options=None):
 
                     if not best:
                         skipped += 1
+                        if not products:
+                            report.append({"name": name, "ean": "", "status": "skipped", "reason": "no_results"})
+                        else:
+                            top = products[0]
+                            top_cert = top.get("certainty", 0)
+                            top_comp = round(float(top.get("completeness") or 0) * 100)
+                            report.append({
+                                "name": name, "ean": "", "status": "skipped",
+                                "reason": "below_threshold",
+                                "detail": f"best: {top_cert}% cert, {top_comp}% comp",
+                            })
                         with _refresh_lock:
                             _refresh_job.update(status="skipped", skipped=skipped)
                         time.sleep(1.0)
@@ -435,6 +458,7 @@ def _run_refresh(options=None):
 
                     if not field_updates and not image_uri:
                         skipped += 1
+                        report.append({"name": name, "ean": "", "status": "skipped", "reason": "no_new_data"})
                         with _refresh_lock:
                             _refresh_job.update(status="skipped", skipped=skipped)
                         time.sleep(1.0)
@@ -457,12 +481,17 @@ def _run_refresh(options=None):
                     conn.commit()
                     updated += 1
                     _set_off_sync_flag(conn, pid)
+                    updated_fields = list(field_updates.keys())
+                    if image_uri:
+                        updated_fields.append("image")
+                    report.append({"name": name, "ean": matched_ean or "", "status": "updated", "fields": updated_fields})
                     with _refresh_lock:
                         _refresh_job.update(status="updated", updated=updated)
 
                 except Exception as e:
                     logger.error("Error searching product %s (%s): %s", pid, name, e)
                     errors += 1
+                    report.append({"name": name, "ean": "", "status": "error", "reason": str(e)})
                     with _refresh_lock:
                         _refresh_job.update(status="error", errors=errors)
 
@@ -472,6 +501,7 @@ def _run_refresh(options=None):
             _refresh_job.update(
                 done=True, running=False,
                 updated=updated, skipped=skipped, errors=errors,
+                report=report,
             )
     except Exception as e:
         logger.error("Refresh thread crashed: %s", e, exc_info=True)

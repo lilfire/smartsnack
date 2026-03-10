@@ -631,5 +631,15 @@
     "bulk_estimate_pq_result": "{total} produkter kontrollerade — {updated} uppskattade, {skipped} hoppade över (ingen träff)",
     "bulk_refresh_off_search_missing": "Sök saknade efter namn",
     "bulk_refresh_off_min_certainty": "Min. säkerhet",
-    "bulk_refresh_off_min_completeness": "Min. fullständighet"
+    "bulk_refresh_off_min_completeness": "Min. fullständighet",
+    "bulk_report_show": "Visa detaljer ({count} produkter)",
+    "bulk_report_hide": "Dölj detaljer",
+    "bulk_report_updated": "Uppdaterad",
+    "bulk_report_skipped": "Hoppades över",
+    "bulk_report_error": "Fel",
+    "bulk_report_not_found": "Hittades inte i OFF",
+    "bulk_report_no_new_data": "Inga nya data",
+    "bulk_report_no_results": "Inga resultat från OFF",
+    "bulk_report_below_threshold": "Under tröskel",
+    "bulk_report_fields": "Fält: {fields}"
 }
