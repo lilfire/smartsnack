@@ -1,5 +1,7 @@
 """Service for product CRUD and scored listing."""
 
+import json
+import math
 import re
 
 from db import get_db
@@ -7,6 +9,7 @@ from config import (
     PRODUCT_COLS_NO_IMAGE, INSERT_FIELDS, INSERT_PLACEHOLDERS,
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
     SCORE_CONFIG_MAP, COMPUTED_FIELDS,
+    ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS,
 )
 from helpers import _num, _safe_float
 
@@ -115,7 +118,74 @@ def _score_product(
     p["missing_fields"] = missing_fields
 
 
-def list_products(search: str | None, type_filter: str | None) -> list:
+def _parse_advanced_filters(filters_json: str) -> tuple[str, list]:
+    """Parse advanced filter JSON and return (sql_fragment, params).
+
+    Expected format:
+      {"logic": "and"|"or", "conditions": [{"field": ..., "op": ..., "value": ...}, ...]}
+    """
+    try:
+        data = json.loads(filters_json)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise ValueError("Invalid filters JSON") from e
+
+    if not isinstance(data, dict):
+        raise ValueError("Filters must be a JSON object")
+
+    logic = data.get("logic", "and").upper()
+    if logic not in ("AND", "OR"):
+        raise ValueError("logic must be 'and' or 'or'")
+
+    conditions = data.get("conditions")
+    if not isinstance(conditions, list) or not conditions:
+        raise ValueError("conditions must be a non-empty list")
+    if len(conditions) > 20:
+        raise ValueError("Too many filter conditions (max 20)")
+
+    fragments, params = [], []
+    for c in conditions:
+        field = c.get("field", "")
+        op = c.get("op", "")
+        value = c.get("value", "")
+
+        if field not in FILTERABLE_FIELDS:
+            raise ValueError(f"Invalid filter field: {field}")
+        if op not in ADVANCED_FILTER_OPS:
+            raise ValueError(f"Invalid filter operator: {op}")
+        if value is None or str(value).strip() == "":
+            raise ValueError(f"Filter value required for {field}")
+
+        value = str(value).strip()
+        sql_op = ADVANCED_FILTER_OPS[op]
+
+        if field in TEXT_FIELDS:
+            if op == "contains":
+                escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                fragments.append(f"LOWER({field}) LIKE ? ESCAPE '\\'")
+                params.append(f"%{escaped.lower()}%")
+            elif op in ("=", "!="):
+                fragments.append(f"LOWER({field}) {sql_op} LOWER(?)")
+                params.append(value)
+            else:
+                raise ValueError(f"Operator '{op}' not valid for text field '{field}'")
+        else:
+            # Numeric field
+            if op == "contains":
+                raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
+            try:
+                num_val = float(value)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Invalid numeric value for {field}") from e
+            if not math.isfinite(num_val):
+                raise ValueError(f"Non-finite value for {field}")
+            fragments.append(f"{field} {sql_op} ?")
+            params.append(num_val)
+
+    combined = f" {logic} ".join(f"({f})" for f in fragments)
+    return f"({combined})", params
+
+
+def list_products(search: str | None, type_filter: str | None, advanced_filters: str | None = None) -> list:
     """List products with computed scores, filtered and sorted."""
     conn = get_db()
     cur = conn.cursor()
@@ -137,6 +207,10 @@ def list_products(search: str | None, type_filter: str | None) -> list:
             placeholders = ",".join("?" * len(types))
             conditions.append(f"type IN ({placeholders})")
             params.extend(types)
+    if advanced_filters:
+        af_sql, af_params = _parse_advanced_filters(advanced_filters)
+        conditions.append(af_sql)
+        params.extend(af_params)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     rows = cur.execute(

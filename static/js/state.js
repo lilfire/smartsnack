@@ -12,6 +12,7 @@ export const state = {
   sortDir: 'desc',
   categories: [],
   imageCache: {},
+  advancedFilters: null,
 };
 
 // All nutrition field IDs used in register/edit forms
@@ -82,6 +83,7 @@ export async function fetchProducts(search, types) {
   const p = new URLSearchParams();
   if (search) p.set('search', search);
   if (types && types.length) p.set('type', types.join(','));
+  if (state.advancedFilters) p.set('filters', state.advancedFilters);
   return api('/api/products?' + p);
 }
 

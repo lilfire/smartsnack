@@ -33,13 +33,14 @@ import {
   selectOffResult, estimateProteinQuality, updateEstimateBtn,
   showOffAddReview, closeOffAddReview, submitToOff
 } from './openfoodfacts.js';
+import { toggleAdvancedFilters } from './advanced-filters.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
 Object.assign(window, {
   // i18n
   changeLanguage,
   // filters
-  toggleFilters, setSort,
+  toggleFilters, setSort, toggleAdvancedFilters,
   // images
   triggerImageUpload, removeProductImage,
   // products
