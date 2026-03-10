@@ -69,7 +69,11 @@ def get_flag_config() -> dict:
         "SELECT name, type, label_key FROM flag_definitions ORDER BY type, name"
     ).fetchall()
     return {
-        r["name"]: {"type": r["type"], "labelKey": r["label_key"]}
+        r["name"]: {
+            "type": r["type"],
+            "labelKey": r["label_key"],
+            "label": _flag_label(r["name"]),
+        }
         for r in rows
     }
 
