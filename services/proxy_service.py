@@ -7,7 +7,8 @@ import urllib.request
 import urllib.error
 from urllib.parse import urlparse, urlencode
 
-from config import OFF_NUTRITION_COMPARE_MAP
+from config import OFF_NUTRITION_COMPARE_MAP, SUPPORTED_LANGUAGES
+from translations import _category_label
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ _OFF_SEARCH_FIELDS = (
     "code,product_name,product_name_no,brands,stores,stores_tags,"
     "nutriments,image_front_small_url,image_front_url,image_url,"
     "serving_size,product_quantity,ingredients_text,"
-    "ingredients_text_no,ingredients_text_en,completeness"
+    "ingredients_text_no,ingredients_text_en,completeness,lang"
 )
 
 
@@ -121,12 +122,13 @@ def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
     return (avg - 0.5) * 50
 
 
-def _compute_certainty(query: str, product: dict, nutrition: dict | None = None) -> int:
+def _compute_certainty(
+    query: str, product: dict, nutrition: dict | None = None, category: str = ""
+) -> int:
     """Compute a 0-100 certainty score for how well a product matches the query.
 
-    Based on name word overlap, brand match, and optionally nutrition similarity.
-    With nutrition: name up to 60, brand up to 15, nutrition -25 to +25.
-    Without nutrition: name up to 80, brand up to 20 (preserves original behavior).
+    Based on name word overlap, brand match, optional category boost,
+    and optionally nutrition similarity.
     """
     query_lower = query.lower().strip()
     query_words = query_lower.split()
@@ -141,11 +143,18 @@ def _compute_certainty(query: str, product: dict, nutrition: dict | None = None)
         name_word_max, name_exact_bonus, name_all_bonus = 60, 20, 10
         brand_max = 20
 
-    # Check both name fields, take the best score
-    names = [
-        (product.get("product_name_no") or "").lower(),
-        (product.get("product_name") or "").lower(),
-    ]
+    # Collect all product name variants dynamically (no hardcoded language codes)
+    brand = (product.get("brands") or "").lower()
+    names = []
+    for key, val in product.items():
+        if key.startswith("product_name") and isinstance(val, str) and val.strip():
+            names.append(val.strip().lower())
+
+    # Also try brand + name combinations so queries like
+    # "Dave & Jon's Chokladboll" match product_name="Chokladboll" brand="Dave & Jon's"
+    if brand:
+        for name in list(names):
+            names.append(brand + " " + name)
 
     best_name_score = 0
     for name in names:
@@ -167,8 +176,25 @@ def _compute_certainty(query: str, product: dict, nutrition: dict | None = None)
 
         best_name_score = max(best_name_score, word_score)
 
+    # Category boost (positive-only, never penalizes)
+    if category and names:
+        off_lang = (product.get("lang") or product.get("lc") or "").lower()
+        langs_to_try = (
+            [off_lang] if off_lang in SUPPORTED_LANGUAGES
+            else list(SUPPORTED_LANGUAGES)
+        )
+        cat_labels = set()
+        for lang in langs_to_try:
+            label = _category_label(category, lang=lang).lower()
+            if label:
+                cat_labels.add(label)
+        if cat_labels and any(
+            any(cat in name for cat in cat_labels) for name in names if name
+        ):
+            cat_max = 3 if has_nutrition else 5
+            best_name_score += cat_max
+
     # Brand match
-    brand = (product.get("brands") or "").lower()
     brand_score = 0
     if brand:
         brand_words = brand.split()
@@ -184,12 +210,12 @@ def _compute_certainty(query: str, product: dict, nutrition: dict | None = None)
     return max(0, score)
 
 
-def off_search(query: str, nutrition: dict | None = None) -> dict:
+def off_search(query: str, nutrition: dict | None = None, category: str = "") -> dict:
     """Proxy a product name search to the OpenFoodFacts API.
 
     Queries both search-a-licious (Elasticsearch) and classic search.pl,
     then combines and deduplicates results sorted by completeness.
-    Optionally accepts local nutrition data to improve certainty scoring.
+    Optionally accepts local nutrition data and category to improve certainty scoring.
     """
     if not query or len(query.strip()) < 2:
         raise ValueError("Query too short")
@@ -233,7 +259,7 @@ def off_search(query: str, nutrition: dict | None = None) -> dict:
     # Compute certainty score for each product and sort by it
     for p in combined:
         try:
-            p["certainty"] = _compute_certainty(cleaned, p, nutrition)
+            p["certainty"] = _compute_certainty(cleaned, p, nutrition, category)
         except Exception:
             p["certainty"] = 0
     combined.sort(key=lambda p: p.get("certainty", 0), reverse=True)

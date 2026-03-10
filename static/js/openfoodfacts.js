@@ -63,7 +63,8 @@ export async function lookupOFF(prefix, productId) {
   } else if (name.length >= 2) {
     showOffPickerLoading(t('off_searching_name', { name: name }));
     try {
-      const products = await searchOFF(name, _gatherNutrition(prefix));
+      const category = document.getElementById(prefix + '-type')?.value || '';
+      const products = await searchOFF(name, _gatherNutrition(prefix), category);
       updateOffPickerResults(products);
       const si = document.getElementById('off-search-input');
       if (si) si.value = name;
@@ -174,9 +175,10 @@ function updateOffPickerResults(products, errorMsg, ean) {
   if (count) count.textContent = t('off_result_count', { count: products.length });
 }
 
-export async function searchOFF(query, nutrition) {
+export async function searchOFF(query, nutrition, category) {
   const body = { q: query };
   if (nutrition) body.nutrition = nutrition;
+  if (category) body.category = category;
   const res = await fetchWithTimeout('/api/off/search', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -237,7 +239,8 @@ export async function offModalSearch() {
   if (bodyEl) bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('off_searching_name', { name: query });
   try {
-    const products = await searchOFF(query, _gatherNutrition(_offCtx.prefix));
+    const category = document.getElementById(_offCtx.prefix + '-type')?.value || '';
+    const products = await searchOFF(query, _gatherNutrition(_offCtx.prefix), category);
     updateOffPickerResults(products);
   } catch(e) { updateOffPickerResults([], t('toast_network_error')); }
 }
