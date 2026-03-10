@@ -93,7 +93,10 @@ def _nutrition_field_similarity(local_val: float, off_val: float) -> float:
 
 
 def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
-    """Compute nutrition similarity score (0-25) between local and OFF data."""
+    """Compute nutrition similarity score (-25 to +25) between local and OFF data.
+
+    Matching nutrition boosts the score; mismatching nutrition penalizes it.
+    """
     nutriments = product.get("nutriments") or {}
     if not nutriments:
         return 0
@@ -102,7 +105,12 @@ def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
     for local_key, off_key in OFF_NUTRITION_COMPARE_MAP.items():
         local_val = nutrition.get(local_key)
         off_val = nutriments.get(off_key)
-        if local_val is None or off_val is None:
+        # Skip fields where the user didn't provide a value
+        if local_val is None:
+            continue
+        # User provided a value but OFF is missing it → mismatch
+        if off_val is None:
+            similarities.append(0.0)
             continue
         try:
             local_val = float(local_val)
@@ -113,14 +121,15 @@ def _compute_nutrition_similarity(nutrition: dict, product: dict) -> float:
 
     if not similarities:
         return 0
-    return (sum(similarities) / len(similarities)) * 25
+    avg = sum(similarities) / len(similarities)
+    return (avg - 0.5) * 50
 
 
 def _compute_certainty(query: str, product: dict, nutrition: dict | None = None) -> int:
     """Compute a 0-100 certainty score for how well a product matches the query.
 
     Based on name word overlap, brand match, and optionally nutrition similarity.
-    With nutrition: name up to 60, brand up to 15, nutrition up to 25.
+    With nutrition: name up to 60, brand up to 15, nutrition -25 to +25.
     Without nutrition: name up to 80, brand up to 20 (preserves original behavior).
     """
     query_lower = query.lower().strip()
@@ -153,6 +162,12 @@ def _compute_certainty(query: str, product: dict, nutrition: dict | None = None)
             word_score += name_exact_bonus
         elif matches == len(query_words):
             word_score += name_all_bonus
+
+        # Penalize product names that are much longer than the query
+        name_words = len(name.split())
+        if name_words > len(query_words):
+            length_ratio = len(query_words) / name_words
+            word_score *= (1 + length_ratio) / 2
 
         best_name_score = max(best_name_score, word_score)
 
