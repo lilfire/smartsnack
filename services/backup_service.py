@@ -397,6 +397,7 @@ def import_products(data: dict) -> str:
     conn = get_db()
     cur = conn.cursor()
     added = 0
+    skipped = 0
     pending_translations = []
     try:
         if "categories" in data:
@@ -457,6 +458,16 @@ def import_products(data: dict) -> str:
                     existing_cats.add(cat)
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
+            ean = p.get("ean", "").strip()
+            name = p.get("name", "").strip()
+            if ean:
+                if cur.execute("SELECT 1 FROM products WHERE ean = ?", (ean,)).fetchone():
+                    skipped += 1
+                    continue
+            if name:
+                if cur.execute("SELECT 1 FROM products WHERE LOWER(name) = LOWER(?)", (name,)).fetchone():
+                    skipped += 1
+                    continue
             _restore_product(cur, p, valid_flags=valid_flags)
             added += 1
         conn.commit()
@@ -466,4 +477,7 @@ def import_products(data: dict) -> str:
         raise
     # Apply translation file writes only after DB commit succeeds
     _apply_pending_translations(pending_translations)
-    return f"Imported {added} products"
+    msg = f"Imported {added} products"
+    if skipped:
+        msg += f", {skipped} skipped as duplicates"
+    return msg
