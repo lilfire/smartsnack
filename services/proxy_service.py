@@ -174,9 +174,10 @@ def _compute_certainty(query: str, product: dict, nutrition: dict | None = None)
     # Brand match
     brand = (product.get("brands") or "").lower()
     brand_score = 0
-    if brand and query_words:
-        brand_matches = sum(1 for w in query_words if w in brand)
-        brand_score = (brand_matches / len(query_words)) * brand_max
+    if brand:
+        brand_words = brand.split()
+        brand_matches = sum(1 for w in brand_words if w in query_lower)
+        brand_score = (brand_matches / len(brand_words)) * brand_max
 
     # Nutrition similarity
     nutri_score = 0
