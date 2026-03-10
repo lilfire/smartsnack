@@ -203,4 +203,60 @@
   color: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   user-select: none;
+  transition: color 0.15s;
+}
+
+.flag-toggle:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.flag-toggle:has(input:checked) {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.flag-toggle input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  margin: 0;
+}
+
+.flag-toggle input[type="checkbox"]:hover {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.flag-toggle input[type="checkbox"]:checked {
+  background: #E8B84B;
+  border-color: #E8B84B;
+}
+
+.flag-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 4px;
+  height: 8px;
+  border: solid #0a0a0c;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.flag-toggle input[type="checkbox"]:checked::after {
+  opacity: 1;
+}
+
+.flag-toggle input[type="checkbox"]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(232, 184, 75, 0.3);
+  outline: none;
 }
