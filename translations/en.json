@@ -589,5 +589,8 @@
     "adv_op_contains": "contains",
     "adv_group_text": "Text",
     "adv_group_nutrition": "Nutrition",
-    "adv_placeholder_value": "Value..."
+    "adv_placeholder_value": "Value...",
+    "adv_add_condition": "+ Add condition",
+    "adv_add_group": "+ Add group",
+    "adv_remove_group": "Remove group"
 }

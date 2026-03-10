@@ -589,5 +589,8 @@
     "adv_op_contains": "inneholder",
     "adv_group_text": "Tekst",
     "adv_group_nutrition": "Ernæring",
-    "adv_placeholder_value": "Verdi..."
+    "adv_placeholder_value": "Verdi...",
+    "adv_add_condition": "+ Legg til betingelse",
+    "adv_add_group": "+ Legg til gruppe",
+    "adv_remove_group": "Fjern gruppe"
 }
