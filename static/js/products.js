@@ -47,6 +47,7 @@ export function startEdit(id) { state.editingId = id; rerender(); }
 
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
+  if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   try {

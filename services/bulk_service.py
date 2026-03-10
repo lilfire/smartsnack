@@ -31,6 +31,15 @@ _refresh_job = {
 _refresh_lock = threading.Lock()
 
 
+def _set_off_sync_flag(conn, pid):
+    """Mark a product as synced with OFF in the product_flags table."""
+    conn.execute(
+        "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+        (pid, "is_synced_with_off"),
+    )
+    conn.commit()
+
+
 def _parse_off_nutriment(nutriments, key):
     """Extract a nutriment value from OFF data, preferring per-100g."""
     val = nutriments.get(f"{key}_100g") or nutriments.get(key)
@@ -231,6 +240,7 @@ def refresh_from_off():
 
             conn.commit()
             updated += 1
+            _set_off_sync_flag(conn, pid)
 
         except Exception as e:
             logger.error("Error refreshing product %s (EAN %s): %s", pid, ean, e)
@@ -337,6 +347,7 @@ def _run_refresh(options=None):
 
                 conn.commit()
                 updated += 1
+                _set_off_sync_flag(conn, pid)
 
                 with _refresh_lock:
                     _refresh_job.update(status="updated", updated=updated)
@@ -445,6 +456,7 @@ def _run_refresh(options=None):
 
                     conn.commit()
                     updated += 1
+                    _set_off_sync_flag(conn, pid)
                     with _refresh_lock:
                         _refresh_job.update(status="updated", updated=updated)
 
