@@ -308,6 +308,65 @@
   font-family: 'Space Mono', monospace;
 }
 
+/* ── Refresh OFF Options ─────────────────────────── */
+.refresh-off-options {
+  text-align: left;
+  margin-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 12px;
+}
+
+.refresh-off-cb-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.refresh-off-cb-label input[type="checkbox"] {
+  accent-color: #E8B84B;
+  width: 16px;
+  height: 16px;
+}
+
+.refresh-off-sliders {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 24px;
+}
+
+.refresh-off-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.refresh-off-range-row label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  min-width: 100px;
+  margin: 0;
+}
+
+.refresh-off-range-row input[type="range"] {
+  flex: 1;
+  accent-color: #E8B84B;
+  height: 4px;
+}
+
+.refresh-off-range-val {
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  color: #E8B84B;
+  min-width: 28px;
+  text-align: right;
+}
+
 /* ── Category Move Modal ─────────────────────────── */
 .cat-move-modal .cat-move-select {
   margin-bottom: 16px;

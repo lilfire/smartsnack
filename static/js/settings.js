@@ -785,12 +785,130 @@ export async function checkRefreshStatus() {
   } catch(e) { /* ignore */ }
 }
 
+function _showRefreshOffModal() {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '🔄';
+    modal.appendChild(iconDiv);
+
+    const h3 = document.createElement('h3');
+    h3.textContent = t('bulk_refresh_off_title');
+    modal.appendChild(h3);
+
+    const pEl = document.createElement('p');
+    pEl.textContent = t('bulk_refresh_off_confirm');
+    modal.appendChild(pEl);
+
+    // Options section
+    const opts = document.createElement('div');
+    opts.className = 'refresh-off-options';
+
+    const cbLabel = document.createElement('label');
+    cbLabel.className = 'refresh-off-cb-label';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    const cbText = document.createElement('span');
+    cbText.textContent = t('bulk_refresh_off_search_missing');
+    cbLabel.appendChild(cb);
+    cbLabel.appendChild(cbText);
+    opts.appendChild(cbLabel);
+
+    const sliders = document.createElement('div');
+    sliders.className = 'refresh-off-sliders';
+    sliders.style.display = 'none';
+
+    function makeSlider(labelKey, defaultVal) {
+      const row = document.createElement('div');
+      row.className = 'refresh-off-range-row';
+      const lbl = document.createElement('label');
+      lbl.className = 'form-sub';
+      lbl.textContent = t(labelKey);
+      const range = document.createElement('input');
+      range.type = 'range';
+      range.min = '0';
+      range.max = '100';
+      range.value = String(defaultVal);
+      const val = document.createElement('span');
+      val.className = 'refresh-off-range-val';
+      val.textContent = String(defaultVal);
+      range.addEventListener('input', () => { val.textContent = range.value; });
+      row.appendChild(lbl);
+      row.appendChild(range);
+      row.appendChild(val);
+      sliders.appendChild(row);
+      return range;
+    }
+
+    const certSlider = makeSlider('bulk_refresh_off_min_certainty', 50);
+    const compSlider = makeSlider('bulk_refresh_off_min_completeness', 50);
+    opts.appendChild(sliders);
+    modal.appendChild(opts);
+
+    cb.addEventListener('change', () => {
+      sliders.style.display = cb.checked ? '' : 'none';
+    });
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'scan-modal-btn-register confirm-yes';
+    yesBtn.textContent = t('btn_start');
+    actions.appendChild(yesBtn);
+    const noBtn = document.createElement('button');
+    noBtn.className = 'scan-modal-btn-cancel confirm-no';
+    noBtn.textContent = t('btn_cancel');
+    actions.appendChild(noBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+
+    function close(val) {
+      document.removeEventListener('keydown', onKeyDown);
+      bg.remove();
+      resolve(val);
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') close(null);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    noBtn.onclick = () => { close(null); };
+    yesBtn.onclick = () => {
+      close({
+        searchMissing: cb.checked,
+        minCertainty: parseInt(certSlider.value, 10),
+        minCompleteness: parseInt(compSlider.value, 10),
+      });
+    };
+    bg.addEventListener('click', (e) => { if (e.target === bg) close(null); });
+    yesBtn.focus();
+  });
+}
+
 export async function refreshAllFromOff() {
-  if (!await showConfirmModal('🔄', t('bulk_refresh_off_title'), t('bulk_refresh_off_confirm'), t('btn_start'), t('btn_cancel'))) return;
+  const opts = await _showRefreshOffModal();
+  if (!opts) return;
   const bar = document.getElementById('refresh-off-bar');
   if (bar) bar.style.width = '0%';
   try {
-    const res = await api('/api/bulk/refresh-off/start', { method: 'POST' });
+    const body = {};
+    if (opts.searchMissing) {
+      body.search_missing = true;
+      body.min_certainty = opts.minCertainty;
+      body.min_completeness = opts.minCompleteness;
+    }
+    const res = await api('/api/bulk/refresh-off/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
     if (res.error === 'already_running') {
       _connectRefreshStream();
       return;
