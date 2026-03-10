@@ -144,10 +144,18 @@ def off_search(query: str) -> dict:
     except Exception:
         logger.info("search.pl unavailable")
 
+    # Ensure both are lists of dicts (guard against unexpected API formats)
+    if not isinstance(products_a, list):
+        products_a = []
+    if not isinstance(products_c, list):
+        products_c = []
+
     # Combine and deduplicate by barcode (code), keeping first occurrence
     seen = set()
     combined = []
     for p in products_a + products_c:
+        if not isinstance(p, dict):
+            continue
         code = p.get("code", "")
         key = code if code else id(p)
         if key not in seen:
@@ -156,8 +164,11 @@ def off_search(query: str) -> dict:
 
     # Compute certainty score for each product and sort by it
     for p in combined:
-        p["certainty"] = _compute_certainty(cleaned, p)
-    combined.sort(key=lambda p: p["certainty"], reverse=True)
+        try:
+            p["certainty"] = _compute_certainty(cleaned, p)
+        except Exception:
+            p["certainty"] = 0
+    combined.sort(key=lambda p: p.get("certainty", 0), reverse=True)
 
     return {"products": combined, "count": len(combined)}
 
@@ -181,7 +192,14 @@ def _off_search_a_licious(query: str) -> dict:
         raise RuntimeError("Failed to fetch from search-a-licious") from e
     # Normalize: search-a-licious returns "hits", frontend expects "products"
     if "hits" in data and "products" not in data:
-        data["products"] = data["hits"]
+        hits = data["hits"]
+        # Handle nested Elasticsearch format: {"hits": {"total": ..., "hits": [...]}}
+        if isinstance(hits, dict) and "hits" in hits:
+            hits = hits["hits"]
+        # Elasticsearch hits may wrap product data in "_source"
+        if isinstance(hits, list) and hits and "_source" in hits[0]:
+            hits = [h["_source"] for h in hits if isinstance(h, dict) and "_source" in h]
+        data["products"] = hits if isinstance(hits, list) else []
     return data
 
 
