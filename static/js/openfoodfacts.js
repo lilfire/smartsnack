@@ -262,6 +262,7 @@ export async function selectOffResult(idx, ctxSnapshot) {
 }
 
 async function applyOffProduct(prod, prefix, productId) {
+  window._pendingOFFSync = true;
   const n = prod.nutriments || {};
   const offMap = {
     kcal: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? null,

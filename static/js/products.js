@@ -158,6 +158,7 @@ export async function registerProduct() {
   btn.textContent = t('toast_saving');
   try {
     const body = collectFormFields('f');
+    if (window._pendingOFFSync) { body.from_off = true; window._pendingOFFSync = null; }
     const registeredType = body.type;
     const result = await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
     const newProductId = result.id;
