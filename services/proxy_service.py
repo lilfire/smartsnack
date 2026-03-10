@@ -77,9 +77,7 @@ def _sort_by_completeness(data: dict) -> dict:
 
 def _nutrition_field_similarity(local_val: float, off_val: float) -> float:
     """Compute similarity (0.0-1.0) between two nutrition values."""
-    if abs(local_val - off_val) < 0.1:
-        return 1.0
-    if local_val == 0 and off_val == 0:
+    if local_val == off_val:
         return 1.0
     denominator = max(abs(local_val), abs(off_val))
     if denominator == 0:
