@@ -215,7 +215,7 @@ export async function registerProduct() {
         }
       }, 500);
     }
-  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
+  } catch(e) { console.error(e); showToast(e.message || t('toast_save_error'), 'error'); }
   finally {
     btn.disabled = false;
     btn.textContent = t('btn_register_product');
