@@ -122,6 +122,18 @@ COMPLETENESS_FIELDS = (
 # System flags are managed programmatically; user flags are dynamic (stored in DB).
 SYSTEM_FLAGS = frozenset(("is_synced_with_off",))
 
+# Mapping of local nutrition fields to OFF nutriment keys for certainty scoring
+OFF_NUTRITION_COMPARE_MAP = {
+    "kcal":          "energy-kcal_100g",
+    "fat":           "fat_100g",
+    "saturated_fat": "saturated-fat_100g",
+    "carbs":         "carbohydrates_100g",
+    "sugar":         "sugars_100g",
+    "protein":       "proteins_100g",
+    "fiber":         "fiber_100g",
+    "salt":          "salt_100g",
+}
+
 # FLAG_FIELDS is built dynamically in product_service from the flag_definitions table.
 FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS
 
