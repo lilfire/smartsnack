@@ -26,9 +26,11 @@ def proxy_image():
 @bp.route("/api/off/search", methods=["GET", "POST"])
 def off_search():
     nutrition = None
+    category = ""
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
         query = body.get("q", "")
+        category = body.get("category", "")
         raw_nutrition = body.get("nutrition")
         if isinstance(raw_nutrition, dict):
             nutrition = {}
@@ -42,7 +44,7 @@ def off_search():
     else:
         query = request.args.get("q", "")
     try:
-        data = proxy_service.off_search(query, nutrition)
+        data = proxy_service.off_search(query, nutrition, category)
         return jsonify(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
