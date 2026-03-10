@@ -144,7 +144,9 @@ export function renderResults(results, search) {
     const brandHtml = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
     h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
       + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + catEmoji(p.type) + '</span>' + thumbHtml + '<span class="prod-name">' + esc(p.name) + '</span></div>'
-      + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandHtml + eanHtml + '</div></div>';
+      + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandHtml + eanHtml
+      + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
+      + '</div></div>';
     for (let ci = 1; ci < cols.length; ci++) {
       const c = cols[ci];
       if (c.key === 'total_score') {
@@ -176,6 +178,16 @@ export function renderResults(results, search) {
       if (p.has_missing_scores && p.missing_fields && p.missing_fields.length) {
         const mLabels = p.missing_fields.map((f) => { const c = SCORE_CFG_MAP[f]; return c ? c.label : f; }).join(', ');
         h += '<div style="margin-top:8px;padding:8px 10px;border-radius:7px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.18);font-size:11px;color:rgba(245,166,35,0.85)"><span style="margin-right:4px">\u26A0</span> ' + t('expanded_missing_data', { fields: esc(mLabels) }) + '</div>';
+      }
+      // Completeness bar
+      {
+        const compPct = p.completeness != null ? p.completeness : 0;
+        const compColor = compPct === 100 ? '#4ecdc4' : compPct >= 50 ? 'rgba(78,205,196,0.7)' : 'rgba(255,140,0,0.7)';
+        h += '<div class="completeness-section">'
+          + '<div class="completeness-header"><span class="completeness-label">' + t('completeness_label') + '</span>'
+          + '<span class="completeness-pct" style="color:' + compColor + '">' + compPct + '%</span></div>'
+          + '<div class="completeness-bar-bg"><div class="completeness-bar-fill" style="width:' + compPct + '%;background:' + compColor + '"></div></div>'
+          + '</div>';
       }
       // Nutrition table
       h += '<p class="nutri-section-title">' + t('expanded_nutrition_title') + '</p>';

@@ -107,7 +107,16 @@ MAX_FILTER_DEPTH = 4
 MAX_FILTER_CONDITIONS = 20
 TEXT_FIELDS = frozenset(_TEXT_FIELD_LIMITS.keys())  # type, name, ean, brand, stores, ingredients
 NUMERIC_FIELDS = frozenset(NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas"))
-POST_QUERY_FIELDS = frozenset(("total_score",))
+POST_QUERY_FIELDS = frozenset(("total_score", "completeness"))
+
+# ── Completeness score ────────────────────────────────
+COMPLETENESS_FIELDS = (
+    "ean", "brand", "stores", "ingredients", "image",
+    "kcal", "energy_kj", "carbs", "sugar", "fat", "saturated_fat",
+    "protein", "fiber", "salt",
+    "volume", "price", "weight", "portion",
+    "taste_score", "est_pdcaas", "est_diaas",
+)
 
 # ── Product flags ──────────────────────────────────────
 # System flags are managed programmatically; user flags are dynamic (stored in DB).

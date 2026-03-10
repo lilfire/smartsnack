@@ -8,7 +8,7 @@ from db import get_db
 from config import (
     PRODUCT_COLS_NO_IMAGE, INSERT_FIELDS, INSERT_PLACEHOLDERS,
     ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
-    SCORE_CONFIG_MAP, COMPUTED_FIELDS,
+    SCORE_CONFIG_MAP, COMPUTED_FIELDS, COMPLETENESS_FIELDS,
     ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS, POST_QUERY_FIELDS,
     MAX_FILTER_DEPTH, MAX_FILTER_CONDITIONS,
 )
@@ -169,6 +169,21 @@ def _score_product(
     )
     p["has_missing_scores"] = bool(missing_fields)
     p["missing_fields"] = missing_fields
+
+
+def _compute_completeness(p: dict) -> int:
+    """Compute completeness percentage (0-100) based on filled fields."""
+    filled = 0
+    total = len(COMPLETENESS_FIELDS)
+    for field in COMPLETENESS_FIELDS:
+        if field == "image":
+            if p.get("has_image"):
+                filled += 1
+        else:
+            val = p.get(field)
+            if val is not None and val != "":
+                filled += 1
+    return round(filled / total * 100) if total > 0 else 0
 
 
 def _parse_condition(c: dict) -> tuple:
@@ -485,6 +500,7 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
         _score_product(
             p, enabled_fields, enabled_weights, weight_config, cat_ranges,
         )
+        p["completeness"] = _compute_completeness(p)
         results.append(p)
 
     results = _apply_post_filters(results, post_filter_spec)
