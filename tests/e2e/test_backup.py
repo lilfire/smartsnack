@@ -1,6 +1,5 @@
 """Test backup and restore functionality."""
 
-import pytest
 from playwright.sync_api import expect
 
 
@@ -14,7 +13,9 @@ def _go_to_settings(page):
 def _open_database_section(page):
     """Open the database section in settings."""
     _go_to_settings(page)
-    db_toggle = page.locator(".settings-toggle:has(span[data-i18n='settings_database_title'])").first
+    db_toggle = page.locator(
+        ".settings-toggle:has(span[data-i18n='settings_database_title'])"
+    ).first
     db_toggle.click()
     page.wait_for_timeout(300)
 

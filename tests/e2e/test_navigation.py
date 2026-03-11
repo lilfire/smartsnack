@@ -2,7 +2,6 @@
 
 import re
 
-import pytest
 from playwright.sync_api import expect
 
 
@@ -20,7 +19,9 @@ def test_switch_to_register_view(page):
     expect(page.locator("#view-register")).to_be_visible()
     expect(page.locator("#view-search")).to_be_hidden()
     # Register tab should be active
-    expect(page.locator("button[data-view='register']")).to_have_class(re.compile("active"))
+    expect(page.locator("button[data-view='register']")).to_have_class(
+        re.compile("active")
+    )
 
 
 def test_switch_to_settings_view(page):
@@ -42,17 +43,25 @@ def test_switch_back_to_search(page):
 
 def test_nav_tabs_highlight_active(page):
     """Only the active nav tab should have the 'active' class."""
-    tabs = page.locator("button.nav-tab")
-
     # Search is active by default
-    expect(page.locator("button[data-view='search']")).to_have_class(re.compile("active"))
+    expect(page.locator("button[data-view='search']")).to_have_class(
+        re.compile("active")
+    )
 
     # Switch to register
     page.locator("button[data-view='register']").click()
-    expect(page.locator("button[data-view='register']")).to_have_class(re.compile("active"))
-    expect(page.locator("button[data-view='search']")).not_to_have_class(re.compile("active"))
+    expect(page.locator("button[data-view='register']")).to_have_class(
+        re.compile("active")
+    )
+    expect(page.locator("button[data-view='search']")).not_to_have_class(
+        re.compile("active")
+    )
 
     # Switch to settings
     page.locator("button[data-view='settings']").click()
-    expect(page.locator("button[data-view='settings']")).to_have_class(re.compile("active"))
-    expect(page.locator("button[data-view='register']")).not_to_have_class(re.compile("active"))
+    expect(page.locator("button[data-view='settings']")).to_have_class(
+        re.compile("active")
+    )
+    expect(page.locator("button[data-view='register']")).not_to_have_class(
+        re.compile("active")
+    )

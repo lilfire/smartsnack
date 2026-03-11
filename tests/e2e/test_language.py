@@ -2,7 +2,6 @@
 
 import re
 
-import pytest
 from playwright.sync_api import expect
 
 
@@ -15,7 +14,9 @@ def _go_to_settings(page):
 
 def _open_language_section(page):
     """Open the language section in settings."""
-    lang_toggle = page.locator(".settings-toggle:has(span[data-i18n='settings_language'])").first
+    lang_toggle = page.locator(
+        ".settings-toggle:has(span[data-i18n='settings_language'])"
+    ).first
     lang_toggle.click()
     page.wait_for_timeout(300)
 
