@@ -40,6 +40,7 @@ vi.mock('../images.js', () => ({
 
 vi.mock('../render.js', () => ({
   renderResults: vi.fn(),
+  loadFlagConfig: vi.fn().mockResolvedValue(),
 }));
 
 vi.mock('../products.js', () => ({
