@@ -9,10 +9,21 @@ import sys
 import threading
 import time
 
+import subprocess
+
 import pytest
 
 # Ensure project root is importable
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _ensure_browsers():
+    """Install Playwright Chromium if not already present."""
+    subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        check=True,
+    )
 
 
 @pytest.fixture(scope="session")
