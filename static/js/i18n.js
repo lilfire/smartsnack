@@ -57,6 +57,11 @@ export async function changeLanguage(lang) {
   if (!ok) return;
   await api('/api/settings/language', { method: 'PUT', body: JSON.stringify({ language: lang }) });
   applyStaticTranslations();
+  // Immediately update stats-line with cached data so it doesn't flash "loading"
+  const statsEl = document.getElementById('stats-line');
+  if (statsEl && state.cachedStats) {
+    statsEl.textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+  }
   // Re-fetch flag config so labels match the new language
   const { loadFlagConfig } = await import('./render.js');
   await loadFlagConfig();
