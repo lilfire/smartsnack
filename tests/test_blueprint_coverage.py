@@ -7,6 +7,7 @@
 - blueprints/off.py
 """
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -41,6 +42,10 @@ class TestGetFlagConfigEndpoint:
 
 class TestAddFlagEndpoint:
     """POST /api/flags"""
+
+    @pytest.fixture(autouse=True)
+    def _use_temp_translations(self, translations_dir):
+        pass
 
     def test_add_flag_success_returns_201(self, client):
         resp = client.post(
@@ -94,6 +99,10 @@ class TestAddFlagEndpoint:
 class TestUpdateFlagEndpoint:
     """PUT /api/flags/<name>"""
 
+    @pytest.fixture(autouse=True)
+    def _use_temp_translations(self, translations_dir):
+        pass
+
     def _create_flag(self, client, name="upd_flag_xyz"):
         client.post("/api/flags", json={"name": name, "label": "Original Label"})
         return name
@@ -126,6 +135,10 @@ class TestUpdateFlagEndpoint:
 
 class TestDeleteFlagEndpoint:
     """DELETE /api/flags/<name>"""
+
+    @pytest.fixture(autouse=True)
+    def _use_temp_translations(self, translations_dir):
+        pass
 
     def _create_flag(self, client, name="del_flag_xyz"):
         client.post("/api/flags", json={"name": name, "label": "Delete Me"})
@@ -604,6 +617,10 @@ class TestRefreshOffStreamEndpoint:
 class TestUpdateProteinQualityEndpoint:
     """PUT /api/protein-quality/<pid>"""
 
+    @pytest.fixture(autouse=True)
+    def _use_temp_translations(self, translations_dir):
+        pass
+
     def _get_existing_pid(self, client) -> int:
         entries = client.get("/api/protein-quality").get_json()
         assert entries, "Seed data must include at least one PQ entry"
@@ -658,6 +675,10 @@ class TestUpdateProteinQualityEndpoint:
 class TestDeleteProteinQualityEndpoint:
     """DELETE /api/protein-quality/<pid>"""
 
+    @pytest.fixture(autouse=True)
+    def _use_temp_translations(self, translations_dir):
+        pass
+
     def _add_entry(self, client, name: str) -> int:
         resp = client.post(
             "/api/protein-quality",
@@ -693,6 +714,10 @@ class TestDeleteProteinQualityEndpoint:
 
 class TestAddProteinQualityEndpoint:
     """POST /api/protein-quality — error paths not covered elsewhere"""
+
+    @pytest.fixture(autouse=True)
+    def _use_temp_translations(self, translations_dir):
+        pass
 
     def test_add_missing_json_returns_400(self, client):
         resp = client.post(
