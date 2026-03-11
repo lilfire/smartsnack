@@ -3,14 +3,25 @@
 import json
 import math
 import re
+import sqlite3
 
 from db import get_db
 from config import (
-    PRODUCT_COLS_NO_IMAGE, INSERT_FIELDS, INSERT_PLACEHOLDERS,
-    ALL_PRODUCT_FIELDS, _VALID_COLUMNS, _TEXT_FIELD_LIMITS,
-    SCORE_CONFIG_MAP, COMPUTED_FIELDS, COMPLETENESS_FIELDS,
-    ADVANCED_FILTER_OPS, TEXT_FIELDS, NUMERIC_FIELDS, FILTERABLE_FIELDS, POST_QUERY_FIELDS,
-    MAX_FILTER_DEPTH, MAX_FILTER_CONDITIONS,
+    PRODUCT_COLS_NO_IMAGE,
+    INSERT_FIELDS,
+    INSERT_PLACEHOLDERS,
+    ALL_PRODUCT_FIELDS,
+    _VALID_COLUMNS,
+    _TEXT_FIELD_LIMITS,
+    SCORE_CONFIG_MAP,
+    COMPUTED_FIELDS,
+    COMPLETENESS_FIELDS,
+    ADVANCED_FILTER_OPS,
+    TEXT_FIELDS,
+    FILTERABLE_FIELDS,
+    POST_QUERY_FIELDS,
+    MAX_FILTER_DEPTH,
+    MAX_FILTER_CONDITIONS,
 )
 from services import flag_service
 from helpers import _num, _safe_float
@@ -28,7 +39,7 @@ def _get_product_flags(cur, product_ids: list) -> dict:
         f"SELECT product_id, flag FROM product_flags WHERE product_id IN ({placeholders})",
         product_ids,
     ).fetchall()
-    result = {}
+    result: dict[int, list[str]] = {}
     for r in rows:
         result.setdefault(r["product_id"], []).append(r["flag"])
     return result
@@ -69,7 +80,7 @@ def set_system_flag(pid: int, flag_name: str, value: bool) -> None:
     conn.commit()
 
 
-def _load_weight_config(cur: object) -> tuple:
+def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
     """Load enabled score weights and their config from the database."""
     weight_rows = cur.execute(
         "SELECT field, enabled, weight, direction, formula, "
@@ -91,7 +102,8 @@ def _load_weight_config(cur: object) -> tuple:
 
 
 def _compute_category_ranges(
-    cur: object, enabled_fields: list,
+    cur: sqlite3.Cursor,
+    enabled_fields: list,
 ) -> dict:
     """Compute min/max ranges per category for minmax scoring."""
     cat_ranges = {}
@@ -100,23 +112,23 @@ def _compute_category_ranges(
         for f in db_fields:
             if f not in _VALID_COLUMNS:
                 raise ValueError(f"Invalid field: {f!r}")
-        agg = ", ".join(
-            f"MIN({f}) as min_{f}, MAX({f}) as max_{f}" for f in db_fields
-        )
+        agg = ", ".join(f"MIN({f}) as min_{f}, MAX({f}) as max_{f}" for f in db_fields)
         type_rows = cur.execute(
             f"SELECT type, {agg} FROM products GROUP BY type"
         ).fetchall()
         for tr in type_rows:
             cat_ranges[tr["type"]] = {
-                f: (tr[f"min_{f}"] or 0, tr[f"max_{f}"] or 0)
-                for f in db_fields
+                f: (tr[f"min_{f}"] or 0, tr[f"max_{f}"] or 0) for f in db_fields
             }
     return cat_ranges
 
 
 def _score_product(
-    p: dict, enabled_fields: list, enabled_weights: dict,
-    weight_config: dict, cat_ranges: dict,
+    p: dict,
+    enabled_fields: list,
+    enabled_weights: dict,
+    weight_config: dict,
+    cat_ranges: dict,
 ) -> None:
     """Compute and attach scores to a product dict in-place."""
     scores = {}
@@ -165,7 +177,8 @@ def _score_product(
     p["scores"] = scores
     p["total_score"] = (
         round(weighted_score_sum / (num_scored_fields * 100), 1)
-        if num_scored_fields > 0 else 0
+        if num_scored_fields > 0
+        else 0
     )
     p["has_missing_scores"] = bool(missing_fields)
     p["missing_fields"] = missing_fields
@@ -206,7 +219,7 @@ def _parse_condition(c: dict) -> tuple:
 
     # Flag fields: only op "=" with value "true"/"false"
     if field in flag_fields:
-        flag_name = field[len(_FLAG_FIELD_PREFIX):]
+        flag_name = field[len(_FLAG_FIELD_PREFIX) :]
         if flag_name not in all_flag_names:
             raise ValueError(f"Unknown flag: {flag_name}")
         if op != "=":
@@ -230,7 +243,7 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
     Returns (sql_fragment, param).
     """
     if field.startswith(_FLAG_FIELD_PREFIX):
-        flag_name = field[len(_FLAG_FIELD_PREFIX):]
+        flag_name = field[len(_FLAG_FIELD_PREFIX) :]
         subquery = "SELECT 1 FROM product_flags pf WHERE pf.product_id = products.id AND pf.flag = ?"
         if value == "true":
             return f"EXISTS ({subquery})", flag_name
@@ -239,7 +252,9 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
 
     if field in TEXT_FIELDS:
         if op == "contains":
-            escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            escaped = (
+                value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
             return f"LOWER({field}) LIKE ? ESCAPE '\\'", f"%{escaped.lower()}%"
         elif op in ("=", "!="):
             return f"LOWER({field}) {sql_op} LOWER(?)", value
@@ -247,7 +262,9 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
             raise ValueError(f"Operator '{op}' not valid for text field '{field}'")
     else:
         if op == "contains":
-            raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
+            raise ValueError(
+                f"Operator 'contains' not valid for numeric field '{field}'"
+            )
         try:
             num_val = float(value)
         except (ValueError, TypeError) as e:
@@ -294,10 +311,12 @@ def _convert_legacy_format(data: dict) -> dict:
         children = []
         for g in data["groups"]:
             if isinstance(g, dict) and g.get("conditions"):
-                children.append({
-                    "logic": g.get("logic", "and"),
-                    "children": g["conditions"],
-                })
+                children.append(
+                    {
+                        "logic": g.get("logic", "and"),
+                        "children": g["conditions"],
+                    }
+                )
         return {"logic": logic, "children": children}
 
     raise ValueError("Unrecognised filter format")
@@ -307,7 +326,9 @@ def _count_conditions(node: dict) -> int:
     """Recursively count leaf conditions in a filter tree."""
     if "field" in node:
         return 1
-    return sum(_count_conditions(c) for c in node.get("children", []) if isinstance(c, dict))
+    return sum(
+        _count_conditions(c) for c in node.get("children", []) if isinstance(c, dict)
+    )
 
 
 def _process_node(node: dict, depth: int = 0) -> tuple:
@@ -325,7 +346,15 @@ def _process_node(node: dict, depth: int = 0) -> tuple:
     if "field" in node:
         field, op, value, sql_op = _parse_condition(node)
         if field in POST_QUERY_FIELDS:
-            return None, [], {"field": field, "op": op, "val": _condition_to_post(field, op, value)[2]}
+            return (
+                None,
+                [],
+                {
+                    "field": field,
+                    "op": op,
+                    "val": _condition_to_post(field, op, value)[2],
+                },
+            )
         frag, param = _condition_to_sql(field, op, value, sql_op)
         return f"({frag})", [param], None
 
@@ -371,7 +400,11 @@ def _process_node(node: dict, depth: int = 0) -> tuple:
     # Build post-filter node for this group
     post_node = None
     if post_parts:
-        post_node = {"logic": logic, "children": post_parts} if len(post_parts) > 1 else post_parts[0]
+        post_node = (
+            {"logic": logic, "children": post_parts}
+            if len(post_parts) > 1
+            else post_parts[0]
+        )
 
     return sql_fragment, all_params, post_node
 
@@ -380,7 +413,11 @@ def _node_to_post(node: dict) -> dict:
     """Convert an entire filter node tree to a post-filter spec (no SQL)."""
     if "field" in node:
         field, op, value, _sql_op = _parse_condition(node)
-        return {"field": field, "op": op, "val": _condition_to_post(field, op, value)[2]}
+        return {
+            "field": field,
+            "op": op,
+            "val": _condition_to_post(field, op, value)[2],
+        }
 
     logic = node.get("logic", "and").upper()
     children = node.get("children", [])
@@ -457,7 +494,9 @@ def _apply_post_filters(results: list, post_filter_spec: dict | None) -> list:
     return [p for p in results if _evaluate_post_node(post_filter_spec, p)]
 
 
-def list_products(search: str | None, type_filter: str | None, advanced_filters: str | None = None) -> list:
+def list_products(
+    search: str | None, type_filter: str | None, advanced_filters: str | None = None
+) -> list:
     """List products with computed scores, filtered and sorted."""
     conn = get_db()
     cur = conn.cursor()
@@ -498,7 +537,11 @@ def list_products(search: str | None, type_filter: str | None, advanced_filters:
         for cf, compute_fn in COMPUTED_FIELDS.items():
             p[cf] = compute_fn(p)
         _score_product(
-            p, enabled_fields, enabled_weights, weight_config, cat_ranges,
+            p,
+            enabled_fields,
+            enabled_weights,
+            weight_config,
+            cat_ranges,
         )
         p["completeness"] = _compute_completeness(p)
         results.append(p)
@@ -527,30 +570,51 @@ def add_product(data: dict) -> dict:
         raise ValueError("EAN must be 8-13 digits")
     conn = get_db()
     cur = conn.cursor()
-    cat_exists = cur.execute("SELECT 1 FROM categories WHERE name = ?", (data["type"].strip(),)).fetchone()
+    cat_exists = cur.execute(
+        "SELECT 1 FROM categories WHERE name = ?", (data["type"].strip(),)
+    ).fetchone()
     if not cat_exists:
         raise ValueError("Category does not exist")
     name = data["name"].strip()
     if ean:
-        dup = cur.execute("SELECT id, name FROM products WHERE ean = ?", (ean,)).fetchone()
+        dup = cur.execute(
+            "SELECT id, name FROM products WHERE ean = ?", (ean,)
+        ).fetchone()
         if dup:
             raise ValueError(f"A product with EAN {ean} already exists: {dup[1]}")
-    dup_name = cur.execute("SELECT id FROM products WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
+    dup_name = cur.execute(
+        "SELECT id FROM products WHERE LOWER(name) = LOWER(?)", (name,)
+    ).fetchone()
     if dup_name:
         raise ValueError(f"A product with name '{name}' already exists")
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
-        (data["type"].strip(), data["name"].strip(), data.get("ean", "").strip(),
-         data.get("brand", "").strip(), data.get("stores", "").strip(), data.get("ingredients", "").strip(),
-         data.get("taste_note", "").strip(),
-         _num(data, "taste_score"), _num(data, "kcal"),
-         _num(data, "energy_kj"), _num(data, "carbs"),
-         _num(data, "sugar"), _num(data, "fat"),
-         _num(data, "saturated_fat"), _num(data, "protein"),
-         _num(data, "fiber"), _num(data, "salt"),
-         _num(data, "volume"), _num(data, "price"),
-         _num(data, "weight"), _num(data, "portion"),
-         _num(data, "est_pdcaas"), _num(data, "est_diaas")))
+        (
+            data["type"].strip(),
+            data["name"].strip(),
+            data.get("ean", "").strip(),
+            data.get("brand", "").strip(),
+            data.get("stores", "").strip(),
+            data.get("ingredients", "").strip(),
+            data.get("taste_note", "").strip(),
+            _num(data, "taste_score"),
+            _num(data, "kcal"),
+            _num(data, "energy_kj"),
+            _num(data, "carbs"),
+            _num(data, "sugar"),
+            _num(data, "fat"),
+            _num(data, "saturated_fat"),
+            _num(data, "protein"),
+            _num(data, "fiber"),
+            _num(data, "salt"),
+            _num(data, "volume"),
+            _num(data, "price"),
+            _num(data, "weight"),
+            _num(data, "portion"),
+            _num(data, "est_pdcaas"),
+            _num(data, "est_diaas"),
+        ),
+    )
     new_id = cur.lastrowid
     if "flags" in data and isinstance(data["flags"], list):
         _set_user_flags(conn, new_id, data["flags"])
@@ -593,12 +657,16 @@ def update_product(pid: int, data: dict) -> None:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data:
-        cat_exists = conn.execute("SELECT 1 FROM categories WHERE name = ?", (data["type"],)).fetchone()
+        cat_exists = conn.execute(
+            "SELECT 1 FROM categories WHERE name = ?", (data["type"],)
+        ).fetchone()
         if not cat_exists:
             raise ValueError("Category does not exist")
     if updates:
         vals.append(pid)
-        cur = conn.execute(f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals)
+        cur = conn.execute(
+            f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
+        )
         if cur.rowcount == 0:
             raise LookupError("Product not found")
     else:

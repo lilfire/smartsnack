@@ -7,21 +7,25 @@ from unittest.mock import patch, MagicMock
 class TestProxyImage:
     def test_invalid_url(self):
         from services.proxy_service import proxy_image
+
         with pytest.raises(ValueError, match="Invalid URL"):
             proxy_image("")
 
     def test_non_http_url(self):
         from services.proxy_service import proxy_image
+
         with pytest.raises(ValueError, match="Invalid URL"):
             proxy_image("ftp://example.com/image.jpg")
 
     def test_disallowed_domain(self):
         from services.proxy_service import proxy_image
+
         with pytest.raises(PermissionError, match="Domain not allowed"):
             proxy_image("https://evil.com/image.jpg")
 
     def test_allowed_domain(self):
         from services.proxy_service import proxy_image, _no_redirect_opener
+
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "image/jpeg"}
         mock_resp.read.return_value = b"\xff\xd8\xff\xe0" * 100
@@ -34,12 +38,15 @@ class TestProxyImage:
 
     def test_http_to_https_upgrade(self):
         from services.proxy_service import proxy_image, _no_redirect_opener
+
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "image/png"}
         mock_resp.read.return_value = b"\x89PNG" * 100
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch.object(_no_redirect_opener, "open", return_value=mock_resp) as mock_open:
+        with patch.object(
+            _no_redirect_opener, "open", return_value=mock_resp
+        ) as mock_open:
             proxy_image("http://images.openfoodfacts.org/test.png")
             # Check that the URL was upgraded to HTTPS
             call_args = mock_open.call_args
@@ -48,6 +55,7 @@ class TestProxyImage:
 
     def test_too_large_image(self):
         from services.proxy_service import proxy_image, _no_redirect_opener
+
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "image/jpeg"}
         mock_resp.read.return_value = b"x" * (5 * 1024 * 1024 + 2)
@@ -59,6 +67,7 @@ class TestProxyImage:
 
     def test_svg_rejected(self):
         from services.proxy_service import proxy_image, _no_redirect_opener
+
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "image/svg+xml"}
         mock_resp.read.return_value = b"<svg></svg>"
@@ -70,6 +79,7 @@ class TestProxyImage:
 
     def test_non_image_content_type(self):
         from services.proxy_service import proxy_image, _no_redirect_opener
+
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "text/html"}
         mock_resp.read.return_value = b"<html></html>"
@@ -81,6 +91,7 @@ class TestProxyImage:
 
     def test_openfoodfacts_net_allowed(self):
         from services.proxy_service import proxy_image, _no_redirect_opener
+
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "image/jpeg"}
         mock_resp.read.return_value = b"\xff\xd8\xff\xe0"

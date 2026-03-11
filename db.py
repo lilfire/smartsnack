@@ -51,21 +51,32 @@ def init_db():
         for sc in SCORE_CONFIG:
             f = sc["field"]
             d = DEFAULT_WEIGHTS.get(f, {"enabled": 0, "weight": 0})
-            cur.execute("INSERT INTO score_weights (field, enabled, weight, direction, formula, formula_min, formula_max) VALUES (?,?,?,?,?,?,?)",
-                        (f, d["enabled"], d["weight"], sc["direction"], sc["formula"], sc["formula_min"], sc["formula_max"]))
+            cur.execute(
+                "INSERT INTO score_weights (field, enabled, weight, direction, formula, formula_min, formula_max) VALUES (?,?,?,?,?,?,?)",
+                (
+                    f,
+                    d["enabled"],
+                    d["weight"],
+                    sc["direction"],
+                    sc["formula"],
+                    sc["formula_min"],
+                    sc["formula_max"],
+                ),
+            )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS categories (
             name TEXT PRIMARY KEY,
-            emoji TEXT NOT NULL DEFAULT '\U0001F4E6'
+            emoji TEXT NOT NULL DEFAULT '\U0001f4e6'
         )
     """)
 
     cur.execute("SELECT COUNT(*) FROM categories")
     if cur.fetchone()[0] == 0:
-        cur.executemany("INSERT INTO categories (name, emoji) VALUES (?,?)", [
-            ("Snacks", "\U0001F37F")
-        ])
+        cur.executemany(
+            "INSERT INTO categories (name, emoji) VALUES (?,?)",
+            [("Snacks", "\U0001f37f")],
+        )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS products (
@@ -108,8 +119,10 @@ def init_db():
     cur.execute("SELECT COUNT(*) FROM protein_quality")
     if cur.fetchone()[0] == 0:
         for name, pdcaas, diaas in PQ_SEED:
-            cur.execute("INSERT INTO protein_quality (name, pdcaas, diaas) VALUES (?,?,?)",
-                        (name, pdcaas, diaas))
+            cur.execute(
+                "INSERT INTO protein_quality (name, pdcaas, diaas) VALUES (?,?,?)",
+                (name, pdcaas, diaas),
+            )
 
     # ── User settings (key-value store) ──────────────────
     cur.execute("""
@@ -120,7 +133,10 @@ def init_db():
     """)
     cur.execute("SELECT COUNT(*) FROM user_settings WHERE key='language'")
     if cur.fetchone()[0] == 0:
-        cur.execute("INSERT INTO user_settings (key, value) VALUES ('language', ?)", (DEFAULT_LANGUAGE,))
+        cur.execute(
+            "INSERT INTO user_settings (key, value) VALUES ('language', ?)",
+            (DEFAULT_LANGUAGE,),
+        )
 
     run_migrations(cur)
 
@@ -138,29 +154,29 @@ def seed_products(cur):
 
     data = [
         (
-            "Snacks",            # type
+            "Snacks",  # type
             "Classic Popcorn",  # name
-            "7000000000001",     # ean
-            "SmartSnack",        # brand
-            "All stores",        # stores
-            "Corn, sunflower oil, sea salt", # ingredients
-            3.0,                 # taste_score
-            450.0,               # kcal
-            1880.0,              # energy_kj
-            55.0,                # carbs
-            1.0,                 # sugar
-            20.0,                # fat
-            2.5,                 # saturated_fat
-            9.0,                 # protein
-            12.0,                # fiber
-            1.5,                 # salt
-            1.0,                 # volume
-            25.0,                # price
-            100.0,               # weight
-            25.0,                # portion
-            0.5,                 # est_pdcaas
-            0.4,                 # est_diaas
-            demo_image_base64    # image (Base64 string)
+            "7000000000001",  # ean
+            "SmartSnack",  # brand
+            "All stores",  # stores
+            "Corn, sunflower oil, sea salt",  # ingredients
+            3.0,  # taste_score
+            450.0,  # kcal
+            1880.0,  # energy_kj
+            55.0,  # carbs
+            1.0,  # sugar
+            20.0,  # fat
+            2.5,  # saturated_fat
+            9.0,  # protein
+            12.0,  # fiber
+            1.5,  # salt
+            1.0,  # volume
+            25.0,  # price
+            100.0,  # weight
+            25.0,  # portion
+            0.5,  # est_pdcaas
+            0.4,  # est_diaas
+            demo_image_base64,  # image (Base64 string)
         )
     ]
 
@@ -172,5 +188,5 @@ def seed_products(cur):
             fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas, image
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """,
-        data
+        data,
     )

@@ -13,8 +13,8 @@ from db import get_db
 
 logger = logging.getLogger(__name__)
 
-_translations_cache = {}
-_cache_mtimes = {}
+_translations_cache: dict[str, dict] = {}
+_cache_mtimes: dict[str, float] = {}
 _cache_lock = threading.Lock()
 _file_locks = {}
 _file_locks_lock = threading.Lock()
@@ -64,7 +64,7 @@ def _get_current_lang() -> str:
         return DEFAULT_LANGUAGE
 
 
-def _t(key: str, lang: str = None) -> str:
+def _t(key: str, lang: str | None = None) -> str:
     """Translate a key to the given or current language."""
     if lang is None:
         lang = _get_current_lang()
@@ -74,11 +74,11 @@ def _t(key: str, lang: str = None) -> str:
 
 def _category_key(name: str) -> str:
     """Generate a translation key for a category name."""
-    slug = re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower().strip()).strip("_")
     return f"category_{slug}"
 
 
-def _category_label(name: str, lang: str = None) -> str:
+def _category_label(name: str, lang: str | None = None) -> str:
     """Get the translated label for a category, falling back to the name."""
     key = _category_key(name)
     label = _t(key, lang=lang)
@@ -89,11 +89,11 @@ def _category_label(name: str, lang: str = None) -> str:
 
 def _flag_key(name: str) -> str:
     """Generate a translation key for a flag name."""
-    slug = re.sub(r'[^a-z0-9]+', '_', name.lower().strip()).strip('_')
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower().strip()).strip("_")
     return f"flag_{slug}"
 
 
-def _flag_label(name: str, lang: str = None) -> str:
+def _flag_label(name: str, lang: str | None = None) -> str:
     """Get the translated label for a flag, falling back to the name."""
     key = _flag_key(name)
     label = _t(key, lang=lang)
@@ -102,7 +102,7 @@ def _flag_label(name: str, lang: str = None) -> str:
     return label
 
 
-def _pq_label(name: str, lang: str = None) -> str:
+def _pq_label(name: str, lang: str | None = None) -> str:
     """Get the translated label for a protein quality entry."""
     label = _t(f"pq_{name}_label", lang=lang)
     if label == f"pq_{name}_label":
@@ -110,7 +110,7 @@ def _pq_label(name: str, lang: str = None) -> str:
     return label
 
 
-def _pq_keywords(name: str, lang: str = None) -> list:
+def _pq_keywords(name: str, lang: str | None = None) -> list:
     """Get translated keywords for a protein quality entry."""
     raw = _t(f"pq_{name}_keywords", lang=lang)
     if raw == f"pq_{name}_keywords":
@@ -149,7 +149,7 @@ def _atomic_write_json(filepath: str, data: dict) -> None:
 
 def _set_translation_key(key: str, values_by_lang: dict) -> None:
     """Set a translation key across one or more languages."""
-    if not re.match(r'^[a-z][a-z0-9_.]*$', key):
+    if not re.match(r"^[a-z][a-z0-9_.]*$", key):
         raise ValueError(f"Invalid translation key format: {key}")
     for lang, value in values_by_lang.items():
         if lang not in SUPPORTED_LANGUAGES:
