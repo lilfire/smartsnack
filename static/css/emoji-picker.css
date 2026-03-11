@@ -19,6 +19,11 @@
   border-color: rgba(232, 184, 75, 0.3);
 }
 
+.emoji-picker-trigger:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+}
+
 .emoji-picker-popup {
   width: 100%;
   max-height: 320px;
@@ -50,6 +55,11 @@
 
 .emoji-picker-search:focus {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.emoji-picker-search:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .emoji-picker-grid {

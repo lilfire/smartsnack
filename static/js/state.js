@@ -31,6 +31,7 @@ export function catLabel(typeName) {
 // Singleton element for HTML escaping
 const _escDiv = document.createElement('div');
 export function esc(s) {
+  if (s == null) return '';
   _escDiv.textContent = s;
   return _escDiv.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
@@ -55,6 +56,7 @@ export function fmtNum(v) {
 let _toastTimer = null;
 export function showToast(msg, type) {
   const toast = document.getElementById('toast');
+  if (!toast) return;
   toast.textContent = msg;
   toast.className = 'toast ' + type + ' show';
   if (_toastTimer) clearTimeout(_toastTimer);

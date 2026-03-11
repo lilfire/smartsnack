@@ -84,10 +84,12 @@ export async function loadData() {
   try {
     await fetchStats();
     buildFilters();
-    document.getElementById('stats-line').textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
+    const statsEl = document.getElementById('stats-line');
+    if (statsEl) statsEl.textContent = t('stats_line', { total: state.cachedStats.total, types: state.cachedStats.types });
     buildTypeSelect();
     upgradeSelect(document.getElementById('f-volume'));
-    const search = state.currentView === 'search' ? document.getElementById('search-input').value.trim() : '';
+    const searchInputEl = document.getElementById('search-input');
+    const search = state.currentView === 'search' && searchInputEl ? searchInputEl.value.trim() : '';
     const results = await fetchProducts(search, state.currentFilter);
     renderResults(results, search);
   } catch (e) {
@@ -109,7 +111,7 @@ export function switchView(v) {
   } else {
     loadData();
   }
-  if (v === 'search') document.getElementById('search-input').focus();
+  if (v === 'search') { const si = document.getElementById('search-input'); if (si) si.focus(); }
 }
 
 export function setFilter(f) {
@@ -181,7 +183,7 @@ export async function registerProduct() {
     const pqr = document.getElementById('f-pq-result');
     if (pqr) pqr.style.display = 'none';
     // Lazy import to avoid circular dep
-    import('./openfoodfacts.js').then((mod) => { mod.validateOffBtn('f'); });
+    import('./openfoodfacts.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
     NUTRI_IDS.forEach((id) => { document.getElementById('f-' + id).value = ''; });
     document.getElementById('f-volume').value = '';
     upgradeSelect(document.getElementById('f-volume'));

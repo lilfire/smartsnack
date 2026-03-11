@@ -33,7 +33,13 @@ def init_db():
     conn.execute("PRAGMA busy_timeout = 5000")
     conn.execute("PRAGMA journal_mode=WAL")
     cur = conn.cursor()
+    try:
+        _init_schema(cur, conn)
+    finally:
+        conn.close()
 
+
+def _init_schema(cur, conn):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS score_weights (
             field TEXT PRIMARY KEY,
@@ -145,7 +151,6 @@ def init_db():
         seed_products(cur)
 
     conn.commit()
-    conn.close()
 
 
 def seed_products(cur):

@@ -37,5 +37,9 @@ def get_translations(lang: str) -> dict:
     filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
     if not os.path.isfile(filepath):
         raise LookupError("Translation file not found")
-    with open(filepath, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        logger.error("Failed to read translation file %s: %s", filepath, e)
+        raise LookupError("Translation file could not be read") from e

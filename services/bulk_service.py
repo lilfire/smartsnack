@@ -8,11 +8,25 @@ import sqlite3
 import threading
 import time
 
-from config import DB_PATH
+from config import DB_PATH, _VALID_COLUMNS
 from db import get_db
 from services import proxy_service, protein_quality_service
 
 logger = logging.getLogger(__name__)
+
+
+def _build_update_sql(field_updates: dict) -> tuple[str, list]:
+    """Build a safe SET clause for UPDATE, validating all field names.
+
+    Raises ValueError if any field name is not in the column whitelist.
+    Returns (set_clause_string, ordered_values_list).
+    """
+    for f in field_updates:
+        if f not in _VALID_COLUMNS:
+            raise ValueError(f"Invalid column name in update: {f!r}")
+    set_clauses = [f"{f} = ?" for f in field_updates]
+    return ", ".join(set_clauses), list(field_updates.values())
+
 
 # ── In-memory refresh job state ──────────────────────
 _refresh_job = {
@@ -231,11 +245,10 @@ def refresh_from_off():
 
             # Update product fields
             if field_updates:
-                set_clauses = [f"{f} = ?" for f in field_updates]
-                vals = list(field_updates.values()) + [pid]
+                set_clause, vals = _build_update_sql(field_updates)
                 conn.execute(
-                    f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                    vals,
+                    f"UPDATE products SET {set_clause} WHERE id = ?",
+                    vals + [pid],
                 )
 
             # Update image separately
@@ -371,11 +384,10 @@ def _run_refresh(options=None):
                     continue
 
                 if field_updates:
-                    set_clauses = [f"{f} = ?" for f in field_updates]
-                    vals = list(field_updates.values()) + [pid]
+                    set_clause, vals = _build_update_sql(field_updates)
                     conn.execute(
-                        f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                        vals,
+                        f"UPDATE products SET {set_clause} WHERE id = ?",
+                        vals + [pid],
                     )
 
                 if image_uri:
@@ -535,11 +547,10 @@ def _run_refresh(options=None):
                         continue
 
                     if field_updates:
-                        set_clauses = [f"{f} = ?" for f in field_updates]
-                        vals = list(field_updates.values()) + [pid]
+                        set_clause, vals = _build_update_sql(field_updates)
                         conn.execute(
-                            f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                            vals,
+                            f"UPDATE products SET {set_clause} WHERE id = ?",
+                            vals + [pid],
                         )
 
                     if image_uri:
