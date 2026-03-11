@@ -1,5 +1,4 @@
 name: Manual Build and Push to GHCR
-
 on:
   workflow_dispatch:
     inputs:
@@ -7,14 +6,12 @@ on:
         description: 'Image tag (e.g., v1.0 or latest)'
         required: true
         default: 'latest'
-
 jobs:
-  build:
+  build-tagged:
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
-    
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,12 +23,39 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and Push
+      - name: Build and Push Tagged
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}:${{ github.event.inputs.tag }}
+          labels: |
+            org.opencontainers.image.description=A self-hosted web application for rating snacks.
+            org.opencontainers.image.documentation=https://github.com/lilfire/smartsnack/blob/main/CHANGELOG.md
+            org.opencontainers.image.source=https://github.com/lilfire/smartsnack
+
+  build-latest:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and Push Latest
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:latest
           labels: |
             org.opencontainers.image.description=A self-hosted web application for rating snacks.
             org.opencontainers.image.documentation=https://github.com/lilfire/smartsnack/blob/main/CHANGELOG.md
