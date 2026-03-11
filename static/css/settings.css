@@ -388,6 +388,19 @@
   margin: 24px 0;
 }
 
+.settings-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 16px 0 12px;
+}
+
+.restore-warning {
+  font-size: 11px;
+  color: rgba(255, 68, 68, 0.6);
+  margin-top: 4px;
+  display: inline-block;
+}
+
 /* ── Settings: Protein Quality ────────────────────── */
 .pq-list {
   gap: 8px;
