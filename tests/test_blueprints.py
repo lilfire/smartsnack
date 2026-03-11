@@ -1,8 +1,5 @@
 """Integration tests for all blueprint routes via Flask test client."""
 
-import json
-import pytest
-
 
 class TestCoreBlueprint:
     def test_health(self, client):
@@ -33,9 +30,14 @@ class TestProductsBlueprint:
         assert resp.status_code == 200
 
     def test_add_product(self, client):
-        resp = client.post("/api/products", json={
-            "type": "Snacks", "name": "Test Chips", "ean": "12345678",
-        })
+        resp = client.post(
+            "/api/products",
+            json={
+                "type": "Snacks",
+                "name": "Test Chips",
+                "ean": "12345678",
+            },
+        )
         assert resp.status_code == 201
         data = resp.get_json()
         assert "id" in data
@@ -57,9 +59,13 @@ class TestProductsBlueprint:
 
     def test_delete_product(self, client):
         # Add then delete
-        add_resp = client.post("/api/products", json={
-            "type": "Snacks", "name": "ToDelete",
-        })
+        add_resp = client.post(
+            "/api/products",
+            json={
+                "type": "Snacks",
+                "name": "ToDelete",
+            },
+        )
         pid = add_resp.get_json()["id"]
         resp = client.delete(f"/api/products/{pid}")
         assert resp.status_code == 200
@@ -80,17 +86,23 @@ class TestImagesBlueprint:
     def test_set_image(self, client):
         products = client.get("/api/products").get_json()
         pid = products[0]["id"]
-        resp = client.put(f"/api/products/{pid}/image", json={
-            "image": "data:image/png;base64,iVBORw0KGgo=",
-        })
+        resp = client.put(
+            f"/api/products/{pid}/image",
+            json={
+                "image": "data:image/png;base64,iVBORw0KGgo=",
+            },
+        )
         assert resp.status_code == 200
 
     def test_set_image_invalid(self, client):
         products = client.get("/api/products").get_json()
         pid = products[0]["id"]
-        resp = client.put(f"/api/products/{pid}/image", json={
-            "image": "invalid-data",
-        })
+        resp = client.put(
+            f"/api/products/{pid}/image",
+            json={
+                "image": "invalid-data",
+            },
+        )
         assert resp.status_code == 400
 
     def test_delete_image(self, client):
@@ -109,27 +121,46 @@ class TestCategoriesBlueprint:
         assert len(data) >= 1
 
     def test_add_category(self, client):
-        resp = client.post("/api/categories", json={
-            "name": "Drinks", "label": "Drikker", "emoji": "🧃",
-        })
+        resp = client.post(
+            "/api/categories",
+            json={
+                "name": "Drinks",
+                "label": "Drikker",
+                "emoji": "🧃",
+            },
+        )
         assert resp.status_code == 201
 
     def test_add_duplicate_category(self, client):
-        resp = client.post("/api/categories", json={
-            "name": "Snacks", "label": "Snacks", "emoji": "🍿",
-        })
+        resp = client.post(
+            "/api/categories",
+            json={
+                "name": "Snacks",
+                "label": "Snacks",
+                "emoji": "🍿",
+            },
+        )
         assert resp.status_code == 409
 
     def test_update_category(self, client):
-        resp = client.put("/api/categories/Snacks", json={
-            "label": "Updated Snacks", "emoji": "🍕",
-        })
+        resp = client.put(
+            "/api/categories/Snacks",
+            json={
+                "label": "Updated Snacks",
+                "emoji": "🍕",
+            },
+        )
         assert resp.status_code == 200
 
     def test_delete_empty_category(self, client):
-        client.post("/api/categories", json={
-            "name": "EmptyCat", "label": "Empty", "emoji": "📦",
-        })
+        client.post(
+            "/api/categories",
+            json={
+                "name": "EmptyCat",
+                "label": "Empty",
+                "emoji": "📦",
+            },
+        )
         resp = client.delete("/api/categories/EmptyCat")
         assert resp.status_code == 200
 
@@ -142,17 +173,32 @@ class TestWeightsBlueprint:
         assert isinstance(data, list)
 
     def test_update_weights(self, client):
-        resp = client.put("/api/weights", json=[{
-            "field": "kcal", "enabled": True, "weight": 50,
-            "direction": "lower", "formula": "minmax",
-            "formula_min": 0, "formula_max": 0,
-        }])
+        resp = client.put(
+            "/api/weights",
+            json=[
+                {
+                    "field": "kcal",
+                    "enabled": True,
+                    "weight": 50,
+                    "direction": "lower",
+                    "formula": "minmax",
+                    "formula_min": 0,
+                    "formula_max": 0,
+                }
+            ],
+        )
         assert resp.status_code == 200
 
     def test_update_weights_invalid(self, client):
-        resp = client.put("/api/weights", json=[{
-            "field": "kcal", "direction": "invalid",
-        }])
+        resp = client.put(
+            "/api/weights",
+            json=[
+                {
+                    "field": "kcal",
+                    "direction": "invalid",
+                }
+            ],
+        )
         assert resp.status_code == 400
 
 
@@ -165,31 +211,46 @@ class TestProteinQualityBlueprint:
         assert len(data) > 0
 
     def test_add_entry(self, client):
-        resp = client.post("/api/protein-quality", json={
-            "name": "new_test_source",
-            "keywords": ["new", "test"],
-            "pdcaas": 0.8, "diaas": 0.7,
-            "label": "New Test",
-        })
+        resp = client.post(
+            "/api/protein-quality",
+            json={
+                "name": "new_test_source",
+                "keywords": ["new", "test"],
+                "pdcaas": 0.8,
+                "diaas": 0.7,
+                "label": "New Test",
+            },
+        )
         assert resp.status_code == 201
 
     def test_add_duplicate(self, client):
-        resp = client.post("/api/protein-quality", json={
-            "name": "whey", "keywords": ["w"],
-            "pdcaas": 1.0, "diaas": 1.0,
-        })
+        resp = client.post(
+            "/api/protein-quality",
+            json={
+                "name": "whey",
+                "keywords": ["w"],
+                "pdcaas": 1.0,
+                "diaas": 1.0,
+            },
+        )
         assert resp.status_code == 409
 
     def test_estimate(self, client):
-        resp = client.post("/api/estimate-protein-quality", json={
-            "ingredients": "corn, sunflower oil",
-        })
+        resp = client.post(
+            "/api/estimate-protein-quality",
+            json={
+                "ingredients": "corn, sunflower oil",
+            },
+        )
         assert resp.status_code == 200
 
     def test_estimate_empty(self, client):
-        resp = client.post("/api/estimate-protein-quality", json={
-            "ingredients": "",
-        })
+        resp = client.post(
+            "/api/estimate-protein-quality",
+            json={
+                "ingredients": "",
+            },
+        )
         assert resp.status_code == 400
 
 
@@ -252,9 +313,12 @@ class TestBackupBlueprint:
         assert resp.status_code == 400
 
     def test_import(self, client):
-        resp = client.post("/api/import", json={
-            "products": [{"type": "Snacks", "name": "Imported"}],
-        })
+        resp = client.post(
+            "/api/import",
+            json={
+                "products": [{"type": "Snacks", "name": "Imported"}],
+            },
+        )
         assert resp.status_code == 200
 
 

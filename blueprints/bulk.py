@@ -48,7 +48,9 @@ def refresh_off_stream():
             if snapshot != last_sent:
                 yield f"data: {snapshot}\n\n"
                 last_sent = snapshot
-            if status.get("done") or (not status.get("running") and not status.get("done")):
+            if status.get("done") or (
+                not status.get("running") and not status.get("done")
+            ):
                 break
             time.sleep(0.3)
 

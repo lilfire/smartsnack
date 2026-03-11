@@ -13,10 +13,12 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def _patch_db_path(monkeypatch, db_file):
     """Patch DB_PATH in all modules that import it by value."""
     import config
+
     monkeypatch.setenv("DB_PATH", db_file)
     monkeypatch.setattr(config, "DB_PATH", db_file)
     try:
         import db as db_mod
+
         monkeypatch.setattr(db_mod, "DB_PATH", db_file)
     except ImportError:
         pass
@@ -37,6 +39,7 @@ def app(tmp_path, monkeypatch):
     _patch_db_path(monkeypatch, db_file)
 
     from app import create_app
+
     application = create_app()
     application.config["TESTING"] = True
     yield application
@@ -59,6 +62,7 @@ def app_ctx(app):
 def db(app_ctx):
     """Get a database connection within the app context."""
     from db import get_db
+
     return get_db()
 
 
@@ -82,6 +86,7 @@ def seed_product(db, seed_category):
 def translations_dir(tmp_path, monkeypatch):
     """Create a temporary translations directory with minimal files."""
     import config
+
     trans_dir = str(tmp_path / "translations")
     os.makedirs(trans_dir, exist_ok=True)
     real_dir = config.TRANSLATIONS_DIR
@@ -91,5 +96,6 @@ def translations_dir(tmp_path, monkeypatch):
                 shutil.copy(os.path.join(real_dir, f), trans_dir)
     monkeypatch.setattr(config, "TRANSLATIONS_DIR", trans_dir)
     import translations
+
     monkeypatch.setattr(translations, "TRANSLATIONS_DIR", trans_dir)
     return trans_dir

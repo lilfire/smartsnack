@@ -15,7 +15,9 @@ logger = logging.getLogger(__name__)
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise urllib.error.HTTPError(req.full_url, code, "Redirects not allowed", headers, fp)
+        raise urllib.error.HTTPError(
+            req.full_url, code, "Redirects not allowed", headers, fp
+        )
 
 
 _no_redirect_opener = urllib.request.build_opener(_NoRedirectHandler)
@@ -29,7 +31,10 @@ def proxy_image(url: str) -> tuple[bytes, str]:
         url = "https://" + url[7:]
     parsed = urlparse(url)
     allowed_domains = (".openfoodfacts.org", ".openfoodfacts.net")
-    if not parsed.hostname or not any(parsed.hostname == d.lstrip(".") or parsed.hostname.endswith(d) for d in allowed_domains):
+    if not parsed.hostname or not any(
+        parsed.hostname == d.lstrip(".") or parsed.hostname.endswith(d)
+        for d in allowed_domains
+    ):
         raise PermissionError("Domain not allowed")
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "SmartSnack/1.0"})
@@ -66,17 +71,17 @@ def _normalize_text(s: str) -> str:
     Replaces smart/curly quotes, dashes, and other variants with their
     ASCII equivalents so that e.g. \u2019 (right single quote) matches '.
     """
-    s = s.replace('\u2019', "'").replace('\u2018', "'")   # curly single quotes
-    s = s.replace('\u201c', '"').replace('\u201d', '"')    # curly double quotes
-    s = s.replace('\u2013', '-').replace('\u2014', '-')    # en-dash, em-dash
+    s = s.replace("\u2019", "'").replace("\u2018", "'")  # curly single quotes
+    s = s.replace("\u201c", '"').replace("\u201d", '"')  # curly double quotes
+    s = s.replace("\u2013", "-").replace("\u2014", "-")  # en-dash, em-dash
     return s.lower().strip()
 
 
 def _clean_search_query(query: str) -> str:
     """Remove special characters that break OFF search."""
     cleaned = _normalize_text(query)
-    cleaned = re.sub(r'[+#@!?*]', ' ', cleaned)
-    return re.sub(r'\s+', ' ', cleaned).strip()
+    cleaned = re.sub(r"[+#@!?*]", " ", cleaned)
+    return re.sub(r"\s+", " ", cleaned).strip()
 
 
 def _sort_by_completeness(data: dict) -> dict:
@@ -169,7 +174,7 @@ def _compute_certainty(
         for name in list(names):
             names.append(brand + " " + name)
 
-    best_name_score = 0
+    best_name_score: float = 0
     for name in names:
         if not name:
             continue
@@ -193,8 +198,7 @@ def _compute_certainty(
     if category and names:
         off_lang = (product.get("lang") or product.get("lc") or "").lower()
         langs_to_try = (
-            [off_lang] if off_lang in SUPPORTED_LANGUAGES
-            else list(SUPPORTED_LANGUAGES)
+            [off_lang] if off_lang in SUPPORTED_LANGUAGES else list(SUPPORTED_LANGUAGES)
         )
         cat_labels = set()
         for lang in langs_to_try:
@@ -208,15 +212,15 @@ def _compute_certainty(
             best_name_score += cat_max
 
     # Brand match
-    brand_score = 0
+    brand_score: float = 0
     if brand:
         brand_words = brand.split()
         brand_matches = sum(1 for w in brand_words if w in query_lower)
         brand_score = (brand_matches / len(brand_words)) * brand_max
 
     # Nutrition similarity
-    nutri_score = 0
-    if has_nutrition:
+    nutri_score: float = 0
+    if has_nutrition and nutrition is not None:
         nutri_score = _compute_nutrition_similarity(nutrition, product)
 
     score = int(min(100, best_name_score + brand_score + nutri_score))
@@ -234,8 +238,8 @@ def off_search(query: str, nutrition: dict | None = None, category: str = "") ->
         raise ValueError("Query too short")
     cleaned = _clean_search_query(query)
 
-    products_a = []
-    products_c = []
+    products_a: list[dict] = []
+    products_c: list[dict] = []
 
     # Search-a-licious (better fuzzy/multi-field search)
     try:
@@ -305,21 +309,25 @@ def _off_search_a_licious(query: str) -> dict:
             hits = hits["hits"]
         # Elasticsearch hits may wrap product data in "_source"
         if isinstance(hits, list) and hits and "_source" in hits[0]:
-            hits = [h["_source"] for h in hits if isinstance(h, dict) and "_source" in h]
+            hits = [
+                h["_source"] for h in hits if isinstance(h, dict) and "_source" in h
+            ]
         data["products"] = hits if isinstance(hits, list) else []
     return data
 
 
 def _off_search_classic(query: str) -> dict:
     """Search via the classic search.pl CGI endpoint."""
-    params = urlencode({
-        "search_terms": query,
-        "search_simple": "1",
-        "action": "process",
-        "json": "1",
-        "page_size": "20",
-        "fields": _OFF_SEARCH_FIELDS,
-    })
+    params = urlencode(
+        {
+            "search_terms": query,
+            "search_simple": "1",
+            "action": "process",
+            "json": "1",
+            "page_size": "20",
+            "fields": _OFF_SEARCH_FIELDS,
+        }
+    )
     url = f"{_OFF_SEARCH_BASE}?{params}"
     return _off_get_json(url)
 
