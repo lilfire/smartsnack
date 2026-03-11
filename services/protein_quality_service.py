@@ -8,8 +8,12 @@ from config import _PQ_MAX_LABEL_LEN
 from exceptions import ConflictError
 from helpers import _safe_float, _validate_keywords
 from translations import (
-    _pq_label, _pq_keywords, _pq_all_keywords,
-    _get_current_lang, _set_translation_key, _delete_translation_key,
+    _pq_label,
+    _pq_keywords,
+    _pq_all_keywords,
+    _get_current_lang,
+    _set_translation_key,
+    _delete_translation_key,
 )
 
 
@@ -22,14 +26,16 @@ def list_entries() -> list:
     result = []
     for r in rows:
         keywords = _pq_keywords(r["name"])
-        result.append({
-            "id": r["id"],
-            "name": r["name"],
-            "keywords": keywords,
-            "pdcaas": r["pdcaas"],
-            "diaas": r["diaas"],
-            "label": _pq_label(r["name"]),
-        })
+        result.append(
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "keywords": keywords,
+                "pdcaas": r["pdcaas"],
+                "diaas": r["diaas"],
+                "label": _pq_label(r["name"]),
+            }
+        )
     return result
 
 
@@ -44,12 +50,13 @@ def add_entry(data: dict) -> dict:
         name = label or (keywords[0] if keywords else "")
     if not name or not keywords or pdcaas is None or diaas is None:
         raise ValueError("keywords, pdcaas and diaas are required")
-    name = re.sub(r'[^a-zA-Z0-9_]', '_', name.lower()).strip('_')
+    name = re.sub(r"[^a-zA-Z0-9_]", "_", name.lower()).strip("_")
     if not name:
         raise ValueError("Invalid name")
-    keywords, kw_err = _validate_keywords(keywords)
-    if kw_err:
-        raise ValueError(kw_err)
+    validated_kws, kw_err = _validate_keywords(keywords)
+    if kw_err or validated_kws is None:
+        raise ValueError(kw_err or "Invalid keywords")
+    keywords = validated_kws
     if isinstance(label, str) and len(label) > _PQ_MAX_LABEL_LEN:
         raise ValueError(f"label exceeds max length of {_PQ_MAX_LABEL_LEN}")
     pdcaas_f = _safe_float(pdcaas, "pdcaas")
@@ -77,7 +84,9 @@ def add_entry(data: dict) -> dict:
 
 def update_entry(pid, data):
     conn = get_db()
-    existing = conn.execute("SELECT id, name FROM protein_quality WHERE id=?", (pid,)).fetchone()
+    existing = conn.execute(
+        "SELECT id, name FROM protein_quality WHERE id=?", (pid,)
+    ).fetchone()
     if not existing:
         raise LookupError("Not found")
     pq_name = existing["name"]
@@ -90,7 +99,9 @@ def update_entry(pid, data):
             params.append(_safe_float(data[field], field))
     if updates:
         params.append(pid)
-        conn.execute(f"UPDATE protein_quality SET {','.join(updates)} WHERE id=?", params)
+        conn.execute(
+            f"UPDATE protein_quality SET {','.join(updates)} WHERE id=?", params
+        )
         conn.commit()
     if "keywords" in data:
         kws, kw_err = _validate_keywords(data["keywords"])
@@ -106,7 +117,9 @@ def update_entry(pid, data):
 
 def delete_entry(pid):
     conn = get_db()
-    existing = conn.execute("SELECT name FROM protein_quality WHERE id=?", (pid,)).fetchone()
+    existing = conn.execute(
+        "SELECT name FROM protein_quality WHERE id=?", (pid,)
+    ).fetchone()
     if not existing:
         raise LookupError("Not found")
     pq_name = existing["name"]
@@ -125,10 +138,7 @@ def _load_protein_quality_table() -> list:
     table = []
     for r in rows:
         keywords = _pq_all_keywords(r["name"])
-        patterns = [
-            re.compile(r'\b' + re.escape(kw) + r'\b')
-            for kw in keywords
-        ]
+        patterns = [re.compile(r"\b" + re.escape(kw) + r"\b") for kw in keywords]
         table.append((r["name"], patterns, r["pdcaas"], r["diaas"]))
     return table
 
@@ -165,12 +175,12 @@ def estimate(ingredients: str) -> dict:
     total_w = sum(1.0 / (pos + 1) for pos, *_ in deduped)
     if total_w == 0:
         return {"est_pdcaas": None, "est_diaas": None, "sources": []}
-    w_pdcaas = sum(
-        (1.0 / (pos + 1)) * pdcaas for pos, pdcaas, diaas, _ in deduped
-    ) / total_w
-    w_diaas = sum(
-        (1.0 / (pos + 1)) * diaas for pos, pdcaas, diaas, _ in deduped
-    ) / total_w
+    w_pdcaas = (
+        sum((1.0 / (pos + 1)) * pdcaas for pos, pdcaas, diaas, _ in deduped) / total_w
+    )
+    w_diaas = (
+        sum((1.0 / (pos + 1)) * diaas for pos, pdcaas, diaas, _ in deduped) / total_w
+    )
 
     return {
         "est_pdcaas": round(min(w_pdcaas, 1.0), 3),

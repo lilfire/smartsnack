@@ -6,11 +6,14 @@ import sqlite3
 from db import get_db
 from exceptions import ConflictError
 from translations import (
-    _flag_key, _flag_label, _get_current_lang,
-    _set_translation_key, _delete_translation_key,
+    _flag_key,
+    _flag_label,
+    _get_current_lang,
+    _set_translation_key,
+    _delete_translation_key,
 )
 
-_FLAG_NAME_RE = re.compile(r'^[a-z][a-z0-9_]*$')
+_FLAG_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 _MAX_FLAG_NAME_LEN = 100
 
 

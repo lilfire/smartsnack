@@ -21,11 +21,13 @@ def get_available_languages() -> list:
         except (OSError, json.JSONDecodeError) as e:
             logger.error("Failed to load translation file %s: %s", filepath, e)
             continue
-        languages.append({
-            "code": lang,
-            "label": data.get("lang_label", lang),
-            "flag": data.get("lang_flag", ""),
-        })
+        languages.append(
+            {
+                "code": lang,
+                "label": data.get("lang_label", lang),
+                "flag": data.get("lang_flag", ""),
+            }
+        )
     return languages
 
 

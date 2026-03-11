@@ -22,12 +22,12 @@ def backup_db():
     include_images = request.args.get("images", "true").lower() == "true"
     payload = backup_service.create_backup(include_images=include_images)
     json_str = json.dumps(payload, ensure_ascii=False, indent=2)
-    timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return Response(
-        json_str, mimetype="application/json",
+        json_str,
+        mimetype="application/json",
         headers={
-            "Content-Disposition":
-                f"attachment; filename=smartsnack_backup_{timestamp}.json"
+            "Content-Disposition": f"attachment; filename=smartsnack_backup_{timestamp}.json"
         },
     )
 

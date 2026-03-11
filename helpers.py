@@ -65,7 +65,10 @@ def _validate_keywords(keywords) -> tuple[list | None, str | None]:
         return None, f"Too many keywords (max {_PQ_MAX_KEYWORDS})"
     for kw in keywords:
         if not isinstance(kw, str) or len(kw) > _PQ_MAX_KEYWORD_LEN:
-            return None, f"Each keyword must be a string of max {_PQ_MAX_KEYWORD_LEN} chars"
+            return (
+                None,
+                f"Each keyword must be a string of max {_PQ_MAX_KEYWORD_LEN} chars",
+            )
     return keywords, None
 
 
