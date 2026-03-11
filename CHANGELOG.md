@@ -30,7 +30,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - OFF fetch overwriting existing local nutrition values with 0
 - 500 error on product name search via OpenFoodFacts
-- OFF match score drop caused by curly vs straight apostrophe mismatch
 - Import endpoint now skips duplicate products
 
 ## [0.4.0] - 2026-03-09
