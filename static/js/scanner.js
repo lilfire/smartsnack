@@ -367,13 +367,13 @@ export async function scanPickerSearch() {
     if (cnt) cnt.textContent = results.length + ' resultat' + (results.length !== 1 ? 'er' : '');
     let h = '';
     results.forEach((p) => {
-      const imgTag = p.has_image ? '<div class="off-result-img" id="scan-pick-img-' + p.id + '" style="background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center"><span style="opacity:0.2">' + catEmoji(p.type) + '</span></div>'
-        : '<div class="off-result-img" style="display:flex;align-items:center;justify-content:center"><span style="font-size:20px">' + catEmoji(p.type) + '</span></div>';
+      const imgTag = p.has_image ? '<div class="off-result-img" id="scan-pick-img-' + p.id + '" style="background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center"><span style="opacity:0.2">' + esc(catEmoji(p.type)) + '</span></div>'
+        : '<div class="off-result-img" style="display:flex;align-items:center;justify-content:center"><span style="font-size:20px">' + esc(catEmoji(p.type)) + '</span></div>';
       const eanInfo = p.ean ? '<span class="off-result-ean">EAN: ' + esc(p.ean) + '</span>' : '<span class="off-result-ean" style="color:rgba(255,100,100,0.5)">' + esc(t('scan_no_ean')) + '</span>';
       h += '<div class="off-result" data-action="pick" data-id="' + p.id + '">'
         + imgTag
         + '<div class="off-result-info"><div class="off-result-name">' + esc(p.name) + '</div>'
-        + '<div class="off-result-brand">' + catLabel(p.type) + (p.brand ? ' \u00B7 ' + esc(p.brand) : '') + '</div>'
+        + '<div class="off-result-brand">' + esc(catLabel(p.type)) + (p.brand ? ' \u00B7 ' + esc(p.brand) : '') + '</div>'
         + eanInfo + '</div></div>';
     });
     // Replace body to clear old event listeners

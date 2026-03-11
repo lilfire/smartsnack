@@ -47,7 +47,7 @@ vi.mock('../openfoodfacts.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
 }));
 
-import { renderNutriTable, fmtCell, getActiveCols, getGridTemplate, renderResults } from '../render.js';
+import { renderNutriTable, fmtCell, getActiveCols, getGridTemplate, renderResults, getFlagConfig, loadFlagConfig } from '../render.js';
 import { state } from '../state.js';
 import { weightData } from '../settings.js';
 
@@ -246,5 +246,32 @@ describe('renderResults', () => {
     const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0, kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8, sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {} }];
     renderResults(products, '');
     expect(document.getElementById('results-container').innerHTML).toContain('expanded');
+  });
+});
+
+describe('getFlagConfig', () => {
+  it('returns an object', () => {
+    const cfg = getFlagConfig();
+    expect(cfg).toBeTypeOf('object');
+    expect(cfg).not.toBeNull();
+  });
+});
+
+describe('loadFlagConfig', () => {
+  it('fetches from /api/flag-config and stores result', async () => {
+    const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
+    global.fetch = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue(mockConfig),
+    });
+    await loadFlagConfig();
+    expect(global.fetch).toHaveBeenCalledWith('/api/flag-config');
+    expect(getFlagConfig()).toEqual(mockConfig);
+  });
+
+  it('handles fetch failure gracefully', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('network error'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await expect(loadFlagConfig()).resolves.toBeUndefined();
+    consoleSpy.mockRestore();
   });
 });

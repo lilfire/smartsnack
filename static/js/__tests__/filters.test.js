@@ -28,7 +28,7 @@ vi.mock('../i18n.js', () => ({
   }),
 }));
 
-import { sortIndicator, applySorting, setSort, buildFilters, updateFilterToggle, toggleFilters, buildTypeSelect } from '../filters.js';
+import { sortIndicator, applySorting, setSort, buildFilters, updateFilterToggle, toggleFilters, buildTypeSelect, rerender } from '../filters.js';
 import { state } from '../state.js';
 import { t } from '../i18n.js';
 
@@ -313,5 +313,37 @@ describe('buildTypeSelect', () => {
 
   it('does nothing if select not found', () => {
     expect(() => buildTypeSelect()).not.toThrow();
+  });
+});
+
+describe('rerender', () => {
+  it('calls renderResults via dynamic import', async () => {
+    const mockRenderResults = vi.fn();
+    // Intercept the dynamic import by mocking it at module level
+    vi.doMock('../render.js', () => ({ renderResults: mockRenderResults }));
+
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    searchInput.value = 'query';
+    document.body.appendChild(searchInput);
+    state.cachedResults = [{ id: 1, name: 'Milk' }];
+
+    rerender();
+
+    // Wait for the dynamic import promise to resolve
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRenderResults).toHaveBeenCalledWith(state.cachedResults, 'query');
+  });
+
+  it('uses empty string when search-input not present', async () => {
+    const mockRenderResults = vi.fn();
+    vi.doMock('../render.js', () => ({ renderResults: mockRenderResults }));
+
+    document.body.innerHTML = '';
+    state.cachedResults = [];
+
+    rerender();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mockRenderResults).toHaveBeenCalledWith([], '');
   });
 });

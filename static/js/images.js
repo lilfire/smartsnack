@@ -45,7 +45,7 @@ export function triggerImageUpload(id) {
 }
 
 export function resizeImage(dataUri, maxSize) {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
       const w = img.width, h = img.height;
