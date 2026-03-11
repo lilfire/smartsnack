@@ -2,7 +2,7 @@
 import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
-import { renderResults } from './render.js';
+import { renderResults, getFlagConfig } from './render.js';
 import { isValidEan } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
@@ -18,6 +18,7 @@ function collectFormFields(prefix) {
     brand: (document.getElementById(prefix + '-brand') || { value: '' }).value.trim(),
     stores: (document.getElementById(prefix + '-stores') || { value: '' }).value.trim(),
     ingredients: (document.getElementById(prefix + '-ingredients') || { value: '' }).value.trim(),
+    taste_note: (document.getElementById(prefix + '-taste_note') || { value: '' }).value.trim(),
     taste_score: numOrNull(prefix + '-smak'),
     kcal: numOrNull(prefix + '-kcal'),
     energy_kj: numOrNull(prefix + '-energy_kj'),
@@ -34,6 +35,11 @@ function collectFormFields(prefix) {
     price: numOrNull(prefix + '-price'),
     est_pdcaas: numOrNull(prefix + '-est_pdcaas'),
     est_diaas: numOrNull(prefix + '-est_diaas'),
+    flags: Object.entries(getFlagConfig()).filter(([, v]) => v.type === 'user').reduce((acc, [f]) => {
+      const cb = document.getElementById(prefix + '-flag-' + f);
+      if (cb && cb.checked) acc.push(f);
+      return acc;
+    }, []),
   };
 }
 
@@ -41,6 +47,7 @@ export function startEdit(id) { state.editingId = id; rerender(); }
 
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
+  if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   try {
@@ -124,7 +131,9 @@ export function toggleExpand(id) {
 }
 
 export function onSearchInput() {
-  const v = document.getElementById('search-input').value;
+  const el = document.getElementById('search-input');
+  if (el.disabled) return;
+  const v = el.value;
   document.getElementById('search-clear').classList.toggle('visible', v.length > 0);
   state.expandedId = null;
   state.editingId = null;
@@ -151,6 +160,7 @@ export async function registerProduct() {
   btn.textContent = t('toast_saving');
   try {
     const body = collectFormFields('f');
+    if (window._pendingOFFSync) { body.from_off = true; window._pendingOFFSync = null; }
     const registeredType = body.type;
     const result = await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
     const newProductId = result.id;
@@ -163,6 +173,7 @@ export async function registerProduct() {
     document.getElementById('f-brand').value = '';
     document.getElementById('f-stores').value = '';
     document.getElementById('f-ingredients').value = '';
+    document.getElementById('f-taste_note').value = '';
     document.getElementById('f-est_pdcaas').value = '';
     document.getElementById('f-est_diaas').value = '';
     const pqw = document.getElementById('f-protein-quality-wrap');
@@ -204,7 +215,7 @@ export async function registerProduct() {
         }
       }, 500);
     }
-  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
+  } catch(e) { console.error(e); showToast(e.message || t('toast_save_error'), 'error'); }
   finally {
     btn.disabled = false;
     btn.textContent = t('btn_register_product');

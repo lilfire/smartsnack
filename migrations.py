@@ -11,6 +11,37 @@ MIGRATIONS = [
             "WHERE field='volume' AND formula='minmax'",
         ],
     ),
+    (
+        "002_product_flags_table",
+        [
+            """CREATE TABLE IF NOT EXISTS product_flags (
+                product_id INTEGER NOT NULL,
+                flag TEXT NOT NULL,
+                PRIMARY KEY (product_id, flag),
+                FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+            )""",
+        ],
+    ),
+    (
+        "003_flag_definitions_table",
+        [
+            """CREATE TABLE IF NOT EXISTS flag_definitions (
+                name TEXT PRIMARY KEY,
+                type TEXT NOT NULL CHECK(type IN ('user', 'system')),
+                label_key TEXT NOT NULL
+            )""",
+            "INSERT OR IGNORE INTO flag_definitions (name, type, label_key) "
+            "VALUES ('is_discontinued', 'user', 'flag_is_discontinued')",
+            "INSERT OR IGNORE INTO flag_definitions (name, type, label_key) "
+            "VALUES ('is_synced_with_off', 'system', 'flag_is_synced_with_off')",
+        ],
+    ),
+    (
+        "004_add_taste_note",
+        [
+            "ALTER TABLE products ADD COLUMN taste_note TEXT NOT NULL DEFAULT ''",
+        ],
+    ),
 ]
 
 

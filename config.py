@@ -2,7 +2,7 @@
 
 import os
 
-APP_VERSION = "0.4"
+APP_VERSION = "0.5"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 TRANSLATIONS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "translations")
@@ -21,7 +21,7 @@ NUTRITION_FIELDS = (
     "fat", "saturated_fat", "protein", "fiber", "salt",
     "volume", "price", "weight", "portion",
 )
-ALL_PRODUCT_FIELDS = ("taste_score", "est_pdcaas", "est_diaas", "type", "name", "ean", "brand", "stores", "ingredients") + NUTRITION_FIELDS
+ALL_PRODUCT_FIELDS = ("taste_score", "est_pdcaas", "est_diaas", "type", "name", "ean", "brand", "stores", "ingredients", "taste_note") + NUTRITION_FIELDS
 
 # Whitelist of valid column names for dynamic SQL construction
 _VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
@@ -29,7 +29,7 @@ _VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
 # Maximum lengths for text fields
 _TEXT_FIELD_LIMITS = {
     "type": 100, "name": 200, "ean": 50, "brand": 200,
-    "stores": 500, "ingredients": 10000,
+    "stores": 500, "ingredients": 10000, "taste_note": 2000,
 }
 
 _MAX_CATEGORY_NAME_LEN = 100
@@ -101,6 +101,42 @@ SCORE_CONFIG = [
 SCORE_CONFIG_MAP = {c["field"]: c for c in SCORE_CONFIG}
 
 # Computed/derived fields — not stored in DB, calculated on-the-fly
+# ── Advanced filter configuration ─────────────────────
+ADVANCED_FILTER_OPS = {"=": "=", "!=": "!=", "<": "<", ">": ">", "<=": "<=", ">=": ">=", "contains": "LIKE"}
+MAX_FILTER_DEPTH = 4
+MAX_FILTER_CONDITIONS = 20
+TEXT_FIELDS = frozenset(_TEXT_FIELD_LIMITS.keys())  # type, name, ean, brand, stores, ingredients
+NUMERIC_FIELDS = frozenset(NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas"))
+POST_QUERY_FIELDS = frozenset(("total_score", "completeness"))
+
+# ── Completeness score ────────────────────────────────
+COMPLETENESS_FIELDS = (
+    "ean", "brand", "stores", "ingredients", "image",
+    "kcal", "energy_kj", "carbs", "sugar", "fat", "saturated_fat",
+    "protein", "fiber", "salt",
+    "volume", "price", "weight", "portion",
+    "taste_score", "est_pdcaas", "est_diaas",
+)
+
+# ── Product flags ──────────────────────────────────────
+# System flags are managed programmatically; user flags are dynamic (stored in DB).
+SYSTEM_FLAGS = frozenset(("is_synced_with_off",))
+
+# Mapping of local nutrition fields to OFF nutriment keys for certainty scoring
+OFF_NUTRITION_COMPARE_MAP = {
+    "kcal":          "energy-kcal_100g",
+    "fat":           "fat_100g",
+    "saturated_fat": "saturated-fat_100g",
+    "carbs":         "carbohydrates_100g",
+    "sugar":         "sugars_100g",
+    "protein":       "proteins_100g",
+    "fiber":         "fiber_100g",
+    "salt":          "salt_100g",
+}
+
+# FLAG_FIELDS is built dynamically in product_service from the flag_definitions table.
+FILTERABLE_FIELDS = TEXT_FIELDS | NUMERIC_FIELDS | POST_QUERY_FIELDS
+
 COMPUTED_FIELDS = {
     "pct_protein_cal": lambda p: (
         (p["protein"] * 4 / p["kcal"] * 100)
@@ -125,11 +161,11 @@ DEFAULT_WEIGHTS = {
 
 # ── SQL helpers ───────────────────────────────────────
 PRODUCT_COLS_NO_IMAGE = (
-    "id, type, name, ean, brand, stores, ingredients, taste_score, kcal, energy_kj, carbs, sugar, "
+    "id, type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "
     "fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas, "
     "CASE WHEN image != '' THEN 1 ELSE 0 END AS has_image"
 )
 
-INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
+INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
 INSERT_PLACEHOLDERS = ",".join(["?"] * len(INSERT_FIELDS.split(",")))
 INSERT_WITH_IMAGE_SQL = f"INSERT INTO products ({INSERT_FIELDS}, image) VALUES ({INSERT_PLACEHOLDERS}, ?)"

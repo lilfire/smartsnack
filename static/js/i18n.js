@@ -57,6 +57,15 @@ export async function changeLanguage(lang) {
   if (!ok) return;
   await api('/api/settings/language', { method: 'PUT', body: JSON.stringify({ language: lang }) });
   applyStaticTranslations();
+  // Re-fetch flag config so labels match the new language
+  const { loadFlagConfig } = await import('./render.js');
+  await loadFlagConfig();
+  // Rebuild advanced filters panel if open (labels are baked into DOM)
+  const panel = document.getElementById('advanced-filters');
+  if (panel && panel.classList.contains('open')) {
+    const { rebuildAdvancedFilters } = await import('./advanced-filters.js');
+    rebuildAdvancedFilters();
+  }
   // Reload dynamic content — use lazy imports to avoid circular deps
   if (state.currentView === 'settings') {
     const { loadSettings } = await import('./settings.js');

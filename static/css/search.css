@@ -178,6 +178,16 @@
   color: #0a0a0c;
 }
 
+.search-row.advanced-active .search-wrap {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.search-row.advanced-active .btn-scan-search {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 .result-count {
   font-size: 11px;
   color: rgba(255, 255, 255, 0.3);

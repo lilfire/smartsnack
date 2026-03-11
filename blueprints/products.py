@@ -12,8 +12,9 @@ bp = Blueprint("products", __name__)
 def get_products():
     search = request.args.get("search", "").strip()
     type_filter = request.args.get("type", "").strip()
+    advanced_filters = request.args.get("filters", "").strip() or None
     try:
-        results = product_service.list_products(search, type_filter)
+        results = product_service.list_products(search, type_filter, advanced_filters)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify(results)

@@ -300,8 +300,9 @@ describe('submitToOff', () => {
     btn.id = 'off-submit-btn';
     document.body.appendChild(btn);
 
-    api.mockResolvedValueOnce({ error: 'Missing credentials' });
+    api.mockRejectedValueOnce(new Error('off_err_no_credentials'));
     await submitToOff('1234567890123');
-    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+    expect(showToast).toHaveBeenCalledWith('off_err_no_credentials', 'error');
+    expect(btn.disabled).toBe(false);
   });
 });

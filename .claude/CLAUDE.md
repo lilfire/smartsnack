@@ -14,7 +14,9 @@ DB_PATH=./smartsnack.sqlite python app.py
 
 ## Testing & Linting
 
-No test suite exists. No linter is configured.
+- **Backend**: `pytest` — run with `python -m pytest` from the project root
+- **Frontend**: `vitest` — run with `npx vitest` (requires Node.js >= 18)
+- No linter is configured.
 
 ## Project Structure
 

@@ -5,7 +5,7 @@ import { state, api } from './state.js';
 import { initLanguage, changeLanguage, t } from './i18n.js';
 import { toggleFilters, setSort, rerender } from './filters.js';
 import { triggerImageUpload, removeProductImage } from './images.js';
-import { renderResults } from './render.js';
+import { renderResults, loadFlagConfig } from './render.js';
 import {
   showToast, startEdit, saveProduct, deleteProduct,
   loadData, switchView, setFilter, toggleExpand,
@@ -17,10 +17,12 @@ import {
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights,
   updateCategoryLabel, addCategory, deleteCategory,
+  addFlag, deleteFlag, updateFlagLabel,
   autosavePq, deletePq, addPq,
   downloadBackup, handleRestore, handleImport,
   initRestoreDragDrop,
-  saveOffCredentials
+  saveOffCredentials,
+  refreshAllFromOff, estimateAllPq
 } from './settings.js';
 import {
   openScanner, closeScanner, openSearchScanner,
@@ -33,13 +35,14 @@ import {
   selectOffResult, estimateProteinQuality, updateEstimateBtn,
   showOffAddReview, closeOffAddReview, submitToOff
 } from './openfoodfacts.js';
+import { toggleAdvancedFilters } from './advanced-filters.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
 Object.assign(window, {
   // i18n
   changeLanguage,
   // filters
-  toggleFilters, setSort,
+  toggleFilters, setSort, toggleAdvancedFilters,
   // images
   triggerImageUpload, removeProductImage,
   // products
@@ -54,12 +57,16 @@ Object.assign(window, {
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   // settings — categories
   updateCategoryLabel, addCategory, deleteCategory,
+  // settings — flags
+  addFlag, deleteFlag, updateFlagLabel,
   // settings — protein quality
   autosavePq, deletePq, addPq,
   // settings — backup
   downloadBackup, handleRestore, handleImport,
   // settings — OFF credentials
   saveOffCredentials,
+  // settings — bulk operations
+  refreshAllFromOff, estimateAllPq,
   // scanner
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
@@ -92,6 +99,7 @@ Object.defineProperty(window, 'editingId', {
       SCORE_CFG_MAP[w.field] = { label: w.label, desc: w.desc, direction: w.direction };
     });
   } catch(e) { showToast(t('toast_load_error'), 'error'); }
+  await loadFlagConfig();
   initRestoreDragDrop();
   loadData();
   var searchInput = document.getElementById('search-input');

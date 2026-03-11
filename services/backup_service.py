@@ -93,7 +93,7 @@ def _opt_float(v):
     return result
 
 
-def _restore_product(cur, p):
+def _restore_product(cur, p, valid_flags=None):
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
         val = p.get(tf, "")
         if isinstance(val, str) and len(val) > max_len:
@@ -102,17 +102,27 @@ def _restore_product(cur, p):
         INSERT_WITH_IMAGE_SQL,
         (p.get("type",""), p.get("name",""), p.get("ean",""),
          p.get("brand",""), p.get("stores",""), p.get("ingredients",""),
+         p.get("taste_note", ""),
          _opt_float(p.get("taste_score")), _opt_float(p.get("kcal")), _opt_float(p.get("energy_kj")),
          _opt_float(p.get("carbs")), _opt_float(p.get("sugar")), _opt_float(p.get("fat")),
          _opt_float(p.get("saturated_fat")), _opt_float(p.get("protein")), _opt_float(p.get("fiber")),
          _opt_float(p.get("salt")), _opt_float(p.get("volume")), _opt_float(p.get("price")),
          _opt_float(p.get("weight")), _opt_float(p.get("portion")),
          _opt_float(p.get("est_pdcaas")), _opt_float(p.get("est_diaas")), p.get("image","")))
+    new_id = cur.lastrowid
+    if valid_flags is None:
+        valid_flags = flag_service.get_all_flag_names()
+    for flag in p.get("flags", []):
+        if flag in valid_flags:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+                (new_id, flag),
+            )
 
 
 def create_backup(include_images: bool = True):
     from db import get_db
-    from translations import _category_label, _pq_label, _pq_keywords
+    from translations import _category_label, _flag_label, _pq_label, _pq_keywords
     conn = get_db()
     if include_images:
         products = [dict(r) for r in conn.execute("SELECT * FROM products ORDER BY id").fetchall()]
@@ -123,6 +133,16 @@ def create_backup(include_images: bool = True):
             "salt, volume, price, weight, portion, est_pdcaas, est_diaas "
             "FROM products ORDER BY id"
         ).fetchall()]
+    # Attach flags to products
+    flag_rows = conn.execute(
+        "SELECT product_id, flag FROM product_flags ORDER BY product_id, flag"
+    ).fetchall()
+    flags_map = {}
+    for r in flag_rows:
+        flags_map.setdefault(r["product_id"], []).append(r["flag"])
+    for p in products:
+        p["flags"] = flags_map.get(p["id"], [])
+
     cat_rows = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     categories = []
     for c in cat_rows:
@@ -154,12 +174,28 @@ def create_backup(include_images: bool = True):
         if translations:
             pq_entry["translations"] = translations
         protein_quality.append(pq_entry)
+    # Export flag definitions with translations
+    flag_rows = conn.execute(
+        "SELECT name, type, label_key FROM flag_definitions ORDER BY type, name"
+    ).fetchall()
+    flag_definitions = []
+    for fd in flag_rows:
+        fd_data = {"name": fd["name"], "type": fd["type"]}
+        translations = {}
+        for lang in SUPPORTED_LANGUAGES:
+            label = _flag_label(fd["name"], lang=lang)
+            if label != fd["name"]:
+                translations[lang] = label
+        if translations:
+            fd_data["translations"] = translations
+        flag_definitions.append(fd_data)
     return {
         "version": APP_VERSION,
         "exported_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z",
         "score_weights": weights,
         "categories": categories,
         "protein_quality": protein_quality,
+        "flag_definitions": flag_definitions,
         "products": products,
     }
 
@@ -283,6 +319,29 @@ def _restore_protein_quality(cur: object, pq_list: list) -> list:
     return pending_translations
 
 
+def _restore_flag_definitions(cur: object, flag_defs: list) -> list:
+    """Restore flag definitions from backup data. Returns pending translation ops."""
+    from translations import _flag_key
+    pending_translations = []
+    cur.execute("DELETE FROM flag_definitions")
+    for fd in flag_defs:
+        name = fd.get("name", "").strip()
+        fd_type = fd.get("type", "user")
+        if not name:
+            continue
+        if fd_type not in ("user", "system"):
+            fd_type = "user"
+        label_key = _flag_key(name)
+        cur.execute(
+            "INSERT OR IGNORE INTO flag_definitions (name, type, label_key) VALUES (?,?,?)",
+            (name, fd_type, label_key),
+        )
+        translations = fd.get("translations", {})
+        if translations:
+            pending_translations.append((label_key, translations))
+    return pending_translations
+
+
 def _apply_pending_translations(pending: list) -> None:
     """Apply deferred translation writes after DB commit succeeds."""
     from translations import _set_translation_key
@@ -308,9 +367,17 @@ def restore_backup(data: dict) -> str:
             pending_translations.extend(
                 _restore_protein_quality(cur, data["protein_quality"])
             )
+        if "flag_definitions" in data:
+            pending_translations.extend(
+                _restore_flag_definitions(cur, data["flag_definitions"])
+            )
+        # Build valid flags set after flag_definitions are restored
+        valid_flags = {
+            r[0] for r in cur.execute("SELECT name FROM flag_definitions").fetchall()
+        }
         cur.execute("DELETE FROM products")
         for p in data["products"]:
-            _restore_product(cur, p)
+            _restore_product(cur, p, valid_flags=valid_flags)
         conn.commit()
     except Exception as e:
         conn.rollback()
@@ -324,12 +391,13 @@ def restore_backup(data: dict) -> str:
 def import_products(data: dict) -> str:
     """Import products (and optionally categories) without deleting existing data."""
     from db import get_db
-    from translations import _category_key
+    from translations import _category_key, _flag_key
     if not data or "products" not in data:
         raise ValueError("Invalid import file")
     conn = get_db()
     cur = conn.cursor()
     added = 0
+    skipped = 0
     pending_translations = []
     try:
         if "categories" in data:
@@ -350,9 +418,29 @@ def import_products(data: dict) -> str:
                         )
                 except sqlite3.IntegrityError:
                     pass
+        if "flag_definitions" in data:
+            for fd in data["flag_definitions"]:
+                name = fd.get("name", "").strip()
+                fd_type = fd.get("type", "user")
+                if not name or fd_type not in ("user", "system"):
+                    continue
+                label_key = _flag_key(name)
+                try:
+                    cur.execute(
+                        "INSERT INTO flag_definitions (name, type, label_key) VALUES (?,?,?)",
+                        (name, fd_type, label_key),
+                    )
+                    translations = fd.get("translations", {})
+                    if translations:
+                        pending_translations.append((label_key, translations))
+                except sqlite3.IntegrityError:
+                    pass
         existing_cats = {
             r["name"]
             for r in cur.execute("SELECT name FROM categories").fetchall()
+        }
+        valid_flags = {
+            r[0] for r in cur.execute("SELECT name FROM flag_definitions").fetchall()
         }
         for p in data["products"]:
             cat = p.get("type", "").strip()
@@ -370,7 +458,17 @@ def import_products(data: dict) -> str:
                     existing_cats.add(cat)
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
-            _restore_product(cur, p)
+            ean = p.get("ean", "").strip()
+            name = p.get("name", "").strip()
+            if ean:
+                if cur.execute("SELECT 1 FROM products WHERE ean = ?", (ean,)).fetchone():
+                    skipped += 1
+                    continue
+            if name:
+                if cur.execute("SELECT 1 FROM products WHERE LOWER(name) = LOWER(?)", (name,)).fetchone():
+                    skipped += 1
+                    continue
+            _restore_product(cur, p, valid_flags=valid_flags)
             added += 1
         conn.commit()
     except Exception as e:
@@ -379,4 +477,7 @@ def import_products(data: dict) -> str:
         raise
     # Apply translation file writes only after DB commit succeeds
     _apply_pending_translations(pending_translations)
-    return f"Imported {added} products"
+    msg = f"Imported {added} products"
+    if skipped:
+        msg += f", {skipped} skipped as duplicates"
+    return msg

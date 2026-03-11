@@ -65,8 +65,10 @@ export async function loadSettings() {
     }
     loadCategories();
     initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
+    loadFlags();
     loadPq();
     loadOffCredentials();
+    checkRefreshStatus();
   } finally {
     _settingsLoading = false;
   }
@@ -484,6 +486,93 @@ export async function deleteCategory(name, label, count) {
   }
 }
 
+// ── Product Flags ───────────────────────────────────
+export async function loadFlags() {
+  try {
+    const flags = await api('/api/flags');
+    const list = document.getElementById('flag-list');
+    if (!flags.length) { list.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px">No flags</p>'; return; }
+    let h = '';
+    flags.forEach((f) => {
+      const isSystem = f.type === 'system';
+      h += '<div class="cat-item flag-item' + (isSystem ? ' flag-item-system' : '') + '">';
+      if (isSystem) {
+        h += '<span class="flag-type-badge flag-type-system">system</span>';
+        h += '<span class="flag-item-label-ro">' + esc(f.label) + '</span>';
+      } else {
+        h += '<span class="flag-type-badge flag-type-user">user</span>';
+        h += '<input class="cat-item-label-input" data-flag-name="' + esc(f.name) + '" value="' + esc(f.label) + '" title="' + t('label_display_name') + '">';
+      }
+      h += '<span class="cat-item-key">' + esc(f.name) + '</span>';
+      h += '<span class="cat-item-count">' + f.count + ' prod.</span>';
+      if (!isSystem) {
+        h += '<button class="btn-sm btn-red" data-action="delete-flag" data-flag-name="' + esc(f.name) + '" data-flag-label="' + esc(f.label) + '" data-flag-count="' + f.count + '">&#128465;</button>';
+      }
+      h += '</div>';
+    });
+    list.innerHTML = h;
+    list.querySelectorAll('input.cat-item-label-input[data-flag-name]').forEach((inp) => {
+      inp.addEventListener('change', () => {
+        updateFlagLabel(inp.dataset.flagName, inp.value);
+      });
+    });
+    list.querySelectorAll('[data-action="delete-flag"]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        deleteFlag(btn.dataset.flagName, btn.dataset.flagLabel, parseInt(btn.dataset.flagCount, 10));
+      });
+    });
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_load_error'), 'error');
+  }
+}
+
+export async function updateFlagLabel(name, val) {
+  if (!val.trim()) { showToast(t('toast_display_name_empty'), 'error'); loadFlags(); return; }
+  try {
+    await api('/api/flags/' + encodeURIComponent(name), { method: 'PUT', body: JSON.stringify({ label: val.trim() }) });
+    showToast(t('toast_flag_updated'), 'success');
+  } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
+}
+
+export async function addFlag() {
+  const name = document.getElementById('flag-add-name').value.trim();
+  const label = document.getElementById('flag-add-label').value.trim();
+  if (!name || !label) { showToast(t('toast_name_display_required'), 'error'); return; }
+  try {
+    const res = await api('/api/flags', { method: 'POST', body: JSON.stringify({ name: name, label: label }) });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    document.getElementById('flag-add-name').value = '';
+    document.getElementById('flag-add-label').value = '';
+    showToast(t('toast_flag_added', { name: label }), 'success');
+    loadFlags();
+    _refreshFlagConfig();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+  }
+}
+
+export async function deleteFlag(name, label, count) {
+  const msg = count > 0
+    ? t('confirm_delete_flag_body', { name: label, count: count })
+    : t('confirm_delete_flag_body_empty', { name: label });
+  if (!await showConfirmModal('\u{1F5D1}', label, msg, t('btn_delete'), t('btn_cancel'))) return;
+  try {
+    await api('/api/flags/' + encodeURIComponent(name), { method: 'DELETE' });
+    showToast(t('toast_flag_deleted', { name: label }), 'success');
+    loadFlags();
+    _refreshFlagConfig();
+  } catch(e) { console.error(e); showToast(t('toast_network_error'), 'error'); }
+}
+
+async function _refreshFlagConfig() {
+  try {
+    const { loadFlagConfig } = await import('./render.js');
+    await loadFlagConfig();
+  } catch(e) { /* ignore */ }
+}
+
 // ── Protein Quality Settings ────────────────────────
 let pqData = [];
 
@@ -646,6 +735,326 @@ export function initRestoreDragDrop() {
   });
 }
 
+// ── Bulk: Refresh all from OFF ───────────────────────
+let _refreshEvtSource = null;
+
+function _renderRefreshReport(report) {
+  const container = document.getElementById('refresh-off-progress');
+  if (!container) return;
+
+  // Remove any previous report
+  const prev = container.querySelector('.refresh-report');
+  if (prev) prev.remove();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'refresh-report';
+
+  const toggleBtn = document.createElement('button');
+  toggleBtn.className = 'refresh-report-toggle';
+  toggleBtn.textContent = t('bulk_report_show', { count: report.length });
+  wrap.appendChild(toggleBtn);
+
+  const reasonKeys = {
+    not_found: 'bulk_report_not_found',
+    no_new_data: 'bulk_report_no_new_data',
+    no_results: 'bulk_report_no_results',
+    below_threshold: 'bulk_report_below_threshold',
+  };
+
+  function buildReportList() {
+    const list = document.createElement('div');
+    list.className = 'refresh-report-list';
+    for (const item of report) {
+      const row = document.createElement('div');
+      row.className = 'refresh-report-row';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'refresh-report-name';
+      nameEl.textContent = item.name || item.ean || '—';
+      nameEl.title = item.name || item.ean || '—';
+      row.appendChild(nameEl);
+
+      const badge = document.createElement('span');
+      badge.className = 'refresh-report-badge ' + item.status;
+      badge.textContent = t('bulk_report_' + item.status);
+      row.appendChild(badge);
+
+      const detail = document.createElement('span');
+      detail.className = 'refresh-report-detail';
+      if (item.status === 'updated' && item.fields) {
+        detail.textContent = t('bulk_report_fields', { fields: item.fields.join(', ') });
+      } else if (item.reason) {
+        const key = reasonKeys[item.reason];
+        let text = key ? t(key) : item.reason;
+        if (item.detail) text += ' (' + item.detail + ')';
+        detail.textContent = text;
+      }
+      detail.title = detail.textContent;
+      row.appendChild(detail);
+
+      list.appendChild(row);
+    }
+    return list;
+  }
+
+  function openReportModal() {
+    const bg = document.createElement('div');
+    bg.className = 'off-modal-bg';
+    bg.id = 'refresh-report-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+
+    const modal = document.createElement('div');
+    modal.className = 'off-modal';
+
+    const head = document.createElement('div');
+    head.className = 'off-modal-head';
+    const h3 = document.createElement('h3');
+    h3.textContent = t('bulk_report_show', { count: report.length });
+    head.appendChild(h3);
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'off-modal-close';
+    closeBtn.textContent = '\u00D7';
+    closeBtn.setAttribute('aria-label', t('btn_close'));
+    head.appendChild(closeBtn);
+    modal.appendChild(head);
+
+    const body = document.createElement('div');
+    body.className = 'off-modal-body';
+    body.appendChild(buildReportList());
+    modal.appendChild(body);
+
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+    document.body.style.overflow = 'hidden';
+
+    function close() {
+      document.removeEventListener('keydown', onKeyDown);
+      bg.remove();
+      document.body.style.overflow = '';
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') close();
+    }
+    document.addEventListener('keydown', onKeyDown);
+    closeBtn.addEventListener('click', close);
+    bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
+  }
+
+  toggleBtn.addEventListener('click', openReportModal);
+
+  container.appendChild(wrap);
+}
+
+function _connectRefreshStream() {
+  const btn = document.getElementById('btn-refresh-all-off');
+  const progressWrap = document.getElementById('refresh-off-progress');
+  const bar = document.getElementById('refresh-off-bar');
+  const status = document.getElementById('refresh-off-status');
+
+  if (btn) btn.disabled = true;
+  if (progressWrap) progressWrap.style.display = '';
+
+  if (_refreshEvtSource) _refreshEvtSource.close();
+  _refreshEvtSource = new EventSource('/api/bulk/refresh-off/stream');
+
+  _refreshEvtSource.onmessage = (e) => {
+    const data = JSON.parse(e.data);
+    if (data.running && data.total > 0) {
+      const pct = Math.round((data.current / data.total) * 100);
+      if (bar) bar.style.width = pct + '%';
+      const label = data.name || data.ean;
+      if (status) status.textContent = t('bulk_refresh_off_progress', { current: data.current, total: data.total, name: label });
+    }
+    if (data.done) {
+      _refreshEvtSource.close();
+      _refreshEvtSource = null;
+      if (bar) bar.style.width = '100%';
+      const msg = t('bulk_refresh_off_result', { total: data.total, updated: data.updated, skipped: data.skipped, errors: data.errors });
+      if (status) status.textContent = msg;
+      showToast(msg, 'success');
+      if (data.report) _renderRefreshReport(data.report);
+      if (btn) btn.disabled = false;
+      loadData();
+    }
+  };
+
+  _refreshEvtSource.onerror = () => {
+    _refreshEvtSource.close();
+    _refreshEvtSource = null;
+    if (btn) btn.disabled = false;
+    if (progressWrap) progressWrap.style.display = 'none';
+  };
+}
+
+export async function checkRefreshStatus() {
+  try {
+    const status = await api('/api/bulk/refresh-off/status');
+    if (status.running) _connectRefreshStream();
+  } catch(e) { /* ignore */ }
+}
+
+function _showRefreshOffModal() {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '🔄';
+    modal.appendChild(iconDiv);
+
+    const h3 = document.createElement('h3');
+    h3.textContent = t('bulk_refresh_off_title');
+    modal.appendChild(h3);
+
+    const pEl = document.createElement('p');
+    pEl.textContent = t('bulk_refresh_off_confirm');
+    modal.appendChild(pEl);
+
+    // Options section
+    const opts = document.createElement('div');
+    opts.className = 'refresh-off-options';
+
+    const cbLabel = document.createElement('label');
+    cbLabel.className = 'refresh-off-cb-label';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    const cbText = document.createElement('span');
+    cbText.textContent = t('bulk_refresh_off_search_missing');
+    cbLabel.appendChild(cb);
+    cbLabel.appendChild(cbText);
+    opts.appendChild(cbLabel);
+
+    const sliders = document.createElement('div');
+    sliders.className = 'refresh-off-sliders';
+    sliders.style.display = 'none';
+
+    function makeSlider(labelKey, defaultVal) {
+      const row = document.createElement('div');
+      row.className = 'refresh-off-range-row';
+      const lbl = document.createElement('label');
+      lbl.className = 'form-sub';
+      lbl.textContent = t(labelKey);
+      const range = document.createElement('input');
+      range.type = 'range';
+      range.min = '0';
+      range.max = '100';
+      range.value = String(defaultVal);
+      const val = document.createElement('span');
+      val.className = 'refresh-off-range-val';
+      val.textContent = String(defaultVal);
+      range.addEventListener('input', () => { val.textContent = range.value; });
+      row.appendChild(lbl);
+      row.appendChild(range);
+      row.appendChild(val);
+      sliders.appendChild(row);
+      return range;
+    }
+
+    const certSlider = makeSlider('bulk_refresh_off_min_certainty', 100);
+    const compSlider = makeSlider('bulk_refresh_off_min_completeness', 75);
+    opts.appendChild(sliders);
+    modal.appendChild(opts);
+
+    cb.addEventListener('change', () => {
+      sliders.style.display = cb.checked ? '' : 'none';
+    });
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'scan-modal-btn-register confirm-yes';
+    yesBtn.textContent = t('btn_start');
+    actions.appendChild(yesBtn);
+    const noBtn = document.createElement('button');
+    noBtn.className = 'scan-modal-btn-cancel confirm-no';
+    noBtn.textContent = t('btn_cancel');
+    actions.appendChild(noBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+
+    function close(val) {
+      document.removeEventListener('keydown', onKeyDown);
+      bg.remove();
+      resolve(val);
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') close(null);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    noBtn.onclick = () => { close(null); };
+    yesBtn.onclick = () => {
+      close({
+        searchMissing: cb.checked,
+        minCertainty: parseInt(certSlider.value, 10),
+        minCompleteness: parseInt(compSlider.value, 10),
+      });
+    };
+    bg.addEventListener('click', (e) => { if (e.target === bg) close(null); });
+    yesBtn.focus();
+  });
+}
+
+export async function refreshAllFromOff() {
+  const opts = await _showRefreshOffModal();
+  if (!opts) return;
+  const bar = document.getElementById('refresh-off-bar');
+  if (bar) bar.style.width = '0%';
+  // Clear previous report
+  const prevReport = document.querySelector('.refresh-report');
+  if (prevReport) prevReport.remove();
+  try {
+    const body = {};
+    if (opts.searchMissing) {
+      body.search_missing = true;
+      body.min_certainty = opts.minCertainty;
+      body.min_completeness = opts.minCompleteness;
+    }
+    const res = await api('/api/bulk/refresh-off/start', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    if (res.error === 'already_running') {
+      _connectRefreshStream();
+      return;
+    }
+    if (res.error) { showToast(res.error, 'error'); return; }
+    _connectRefreshStream();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+  }
+}
+
+// ── Bulk: Estimate PQ for all ────────────────────────
+export async function estimateAllPq() {
+  const btn = document.getElementById('btn-estimate-all-pq');
+  const status = document.getElementById('estimate-pq-status');
+  if (btn) btn.disabled = true;
+  if (status) { status.style.display = ''; status.textContent = t('bulk_running'); }
+  try {
+    const res = await api('/api/bulk/estimate-pq', { method: 'POST' });
+    if (res.error) { showToast(res.error, 'error'); return; }
+    const msg = t('bulk_estimate_pq_result', { total: res.total, updated: res.updated, skipped: res.skipped });
+    if (status) status.textContent = msg;
+    showToast(msg, 'success');
+    loadData();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+    if (status) status.style.display = 'none';
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 // ── OFF Credentials ─────────────────────────────────
 async function loadOffCredentials() {
   try {
@@ -666,5 +1075,10 @@ export async function saveOffCredentials() {
   try {
     await api('/api/settings/off-credentials', { method: 'PUT', body: JSON.stringify(body) });
     showToast(t('toast_off_credentials_saved'), 'success');
-  } catch(e) { showToast(t('toast_save_error'), 'error'); }
+  } catch(e) {
+    const msg = e.message === 'encryption_not_configured'
+      ? t('toast_encryption_not_configured')
+      : t('toast_save_error');
+    showToast(msg, 'error');
+  }
 }

@@ -12,6 +12,7 @@ export const state = {
   sortDir: 'desc',
   categories: [],
   imageCache: {},
+  advancedFilters: null,
 };
 
 // All nutrition field IDs used in register/edit forms
@@ -82,6 +83,7 @@ export async function fetchProducts(search, types) {
   const p = new URLSearchParams();
   if (search) p.set('search', search);
   if (types && types.length) p.set('type', types.join(','));
+  if (state.advancedFilters) p.set('filters', state.advancedFilters);
   return api('/api/products?' + p);
 }
 
@@ -186,9 +188,9 @@ export function upgradeSelect(sel, onSelect) {
 
   let highlighted = -1;
 
-  // Build custom option items
-  sel.querySelectorAll('option').forEach((o) => {
-    if (!o.value && !o.textContent.trim()) return; // skip truly empty placeholders
+  // Build custom option items (with optgroup support)
+  function _addOption(o) {
+    if (!o.value && !o.textContent.trim()) return;
     const div = document.createElement('div');
     div.className = 'custom-select-option';
     div.setAttribute('role', 'option');
@@ -200,7 +202,20 @@ export function upgradeSelect(sel, onSelect) {
       e.stopPropagation();
       _pick(div.getAttribute('data-value'), div.textContent);
     });
-  });
+  }
+
+  const groups = sel.querySelectorAll('optgroup');
+  if (groups.length) {
+    groups.forEach((g) => {
+      const header = document.createElement('div');
+      header.className = 'custom-select-group';
+      header.textContent = g.label;
+      optionsDiv.appendChild(header);
+      g.querySelectorAll('option').forEach(_addOption);
+    });
+  } else {
+    sel.querySelectorAll('option').forEach(_addOption);
+  }
 
   // Only attach trigger/document listeners once
   if (isNew) {

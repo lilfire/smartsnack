@@ -3,7 +3,7 @@ import { state, api, esc, safeDataUri, showToast } from './state.js';
 import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
-const OFF_FETCH_TIMEOUT = 15000;
+const OFF_FETCH_TIMEOUT = 45000;
 
 function fetchWithTimeout(url, opts) {
   const controller = new AbortController();
@@ -28,6 +28,20 @@ export function validateOffBtn(prefix) {
 let _offCtx = { prefix: null, productId: null };
 let _offPickerProducts = null;
 
+const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
+
+function _gatherNutrition(prefix) {
+  const nutrition = {};
+  _nutritionCompareFields.forEach((f) => {
+    const el = document.getElementById(prefix + '-' + f);
+    if (el && el.value.trim()) {
+      const v = parseFloat(el.value);
+      if (!isNaN(v)) nutrition[f] = v;
+    }
+  });
+  return Object.keys(nutrition).length > 0 ? nutrition : null;
+}
+
 export async function lookupOFF(prefix, productId) {
   const ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
   const name = document.getElementById(prefix + '-name').value.trim();
@@ -36,7 +50,7 @@ export async function lookupOFF(prefix, productId) {
   if (isValidEan(ean)) {
     showOffPickerLoading(t('off_searching_ean', { ean: ean }));
     try {
-      const res = await fetchWithTimeout('https://world.openfoodfacts.org/api/v2/product/' + ean + '.json');
+      const res = await fetchWithTimeout('/api/off/product/' + ean);
       if (!res.ok) { updateOffPickerResults([], t('toast_network_error')); return; }
       const data = await res.json();
       if (data.status !== 1 || !data.product) {
@@ -49,7 +63,8 @@ export async function lookupOFF(prefix, productId) {
   } else if (name.length >= 2) {
     showOffPickerLoading(t('off_searching_name', { name: name }));
     try {
-      const products = await searchOFF(name);
+      const category = document.getElementById(prefix + '-type')?.value || '';
+      const products = await searchOFF(name, _gatherNutrition(prefix), category);
       updateOffPickerResults(products);
       const si = document.getElementById('off-search-input');
       if (si) si.value = name;
@@ -160,17 +175,15 @@ function updateOffPickerResults(products, errorMsg, ean) {
   if (count) count.textContent = t('off_result_count', { count: products.length });
 }
 
-export async function searchOFF(query) {
-  const params = new URLSearchParams({
-    search_terms: query,
-    search_simple: '1',
-    action: 'process',
-    json: '1',
-    page_size: '20',
-    fields: 'code,product_name,product_name_no,brands,stores,stores_tags,nutriments,image_front_small_url,image_front_url,image_url,serving_size,product_quantity,ingredients_text,ingredients_text_no,ingredients_text_en'
+export async function searchOFF(query, nutrition, category) {
+  const body = { q: query };
+  if (nutrition) body.nutrition = nutrition;
+  if (category) body.category = category;
+  const res = await fetchWithTimeout('/api/off/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
   });
-  const url = 'https://world.openfoodfacts.org/cgi/search.pl?' + params;
-  const res = await fetchWithTimeout(url);
   if (!res.ok) throw new Error('Search failed: ' + res.status);
   const data = await res.json();
   return (data.products || []).filter((p) => p.product_name || p.product_name_no);
@@ -195,6 +208,20 @@ function renderOffResults(products) {
     if (brand) h += '<div class="off-result-brand">' + esc(brand) + '</div>';
     h += '<div class="off-result-nutri">' + kcal + ' kcal \u00B7 ' + pro + 'g protein \u00B7 ' + carb + 'g carbs</div>';
     if (code) h += '<div class="off-result-ean">EAN: ' + esc(code) + '</div>';
+    const cert = p.certainty != null ? p.certainty : null;
+    if (cert != null) {
+      const certColor = cert >= 70 ? '#4caf50' : cert >= 40 ? '#ff9800' : '#f44336';
+      h += '<div class="off-result-completeness">';
+      h += '<div class="off-result-completeness-bar"><div class="off-result-completeness-fill" style="width:' + cert + '%;background:' + certColor + '"></div></div>';
+      h += '<span class="off-result-completeness-pct">' + t('off_certainty_label') + ' ' + cert + '%</span>';
+      h += '</div>';
+    }
+    const comp = Math.round((p.completeness || 0) * 100);
+    const compColor = comp >= 70 ? '#4caf50' : comp >= 40 ? '#ff9800' : '#f44336';
+    h += '<div class="off-result-completeness">';
+    h += '<div class="off-result-completeness-bar"><div class="off-result-completeness-fill" style="width:' + comp + '%;background:' + compColor + '"></div></div>';
+    h += '<span class="off-result-completeness-pct">' + comp + '%</span>';
+    h += '</div>';
     h += '</div></div>';
   });
   return h;
@@ -212,7 +239,8 @@ export async function offModalSearch() {
   if (bodyEl) bodyEl.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('off_searching_name', { name: query });
   try {
-    const products = await searchOFF(query);
+    const category = document.getElementById(_offCtx.prefix + '-type')?.value || '';
+    const products = await searchOFF(query, _gatherNutrition(_offCtx.prefix), category);
     updateOffPickerResults(products);
   } catch(e) { updateOffPickerResults([], t('toast_network_error')); }
 }
@@ -239,7 +267,7 @@ export async function selectOffResult(idx, ctxSnapshot) {
 
   try {
     if (code) {
-      const res = await fetchWithTimeout('https://world.openfoodfacts.org/api/v2/product/' + code + '.json');
+      const res = await fetchWithTimeout('/api/off/product/' + code);
       if (res.ok) {
         const data = await res.json();
         if (data.status === 1 && data.product) {
@@ -264,6 +292,7 @@ export async function selectOffResult(idx, ctxSnapshot) {
 }
 
 async function applyOffProduct(prod, prefix, productId) {
+  window._pendingOFFSync = true;
   const n = prod.nutriments || {};
   const offMap = {
     kcal: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? null,
@@ -282,10 +311,11 @@ async function applyOffProduct(prod, prefix, productId) {
     const val = offMap[key];
     if (val == null) return;
     const fieldEl = document.getElementById(prefix + '-' + key);
-    if (fieldEl) {
-      fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
-      filled.push(key);
-    }
+    if (!fieldEl) return;
+    // Don't overwrite existing local values with 0 from OFF (likely missing data)
+    if (val === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
+    fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
+    filled.push(key);
   });
 
   const serving = prod.serving_size || '';
@@ -296,7 +326,7 @@ async function applyOffProduct(prod, prefix, productId) {
   if (qty) { const weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
 
   const nameEl = document.getElementById(prefix + '-name');
-  if (nameEl) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
+  if (nameEl && !nameEl.value.trim()) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
 
   if (prod.code) {
     const codeEl = document.getElementById(prefix + '-ean');
@@ -513,17 +543,12 @@ export async function submitToOff(ean) {
       method: 'POST',
       body: JSON.stringify(body)
     });
-    if (res.error) {
-      const msg = t(res.error) !== res.error ? t(res.error) : res.error;
-      showToast(msg, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
-      return;
-    }
     closeOffAddReview();
     closeOffPicker();
     showToast(t('toast_off_product_added'), 'success');
   } catch(e) {
-    showToast(t('toast_network_error'), 'error');
+    const msg = e.message && t(e.message) !== e.message ? t(e.message) : (e.message || t('toast_network_error'));
+    showToast(msg, 'error');
     if (btn) { btn.disabled = false; btn.textContent = t('off_submit_btn'); }
   }
 }
