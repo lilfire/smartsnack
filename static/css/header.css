@@ -61,7 +61,6 @@ header {
   border-radius: 10px;
   padding: 3px;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
 
@@ -87,4 +86,9 @@ header {
 .nav-tab.active {
   background: #E8B84B;
   color: #0a0a0c;
+}
+
+.nav-tab:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }

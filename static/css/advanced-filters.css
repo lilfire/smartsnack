@@ -40,6 +40,11 @@
   background: rgba(232, 184, 75, 0.15);
 }
 
+.adv-logic-btn:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+}
+
 .adv-row {
   display: flex;
   gap: 6px;
@@ -111,6 +116,13 @@
   border-color: rgba(232, 184, 75, 0.3);
 }
 
+.adv-value-input:focus-visible,
+.adv-field-select:focus-visible,
+.adv-op-select:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+}
+
 /* Custom select overrides for advanced filter rows */
 .adv-row .custom-select-wrap {
   width: auto;
@@ -165,6 +177,11 @@
   color: #ff5050;
 }
 
+.adv-remove-btn:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+}
+
 .adv-add-btn {
   padding: 6px 14px;
   border-radius: 8px;
@@ -180,6 +197,11 @@
 .adv-add-btn:hover {
   border-color: rgba(232, 184, 75, 0.3);
   color: #E8B84B;
+}
+
+.adv-add-btn:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 /* Group container */

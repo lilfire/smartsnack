@@ -41,6 +41,9 @@ def _decrypt(stored: str) -> str:
     # Legacy XOR fallback for existing data -- migrate to Fernet on read
     try:
         key = os.environ.get("SMARTSNACK_SECRET_KEY", "")
+        if not key:
+            logger.warning("Cannot decrypt legacy value: SMARTSNACK_SECRET_KEY not set")
+            return stored
         key_bytes = key.encode("utf-8")[:32].ljust(32, b"\0")
         encrypted = base64.b64decode(stored)
         decrypted = bytes(

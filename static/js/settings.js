@@ -31,8 +31,10 @@ export async function loadSettings() {
   if (_settingsLoading) return;
   _settingsLoading = true;
   try {
-    document.getElementById('settings-loading').style.display = '';
-    document.getElementById('settings-content').style.display = 'none';
+    const settingsLoading = document.getElementById('settings-loading');
+    const settingsContent = document.getElementById('settings-content');
+    if (settingsLoading) settingsLoading.style.display = '';
+    if (settingsContent) settingsContent.style.display = 'none';
     try {
       weightData.length = 0;
       const wd = await api('/api/weights');
@@ -44,8 +46,8 @@ export async function loadSettings() {
       });
       renderWeightItems();
     } catch(e) { showToast(t('toast_load_error'), 'error'); }
-    document.getElementById('settings-loading').style.display = 'none';
-    document.getElementById('settings-content').style.display = '';
+    if (settingsLoading) settingsLoading.style.display = 'none';
+    if (settingsContent) settingsContent.style.display = '';
     // Populate language dropdown dynamically
     const langSelect = document.getElementById('language-select');
     if (langSelect) {
@@ -716,6 +718,7 @@ export function toggleSettingsSection(header) {
   const isOpen = body.style.display !== 'none';
   body.style.display = isOpen ? 'none' : '';
   header.classList.toggle('open', !isOpen);
+  header.setAttribute('aria-expanded', String(!isOpen));
 }
 
 // Drag-and-drop for restore
@@ -859,7 +862,8 @@ function _connectRefreshStream() {
   _refreshEvtSource = new EventSource('/api/bulk/refresh-off/stream');
 
   _refreshEvtSource.onmessage = (e) => {
-    const data = JSON.parse(e.data);
+    let data;
+    try { data = JSON.parse(e.data); } catch(_) { return; }
     if (data.running && data.total > 0) {
       const pct = Math.round((data.current / data.total) * 100);
       if (bar) bar.style.width = pct + '%';

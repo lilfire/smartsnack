@@ -13,13 +13,13 @@
           <select class="field-select" id="f-type"></select>
         </div>
         <div>
-          <label class="field-label" data-i18n="label_ean">EAN (barcode)</label>
+          <label class="field-label" for="f-ean" data-i18n="label_ean">EAN (barcode)</label>
           <div class="ean-row">
             <div>
               <input class="field-input" id="f-ean" data-i18n-placeholder="ph_ean" placeholder="e.g. 7038010069307" oninput="validateOffBtn('f')">
             </div>
-            <button class="btn-scan" onclick="openScanner('f')" data-i18n-title="btn_scan_title" title="Scan barcode">&#128247;</button>
-            <button class="btn-off" id="f-off-btn" disabled onclick="lookupOFF('f')">
+            <button type="button" class="btn-scan" onclick="openScanner('f')" data-i18n-title="btn_scan_title" title="Scan barcode" aria-label="Scan barcode">&#128247;</button>
+            <button type="button" class="btn-off" id="f-off-btn" disabled onclick="lookupOFF('f')">
               <span class="off-spin"></span>
               <span class="off-label" data-i18n="btn_fetch">&#127758; Fetch</span>
             </button>
@@ -48,7 +48,7 @@
         <textarea class="field-input" id="f-ingredients" data-i18n-placeholder="ph_ingredients" placeholder="e.g. Lentils, sunflower oil, paprika..." rows="2" style="resize:vertical;min-height:60px" oninput="updateEstimateBtn('f')"></textarea>
       </div>
 
-      <div class="form-section" data-i18n="section_nutrition">N&aelig;ringsverdier per 100g</div>
+      <h3 class="form-section" data-i18n="section_nutrition">N&aelig;ringsverdier per 100g</h3>
 
       <div class="grid-4">
         <div>
@@ -104,7 +104,7 @@
         <div></div>
       </div>
 
-      <div class="form-section" data-i18n="section_rating_price">Rating &amp; price</div>
+      <h3 class="form-section" data-i18n="section_rating_price">Rating &amp; price</h3>
 
       <div class="grid-3">
         <div>
@@ -157,7 +157,7 @@
         <input type="hidden" id="f-est_diaas" value="">
       </div>
 
-      <button class="btn-register" id="btn-submit" onclick="registerProduct()" data-i18n="btn_register_product">+ Register product</button>
+      <button type="button" class="btn-register" id="btn-submit" onclick="registerProduct()" data-i18n="btn_register_product">+ Register product</button>
     </div>
   </div>
 </div>

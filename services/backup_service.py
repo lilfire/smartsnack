@@ -156,9 +156,10 @@ def create_backup(include_images: bool = True):
         products = [
             dict(r)
             for r in conn.execute(
-                "SELECT id, type, name, ean, brand, stores, ingredients, taste_score, "
-                "kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, "
-                "salt, volume, price, weight, portion, est_pdcaas, est_diaas "
+                "SELECT id, type, name, ean, brand, stores, ingredients, taste_note, "
+                "taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, "
+                "protein, fiber, salt, volume, price, weight, portion, "
+                "est_pdcaas, est_diaas "
                 "FROM products ORDER BY id"
             ).fetchall()
         ]
