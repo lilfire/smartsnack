@@ -91,7 +91,7 @@ Object.defineProperty(window, 'editingId', {
 (async function() {
   await initLanguage();
   try {
-    var wc = await api('/api/weights');
+    const wc = await api('/api/weights');
     weightData.length = 0;
     Object.keys(SCORE_CFG_MAP).forEach(function(k) { delete SCORE_CFG_MAP[k]; });
     wc.forEach(function(w) {
@@ -102,6 +102,6 @@ Object.defineProperty(window, 'editingId', {
   await loadFlagConfig();
   initRestoreDragDrop();
   loadData();
-  var searchInput = document.getElementById('search-input');
+  const searchInput = document.getElementById('search-input');
   if (searchInput) searchInput.focus();
 })();

@@ -143,7 +143,7 @@ export function renderResults(results, search) {
     const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
     const brandHtml = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
     h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
-      + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + catEmoji(p.type) + '</span>' + thumbHtml + '<span class="prod-name">' + esc(p.name) + '</span></div>'
+      + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span>' + thumbHtml + '<span class="prod-name">' + esc(p.name) + '</span></div>'
       + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandHtml + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
       + '</div></div>';
@@ -235,7 +235,7 @@ export function renderResults(results, search) {
           + '<div><label>' + t('edit_label_salt') + '</label><input type="number" step="0.01" id="ed-salt" value="' + ev(p.salt) + '"></div>'
           + '<div><label>' + t('edit_label_weight') + '</label><input type="number" step="1" id="ed-weight" value="' + ev(p.weight) + '"></div>'
           + '<div><label>' + t('edit_label_portion') + '</label><input type="number" step="1" id="ed-portion" value="' + ev(p.portion) + '"></div>'
-          + '<div><label>' + t('edit_label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume == 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume == 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume == 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
+          + '<div><label>' + t('edit_label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume === 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume === 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume === 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
           + '<div><label>' + t('edit_label_price') + '</label><input type="number" step="1" id="ed-price" value="' + ev(p.price) + '"></div>'
           + '<div><label>' + t('edit_label_taste') + '</label><div class="range-row"><input type="range" min="0" max="6" step="0.5" value="' + (p.taste_score != null ? p.taste_score : 3) + '" id="ed-smak" oninput="document.getElementById(\'ed-smak-val\').textContent=this.value"><span class="range-val" id="ed-smak-val">' + (p.taste_score != null ? p.taste_score : 3) + '</span></div></div>'
           + '<div class="edit-grid-2"><label>' + t('edit_label_taste_note') + '</label><textarea id="ed-taste_note" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.taste_note || '') + '</textarea></div>'
