@@ -465,6 +465,7 @@ def _run_refresh(options=None):
 
                     best = None
                     best_comp = -1
+                    best_cert = -1
                     for p in products:
                         cert = p.get("certainty", 0)
                         comp = float(p.get("completeness") or 0) * 100

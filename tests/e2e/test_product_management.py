@@ -1,6 +1,5 @@
 """Test product editing and deletion."""
 
-import pytest
 from playwright.sync_api import expect
 
 

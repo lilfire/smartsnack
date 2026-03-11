@@ -14,7 +14,9 @@ import subprocess
 import pytest
 
 # Ensure project root is importable
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -41,6 +43,7 @@ def app_server(tmp_path_factory):
     os.environ["SMARTSNACK_SECRET_KEY"] = "e2e-testing-secret"
 
     import config
+
     config.DB_PATH = db_file
 
     # Now import db module — it does `from config import DB_PATH` at
@@ -48,6 +51,7 @@ def app_server(tmp_path_factory):
     # Python's import will re-read the patched value.  However, the
     # `from … import` copies by value, so we also patch the module attr.
     import db as db_mod
+
     db_mod.DB_PATH = db_file
 
     # Now import the app.  `create_app()` calls `init_db()` which reads
@@ -72,6 +76,7 @@ def app_server(tmp_path_factory):
 
     # Wait for server to be ready
     import urllib.request
+
     base_url = f"http://{host}:{port}"
     for _ in range(50):
         try:
@@ -99,9 +104,14 @@ def page(page, live_url):
     the page doesn't hang waiting for unreachable hosts.
     """
     # Block external resources that can hang in sandboxed environments
-    page.route("**/*", lambda route: (
-        route.abort() if not route.request.url.startswith(live_url) else route.continue_()
-    ))
+    page.route(
+        "**/*",
+        lambda route: (
+            route.abort()
+            if not route.request.url.startswith(live_url)
+            else route.continue_()
+        ),
+    )
     page.goto(live_url, wait_until="domcontentloaded")
     # Wait for the app to finish initial load (products list populated)
     page.wait_for_selector("#results-container", state="attached", timeout=10000)

@@ -1,6 +1,5 @@
 """Test the settings view sections."""
 
-import pytest
 from playwright.sync_api import expect
 
 

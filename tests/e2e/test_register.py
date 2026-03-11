@@ -1,6 +1,5 @@
 """Test product registration flow."""
 
-import pytest
 from playwright.sync_api import expect
 
 
@@ -14,19 +13,21 @@ def test_register_form_fields_present(page):
     """All required form fields should be present in the register view."""
     _go_to_register(page)
 
-    expect(page.locator("#f-type")).to_be_attached()       # category select (hidden by custom overlay)
-    expect(page.locator("#f-ean")).to_be_visible()         # EAN input
-    expect(page.locator("#f-name")).to_be_visible()        # product name
-    expect(page.locator("#f-brand")).to_be_visible()       # brand
-    expect(page.locator("#f-kcal")).to_be_visible()        # kcal
-    expect(page.locator("#f-protein")).to_be_visible()     # protein
-    expect(page.locator("#f-fat")).to_be_visible()         # fat
-    expect(page.locator("#f-carbs")).to_be_visible()       # carbs
-    expect(page.locator("#f-sugar")).to_be_visible()       # sugar
-    expect(page.locator("#f-salt")).to_be_visible()        # salt
-    expect(page.locator("#f-fiber")).to_be_visible()       # fiber
-    expect(page.locator("#f-smak")).to_be_visible()        # taste slider
-    expect(page.locator("#btn-submit")).to_be_visible()    # submit button
+    expect(
+        page.locator("#f-type")
+    ).to_be_attached()  # category select (hidden by custom overlay)
+    expect(page.locator("#f-ean")).to_be_visible()  # EAN input
+    expect(page.locator("#f-name")).to_be_visible()  # product name
+    expect(page.locator("#f-brand")).to_be_visible()  # brand
+    expect(page.locator("#f-kcal")).to_be_visible()  # kcal
+    expect(page.locator("#f-protein")).to_be_visible()  # protein
+    expect(page.locator("#f-fat")).to_be_visible()  # fat
+    expect(page.locator("#f-carbs")).to_be_visible()  # carbs
+    expect(page.locator("#f-sugar")).to_be_visible()  # sugar
+    expect(page.locator("#f-salt")).to_be_visible()  # salt
+    expect(page.locator("#f-fiber")).to_be_visible()  # fiber
+    expect(page.locator("#f-smak")).to_be_visible()  # taste slider
+    expect(page.locator("#btn-submit")).to_be_visible()  # submit button
 
 
 def test_category_dropdown_has_options(page):
