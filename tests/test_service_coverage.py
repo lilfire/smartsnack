@@ -807,3 +807,476 @@ class TestRunRefresh:
         with svc._refresh_lock:
             assert svc._refresh_job["skipped"] >= 1
             svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# bulk_service — _fetch_off_image (PIL branch and fallbacks)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestFetchOffImage:
+    def test_no_url_returns_none(self):
+        from services.bulk_service import _fetch_off_image
+
+        assert _fetch_off_image({}) is None
+        assert _fetch_off_image({"image_front_url": ""}) is None
+
+    def test_proxy_image_exception_returns_none(self):
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/test.jpg"}
+        with patch("services.bulk_service.proxy_service.proxy_image", side_effect=Exception("no")):
+            assert _fetch_off_image(product) is None
+
+    def test_valid_image_produces_data_uri(self):
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/test.jpg"}
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(b"\xff\xd8\xff\xe0" + b"\x00" * 50, "image/jpeg"),
+        ):
+            result = _fetch_off_image(product)
+
+        assert result is not None
+        assert result.startswith("data:image/jpeg;base64,")
+
+    def test_oversized_returns_none(self):
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/test.jpg"}
+        big = b"x" * (3 * 1024 * 1024)
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(big, "image/jpeg"),
+        ):
+            result = _fetch_off_image(product)
+
+        assert result is None
+
+    def test_image_url_fallback(self):
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_url": "https://images.openfoodfacts.org/fallback.jpg"}
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(b"\x89PNG\r\n" + b"\x00" * 30, "image/png"),
+        ) as mock_proxy:
+            result = _fetch_off_image(product)
+
+        assert result is not None
+        assert "fallback.jpg" in mock_proxy.call_args[0][0]
+
+    def test_content_type_with_params(self):
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/test.jpg"}
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(b"\xff\xd8\xff" + b"\x00" * 30, "image/jpeg; charset=utf-8"),
+        ):
+            result = _fetch_off_image(product)
+
+        assert result is not None
+        assert "data:image/jpeg;base64," in result
+
+    def test_pil_resize_jpeg_path(self):
+        import sys
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/large.jpg"}
+        small_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 40
+        resized_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 20
+
+        mock_img = MagicMock()
+        mock_img.width = 800
+        mock_img.height = 600
+
+        def fake_save(buf, format, quality=None):
+            buf.write(resized_bytes)
+
+        mock_img.save = fake_save
+        mock_img.thumbnail = MagicMock()
+
+        mock_pil_image = MagicMock()
+        mock_pil_image.open.return_value = mock_img
+        mock_pil_image.LANCZOS = MagicMock()
+        fake_pil = MagicMock()
+        fake_pil.Image = mock_pil_image
+
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(small_bytes, "image/jpeg"),
+        ), patch.dict(sys.modules, {"PIL": fake_pil, "PIL.Image": mock_pil_image}):
+            result = _fetch_off_image(product)
+
+        mock_img.thumbnail.assert_called_once()
+        assert result is not None
+
+    def test_pil_resize_png_path(self):
+        import sys
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/img.png"}
+        small_bytes = b"\x89PNG\r\n" + b"\x00" * 40
+        png_bytes = b"\x89PNG\r\n" + b"\x00" * 10
+
+        mock_img = MagicMock()
+        mock_img.width = 500
+        mock_img.height = 500
+
+        def fake_save(buf, format, quality=None):
+            buf.write(png_bytes)
+
+        mock_img.save = fake_save
+        mock_img.thumbnail = MagicMock()
+
+        mock_pil_image = MagicMock()
+        mock_pil_image.open.return_value = mock_img
+        mock_pil_image.LANCZOS = MagicMock()
+        fake_pil = MagicMock()
+        fake_pil.Image = mock_pil_image
+
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(small_bytes, "image/png"),
+        ), patch.dict(sys.modules, {"PIL": fake_pil, "PIL.Image": mock_pil_image}):
+            result = _fetch_off_image(product)
+
+        mock_img.thumbnail.assert_called_once()
+        assert result is not None
+
+    def test_pil_not_installed_uses_original(self):
+        import sys
+        from services.bulk_service import _fetch_off_image
+
+        product = {"image_front_url": "https://images.openfoodfacts.org/test.jpg"}
+        raw_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 30
+
+        with patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            return_value=(raw_bytes, "image/jpeg"),
+        ), patch.dict(sys.modules, {"PIL": None}):
+            result = _fetch_off_image(product)
+
+        assert result is not None
+        assert result.startswith("data:image/jpeg;base64,")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# bulk_service — _run_refresh (background thread body)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestRunRefresh:
+
+    @staticmethod
+    def _insert_ean_product(db, name, ean):
+        cur = db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES (?, ?, ?, ?)",
+            ("Snacks", name, ean, ""),
+        )
+        db.commit()
+        return cur.lastrowid
+
+    @staticmethod
+    def _off_ok(name="OFF Name", kcal=250):
+        return {
+            "status": 1,
+            "product": {
+                "product_name": name,
+                "brands": "Brand",
+                "nutriments": {"energy-kcal_100g": kcal},
+                "stores": "Rema",
+            },
+        }
+
+    @staticmethod
+    def _reset_job(bs):
+        with bs._refresh_lock:
+            bs._refresh_job.update(
+                running=True, done=False, current=0, total=0,
+                updated=0, skipped=0, errors=0, name="", ean="", status="",
+            )
+            bs._refresh_job.pop("report", None)
+
+    def test_sets_done_after_run(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._reset_job(bs)
+
+        with patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["running"] is False
+
+    def test_report_key_present(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._reset_job(bs)
+
+        with patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert "report" in bs._refresh_job
+        assert isinstance(bs._refresh_job["report"], list)
+
+    def test_total_reflects_ean_rows(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._insert_ean_product(db, "P1", "1000000000001")
+        self._insert_ean_product(db, "P2", "1000000000002")
+        self._reset_job(bs)
+
+        with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}), \
+             patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["total"] == 2
+
+    def test_not_found_increments_skipped(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._insert_ean_product(db, "Ghost", "2000000000001")
+        self._reset_job(bs)
+
+        with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}), \
+             patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["skipped"] >= 1
+
+    def test_found_increments_updated(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._insert_ean_product(db, "Local Name", "3000000000001")
+        self._reset_job(bs)
+
+        with patch("services.bulk_service.proxy_service.off_product", return_value=self._off_ok()), \
+             patch("services.bulk_service.proxy_service.proxy_image", side_effect=Exception("no img")), \
+             patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["updated"] >= 1
+
+    def test_no_new_data_increments_skipped(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        pid = self._insert_ean_product(db, "OFF Name", "4000000000001")
+        db.execute(
+            "UPDATE products SET brand=?, stores=?, kcal=? WHERE id=?",
+            ("Brand", "Rema", 250, pid),
+        )
+        db.commit()
+        self._reset_job(bs)
+
+        with patch(
+            "services.bulk_service.proxy_service.off_product",
+            return_value=self._off_ok(name="OFF Name"),
+        ), patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            side_effect=Exception("no img"),
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["errors"] == 0
+
+    def test_exception_increments_errors(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._insert_ean_product(db, "Error Product", "5000000000001")
+        self._reset_job(bs)
+
+        with patch(
+            "services.bulk_service.proxy_service.off_product",
+            side_effect=RuntimeError("crash"),
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["errors"] >= 1
+
+    def test_image_uri_triggers_update(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        self._insert_ean_product(db, "Image Prod", "6000000000001")
+        self._reset_job(bs)
+
+        off_data = {"status": 1, "product": {"product_name": "Image Prod", "nutriments": {}}}
+        fake_uri = "data:image/jpeg;base64,/9j/AAAA"
+
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data), \
+             patch("services.bulk_service._fetch_off_image", return_value=fake_uri), \
+             patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["updated"] >= 1
+
+    def test_outer_crash_sets_done(self, app_ctx):
+        import services.bulk_service as bs
+
+        self._reset_job(bs)
+        with patch("services.bulk_service.sqlite3.connect", side_effect=Exception("DB down")):
+            bs._run_refresh({})
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["running"] is False
+
+    def test_phase2_no_results_skipped(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES (?, ?, ?, ?)",
+            ("Snacks", "No EAN Product", "", ""),
+        )
+        db.commit()
+        self._reset_job(bs)
+
+        with patch(
+            "services.bulk_service.proxy_service.off_search",
+            return_value={"products": []},
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({"search_missing": True, "min_certainty": 100})
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["skipped"] >= 1
+
+    def test_phase2_below_threshold_skipped(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES (?, ?, ?, ?)",
+            ("Snacks", "Low Match", "", ""),
+        )
+        db.commit()
+        self._reset_job(bs)
+
+        low_product = {
+            "code": "1111111100001",
+            "product_name": "Completely Different",
+            "brands": "",
+            "completeness": 0.1,
+            "certainty": 5,
+        }
+
+        with patch(
+            "services.bulk_service.proxy_service.off_search",
+            return_value={"products": [low_product]},
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh(
+                {"search_missing": True, "min_certainty": 90, "min_completeness": 75}
+            )
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["skipped"] >= 1
+
+    def test_phase2_product_above_threshold_updated(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES (?, ?, ?, ?)",
+            ("Snacks", "Known Cracker", "", ""),
+        )
+        db.commit()
+        self._reset_job(bs)
+
+        high_product = {
+            "code": "2222222200001",
+            "product_name": "Known Cracker",
+            "brands": "BestBrand",
+            "completeness": 0.95,
+            "certainty": 100,
+            "nutriments": {"energy-kcal_100g": 400},
+        }
+
+        with patch(
+            "services.bulk_service.proxy_service.off_search",
+            return_value={"products": [high_product]},
+        ), patch(
+            "services.bulk_service.proxy_service.proxy_image",
+            side_effect=Exception("no img"),
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh(
+                {"search_missing": True, "min_certainty": 80, "min_completeness": 50}
+            )
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["updated"] >= 1
+
+    def test_phase2_exception_increments_errors(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES (?, ?, ?, ?)",
+            ("Snacks", "Crash Product", "", ""),
+        )
+        db.commit()
+        self._reset_job(bs)
+
+        with patch(
+            "services.bulk_service.proxy_service.off_search",
+            side_effect=RuntimeError("search error"),
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh({"search_missing": True, "min_certainty": 80})
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["errors"] >= 1
+
+    def test_phase2_no_new_data_skipped(self, app_ctx, db):
+        import services.bulk_service as bs
+
+        db.execute("UPDATE products SET ean = ''")
+        db.commit()
+        db.execute(
+            "INSERT INTO products (type, name, ean, brand, image) VALUES (?, ?, ?, ?, ?)",
+            ("Snacks", "Already Current", "", "BestBrand", ""),
+        )
+        db.commit()
+        self._reset_job(bs)
+
+        matched = {
+            "code": "",
+            "product_name": "",
+            "brands": "",
+            "completeness": 0.95,
+            "certainty": 100,
+            "nutriments": {},
+        }
+
+        with patch(
+            "services.bulk_service.proxy_service.off_search",
+            return_value={"products": [matched]},
+        ), patch(
+            "services.bulk_service._fetch_off_image",
+            return_value=None,
+        ), patch("services.bulk_service.time.sleep"):
+            bs._run_refresh(
+                {"search_missing": True, "min_certainty": 80, "min_completeness": 50}
+            )
+
+        assert bs._refresh_job["done"] is True
+        assert bs._refresh_job["errors"] == 0
