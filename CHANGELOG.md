@@ -4,6 +4,35 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-03-11
+
+### Added
+
+- Taste note text field for products
+- Completeness score to track product data quality
+- Product flags system with dynamic flag management (junction table, settings UI, dark-themed toggle checkboxes, filters)
+- Advanced filters with toggle between search and advanced mode, slide-down animation
+- Bulk refresh from OpenFoodFacts with progress bar, server-side job state, and "search missing by name" option
+- Certainty score for OFF product name search results with nutrition comparison
+- Detailed per-product report after OFF refresh shown in full-width modal
+- Duplicate check on EAN and name when adding products
+- `is_synced_with_off` flag tracking across all OFF data flows
+
+### Changed
+
+- Improved OFF product matching with brand+name boost, category boost, and stricter nutrition similarity
+- Search scoring now penalizes extra name words and missing OFF nutrition data
+- Brand scoring checks brand words against query, not the reverse
+- Show API error message in toast instead of generic "Error saving"
+- Show taste score with taste note in expanded product view
+
+### Fixed
+
+- OFF fetch overwriting existing local nutrition values with 0
+- 500 error on product name search via OpenFoodFacts
+- OFF match score drop caused by curly vs straight apostrophe mismatch
+- Import endpoint now skips duplicate products
+
 ## [0.4.0] - 2026-03-09
 
 ### Added
