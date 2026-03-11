@@ -30,6 +30,8 @@ Thumbs.db
 # Coverage
 .coverage
 htmlcov/
+coverage/
+**/coverage/
 
 # Environment
 .env

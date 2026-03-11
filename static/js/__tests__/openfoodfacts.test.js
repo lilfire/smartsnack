@@ -27,7 +27,7 @@ vi.mock('../images.js', () => ({
   resizeImage: vi.fn((dataUri) => Promise.resolve(dataUri)),
 }));
 
-import { isValidEan, validateOffBtn, searchOFF, closeOffPicker, closeOffAddReview, estimateProteinQuality, updateEstimateBtn, submitToOff } from '../openfoodfacts.js';
+import { isValidEan, validateOffBtn, searchOFF, closeOffPicker, closeOffAddReview, estimateProteinQuality, updateEstimateBtn, submitToOff, lookupOFF, selectOffResult, offModalSearch, showOffAddReview } from '../openfoodfacts.js';
 import { state, api, showToast } from '../state.js';
 
 beforeEach(() => {
@@ -128,8 +128,12 @@ describe('searchOFF', () => {
     const results = await searchOFF('milk');
     expect(results.length).toBe(2);
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('search_terms=milk'),
-      expect.any(Object)
+      '/api/off/search',
+      expect.objectContaining({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: expect.stringContaining('"q":"milk"'),
+      })
     );
   });
 
@@ -304,5 +308,146 @@ describe('submitToOff', () => {
     await submitToOff('1234567890123');
     expect(showToast).toHaveBeenCalledWith('off_err_no_credentials', 'error');
     expect(btn.disabled).toBe(false);
+  });
+});
+
+describe('lookupOFF', () => {
+  function setupEdFields() {
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = '';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    // Add nutrition fields for _gatherNutrition
+    ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    return { ean, name, btn };
+  }
+
+  it('looks up product by EAN', async () => {
+    const { ean } = setupEdFields();
+    ean.value = '1234567890123';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        status: 1,
+        product: { product_name: 'Test Milk', nutriments: {} },
+      }),
+    });
+    await lookupOFF('ed', null);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/off/product/1234567890123'),
+      expect.any(Object)
+    );
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_off_fetched'), 'success');
+  });
+
+  it('shows empty results when EAN not found', async () => {
+    const { ean } = setupEdFields();
+    ean.value = '1234567890123';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 0, product: null }),
+    });
+    await lookupOFF('ed', null);
+    // Should create off-modal-bg for the picker
+    expect(document.getElementById('off-modal-bg')).not.toBeNull();
+  });
+
+  it('searches by name when no valid EAN', async () => {
+    const { name } = setupEdFields();
+    name.value = 'Milk';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [{ product_name: 'Milk', code: '123' }] }),
+    });
+    await lookupOFF('ed', null);
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/off/search',
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('shows error on network failure for EAN lookup', async () => {
+    const { ean } = setupEdFields();
+    ean.value = '1234567890123';
+    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    await lookupOFF('ed', null);
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+  });
+});
+
+describe('offModalSearch', () => {
+  it('does nothing for short queries', async () => {
+    const origFetch = global.fetch;
+    delete global.fetch;
+    const input = document.createElement('input');
+    input.id = 'off-search-input';
+    input.value = 'a';
+    document.body.appendChild(input);
+    await offModalSearch();
+    // No fetch should have been attempted
+    expect(showToast).not.toHaveBeenCalled();
+    if (origFetch) global.fetch = origFetch;
+  });
+});
+
+describe('showOffAddReview', () => {
+  it('creates review modal with filled fields', () => {
+    // Set up form fields
+    const fields = [
+      { id: 'ed-name', value: 'Test Milk' },
+      { id: 'ed-brand', value: 'Brand' },
+      { id: 'ed-stores', value: '' },
+      { id: 'ed-ingredients', value: 'milk' },
+      { id: 'ed-kcal', value: '60' },
+      { id: 'ed-energy_kj', value: '' },
+      { id: 'ed-fat', value: '' },
+      { id: 'ed-saturated_fat', value: '' },
+      { id: 'ed-carbs', value: '' },
+      { id: 'ed-sugar', value: '' },
+      { id: 'ed-protein', value: '' },
+      { id: 'ed-fiber', value: '' },
+      { id: 'ed-salt', value: '' },
+      { id: 'ed-weight', value: '' },
+      { id: 'ed-portion', value: '' },
+    ];
+    fields.forEach(({ id, value }) => {
+      const el = document.createElement('input');
+      el.id = id;
+      el.value = value;
+      document.body.appendChild(el);
+    });
+
+    // Set _offCtx.prefix by calling lookupOFF setup
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '1234567890123';
+    document.body.appendChild(ean);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+
+    // We need to set context first - trigger lookupOFF to set _offCtx
+    // Since _offCtx is private, we'll use lookupOFF with a short-circuit
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 0, product: null }),
+    });
+
+    showOffAddReview('1234567890123');
+    const modal = document.getElementById('off-add-review-bg');
+    expect(modal).not.toBeNull();
+    expect(modal.innerHTML).toContain('1234567890123');
   });
 });
