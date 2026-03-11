@@ -96,7 +96,9 @@
 }
 
 /* Refresh report */
-.refresh-report { margin-top: 10px; }
+.refresh-report {
+  margin-top: 10px;
+}
 .refresh-report-toggle {
   color: rgba(255,255,255,0.7);
   background: none;
@@ -107,7 +109,10 @@
   cursor: pointer;
   margin-bottom: 8px;
 }
-.refresh-report-toggle:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+.refresh-report-toggle:hover {
+  color: #fff;
+  border-color: rgba(255,255,255,0.3);
+}
 .refresh-report-list {
   padding: 4px 0;
 }
@@ -119,7 +124,9 @@
   font-size: 14px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
 }
-.refresh-report-row:last-child { border-bottom: none; }
+.refresh-report-row:last-child {
+  border-bottom: none;
+}
 .refresh-report-name {
   flex: 0 0 220px;
   min-width: 0;
@@ -135,9 +142,18 @@
   white-space: nowrap;
   font-weight: 500;
 }
-.refresh-report-badge.updated { background: rgba(0,200,100,0.25); color: #5f5; }
-.refresh-report-badge.skipped { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); }
-.refresh-report-badge.error { background: rgba(255,60,60,0.25); color: #f77; }
+.refresh-report-badge.updated {
+  background: rgba(0,200,100,0.25);
+  color: #5f5;
+}
+.refresh-report-badge.skipped {
+  background: rgba(255,255,255,0.1);
+  color: rgba(255,255,255,0.6);
+}
+.refresh-report-badge.error {
+  background: rgba(255,60,60,0.25);
+  color: #f77;
+}
 .refresh-report-detail {
   flex: 1;
   font-size: 13px;

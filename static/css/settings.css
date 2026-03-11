@@ -68,7 +68,6 @@
   border-color: rgba(232, 184, 75, 0.15);
 }
 
-
 .weight-header {
   display: flex;
   justify-content: space-between;
@@ -87,7 +86,6 @@
   flex: 1;
   min-width: 0;
 }
-
 
 .weight-val {
   font-size: 16px;
@@ -284,7 +282,6 @@
   font-size: 18px;
 }
 
-
 /* ── Settings: Categories ───────────────────────── */
 .cat-item {
   display: flex;
@@ -392,7 +389,7 @@
 }
 
 /* ── Settings: Protein Quality ────────────────────── */
-.pq-list {  
+.pq-list {
   gap: 8px;
   margin-bottom: 12px;
 }

@@ -13,7 +13,6 @@
   cursor: pointer;
   outline: none;
   font-family: 'DM Sans', sans-serif;
-  box-sizing: border-box;
 }
 
 .emoji-picker-trigger:hover {
@@ -31,7 +30,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-sizing: border-box;
 }
 
 .emoji-picker-search {
