@@ -43,6 +43,8 @@ import {
   toggleSettingsSection, downloadBackup, saveOffCredentials,
   loadCategories, updateCategoryLabel, updateCategoryEmoji, addCategory, deleteCategory,
   loadPq, addPq, deletePq, saveWeights,
+  loadFlags, addFlag, deleteFlag, updateFlagLabel,
+  savePqField, handleRestore, handleImport, estimateAllPq,
 } from '../settings.js';
 import { state, api, showToast, fetchStats, showConfirmModal } from '../state.js';
 
@@ -448,5 +450,255 @@ describe('saveOffCredentials', () => {
     await saveOffCredentials();
     const callBody = JSON.parse(api.mock.calls[0][1].body);
     expect(callBody.off_password).toBeUndefined();
+  });
+});
+
+describe('loadFlags', () => {
+  beforeEach(() => {
+    const list = document.createElement('div');
+    list.id = 'flag-list';
+    document.body.appendChild(list);
+  });
+
+  it('renders user and system flags', async () => {
+    api.mockResolvedValueOnce([
+      { name: 'vegan', label: 'Vegan', type: 'user', count: 3 },
+      { name: 'lactose_free', label: 'Lactose Free', type: 'system', count: 5 },
+    ]);
+    await loadFlags();
+    const list = document.getElementById('flag-list');
+    expect(list.innerHTML).toContain('Vegan');
+    expect(list.innerHTML).toContain('Lactose Free');
+    expect(list.querySelector('.flag-type-user')).not.toBeNull();
+    expect(list.querySelector('.flag-type-system')).not.toBeNull();
+  });
+
+  it('shows empty message when no flags', async () => {
+    api.mockResolvedValueOnce([]);
+    await loadFlags();
+    expect(document.getElementById('flag-list').innerHTML).toContain('No flags');
+  });
+
+  it('shows error on API failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.mockRejectedValueOnce(new Error('fail'));
+    await loadFlags();
+    expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
+    console.error.mockRestore();
+  });
+});
+
+describe('addFlag', () => {
+  beforeEach(() => {
+    ['flag-add-name', 'flag-add-label'].forEach((id) => {
+      const el = document.createElement('input');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+    const list = document.createElement('div');
+    list.id = 'flag-list';
+    document.body.appendChild(list);
+  });
+
+  it('shows error when name or label empty', async () => {
+    document.getElementById('flag-add-name').value = '';
+    document.getElementById('flag-add-label').value = '';
+    await addFlag();
+    expect(showToast).toHaveBeenCalledWith('toast_name_display_required', 'error');
+  });
+
+  it('creates flag and resets form', async () => {
+    document.getElementById('flag-add-name').value = 'organic';
+    document.getElementById('flag-add-label').value = 'Organic';
+    api.mockResolvedValueOnce({}) // POST
+       .mockResolvedValueOnce([]); // loadFlags
+    await addFlag();
+    expect(api).toHaveBeenCalledWith('/api/flags', expect.objectContaining({ method: 'POST' }));
+    expect(document.getElementById('flag-add-name').value).toBe('');
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+  });
+});
+
+describe('deleteFlag', () => {
+  beforeEach(() => {
+    const list = document.createElement('div');
+    list.id = 'flag-list';
+    document.body.appendChild(list);
+  });
+
+  it('deletes flag after confirmation', async () => {
+    showConfirmModal.mockResolvedValue(true);
+    api.mockResolvedValueOnce({}) // DELETE
+       .mockResolvedValueOnce([]); // loadFlags
+    await deleteFlag('vegan', 'Vegan', 0);
+    expect(showConfirmModal).toHaveBeenCalled();
+    expect(api).toHaveBeenCalledWith('/api/flags/vegan', { method: 'DELETE' });
+  });
+
+  it('does not delete when cancelled', async () => {
+    showConfirmModal.mockResolvedValue(false);
+    await deleteFlag('vegan', 'Vegan', 0);
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateFlagLabel', () => {
+  beforeEach(() => {
+    const list = document.createElement('div');
+    list.id = 'flag-list';
+    document.body.appendChild(list);
+  });
+
+  it('updates flag label via API', async () => {
+    api.mockResolvedValueOnce({});
+    await updateFlagLabel('vegan', 'Vegansk');
+    expect(api).toHaveBeenCalledWith('/api/flags/vegan', expect.objectContaining({ method: 'PUT' }));
+    expect(showToast).toHaveBeenCalledWith('toast_flag_updated', 'success');
+  });
+
+  it('shows error for empty label', async () => {
+    api.mockResolvedValueOnce([]);
+    await updateFlagLabel('vegan', '   ');
+    expect(showToast).toHaveBeenCalledWith('toast_display_name_empty', 'error');
+  });
+});
+
+describe('savePqField', () => {
+  it('saves PQ field via API', async () => {
+    const ids = [
+      { tag: 'input', id: 'pqe-label-1', value: 'Whey' },
+      { tag: 'input', id: 'pqe-kw-1', value: 'whey, whey protein' },
+      { tag: 'input', id: 'pqe-pdcaas-1', value: '1.0' },
+      { tag: 'input', id: 'pqe-diaas-1', value: '1.1' },
+    ];
+    ids.forEach(({ tag, id, value }) => {
+      const el = document.createElement(tag);
+      el.id = id;
+      el.value = value;
+      document.body.appendChild(el);
+    });
+    api.mockResolvedValueOnce({});
+    await savePqField(1);
+    expect(api).toHaveBeenCalledWith('/api/protein-quality/1', expect.objectContaining({ method: 'PUT' }));
+    expect(showToast).toHaveBeenCalledWith('toast_updated', 'success');
+  });
+
+  it('does nothing when keywords empty', async () => {
+    const ids = [
+      { tag: 'input', id: 'pqe-label-1', value: 'Whey' },
+      { tag: 'input', id: 'pqe-kw-1', value: '' },
+      { tag: 'input', id: 'pqe-pdcaas-1', value: '1.0' },
+      { tag: 'input', id: 'pqe-diaas-1', value: '1.1' },
+    ];
+    ids.forEach(({ tag, id, value }) => {
+      const el = document.createElement(tag);
+      el.id = id;
+      el.value = value;
+      document.body.appendChild(el);
+    });
+    await savePqField(1);
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleRestore', () => {
+  it('restores database from file after confirmation', async () => {
+    showConfirmModal.mockResolvedValue(true);
+    api.mockResolvedValueOnce({ message: 'Restored!' });
+
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+
+    const input = { files: [new Blob(['{}'])], value: 'file.json' };
+    await handleRestore(input);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(showConfirmModal).toHaveBeenCalled();
+    expect(api).toHaveBeenCalledWith('/api/restore', expect.objectContaining({ method: 'POST' }));
+
+    global.FileReader = origFileReader;
+  });
+
+  it('does nothing when cancelled', async () => {
+    showConfirmModal.mockResolvedValue(false);
+    const input = { files: [new Blob(['{}'])], value: 'file.json' };
+    await handleRestore(input);
+    expect(api).not.toHaveBeenCalled();
+    expect(input.value).toBe('');
+  });
+
+  it('does nothing when no files', async () => {
+    const input = { files: [], value: '' };
+    await handleRestore(input);
+    expect(showConfirmModal).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleImport', () => {
+  it('imports data from file', async () => {
+    api.mockResolvedValueOnce({ message: 'Imported 5 products' });
+
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(api).toHaveBeenCalledWith('/api/import', expect.objectContaining({ method: 'POST' }));
+
+    global.FileReader = origFileReader;
+  });
+
+  it('does nothing when no files', () => {
+    const input = { files: [], value: '' };
+    handleImport(input);
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+describe('estimateAllPq', () => {
+  it('estimates PQ for all products', async () => {
+    const btn = document.createElement('button');
+    btn.id = 'btn-estimate-all-pq';
+    document.body.appendChild(btn);
+    const status = document.createElement('div');
+    status.id = 'estimate-pq-status';
+    status.style.display = 'none';
+    document.body.appendChild(status);
+
+    api.mockResolvedValueOnce({ total: 10, updated: 8, skipped: 2 });
+    await estimateAllPq();
+    expect(api).toHaveBeenCalledWith('/api/bulk/estimate-pq', { method: 'POST' });
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+    expect(btn.disabled).toBe(false);
+  });
+
+  it('shows error on failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const btn = document.createElement('button');
+    btn.id = 'btn-estimate-all-pq';
+    document.body.appendChild(btn);
+    const status = document.createElement('div');
+    status.id = 'estimate-pq-status';
+    document.body.appendChild(status);
+
+    api.mockRejectedValueOnce(new Error('fail'));
+    await estimateAllPq();
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    expect(btn.disabled).toBe(false);
+    console.error.mockRestore();
   });
 });
