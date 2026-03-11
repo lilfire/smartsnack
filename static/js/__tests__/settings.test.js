@@ -37,6 +37,8 @@ vi.mock('../emoji-picker.js', () => ({
   resetEmojiPicker: vi.fn(),
 }));
 
+vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn(), getFlagConfig: vi.fn(() => ({})) }));
+
 import {
   SCORE_COLORS, SCORE_CFG_MAP, weightData,
   toggleWeightConfig, removeWeight, addWeightFromDropdown,
