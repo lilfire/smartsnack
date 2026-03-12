@@ -363,8 +363,79 @@ async function applyOffProduct(prod, prefix, productId) {
     } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
   }
 
+  // Duplicate check in edit mode
+  if (productId) {
+    const offEan = prod.code || '';
+    const offName = prod.product_name_no || prod.product_name || '';
+    if (offEan || offName) {
+      try {
+        const dupResult = await api('/api/products/' + productId + '/check-duplicate', {
+          method: 'POST', body: JSON.stringify({ ean: offEan, name: offName })
+        });
+        if (dupResult.duplicate) {
+          const dup = dupResult.duplicate;
+          const choice = await _showEditDuplicateModal(dup);
+          if (choice === 'delete') {
+            await api('/api/products/' + dup.id, { method: 'DELETE' });
+            showToast(t('toast_duplicate_deleted'), 'success');
+          } else if (choice === 'merge') {
+            await api('/api/products/' + productId + '/merge', {
+              method: 'POST', body: JSON.stringify({ source_id: dup.id })
+            });
+            showToast(t('toast_duplicate_merged'), 'success');
+          }
+        }
+      } catch(e) { console.error('Duplicate check failed:', e); }
+    }
+  }
+
   showToast(t('toast_off_fetched', { fields: filled.join(', ') }), 'success');
   if (ing) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
+}
+
+function _showEditDuplicateModal(duplicate) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+    const pEl = document.createElement('p');
+    const msgKey = duplicate.is_synced_with_off ? 'duplicate_edit_synced' : 'duplicate_edit_unsynced';
+    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
+    modal.appendChild(pEl);
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    if (duplicate.is_synced_with_off) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'scan-modal-btn-register confirm-yes';
+      deleteBtn.textContent = t('duplicate_action_delete');
+      deleteBtn.addEventListener('click', () => { bg.remove(); resolve('delete'); });
+      actions.appendChild(deleteBtn);
+    } else {
+      const mergeBtn = document.createElement('button');
+      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
+      mergeBtn.textContent = t('duplicate_action_merge_into');
+      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('merge'); });
+      actions.appendChild(mergeBtn);
+    }
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
 }
 
 // Validate image URLs to prevent SSRF via the proxy endpoint

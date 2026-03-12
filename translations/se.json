@@ -654,5 +654,11 @@
     "duplicate_found_unsynced": "En produkt med detta {match_type} finns redan: \"{name}\"",
     "duplicate_action_merge": "Slå ihop med befintlig",
     "duplicate_action_create_new": "Skapa ändå",
-    "toast_product_merged": "\"{name}\" sammanslagen med befintlig produkt"
+    "toast_product_merged": "\"{name}\" sammanslagen med befintlig produkt",
+    "duplicate_edit_synced": "En annan produkt med detta {match_type} finns och är synkroniserad med OFF: \"{name}\". Ta bort den?",
+    "duplicate_edit_unsynced": "En annan produkt med detta {match_type} finns: \"{name}\". Slå ihop med denna produkt?",
+    "duplicate_action_delete": "Ta bort dubblett",
+    "duplicate_action_merge_into": "Slå ihop med denna produkt",
+    "toast_duplicate_deleted": "Dubblettprodukt borttagen",
+    "toast_duplicate_merged": "Dubblettprodukt sammanslagen"
 }

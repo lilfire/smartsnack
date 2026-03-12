@@ -658,5 +658,11 @@
     "duplicate_found_unsynced": "Et produkt med dette {match_type} finnes allerede: \"{name}\"",
     "duplicate_action_merge": "Slå sammen med eksisterende",
     "duplicate_action_create_new": "Opprett likevel",
-    "toast_product_merged": "\"{name}\" slått sammen med eksisterende produkt"
+    "toast_product_merged": "\"{name}\" slått sammen med eksisterende produkt",
+    "duplicate_edit_synced": "Et annet produkt med dette {match_type} finnes og er synkronisert med OFF: \"{name}\". Slette det?",
+    "duplicate_edit_unsynced": "Et annet produkt med dette {match_type} finnes: \"{name}\". Slå sammen med dette produktet?",
+    "duplicate_action_delete": "Slett duplikat",
+    "duplicate_action_merge_into": "Slå sammen med dette produktet",
+    "toast_duplicate_deleted": "Duplikatprodukt slettet",
+    "toast_duplicate_merged": "Duplikatprodukt slått sammen"
 }

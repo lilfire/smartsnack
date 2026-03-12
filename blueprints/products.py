@@ -46,6 +46,33 @@ def update_product(pid):
     return jsonify({"ok": True, "message": "Product updated"})
 
 
+@bp.route("/api/products/<int:pid>/check-duplicate", methods=["POST"])
+def check_duplicate(pid):
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    ean = data.get("ean", "")
+    name = data.get("name", "")
+    dup = product_service.check_duplicate_for_edit(pid, ean, name)
+    return jsonify({"duplicate": dup})
+
+
+@bp.route("/api/products/<int:pid>/merge", methods=["POST"])
+def merge_product(pid):
+    try:
+        data = _require_json()
+        source_id = data.get("source_id")
+        if not source_id or not isinstance(source_id, int):
+            raise ValueError("source_id is required and must be an integer")
+        product_service.merge_products(pid, source_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True, "message": "Products merged"})
+
+
 @bp.route("/api/products/<int:pid>", methods=["DELETE"])
 def delete_product(pid):
     found = product_service.delete_product(pid)

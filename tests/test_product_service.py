@@ -440,3 +440,82 @@ class TestDeleteProduct:
         from services.product_service import delete_product
 
         assert delete_product(99999) is False
+
+
+class TestCheckDuplicateForEdit:
+    def test_returns_duplicate_ean_match(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit, add_product
+        from db import get_db
+
+        other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
+        result = check_duplicate_for_edit(other["id"], "7000000000001", "No Match")
+        assert result is not None
+        assert result["match_type"] == "ean"
+        assert result["id"] == seed_product
+
+    def test_returns_duplicate_name_match(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit, add_product
+
+        other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
+        result = check_duplicate_for_edit(other["id"], "", "Classic Popcorn")
+        assert result is not None
+        assert result["match_type"] == "name"
+        assert result["id"] == seed_product
+
+    def test_returns_none_no_match(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit
+
+        result = check_duplicate_for_edit(seed_product, "9999999999999", "Nonexistent")
+        assert result is None
+
+    def test_excludes_current_product(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit
+
+        result = check_duplicate_for_edit(seed_product, "7000000000001", "Classic Popcorn")
+        assert result is None
+
+
+class TestMergeProducts:
+    def test_merges_fields_into_target(self, app_ctx, seed_category):
+        from services.product_service import add_product, merge_products
+        from db import get_db
+
+        target = add_product({"type": "Snacks", "name": "Target", "ean": "8000000000001", "brand": ""})
+        source = add_product({"type": "Snacks", "name": "Source", "ean": "8000000000002", "brand": "SourceBrand", "kcal": 200})
+        merge_products(target["id"], source["id"])
+        row = get_db().execute("SELECT brand, kcal FROM products WHERE id=?", (target["id"],)).fetchone()
+        assert row["brand"] == "SourceBrand"
+        assert row["kcal"] == 200
+
+    def test_does_not_overwrite_existing_fields(self, app_ctx, seed_category):
+        from services.product_service import add_product, merge_products
+        from db import get_db
+
+        target = add_product({"type": "Snacks", "name": "Target", "ean": "8000000000001", "brand": "TargetBrand"})
+        source = add_product({"type": "Snacks", "name": "Source", "ean": "8000000000002", "brand": "SourceBrand"})
+        merge_products(target["id"], source["id"])
+        row = get_db().execute("SELECT brand FROM products WHERE id=?", (target["id"],)).fetchone()
+        assert row["brand"] == "TargetBrand"
+
+    def test_deletes_source_after_merge(self, app_ctx, seed_category):
+        from services.product_service import add_product, merge_products
+        from db import get_db
+
+        target = add_product({"type": "Snacks", "name": "Target", "ean": "8000000000001"})
+        source = add_product({"type": "Snacks", "name": "Source", "ean": "8000000000002"})
+        source_id = source["id"]
+        merge_products(target["id"], source_id)
+        row = get_db().execute("SELECT id FROM products WHERE id=?", (source_id,)).fetchone()
+        assert row is None
+
+    def test_source_not_found_raises(self, app_ctx, seed_product):
+        from services.product_service import merge_products
+
+        with pytest.raises(LookupError):
+            merge_products(seed_product, 99999)
+
+    def test_target_not_found_raises(self, app_ctx, seed_product):
+        from services.product_service import merge_products
+
+        with pytest.raises(LookupError):
+            merge_products(99999, seed_product)
