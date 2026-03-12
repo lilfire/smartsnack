@@ -647,5 +647,11 @@
     "bulk_report_no_new_data": "Inga nya data",
     "bulk_report_no_results": "Inga resultat från OFF",
     "bulk_report_below_threshold": "Under tröskel",
-    "bulk_report_fields": "Fält: {fields}"
+    "bulk_report_fields": "Fält: {fields}",
+    "duplicate_found_title": "Dubblett hittad",
+    "duplicate_found_synced": "En produkt med detta {match_type} finns redan och är synkroniserad med OFF: \"{name}\"",
+    "duplicate_found_unsynced": "En produkt med detta {match_type} finns redan: \"{name}\"",
+    "duplicate_action_merge": "Slå ihop med befintlig",
+    "duplicate_action_create_new": "Skapa ändå",
+    "toast_product_merged": "\"{name}\" sammanslagen med befintlig produkt"
 }

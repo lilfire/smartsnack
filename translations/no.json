@@ -651,5 +651,11 @@
     "category_drinks": "Drikker",
     "category_snacks": "Updated Snacks",
     "pq_new_test_source_label": "New Test",
-    "pq_new_test_source_keywords": "new, test"
+    "pq_new_test_source_keywords": "new, test",
+    "duplicate_found_title": "Duplikat funnet",
+    "duplicate_found_synced": "Et produkt med dette {match_type} finnes allerede og er synkronisert med OFF: \"{name}\"",
+    "duplicate_found_unsynced": "Et produkt med dette {match_type} finnes allerede: \"{name}\"",
+    "duplicate_action_merge": "Slå sammen med eksisterende",
+    "duplicate_action_create_new": "Opprett likevel",
+    "toast_product_merged": "\"{name}\" slått sammen med eksisterende produkt"
 }
