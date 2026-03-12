@@ -48,6 +48,7 @@ export function startEdit(id) { state.editingId = id; rerender(); }
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
   if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
+  const offAppliedFields = window._offAppliedFields; window._offAppliedFields = null;
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   // Check for duplicate EAN/name before saving
@@ -66,7 +67,7 @@ export async function saveProduct(id) {
           state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
         } else if (choice === 'merge') {
           // Show conflict resolution for fields both products have values for
-          const conflictChoices = await showMergeConflictModal(data, dupResult.duplicate);
+          const conflictChoices = await showMergeConflictModal(data, dupResult.duplicate, offAppliedFields);
           if (conflictChoices === null) return; // User cancelled conflict dialog
           // Apply chosen values back into form data so the subsequent save uses them
           for (const [field, val] of Object.entries(conflictChoices)) {

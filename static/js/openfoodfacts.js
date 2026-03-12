@@ -352,129 +352,23 @@ function _detectConflicts(offValues, prefix) {
 
     if (isNum) {
       const offNum = offVal != null ? parseFloat(offVal) : NaN;
-      const localNum = localRaw !== '' ? parseFloat(localRaw) : NaN;
       const offEmpty = isNaN(offNum) || offNum === 0;
-      const localEmpty = isNaN(localNum) || localNum === 0;
 
-      if (offEmpty && !localEmpty) return; // keep local
-      if (offEmpty && localEmpty) return; // both empty, skip
-      if (!offEmpty && localEmpty) { autoApply[key] = _formatNumeric(key, offNum); return; }
-      // Both have values — check if they match
-      const offFormatted = _formatNumeric(key, offNum);
-      const localFormatted = _formatNumeric(key, localNum);
-      if (offFormatted === localFormatted) { autoApply[key] = offFormatted; return; }
-      conflicts.push({ key, localVal: localFormatted, offVal: offFormatted });
+      if (offEmpty) return; // keep local (or both empty)
+      autoApply[key] = _formatNumeric(key, offNum);
     } else {
       const offStr = (offVal || '').trim();
-      const localStr = localRaw;
-      const offEmpty = offStr === '';
-      const localEmpty = localStr === '';
 
-      if (offEmpty && !localEmpty) return; // keep local
-      if (offEmpty && localEmpty) return; // both empty
-      if (!offEmpty && localEmpty) { autoApply[key] = offStr; return; }
-      if (offStr.toLowerCase() === localStr.toLowerCase()) { autoApply[key] = offStr; return; }
-      conflicts.push({ key, localVal: localStr, offVal: offStr });
+      if (offStr === '') return; // keep local (or both empty)
+      autoApply[key] = offStr;
     }
   });
   return { autoApply, conflicts };
 }
 
-function showConflictModal(conflicts) {
-  return new Promise((resolve) => {
-    const bg = document.createElement('div');
-    bg.className = 'scan-modal-bg';
-    bg.setAttribute('role', 'dialog');
-    bg.setAttribute('aria-modal', 'true');
-
-    const modal = document.createElement('div');
-    modal.className = 'conflict-modal';
-
-    const h3 = document.createElement('h3');
-    h3.textContent = t('conflict_title');
-    modal.appendChild(h3);
-
-    const desc = document.createElement('p');
-    desc.textContent = t('conflict_description');
-    modal.appendChild(desc);
-
-    // Track selections — default to OFF (OFF is master)
-    const selections = {};
-    conflicts.forEach((c) => { selections[c.key] = 'off'; });
-
-    const bulkDiv = document.createElement('div');
-    bulkDiv.className = 'conflict-bulk';
-    const btnAllOff = document.createElement('button');
-    btnAllOff.textContent = t('conflict_use_all_off');
-    btnAllOff.addEventListener('click', () => {
-      conflicts.forEach((c) => { selections[c.key] = 'off'; });
-      updateSelections();
-    });
-    bulkDiv.appendChild(btnAllOff);
-    const btnAllLocal = document.createElement('button');
-    btnAllLocal.textContent = t('conflict_use_all_local');
-    btnAllLocal.addEventListener('click', () => {
-      conflicts.forEach((c) => { selections[c.key] = 'local'; });
-      updateSelections();
-    });
-    bulkDiv.appendChild(btnAllLocal);
-    modal.appendChild(bulkDiv);
-
-    const fieldsDiv = document.createElement('div');
-    fieldsDiv.className = 'conflict-fields';
-
-    const optionEls = [];
-    conflicts.forEach((c) => {
-      const row = document.createElement('div');
-      const label = document.createElement('div');
-      label.className = 'conflict-row-label';
-      label.textContent = t('edit_label_' + c.key) || c.key;
-      row.appendChild(label);
-
-      const opts = document.createElement('div');
-      opts.className = 'conflict-row-options';
-
-      const localOpt = document.createElement('div');
-      localOpt.className = 'conflict-option';
-      localOpt.innerHTML = '<div class="conflict-option-source">' + esc(t('conflict_local')) + '</div>'
-        + '<div class="conflict-option-value">' + esc(c.localVal) + '</div>';
-      localOpt.addEventListener('click', () => { selections[c.key] = 'local'; updateSelections(); });
-      opts.appendChild(localOpt);
-
-      const offOpt = document.createElement('div');
-      offOpt.className = 'conflict-option selected';
-      offOpt.innerHTML = '<div class="conflict-option-source">' + esc(t('conflict_off')) + '</div>'
-        + '<div class="conflict-option-value">' + esc(c.offVal) + '</div>';
-      offOpt.addEventListener('click', () => { selections[c.key] = 'off'; updateSelections(); });
-      opts.appendChild(offOpt);
-
-      row.appendChild(opts);
-      fieldsDiv.appendChild(row);
-      optionEls.push({ key: c.key, localEl: localOpt, offEl: offOpt });
-    });
-    modal.appendChild(fieldsDiv);
-
-    function updateSelections() {
-      optionEls.forEach((o) => {
-        o.localEl.classList.toggle('selected', selections[o.key] === 'local');
-        o.offEl.classList.toggle('selected', selections[o.key] === 'off');
-      });
-    }
-
-    const applyBtn = document.createElement('button');
-    applyBtn.className = 'conflict-apply-btn';
-    applyBtn.textContent = t('conflict_apply');
-    applyBtn.addEventListener('click', () => { bg.remove(); resolve(selections); });
-    modal.appendChild(applyBtn);
-
-    bg.appendChild(modal);
-    bg.addEventListener('click', (e) => { if (e.target === bg) { bg.remove(); resolve(null); } });
-    document.body.appendChild(bg);
-  });
-}
-
 async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
   window._pendingOFFSync = true;
+  window._offAppliedFields = null;
   const n = prod.nutriments || {};
   const offMap = {
     kcal: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? null,
@@ -506,30 +400,12 @@ async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
   const filled = [];
 
   if (duplicateResolved) {
-    // Conflict-aware flow: detect conflicts and let user choose
-    const { autoApply, conflicts } = _detectConflicts(offMap, prefix);
+    // OFF is authoritative: auto-apply all OFF values, no conflict modal
+    const { autoApply } = _detectConflicts(offMap, prefix);
 
-    // Collect all field writes first (atomic: nothing written until user confirms)
-    const pendingWrites = {};
-    Object.keys(autoApply).forEach((key) => { pendingWrites[key] = autoApply[key]; });
-
-    // Show conflict modal if needed; if cancelled, abort everything
-    if (conflicts.length > 0) {
-      const resolutions = await showConflictModal(conflicts);
-      if (!resolutions) {
-        // User cancelled — don't apply anything
-        showToast(t('btn_cancel'), 'info');
-        return;
-      }
-      conflicts.forEach((c) => {
-        pendingWrites[c.key] = resolutions[c.key] === 'local' ? c.localVal : c.offVal;
-      });
-    }
-
-    // Commit all writes to the form
-    Object.keys(pendingWrites).forEach((key) => {
+    Object.keys(autoApply).forEach((key) => {
       const el = document.getElementById(prefix + '-' + key);
-      if (el) { el.value = pendingWrites[key]; filled.push(key); }
+      if (el) { el.value = autoApply[key]; filled.push(key); }
     });
 
     if (offMap.ingredients) updateEstimateBtn(prefix);
@@ -579,8 +455,9 @@ async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
     } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
   }
 
+  window._offAppliedFields = new Set(filled.filter(f => f !== 'image'));
   showToast(t('toast_off_fetched', { fields: filled.join(', ') }), 'success');
-  if (ing) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
+  if (offMap.ingredients) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
 }
 
 export function showEditDuplicateModal(duplicate) {
@@ -643,20 +520,28 @@ const MERGE_CONFLICT_FIELDS = [
  * values for the same fields.  Returns a dict of {field: chosenValue} or null
  * if the user cancels.
  */
-export function showMergeConflictModal(formData, duplicate) {
+export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
   // Build list of conflicting fields
+  const resolved = {};  // fields auto-resolved by OFF data
   const conflicts = [];
   for (const f of MERGE_CONFLICT_FIELDS) {
     const formVal = formData[f];
     const dupVal = duplicate[f];
     const formEmpty = formVal === null || formVal === undefined || formVal === '' || formVal === 0;
     const dupEmpty = dupVal === null || dupVal === undefined || dupVal === '' || dupVal === 0;
+
+    // If OFF provided this field, auto-resolve to form value (which has the OFF value)
+    if (offAppliedFields && offAppliedFields.has(f) && !formEmpty) {
+      resolved[f] = formVal;
+      continue;
+    }
+
     if (!formEmpty && !dupEmpty && String(formVal) !== String(dupVal)) {
       conflicts.push({ field: f, formVal, dupVal });
     }
   }
 
-  if (conflicts.length === 0) return Promise.resolve({});
+  if (conflicts.length === 0) return Promise.resolve(resolved);
 
   return new Promise((resolve) => {
     const choices = {};
@@ -759,7 +644,7 @@ export function showMergeConflictModal(formData, duplicate) {
     applyBtn.className = 'conflict-apply-btn';
     applyBtn.textContent = t('merge_apply');
     applyBtn.type = 'button';
-    applyBtn.addEventListener('click', () => { bg.remove(); resolve(choices); });
+    applyBtn.addEventListener('click', () => { bg.remove(); resolve(Object.assign({}, resolved, choices)); });
     actions.appendChild(applyBtn);
 
     const cancelBtn = document.createElement('button');
