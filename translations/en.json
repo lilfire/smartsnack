@@ -654,5 +654,11 @@
     "duplicate_found_unsynced": "A product with this {match_type} already exists: \"{name}\"",
     "duplicate_action_merge": "Merge into existing",
     "duplicate_action_create_new": "Create anyway",
-    "toast_product_merged": "\"{name}\" merged into existing product"
+    "toast_product_merged": "\"{name}\" merged into existing product",
+    "duplicate_edit_synced": "Another product with this {match_type} exists and is synced with OFF: \"{name}\". Delete it?",
+    "duplicate_edit_unsynced": "Another product with this {match_type} exists: \"{name}\". Merge it into this product?",
+    "duplicate_action_delete": "Delete duplicate",
+    "duplicate_action_merge_into": "Merge into this product",
+    "toast_duplicate_deleted": "Duplicate product deleted",
+    "toast_duplicate_merged": "Duplicate product merged"
 }

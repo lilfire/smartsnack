@@ -782,6 +782,58 @@ def update_product(pid: int, data: dict) -> None:
         set_system_flag(pid, "is_synced_with_off", True)
 
 
+def check_duplicate_for_edit(pid: int, ean: str, name: str):
+    """Check if OFF data for an edited product matches a different existing product."""
+    return _find_duplicate(ean, name, exclude_id=pid)
+
+
+def merge_products(target_id: int, source_id: int) -> None:
+    """Merge source product into target, filling empty target fields, then delete source."""
+    conn = get_db()
+    cur = conn.cursor()
+    target = cur.execute(
+        "SELECT * FROM products WHERE id = ?", (target_id,)
+    ).fetchone()
+    if not target:
+        raise LookupError("Target product not found")
+    source = cur.execute(
+        "SELECT * FROM products WHERE id = ?", (source_id,)
+    ).fetchone()
+    if not source:
+        raise LookupError("Source product not found")
+
+    merge_fields = [f for f in ALL_PRODUCT_FIELDS if f not in ("type",)]
+    updates, vals = [], []
+    for f in merge_fields:
+        target_val = target[f]
+        source_val = source[f]
+        if (target_val is None or target_val == "" or target_val == 0) and source_val not in (None, "", 0):
+            updates.append(f"{f} = ?")
+            vals.append(source_val)
+    if target["image"] in (None, "") and source["image"] not in (None, ""):
+        updates.append("image = ?")
+        vals.append(source["image"])
+
+    if updates:
+        vals.append(target_id)
+        cur.execute(
+            f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
+        )
+
+    # Copy flags from source to target
+    source_flags = cur.execute(
+        "SELECT flag FROM product_flags WHERE product_id = ?", (source_id,)
+    ).fetchall()
+    for row in source_flags:
+        cur.execute(
+            "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+            (target_id, row["flag"]),
+        )
+
+    cur.execute("DELETE FROM products WHERE id = ?", (source_id,))
+    conn.commit()
+
+
 def delete_product(pid: int) -> bool:
     conn = get_db()
     cur = conn.cursor()
