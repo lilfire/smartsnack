@@ -650,10 +650,15 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
                     raise ValueError(f"Product with this name already exists (synced with OFF)")
             # Duplicate found, not synced
             if on_duplicate == "overwrite":
-                # Merge data into existing product
+                # Merge data into existing product — only non-empty fields
                 merge_data = dict(data)
                 merge_data.pop("on_duplicate", None)
                 from_off = merge_data.pop("from_off", False)
+                merge_data = {
+                    k: v for k, v in merge_data.items()
+                    if v is not None and v != ""
+                    and (not isinstance(v, str) or v.strip() != "")
+                }
                 merge_data["from_off"] = from_off
                 update_product(dup["id"], merge_data)
                 return {"id": dup["id"], "merged": True, "message": "Product merged"}
