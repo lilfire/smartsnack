@@ -54,8 +54,8 @@ def check_duplicate(pid):
         return jsonify({"error": str(e)}), 400
     ean = data.get("ean", "")
     name = data.get("name", "")
-    dup = product_service.check_duplicate_for_edit(pid, ean, name)
-    return jsonify({"duplicate": dup})
+    dup, a_synced = product_service.check_duplicate_for_edit(pid, ean, name)
+    return jsonify({"duplicate": dup, "a_is_synced_with_off": a_synced})
 
 
 @bp.route("/api/products/<int:pid>/merge", methods=["POST"])

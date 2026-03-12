@@ -448,31 +448,44 @@ class TestCheckDuplicateForEdit:
         from db import get_db
 
         other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
-        result = check_duplicate_for_edit(other["id"], "7000000000001", "No Match")
+        result, a_synced = check_duplicate_for_edit(other["id"], "7000000000001", "No Match")
         assert result is not None
         assert result["match_type"] == "ean"
         assert result["id"] == seed_product
+        assert a_synced is False
 
     def test_returns_duplicate_name_match(self, app_ctx, seed_product):
         from services.product_service import check_duplicate_for_edit, add_product
 
         other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
-        result = check_duplicate_for_edit(other["id"], "", "Classic Popcorn")
+        result, a_synced = check_duplicate_for_edit(other["id"], "", "Classic Popcorn")
         assert result is not None
         assert result["match_type"] == "name"
         assert result["id"] == seed_product
+        assert a_synced is False
 
     def test_returns_none_no_match(self, app_ctx, seed_product):
         from services.product_service import check_duplicate_for_edit
 
-        result = check_duplicate_for_edit(seed_product, "9999999999999", "Nonexistent")
+        result, a_synced = check_duplicate_for_edit(seed_product, "9999999999999", "Nonexistent")
         assert result is None
+        assert a_synced is False
 
     def test_excludes_current_product(self, app_ctx, seed_product):
         from services.product_service import check_duplicate_for_edit
 
-        result = check_duplicate_for_edit(seed_product, "7000000000001", "Classic Popcorn")
+        result, a_synced = check_duplicate_for_edit(seed_product, "7000000000001", "Classic Popcorn")
         assert result is None
+        assert a_synced is False
+
+    def test_returns_a_synced_status(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit, add_product, set_system_flag
+
+        other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
+        set_system_flag(other["id"], "is_synced_with_off", True)
+        result, a_synced = check_duplicate_for_edit(other["id"], "7000000000001", "No Match")
+        assert result is not None
+        assert a_synced is True
 
 
 class TestMergeProducts:

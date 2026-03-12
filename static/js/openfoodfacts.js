@@ -516,6 +516,20 @@ const MERGE_CONFLICT_FIELDS = [
 ];
 
 /**
+ * Fields whose values originate from OpenFoodFacts when a product is synced.
+ */
+const OFF_PROVIDED_FIELDS = new Set([
+  'name', 'ean', 'brand', 'stores', 'ingredients',
+  'kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar',
+  'protein', 'fiber', 'salt', 'weight', 'portion',
+]);
+
+/**
+ * Non-OFF (user-only) merge fields — used when one product is OFF-synced.
+ */
+const USER_ONLY_MERGE_FIELDS = MERGE_CONFLICT_FIELDS.filter(f => !OFF_PROVIDED_FIELDS.has(f));
+
+/**
  * Show a conflict resolution modal when merging two products that both have
  * values for the same fields.  Returns a dict of {field: chosenValue} or null
  * if the user cancels.
@@ -645,6 +659,195 @@ export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
     applyBtn.textContent = t('merge_apply');
     applyBtn.type = 'button';
     applyBtn.addEventListener('click', () => { bg.remove(); resolve(Object.assign({}, resolved, choices)); });
+    actions.appendChild(applyBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.type = 'button';
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve(null); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
+}
+
+/**
+ * Show a combined duplicate-detection + merge-conflict modal for the edit-save flow.
+ *
+ * Three scenarios:
+ *  1. B (duplicate) is synced with OFF → A will be deleted, merged into B
+ *  2. A (current) is synced but B is not → B will be deleted, merged into A
+ *  3. Neither is synced → products merge (A survives, B deleted)
+ *
+ * Returns { scenario, choices: {field: value}, survivorId } or null on cancel.
+ */
+export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
+  const bIsSynced = duplicate.is_synced_with_off;
+
+  let scenario, messageKey, fieldsToCheck;
+  if (bIsSynced) {
+    scenario = 'b_synced';
+    messageKey = 'duplicate_merge_b_synced';
+    fieldsToCheck = USER_ONLY_MERGE_FIELDS;
+  } else if (aIsSynced) {
+    scenario = 'a_synced';
+    messageKey = 'duplicate_merge_a_synced';
+    fieldsToCheck = USER_ONLY_MERGE_FIELDS;
+  } else {
+    scenario = 'neither';
+    messageKey = 'duplicate_merge_neither';
+    fieldsToCheck = MERGE_CONFLICT_FIELDS;
+  }
+
+  // Build auto-resolved values and conflicts
+  const autoResolved = {};
+  const conflicts = [];
+  for (const f of fieldsToCheck) {
+    const aVal = formData[f];
+    const bVal = duplicate[f];
+    const aEmpty = aVal === null || aVal === undefined || aVal === '' || aVal === 0;
+    const bEmpty = bVal === null || bVal === undefined || bVal === '' || bVal === 0;
+
+    if (aEmpty && bEmpty) continue;
+    if (!aEmpty && !bEmpty && String(aVal) === String(bVal)) continue;
+
+    if (aEmpty && !bEmpty) {
+      autoResolved[f] = bVal;
+    } else if (!aEmpty && bEmpty) {
+      autoResolved[f] = aVal;
+    } else {
+      conflicts.push({ field: f, aVal, bVal });
+    }
+  }
+
+  // If no conflicts, resolve immediately with auto-resolved values
+  if (conflicts.length === 0) {
+    return Promise.resolve({ scenario, choices: autoResolved });
+  }
+
+  return new Promise((resolve) => {
+    const choices = {};
+    // Default: keep A's values for conflicts
+    for (const c of conflicts) choices[c.field] = c.aVal;
+
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'conflict-modal';
+
+    // Icon
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+
+    // Title
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+
+    // Scenario message
+    const msgEl = document.createElement('p');
+    msgEl.textContent = t(messageKey, { match_type: duplicate.match_type, name: duplicate.name });
+    modal.appendChild(msgEl);
+
+    // Section header for field choices
+    const chooseHeader = document.createElement('p');
+    chooseHeader.style.cssText = 'font-size:13px;opacity:0.7;margin-top:12px';
+    chooseHeader.textContent = t('duplicate_merge_choose_values');
+    modal.appendChild(chooseHeader);
+
+    // Bulk buttons
+    const bulk = document.createElement('div');
+    bulk.className = 'conflict-bulk';
+    const keepAllA = document.createElement('button');
+    keepAllA.textContent = t('duplicate_merge_keep_all_a');
+    keepAllA.type = 'button';
+    const keepAllB = document.createElement('button');
+    keepAllB.textContent = t('duplicate_merge_keep_all_b');
+    keepAllB.type = 'button';
+    bulk.appendChild(keepAllA);
+    bulk.appendChild(keepAllB);
+    modal.appendChild(bulk);
+
+    const fieldsContainer = document.createElement('div');
+    fieldsContainer.className = 'conflict-fields';
+
+    const optionEls = [];
+
+    for (const c of conflicts) {
+      const row = document.createElement('div');
+      const label = document.createElement('div');
+      label.className = 'conflict-row-label';
+      label.textContent = t('adv_field_' + c.field) || c.field;
+      row.appendChild(label);
+
+      const opts = document.createElement('div');
+      opts.className = 'conflict-row-options';
+
+      const optA = document.createElement('div');
+      optA.className = 'conflict-option selected';
+      optA.innerHTML =
+        '<div class="conflict-option-source">' + t('duplicate_merge_source_a') + '</div>' +
+        '<div class="conflict-option-value">' + _esc(String(c.aVal)) + '</div>';
+
+      const optB = document.createElement('div');
+      optB.className = 'conflict-option';
+      optB.innerHTML =
+        '<div class="conflict-option-source">' + t('duplicate_merge_source_b') + '</div>' +
+        '<div class="conflict-option-value">' + _esc(String(c.bVal)) + '</div>';
+
+      optionEls.push({ field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB });
+
+      optA.addEventListener('click', () => {
+        choices[c.field] = c.aVal;
+        optA.classList.add('selected');
+        optB.classList.remove('selected');
+      });
+      optB.addEventListener('click', () => {
+        choices[c.field] = c.bVal;
+        optB.classList.add('selected');
+        optA.classList.remove('selected');
+      });
+
+      opts.appendChild(optA);
+      opts.appendChild(optB);
+      row.appendChild(opts);
+      fieldsContainer.appendChild(row);
+    }
+
+    keepAllA.addEventListener('click', () => {
+      for (const o of optionEls) {
+        choices[o.field] = o.aVal;
+        o.optA.classList.add('selected');
+        o.optB.classList.remove('selected');
+      }
+    });
+    keepAllB.addEventListener('click', () => {
+      for (const o of optionEls) {
+        choices[o.field] = o.bVal;
+        o.optB.classList.add('selected');
+        o.optA.classList.remove('selected');
+      }
+    });
+
+    modal.appendChild(fieldsContainer);
+
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'conflict-apply-btn';
+    applyBtn.textContent = t('duplicate_merge_confirm');
+    applyBtn.type = 'button';
+    applyBtn.addEventListener('click', () => {
+      bg.remove();
+      resolve({ scenario, choices: Object.assign({}, autoResolved, choices) });
+    });
     actions.appendChild(applyBtn);
 
     const cancelBtn = document.createElement('button');

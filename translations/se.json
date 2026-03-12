@@ -674,5 +674,14 @@
     "merge_keep_all_other": "Behåll alla andra",
     "merge_source_current": "Nuvarande",
     "merge_source_other": "Andra",
-    "merge_apply": "Slå ihop"
+    "merge_apply": "Slå ihop",
+    "duplicate_merge_b_synced": "En produkt med samma {match_type} finns redan och är synkroniserad med OFF: \"{name}\". Din nuvarande produkt kommer att tas bort och slås ihop med den befintliga.",
+    "duplicate_merge_a_synced": "En produkt med samma {match_type} finns redan: \"{name}\". Eftersom din produkt är synkroniserad med OFF kommer dubbletten att tas bort och slås ihop med din.",
+    "duplicate_merge_neither": "En produkt med samma {match_type} finns redan: \"{name}\". Produkterna kommer att slås ihop till en.",
+    "duplicate_merge_choose_values": "Välj vilka värden du vill behålla:",
+    "duplicate_merge_keep_all_a": "Behåll alla från A",
+    "duplicate_merge_keep_all_b": "Behåll alla från B",
+    "duplicate_merge_source_a": "Nuvarande (A)",
+    "duplicate_merge_source_b": "Dubblett (B)",
+    "duplicate_merge_confirm": "Bekräfta sammanslagning"
 }

@@ -674,5 +674,14 @@
     "merge_keep_all_other": "Keep all other",
     "merge_source_current": "Current",
     "merge_source_other": "Other",
-    "merge_apply": "Merge"
+    "merge_apply": "Merge",
+    "duplicate_merge_b_synced": "A product with the same {match_type} already exists and is synced with OFF: \"{name}\". Your current product will be deleted and merged into the existing one.",
+    "duplicate_merge_a_synced": "A product with the same {match_type} already exists: \"{name}\". Since your product is synced with OFF, the duplicate will be deleted and merged into yours.",
+    "duplicate_merge_neither": "A product with the same {match_type} already exists: \"{name}\". The products will be merged into one.",
+    "duplicate_merge_choose_values": "Choose which values to keep:",
+    "duplicate_merge_keep_all_a": "Keep all from A",
+    "duplicate_merge_keep_all_b": "Keep all from B",
+    "duplicate_merge_source_a": "Current (A)",
+    "duplicate_merge_source_b": "Duplicate (B)",
+    "duplicate_merge_confirm": "Confirm merge"
 }
