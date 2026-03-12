@@ -35,18 +35,18 @@ async function _checkEditDuplicate(ean, name, productId) {
     const dupRes = await api('/api/products/' + productId + '/check-duplicate', {
       method: 'POST', body: JSON.stringify({ ean: ean || '', name: name || '' })
     });
-    if (!dupRes.duplicate) return true;
+    if (!dupRes.duplicate) return 'no_duplicate';
     const choice = await showEditDuplicateModal(dupRes.duplicate);
     if (choice === 'delete') {
       await api('/api/products/' + dupRes.duplicate.id, { method: 'DELETE' });
       showToast(t('toast_duplicate_deleted'), 'success');
-      return true;
+      return 'resolved';
     } else if (choice === 'merge') {
       await api('/api/products/' + productId + '/merge', {
         method: 'POST', body: JSON.stringify({ source_id: dupRes.duplicate.id })
       });
       showToast(t('toast_duplicate_merged'), 'success');
-      return true;
+      return 'resolved';
     }
     return false;
   } catch (e) {
@@ -83,13 +83,16 @@ export async function lookupOFF(prefix, productId) {
         updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
       }
+      let duplicateResolved = false;
       if (prefix === 'ed' && productId) {
-        if (!await _checkEditDuplicate(ean, data.product.product_name || '', productId)) {
+        const dupResult = await _checkEditDuplicate(ean, data.product.product_name || '', productId);
+        if (!dupResult) {
           closeOffPicker();
           return;
         }
+        if (dupResult === 'resolved') duplicateResolved = true;
       }
-      await applyOffProduct(data.product, prefix, productId);
+      await applyOffProduct(data.product, prefix, productId, duplicateResolved);
       closeOffPicker();
     } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   } else if (name.length >= 2) {
@@ -316,17 +319,161 @@ export async function selectOffResult(idx, ctxSnapshot) {
   }
 
   try {
+    let duplicateResolved = false;
     if (prefix === 'ed' && productId) {
       const checkName = productToApply.product_name || productToApply.product_name_no || '';
-      if (!await _checkEditDuplicate(resolvedEan, checkName, productId)) return;
+      const dupResult = await _checkEditDuplicate(resolvedEan, checkName, productId);
+      if (!dupResult) return;
+      if (dupResult === 'resolved') duplicateResolved = true;
     }
-    await applyOffProduct(productToApply, prefix, productId);
+    await applyOffProduct(productToApply, prefix, productId, duplicateResolved);
   } finally {
     if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
   }
 }
 
-async function applyOffProduct(prod, prefix, productId) {
+const _numericFields = new Set(['kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt', 'weight', 'portion']);
+
+function _formatNumeric(key, val) {
+  return (key === 'kcal' || key === 'energy_kj' || key === 'weight' || key === 'portion')
+    ? String(Math.round(val))
+    : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
+}
+
+function _detectConflicts(offValues, prefix) {
+  const autoApply = {};
+  const conflicts = [];
+  Object.keys(offValues).forEach((key) => {
+    const offVal = offValues[key];
+    const fieldEl = document.getElementById(prefix + '-' + key);
+    if (!fieldEl) return;
+    const localRaw = fieldEl.value.trim();
+    const isNum = _numericFields.has(key);
+
+    if (isNum) {
+      const offNum = offVal != null ? parseFloat(offVal) : NaN;
+      const localNum = localRaw !== '' ? parseFloat(localRaw) : NaN;
+      const offEmpty = isNaN(offNum) || offNum === 0;
+      const localEmpty = isNaN(localNum) || localNum === 0;
+
+      if (offEmpty && !localEmpty) return; // keep local
+      if (offEmpty && localEmpty) return; // both empty, skip
+      if (!offEmpty && localEmpty) { autoApply[key] = _formatNumeric(key, offNum); return; }
+      // Both have values — check if they match
+      const offFormatted = _formatNumeric(key, offNum);
+      const localFormatted = _formatNumeric(key, localNum);
+      if (offFormatted === localFormatted) { autoApply[key] = offFormatted; return; }
+      conflicts.push({ key, localVal: localFormatted, offVal: offFormatted });
+    } else {
+      const offStr = (offVal || '').trim();
+      const localStr = localRaw;
+      const offEmpty = offStr === '';
+      const localEmpty = localStr === '';
+
+      if (offEmpty && !localEmpty) return; // keep local
+      if (offEmpty && localEmpty) return; // both empty
+      if (!offEmpty && localEmpty) { autoApply[key] = offStr; return; }
+      if (offStr.toLowerCase() === localStr.toLowerCase()) { autoApply[key] = offStr; return; }
+      conflicts.push({ key, localVal: localStr, offVal: offStr });
+    }
+  });
+  return { autoApply, conflicts };
+}
+
+function showConflictModal(conflicts) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+
+    const modal = document.createElement('div');
+    modal.className = 'conflict-modal';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = t('conflict_title');
+    modal.appendChild(h3);
+
+    const desc = document.createElement('p');
+    desc.textContent = t('conflict_description');
+    modal.appendChild(desc);
+
+    // Track selections — default to OFF (OFF is master)
+    const selections = {};
+    conflicts.forEach((c) => { selections[c.key] = 'off'; });
+
+    const bulkDiv = document.createElement('div');
+    bulkDiv.className = 'conflict-bulk';
+    const btnAllOff = document.createElement('button');
+    btnAllOff.textContent = t('conflict_use_all_off');
+    btnAllOff.addEventListener('click', () => {
+      conflicts.forEach((c) => { selections[c.key] = 'off'; });
+      updateSelections();
+    });
+    bulkDiv.appendChild(btnAllOff);
+    const btnAllLocal = document.createElement('button');
+    btnAllLocal.textContent = t('conflict_use_all_local');
+    btnAllLocal.addEventListener('click', () => {
+      conflicts.forEach((c) => { selections[c.key] = 'local'; });
+      updateSelections();
+    });
+    bulkDiv.appendChild(btnAllLocal);
+    modal.appendChild(bulkDiv);
+
+    const fieldsDiv = document.createElement('div');
+    fieldsDiv.className = 'conflict-fields';
+
+    const optionEls = [];
+    conflicts.forEach((c) => {
+      const row = document.createElement('div');
+      const label = document.createElement('div');
+      label.className = 'conflict-row-label';
+      label.textContent = t('edit_label_' + c.key) || c.key;
+      row.appendChild(label);
+
+      const opts = document.createElement('div');
+      opts.className = 'conflict-row-options';
+
+      const localOpt = document.createElement('div');
+      localOpt.className = 'conflict-option';
+      localOpt.innerHTML = '<div class="conflict-option-source">' + esc(t('conflict_local')) + '</div>'
+        + '<div class="conflict-option-value">' + esc(c.localVal) + '</div>';
+      localOpt.addEventListener('click', () => { selections[c.key] = 'local'; updateSelections(); });
+      opts.appendChild(localOpt);
+
+      const offOpt = document.createElement('div');
+      offOpt.className = 'conflict-option selected';
+      offOpt.innerHTML = '<div class="conflict-option-source">' + esc(t('conflict_off')) + '</div>'
+        + '<div class="conflict-option-value">' + esc(c.offVal) + '</div>';
+      offOpt.addEventListener('click', () => { selections[c.key] = 'off'; updateSelections(); });
+      opts.appendChild(offOpt);
+
+      row.appendChild(opts);
+      fieldsDiv.appendChild(row);
+      optionEls.push({ key: c.key, localEl: localOpt, offEl: offOpt });
+    });
+    modal.appendChild(fieldsDiv);
+
+    function updateSelections() {
+      optionEls.forEach((o) => {
+        o.localEl.classList.toggle('selected', selections[o.key] === 'local');
+        o.offEl.classList.toggle('selected', selections[o.key] === 'off');
+      });
+    }
+
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'conflict-apply-btn';
+    applyBtn.textContent = t('conflict_apply');
+    applyBtn.addEventListener('click', () => { bg.remove(); resolve(selections); });
+    modal.appendChild(applyBtn);
+
+    bg.appendChild(modal);
+    bg.addEventListener('click', (e) => { if (e.target === bg) { bg.remove(); resolve(null); } });
+    document.body.appendChild(bg);
+  });
+}
+
+async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
   window._pendingOFFSync = true;
   const n = prod.nutriments || {};
   const offMap = {
@@ -341,43 +488,77 @@ async function applyOffProduct(prod, prefix, productId) {
     salt: n['salt_100g'] ?? n['salt'] ?? null,
   };
 
-  const filled = [];
-  Object.keys(offMap).forEach((key) => {
-    const val = offMap[key];
-    if (val == null) return;
-    const fieldEl = document.getElementById(prefix + '-' + key);
-    if (!fieldEl) return;
-    // Don't overwrite existing local values with 0 from OFF (likely missing data)
-    if (val === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
-    fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
-    filled.push(key);
-  });
-
+  // Build unified OFF values map (nutrition + metadata)
   const serving = prod.serving_size || '';
   const servMatch = serving.match(/([\d.]+)\s*g/);
-  if (servMatch) { const portionEl = document.getElementById(prefix + '-portion'); if (portionEl) { portionEl.value = Math.round(parseFloat(servMatch[1])); filled.push('portion'); } }
-
+  if (servMatch) offMap.portion = parseFloat(servMatch[1]);
   const qty = prod.product_quantity || 0;
-  if (qty) { const weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
-
-  const nameEl = document.getElementById(prefix + '-name');
-  if (nameEl && !nameEl.value.trim()) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
-
-  if (prod.code) {
-    const codeEl = document.getElementById(prefix + '-ean');
-    if (codeEl && !codeEl.value.trim()) { codeEl.value = prod.code; filled.push('ean'); }
-  }
-
-  const brand = prod.brands || '';
-  if (brand) { const brandEl = document.getElementById(prefix + '-brand'); if (brandEl) { brandEl.value = brand; filled.push('brand'); } }
-
+  if (qty) offMap.weight = parseFloat(qty);
+  offMap.name = prod.product_name_no || prod.product_name || '';
+  offMap.ean = prod.code || '';
+  offMap.brand = prod.brands || '';
   let stores = '';
   if (prod.stores) stores = prod.stores;
   else if (prod.stores_tags?.length) stores = prod.stores_tags.map((s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())).join(', ');
-  if (stores) { const storesEl = document.getElementById(prefix + '-stores'); if (storesEl) { storesEl.value = stores; filled.push('stores'); } }
+  offMap.stores = stores;
+  offMap.ingredients = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
 
-  const ing = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
-  if (ing) { const ingEl = document.getElementById(prefix + '-ingredients'); if (ingEl) { ingEl.value = ing; filled.push('ingredients'); updateEstimateBtn(prefix); } }
+  const filled = [];
+
+  if (duplicateResolved) {
+    // Conflict-aware flow: detect conflicts and let user choose
+    const { autoApply, conflicts } = _detectConflicts(offMap, prefix);
+
+    // Collect all field writes first (atomic: nothing written until user confirms)
+    const pendingWrites = {};
+    Object.keys(autoApply).forEach((key) => { pendingWrites[key] = autoApply[key]; });
+
+    // Show conflict modal if needed; if cancelled, abort everything
+    if (conflicts.length > 0) {
+      const resolutions = await showConflictModal(conflicts);
+      if (!resolutions) {
+        // User cancelled — don't apply anything
+        showToast(t('btn_cancel'), 'info');
+        return;
+      }
+      conflicts.forEach((c) => {
+        pendingWrites[c.key] = resolutions[c.key] === 'local' ? c.localVal : c.offVal;
+      });
+    }
+
+    // Commit all writes to the form
+    Object.keys(pendingWrites).forEach((key) => {
+      const el = document.getElementById(prefix + '-' + key);
+      if (el) { el.value = pendingWrites[key]; filled.push(key); }
+    });
+
+    if (offMap.ingredients) updateEstimateBtn(prefix);
+  } else {
+    // Normal flow (no duplicate): OFF overwrites, but skip OFF 0 over local non-zero
+    Object.keys(offMap).forEach((key) => {
+      if (!_numericFields.has(key) && !['name', 'ean', 'brand', 'stores', 'ingredients'].includes(key)) return;
+      const val = offMap[key];
+      const fieldEl = document.getElementById(prefix + '-' + key);
+      if (!fieldEl) return;
+
+      if (_numericFields.has(key)) {
+        if (val == null || val === '') return;
+        const num = parseFloat(val);
+        if (isNaN(num)) return;
+        if (num === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
+        fieldEl.value = _formatNumeric(key, num);
+        filled.push(key);
+      } else {
+        const str = (typeof val === 'string' ? val : '').trim();
+        if (!str) return;
+        // name and ean: only fill if empty
+        if ((key === 'name' || key === 'ean') && fieldEl.value.trim()) return;
+        fieldEl.value = str;
+        filled.push(key);
+        if (key === 'ingredients') updateEstimateBtn(prefix);
+      }
+    });
+  }
 
   const imgUrl = prod.image_front_url || prod.image_url || prod.image_front_small_url || '';
   if (imgUrl && isValidImageUrl(imgUrl)) {
