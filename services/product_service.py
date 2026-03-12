@@ -33,11 +33,13 @@ _FLAG_FIELD_PREFIX = "flag:"
 def _find_duplicate(ean, name, exclude_id=None):
     """Find an existing product matching by EAN or name.
 
-    Returns dict with id, name, ean, match_type, is_synced_with_off
-    or None if no duplicate found.
+    Returns dict with id, name, ean, match_type, is_synced_with_off,
+    and all product field values — or None if no duplicate found.
     """
     conn = get_db()
     cur = conn.cursor()
+
+    fields_sql = ", ".join(f"p.{f}" for f in ALL_PRODUCT_FIELDS)
 
     # Check EAN match first (if ean is provided and non-empty)
     if ean and ean.strip():
@@ -46,7 +48,7 @@ def _find_duplicate(ean, name, exclude_id=None):
         if exclude_id:
             params.append(exclude_id)
         row = cur.execute(
-            f"""SELECT p.id, p.name, p.ean,
+            f"""SELECT p.id, {fields_sql},
                    EXISTS(SELECT 1 FROM product_flags pf
                           WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
                    AS is_synced_with_off
@@ -56,13 +58,11 @@ def _find_duplicate(ean, name, exclude_id=None):
             params,
         ).fetchone()
         if row:
-            return {
-                "id": row["id"],
-                "name": row["name"],
-                "ean": row["ean"],
-                "match_type": "ean",
-                "is_synced_with_off": bool(row["is_synced_with_off"]),
-            }
+            result = {f: row[f] for f in ALL_PRODUCT_FIELDS}
+            result["id"] = row["id"]
+            result["match_type"] = "ean"
+            result["is_synced_with_off"] = bool(row["is_synced_with_off"])
+            return result
 
     # Then check name match (case-insensitive)
     if name and name.strip():
@@ -71,7 +71,7 @@ def _find_duplicate(ean, name, exclude_id=None):
         if exclude_id:
             params.append(exclude_id)
         row = cur.execute(
-            f"""SELECT p.id, p.name, p.ean,
+            f"""SELECT p.id, {fields_sql},
                    EXISTS(SELECT 1 FROM product_flags pf
                           WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
                    AS is_synced_with_off
@@ -81,13 +81,11 @@ def _find_duplicate(ean, name, exclude_id=None):
             params,
         ).fetchone()
         if row:
-            return {
-                "id": row["id"],
-                "name": row["name"],
-                "ean": row["ean"],
-                "match_type": "name",
-                "is_synced_with_off": bool(row["is_synced_with_off"]),
-            }
+            result = {f: row[f] for f in ALL_PRODUCT_FIELDS}
+            result["id"] = row["id"]
+            result["match_type"] = "name"
+            result["is_synced_with_off"] = bool(row["is_synced_with_off"])
+            return result
 
     return None
 
@@ -787,8 +785,12 @@ def check_duplicate_for_edit(pid: int, ean: str, name: str):
     return _find_duplicate(ean, name, exclude_id=pid)
 
 
-def merge_products(target_id: int, source_id: int) -> None:
-    """Merge source product into target, filling empty target fields, then delete source."""
+def merge_products(target_id: int, source_id: int, choices: dict | None = None) -> None:
+    """Merge source product into target, filling empty target fields, then delete source.
+
+    ``choices`` is an optional dict of {field: value} for fields where both
+    products had values and the user picked which to keep.
+    """
     conn = get_db()
     cur = conn.cursor()
     target = cur.execute(
@@ -802,14 +804,20 @@ def merge_products(target_id: int, source_id: int) -> None:
     if not source:
         raise LookupError("Source product not found")
 
+    choices = choices or {}
     merge_fields = [f for f in ALL_PRODUCT_FIELDS if f not in ("type",)]
     updates, vals = [], []
     for f in merge_fields:
-        target_val = target[f]
-        source_val = source[f]
-        if (target_val is None or target_val == "" or target_val == 0) and source_val not in (None, "", 0):
+        if f in choices:
+            # User explicitly chose a value for this conflicting field
             updates.append(f"{f} = ?")
-            vals.append(source_val)
+            vals.append(choices[f])
+        else:
+            target_val = target[f]
+            source_val = source[f]
+            if (target_val is None or target_val == "" or target_val == 0) and source_val not in (None, "", 0):
+                updates.append(f"{f} = ?")
+                vals.append(source_val)
     if target["image"] in (None, "") and source["image"] not in (None, ""):
         updates.append("image = ?")
         vals.append(source["image"])

@@ -667,5 +667,12 @@
     "conflict_use_all_local": "Använd alla lokala",
     "conflict_apply": "Tillämpa",
     "conflict_local": "Lokal",
-    "conflict_off": "OFF"
+    "conflict_off": "OFF",
+    "merge_conflict_title": "Välj värden att behålla",
+    "merge_conflict_desc": "Båda produkterna har värden för dessa fält. Välj vilka du vill behålla för \"{name}\":",
+    "merge_keep_all_current": "Behåll alla nuvarande",
+    "merge_keep_all_other": "Behåll alla andra",
+    "merge_source_current": "Nuvarande",
+    "merge_source_other": "Andra",
+    "merge_apply": "Slå ihop"
 }

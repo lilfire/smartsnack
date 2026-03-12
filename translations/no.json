@@ -671,5 +671,12 @@
     "conflict_use_all_local": "Bruk alle lokale",
     "conflict_apply": "Bruk",
     "conflict_local": "Lokal",
-    "conflict_off": "OFF"
+    "conflict_off": "OFF",
+    "merge_conflict_title": "Velg verdier å beholde",
+    "merge_conflict_desc": "Begge produktene har verdier for disse feltene. Velg hvilke du vil beholde for \"{name}\":",
+    "merge_keep_all_current": "Behold alle nåværende",
+    "merge_keep_all_other": "Behold alle andre",
+    "merge_source_current": "Nåværende",
+    "merge_source_other": "Andre",
+    "merge_apply": "Slå sammen"
 }

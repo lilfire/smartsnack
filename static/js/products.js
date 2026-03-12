@@ -3,7 +3,7 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, sho
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan, showEditDuplicateModal } from './openfoodfacts.js';
+import { isValidEan, showEditDuplicateModal, showMergeConflictModal } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -65,8 +65,15 @@ export async function saveProduct(id) {
           mergedOrDeleted = true;
           state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
         } else if (choice === 'merge') {
+          // Show conflict resolution for fields both products have values for
+          const conflictChoices = await showMergeConflictModal(data, dupResult.duplicate);
+          if (conflictChoices === null) return; // User cancelled conflict dialog
+          // Apply chosen values back into form data so the subsequent save uses them
+          for (const [field, val] of Object.entries(conflictChoices)) {
+            data[field] = val;
+          }
           await api('/api/products/' + id + '/merge', {
-            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id })
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: conflictChoices })
           });
           showToast(t('toast_duplicate_merged'), 'success');
           mergedOrDeleted = true;
