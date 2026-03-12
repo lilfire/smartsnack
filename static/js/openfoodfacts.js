@@ -30,6 +30,32 @@ let _offPickerProducts = null;
 
 const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
 
+async function _checkEditDuplicate(ean, name, productId) {
+  try {
+    const dupRes = await api('/api/products/' + productId + '/check-duplicate', {
+      method: 'POST', body: JSON.stringify({ ean: ean || '', name: name || '' })
+    });
+    if (!dupRes.duplicate) return true;
+    const choice = await showEditDuplicateModal(dupRes.duplicate);
+    if (choice === 'delete') {
+      await api('/api/products/' + dupRes.duplicate.id, { method: 'DELETE' });
+      showToast(t('toast_duplicate_deleted'), 'success');
+      return true;
+    } else if (choice === 'merge') {
+      await api('/api/products/' + productId + '/merge', {
+        method: 'POST', body: JSON.stringify({ source_id: dupRes.duplicate.id })
+      });
+      showToast(t('toast_duplicate_merged'), 'success');
+      return true;
+    }
+    return false;
+  } catch (e) {
+    console.error('Duplicate check failed:', e);
+    showToast(t('toast_network_error'), 'error');
+    return false;
+  }
+}
+
 function _gatherNutrition(prefix) {
   const nutrition = {};
   _nutritionCompareFields.forEach((f) => {
@@ -56,6 +82,12 @@ export async function lookupOFF(prefix, productId) {
       if (data.status !== 1 || !data.product) {
         updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
+      }
+      if (prefix === 'ed' && productId) {
+        if (!await _checkEditDuplicate(ean, data.product.product_name || '', productId)) {
+          closeOffPicker();
+          return;
+        }
       }
       await applyOffProduct(data.product, prefix, productId);
       closeOffPicker();
@@ -265,6 +297,8 @@ export async function selectOffResult(idx, ctxSnapshot) {
   const btn = document.getElementById(prefix + '-off-btn');
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
 
+  let productToApply = selected;
+  let resolvedEan = code || '';
   try {
     if (code) {
       const res = await fetchWithTimeout('/api/off/product/' + code);
@@ -273,19 +307,20 @@ export async function selectOffResult(idx, ctxSnapshot) {
         if (data.status === 1 && data.product) {
           const eanEl = document.getElementById(prefix + '-ean');
           if (eanEl) eanEl.value = code;
-          await applyOffProduct(data.product, prefix, productId);
-        } else {
-          await applyOffProduct(selected, prefix, productId);
+          productToApply = data.product;
         }
-      } else {
-        await applyOffProduct(selected, prefix, productId);
       }
-    } else {
-      await applyOffProduct(selected, prefix, productId);
     }
   } catch(e) {
     showToast(t('toast_network_error'), 'error');
-    await applyOffProduct(selected, prefix, productId);
+  }
+
+  try {
+    if (prefix === 'ed' && productId) {
+      const checkName = productToApply.product_name || productToApply.product_name_no || '';
+      if (!await _checkEditDuplicate(resolvedEan, checkName, productId)) return;
+    }
+    await applyOffProduct(productToApply, prefix, productId);
   } finally {
     if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
   }
