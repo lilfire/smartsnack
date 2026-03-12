@@ -664,5 +664,12 @@
     "duplicate_action_delete": "Slett duplikat",
     "duplicate_action_merge_into": "Slå sammen med dette produktet",
     "toast_duplicate_deleted": "Duplikatprodukt slettet",
-    "toast_duplicate_merged": "Duplikatprodukt slått sammen"
+    "toast_duplicate_merged": "Duplikatprodukt slått sammen",
+    "conflict_title": "Verdi-konflikter",
+    "conflict_description": "Disse feltene har ulike verdier lokalt og i OFF. Velg hvilken du vil beholde:",
+    "conflict_use_all_off": "Bruk alle OFF",
+    "conflict_use_all_local": "Bruk alle lokale",
+    "conflict_apply": "Bruk",
+    "conflict_local": "Lokal",
+    "conflict_off": "OFF"
 }

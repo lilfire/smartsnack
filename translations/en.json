@@ -660,5 +660,12 @@
     "duplicate_action_delete": "Delete duplicate",
     "duplicate_action_merge_into": "Merge into this product",
     "toast_duplicate_deleted": "Duplicate product deleted",
-    "toast_duplicate_merged": "Duplicate product merged"
+    "toast_duplicate_merged": "Duplicate product merged",
+    "conflict_title": "Value conflicts",
+    "conflict_description": "These fields differ between your local data and OFF. Choose which to keep:",
+    "conflict_use_all_off": "Use all OFF",
+    "conflict_use_all_local": "Use all Local",
+    "conflict_apply": "Apply",
+    "conflict_local": "Local",
+    "conflict_off": "OFF"
 }
