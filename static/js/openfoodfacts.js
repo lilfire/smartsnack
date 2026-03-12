@@ -509,23 +509,28 @@ async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
     // Conflict-aware flow: detect conflicts and let user choose
     const { autoApply, conflicts } = _detectConflicts(offMap, prefix);
 
-    // Auto-apply non-conflicting fields
-    Object.keys(autoApply).forEach((key) => {
-      const el = document.getElementById(prefix + '-' + key);
-      if (el) { el.value = autoApply[key]; filled.push(key); }
-    });
+    // Collect all field writes first (atomic: nothing written until user confirms)
+    const pendingWrites = {};
+    Object.keys(autoApply).forEach((key) => { pendingWrites[key] = autoApply[key]; });
 
-    // Show conflict modal if needed
+    // Show conflict modal if needed; if cancelled, abort everything
     if (conflicts.length > 0) {
       const resolutions = await showConflictModal(conflicts);
-      if (resolutions) {
-        conflicts.forEach((c) => {
-          const chosen = resolutions[c.key] === 'local' ? c.localVal : c.offVal;
-          const el = document.getElementById(prefix + '-' + c.key);
-          if (el) { el.value = chosen; filled.push(c.key); }
-        });
+      if (!resolutions) {
+        // User cancelled — don't apply anything
+        showToast(t('btn_cancel'), 'info');
+        return;
       }
+      conflicts.forEach((c) => {
+        pendingWrites[c.key] = resolutions[c.key] === 'local' ? c.localVal : c.offVal;
+      });
     }
+
+    // Commit all writes to the form
+    Object.keys(pendingWrites).forEach((key) => {
+      const el = document.getElementById(prefix + '-' + key);
+      if (el) { el.value = pendingWrites[key]; filled.push(key); }
+    });
 
     if (offMap.ingredients) updateEstimateBtn(prefix);
   } else {
