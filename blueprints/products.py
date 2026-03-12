@@ -65,7 +65,8 @@ def merge_product(pid):
         source_id = data.get("source_id")
         if not source_id or not isinstance(source_id, int):
             raise ValueError("source_id is required and must be an integer")
-        product_service.merge_products(pid, source_id)
+        choices = data.get("choices") or {}
+        product_service.merge_products(pid, source_id, choices=choices)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     except ValueError as e:
