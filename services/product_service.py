@@ -644,10 +644,20 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         dup = _find_duplicate(ean, name)
         if dup:
             if dup["is_synced_with_off"]:
-                if dup["match_type"] == "ean":
-                    raise ValueError(f"Product with this EAN already exists")
-                else:
-                    raise ValueError(f"Product with this name already exists (synced with OFF)")
+                if on_duplicate == "overwrite":
+                    raise ValueError(
+                        "Cannot overwrite a product synced with OpenFoodFacts"
+                    )
+                return {
+                    "duplicate": {
+                        "id": dup["id"],
+                        "name": dup["name"],
+                        "ean": dup["ean"],
+                        "match_type": dup["match_type"],
+                        "is_synced_with_off": True,
+                    },
+                    "actions": [],
+                }
             # Duplicate found, not synced
             if on_duplicate == "overwrite":
                 # Merge data into existing product — only non-empty fields
