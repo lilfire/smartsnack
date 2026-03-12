@@ -708,8 +708,8 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
   for (const f of fieldsToCheck) {
     const aVal = formData[f];
     const bVal = duplicate[f];
-    const aEmpty = aVal === null || aVal === undefined || aVal === '' || aVal === 0;
-    const bEmpty = bVal === null || bVal === undefined || bVal === '' || bVal === 0;
+    const aEmpty = aVal === null || aVal === undefined || aVal === '';
+    const bEmpty = bVal === null || bVal === undefined || bVal === '';
 
     if (aEmpty && bEmpty) continue;
     if (!aEmpty && !bEmpty && String(aVal) === String(bVal)) continue;
@@ -723,11 +723,7 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
     }
   }
 
-  // If no conflicts, resolve immediately with auto-resolved values
-  if (conflicts.length === 0) {
-    return Promise.resolve({ scenario, choices: autoResolved });
-  }
-
+  // Always show the dialog so the user can confirm the merge action
   return new Promise((resolve) => {
     const choices = {};
     // Default: keep A's values for conflicts
@@ -756,87 +752,89 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
     msgEl.textContent = t(messageKey, { match_type: duplicate.match_type, name: duplicate.name });
     modal.appendChild(msgEl);
 
-    // Section header for field choices
-    const chooseHeader = document.createElement('p');
-    chooseHeader.style.cssText = 'font-size:13px;opacity:0.7;margin-top:12px';
-    chooseHeader.textContent = t('duplicate_merge_choose_values');
-    modal.appendChild(chooseHeader);
-
-    // Bulk buttons
-    const bulk = document.createElement('div');
-    bulk.className = 'conflict-bulk';
-    const keepAllA = document.createElement('button');
-    keepAllA.textContent = t('duplicate_merge_keep_all_a');
-    keepAllA.type = 'button';
-    const keepAllB = document.createElement('button');
-    keepAllB.textContent = t('duplicate_merge_keep_all_b');
-    keepAllB.type = 'button';
-    bulk.appendChild(keepAllA);
-    bulk.appendChild(keepAllB);
-    modal.appendChild(bulk);
-
-    const fieldsContainer = document.createElement('div');
-    fieldsContainer.className = 'conflict-fields';
-
+    // Only show field choices section if there are conflicts
     const optionEls = [];
+    if (conflicts.length > 0) {
+      // Section header for field choices
+      const chooseHeader = document.createElement('p');
+      chooseHeader.style.cssText = 'font-size:13px;opacity:0.7;margin-top:12px';
+      chooseHeader.textContent = t('duplicate_merge_choose_values');
+      modal.appendChild(chooseHeader);
 
-    for (const c of conflicts) {
-      const row = document.createElement('div');
-      const label = document.createElement('div');
-      label.className = 'conflict-row-label';
-      label.textContent = t('adv_field_' + c.field) || c.field;
-      row.appendChild(label);
+      // Bulk buttons
+      const bulk = document.createElement('div');
+      bulk.className = 'conflict-bulk';
+      const keepAllA = document.createElement('button');
+      keepAllA.textContent = t('duplicate_merge_keep_all_a');
+      keepAllA.type = 'button';
+      const keepAllB = document.createElement('button');
+      keepAllB.textContent = t('duplicate_merge_keep_all_b');
+      keepAllB.type = 'button';
+      bulk.appendChild(keepAllA);
+      bulk.appendChild(keepAllB);
+      modal.appendChild(bulk);
 
-      const opts = document.createElement('div');
-      opts.className = 'conflict-row-options';
+      const fieldsContainer = document.createElement('div');
+      fieldsContainer.className = 'conflict-fields';
 
-      const optA = document.createElement('div');
-      optA.className = 'conflict-option selected';
-      optA.innerHTML =
-        '<div class="conflict-option-source">' + t('duplicate_merge_source_a') + '</div>' +
-        '<div class="conflict-option-value">' + _esc(String(c.aVal)) + '</div>';
+      for (const c of conflicts) {
+        const row = document.createElement('div');
+        const label = document.createElement('div');
+        label.className = 'conflict-row-label';
+        label.textContent = t('adv_field_' + c.field) || c.field;
+        row.appendChild(label);
 
-      const optB = document.createElement('div');
-      optB.className = 'conflict-option';
-      optB.innerHTML =
-        '<div class="conflict-option-source">' + t('duplicate_merge_source_b') + '</div>' +
-        '<div class="conflict-option-value">' + _esc(String(c.bVal)) + '</div>';
+        const opts = document.createElement('div');
+        opts.className = 'conflict-row-options';
 
-      optionEls.push({ field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB });
+        const optA = document.createElement('div');
+        optA.className = 'conflict-option selected';
+        optA.innerHTML =
+          '<div class="conflict-option-source">' + t('duplicate_merge_source_a') + '</div>' +
+          '<div class="conflict-option-value">' + _esc(String(c.aVal)) + '</div>';
 
-      optA.addEventListener('click', () => {
-        choices[c.field] = c.aVal;
-        optA.classList.add('selected');
-        optB.classList.remove('selected');
+        const optB = document.createElement('div');
+        optB.className = 'conflict-option';
+        optB.innerHTML =
+          '<div class="conflict-option-source">' + t('duplicate_merge_source_b') + '</div>' +
+          '<div class="conflict-option-value">' + _esc(String(c.bVal)) + '</div>';
+
+        optionEls.push({ field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB });
+
+        optA.addEventListener('click', () => {
+          choices[c.field] = c.aVal;
+          optA.classList.add('selected');
+          optB.classList.remove('selected');
+        });
+        optB.addEventListener('click', () => {
+          choices[c.field] = c.bVal;
+          optB.classList.add('selected');
+          optA.classList.remove('selected');
+        });
+
+        opts.appendChild(optA);
+        opts.appendChild(optB);
+        row.appendChild(opts);
+        fieldsContainer.appendChild(row);
+      }
+
+      keepAllA.addEventListener('click', () => {
+        for (const o of optionEls) {
+          choices[o.field] = o.aVal;
+          o.optA.classList.add('selected');
+          o.optB.classList.remove('selected');
+        }
       });
-      optB.addEventListener('click', () => {
-        choices[c.field] = c.bVal;
-        optB.classList.add('selected');
-        optA.classList.remove('selected');
+      keepAllB.addEventListener('click', () => {
+        for (const o of optionEls) {
+          choices[o.field] = o.bVal;
+          o.optB.classList.add('selected');
+          o.optA.classList.remove('selected');
+        }
       });
 
-      opts.appendChild(optA);
-      opts.appendChild(optB);
-      row.appendChild(opts);
-      fieldsContainer.appendChild(row);
+      modal.appendChild(fieldsContainer);
     }
-
-    keepAllA.addEventListener('click', () => {
-      for (const o of optionEls) {
-        choices[o.field] = o.aVal;
-        o.optA.classList.add('selected');
-        o.optB.classList.remove('selected');
-      }
-    });
-    keepAllB.addEventListener('click', () => {
-      for (const o of optionEls) {
-        choices[o.field] = o.bVal;
-        o.optB.classList.add('selected');
-        o.optA.classList.remove('selected');
-      }
-    });
-
-    modal.appendChild(fieldsContainer);
 
     const actions = document.createElement('div');
     actions.className = 'scan-modal-actions';
