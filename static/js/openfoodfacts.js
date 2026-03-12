@@ -35,18 +35,18 @@ async function _checkEditDuplicate(ean, name, productId) {
     const dupRes = await api('/api/products/' + productId + '/check-duplicate', {
       method: 'POST', body: JSON.stringify({ ean: ean || '', name: name || '' })
     });
-    if (!dupRes.duplicate) return true;
+    if (!dupRes.duplicate) return 'no_duplicate';
     const choice = await showEditDuplicateModal(dupRes.duplicate);
     if (choice === 'delete') {
       await api('/api/products/' + dupRes.duplicate.id, { method: 'DELETE' });
       showToast(t('toast_duplicate_deleted'), 'success');
-      return true;
+      return 'resolved';
     } else if (choice === 'merge') {
       await api('/api/products/' + productId + '/merge', {
         method: 'POST', body: JSON.stringify({ source_id: dupRes.duplicate.id })
       });
       showToast(t('toast_duplicate_merged'), 'success');
-      return true;
+      return 'resolved';
     }
     return false;
   } catch (e) {
@@ -83,13 +83,16 @@ export async function lookupOFF(prefix, productId) {
         updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
       }
+      let forceOverwrite = false;
       if (prefix === 'ed' && productId) {
-        if (!await _checkEditDuplicate(ean, data.product.product_name || '', productId)) {
+        const dupResult = await _checkEditDuplicate(ean, data.product.product_name || '', productId);
+        if (!dupResult) {
           closeOffPicker();
           return;
         }
+        if (dupResult === 'resolved') forceOverwrite = true;
       }
-      await applyOffProduct(data.product, prefix, productId);
+      await applyOffProduct(data.product, prefix, productId, forceOverwrite);
       closeOffPicker();
     } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   } else if (name.length >= 2) {
@@ -316,17 +319,20 @@ export async function selectOffResult(idx, ctxSnapshot) {
   }
 
   try {
+    let forceOverwrite = false;
     if (prefix === 'ed' && productId) {
       const checkName = productToApply.product_name || productToApply.product_name_no || '';
-      if (!await _checkEditDuplicate(resolvedEan, checkName, productId)) return;
+      const dupResult = await _checkEditDuplicate(resolvedEan, checkName, productId);
+      if (!dupResult) return;
+      if (dupResult === 'resolved') forceOverwrite = true;
     }
-    await applyOffProduct(productToApply, prefix, productId);
+    await applyOffProduct(productToApply, prefix, productId, forceOverwrite);
   } finally {
     if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
   }
 }
 
-async function applyOffProduct(prod, prefix, productId) {
+async function applyOffProduct(prod, prefix, productId, forceOverwrite) {
   window._pendingOFFSync = true;
   const n = prod.nutriments || {};
   const offMap = {
@@ -347,8 +353,8 @@ async function applyOffProduct(prod, prefix, productId) {
     if (val == null) return;
     const fieldEl = document.getElementById(prefix + '-' + key);
     if (!fieldEl) return;
-    // Don't overwrite existing local values with 0 from OFF (likely missing data)
-    if (val === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
+    // Don't overwrite existing local values with 0 from OFF (likely missing data) — unless forceOverwrite
+    if (!forceOverwrite && val === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
     fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
     filled.push(key);
   });
@@ -361,11 +367,11 @@ async function applyOffProduct(prod, prefix, productId) {
   if (qty) { const weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
 
   const nameEl = document.getElementById(prefix + '-name');
-  if (nameEl && !nameEl.value.trim()) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
+  if (nameEl && (forceOverwrite || !nameEl.value.trim())) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
 
   if (prod.code) {
     const codeEl = document.getElementById(prefix + '-ean');
-    if (codeEl && !codeEl.value.trim()) { codeEl.value = prod.code; filled.push('ean'); }
+    if (codeEl && (forceOverwrite || !codeEl.value.trim())) { codeEl.value = prod.code; filled.push('ean'); }
   }
 
   const brand = prod.brands || '';
