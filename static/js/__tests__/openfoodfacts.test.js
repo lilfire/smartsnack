@@ -27,7 +27,7 @@ vi.mock('../images.js', () => ({
   resizeImage: vi.fn((dataUri) => Promise.resolve(dataUri)),
 }));
 
-import { isValidEan, validateOffBtn, searchOFF, closeOffPicker, closeOffAddReview, estimateProteinQuality, updateEstimateBtn, submitToOff, lookupOFF, selectOffResult, offModalSearch, showOffAddReview } from '../openfoodfacts.js';
+import { isValidEan, validateOffBtn, searchOFF, closeOffPicker, closeOffAddReview, estimateProteinQuality, updateEstimateBtn, submitToOff, lookupOFF, selectOffResult, offModalSearch, showOffAddReview, showDuplicateMergeModal, showEditDuplicateModal, showMergeConflictModal } from '../openfoodfacts.js';
 import { state, api, showToast } from '../state.js';
 
 beforeEach(() => {
@@ -809,5 +809,182 @@ describe('showOffAddReview', () => {
     const modal = document.getElementById('off-add-review-bg');
     expect(modal).not.toBeNull();
     expect(modal.innerHTML).toContain('1234567890123');
+  });
+});
+
+describe('showDuplicateMergeModal', () => {
+  afterEach(() => {
+    document.querySelectorAll('.scan-modal-bg').forEach(el => el.remove());
+  });
+
+  it('shows field choices when A and B have different taste_score and price (neither synced)', async () => {
+    const formData = { taste_score: 0.5, price: 123, brand: 'X', kcal: 100 };
+    const duplicate = {
+      id: 99, name: 'Dup Product', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 3, price: 1000, brand: 'X', kcal: 100,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    // Modal should be visible with conflict options
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg).not.toBeNull();
+    const modal = bg.querySelector('.conflict-modal');
+    expect(modal).not.toBeNull();
+
+    // Should contain field choice rows for taste_score and price
+    const fieldLabels = modal.querySelectorAll('.conflict-row-label');
+    const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
+    expect(labelTexts).toContain('adv_field_taste_score');
+    expect(labelTexts).toContain('adv_field_price');
+
+    // Should show conflict option values
+    const optionValues = modal.querySelectorAll('.conflict-option-value');
+    const values = Array.from(optionValues).map(el => el.textContent);
+    expect(values).toContain('0.5');
+    expect(values).toContain('3');
+    expect(values).toContain('123');
+    expect(values).toContain('1000');
+
+    // Click confirm to resolve the promise
+    const confirmBtn = modal.querySelector('.conflict-apply-btn');
+    confirmBtn.click();
+    const result = await promise;
+    expect(result).not.toBeNull();
+    expect(result.scenario).toBe('neither');
+    // Default is A's values
+    expect(result.choices.taste_score).toBe(0.5);
+    expect(result.choices.price).toBe(123);
+  });
+
+  it('shows dialog even with no conflicts (all values equal)', async () => {
+    const formData = { taste_score: 3, price: 100 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'name',
+      is_synced_with_off: false,
+      taste_score: 3, price: 100,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    // Dialog should still show for confirmation
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg).not.toBeNull();
+
+    // But no field choice rows
+    const fieldLabels = bg.querySelectorAll('.conflict-row-label');
+    expect(fieldLabels.length).toBe(0);
+
+    // Confirm
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.scenario).toBe('neither');
+    expect(result.choices).toEqual({});
+  });
+
+  it('only shows user-only fields when B is synced with OFF', async () => {
+    const formData = { taste_score: 0.5, price: 123, kcal: 200, brand: 'Local' };
+    const duplicate = {
+      id: 99, name: 'OFF Product', match_type: 'ean',
+      is_synced_with_off: true,
+      taste_score: 3, price: 1000, kcal: 300, brand: 'OFF Brand',
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const fieldLabels = bg.querySelectorAll('.conflict-row-label');
+    const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
+
+    // taste_score and price should show (user-only fields)
+    expect(labelTexts).toContain('adv_field_taste_score');
+    expect(labelTexts).toContain('adv_field_price');
+    // kcal and brand should NOT show (OFF-provided fields)
+    expect(labelTexts).not.toContain('adv_field_kcal');
+    expect(labelTexts).not.toContain('adv_field_brand');
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.scenario).toBe('b_synced');
+  });
+
+  it('only shows user-only fields when A is synced with OFF', async () => {
+    const formData = { taste_score: 0.5, price: 123, kcal: 200 };
+    const duplicate = {
+      id: 99, name: 'Other', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 3, price: 1000, kcal: 300,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, true);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const fieldLabels = bg.querySelectorAll('.conflict-row-label');
+    const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
+
+    expect(labelTexts).toContain('adv_field_taste_score');
+    expect(labelTexts).toContain('adv_field_price');
+    expect(labelTexts).not.toContain('adv_field_kcal');
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.scenario).toBe('a_synced');
+  });
+
+  it('allows user to pick B values by clicking', async () => {
+    const formData = { taste_score: 0.5, price: 123 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 3, price: 1000,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    // Click the B option for each conflict field
+    const optionBs = bg.querySelectorAll('.conflict-option:not(.selected)');
+    optionBs.forEach(opt => opt.click());
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.choices.taste_score).toBe(3);
+    expect(result.choices.price).toBe(1000);
+  });
+
+  it('returns null when user cancels', async () => {
+    const formData = { taste_score: 0.5 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 3,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    bg.querySelector('.confirm-no').click();
+    const result = await promise;
+    expect(result).toBeNull();
+  });
+
+  it('auto-resolves fields where only one side has a value', async () => {
+    const formData = { taste_score: 0.5, price: null, volume: 2 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 3, price: 1000, volume: null,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    // Only taste_score should show as conflict (price and volume auto-resolve)
+    const fieldLabels = bg.querySelectorAll('.conflict-row-label');
+    const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
+    expect(labelTexts).toContain('adv_field_taste_score');
+    expect(labelTexts).not.toContain('adv_field_price');
+    expect(labelTexts).not.toContain('adv_field_volume');
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    // Auto-resolved values should be in choices
+    expect(result.choices.price).toBe(1000);  // from B (A was null)
+    expect(result.choices.volume).toBe(2);     // from A (B was null)
+    expect(result.choices.taste_score).toBe(0.5); // default: A's value
   });
 });

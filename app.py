@@ -28,6 +28,12 @@ def create_app() -> Flask:
 
     register_blueprints(app)
 
+    @app.after_request
+    def set_js_cache_headers(response):
+        if response.content_type and "javascript" in response.content_type:
+            response.headers["Cache-Control"] = "no-cache, must-revalidate"
+        return response
+
     @app.errorhandler(HTTPException)
     def handle_http_error(e):
         return jsonify({"error": e.description}), e.code
