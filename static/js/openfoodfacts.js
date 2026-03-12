@@ -4,6 +4,8 @@ import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
 const OFF_FETCH_TIMEOUT = 45000;
+const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
+function _volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
 function fetchWithTimeout(url, opts) {
   const controller = new AbortController();
@@ -802,17 +804,20 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
           const opts = document.createElement('div');
           opts.className = 'conflict-row-options';
 
+          const displayA = c.field === 'volume' ? _volumeLabel(c.aVal) : c.aVal;
+          const displayB = c.field === 'volume' ? _volumeLabel(c.bVal) : c.bVal;
+
           const optA = document.createElement('div');
           optA.className = 'conflict-option selected';
           optA.innerHTML =
             '<div class="conflict-option-source">' + _esc(aLabel) + '</div>' +
-            '<div class="conflict-option-value">' + _esc(String(c.aVal)) + '</div>';
+            '<div class="conflict-option-value">' + _esc(String(displayA)) + '</div>';
 
           const optB = document.createElement('div');
           optB.className = 'conflict-option';
           optB.innerHTML =
             '<div class="conflict-option-source">' + _esc(bLabel) + '</div>' +
-            '<div class="conflict-option-value">' + _esc(String(c.bVal)) + '</div>';
+            '<div class="conflict-option-value">' + _esc(String(displayB)) + '</div>';
 
           optionEls.push({
             field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB,
