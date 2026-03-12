@@ -694,5 +694,10 @@
     "import_dup_action_skip": "Hoppa över",
     "import_dup_action_overwrite": "Skriv över (sammanfoga med befintlig)",
     "import_dup_action_allow": "Tillåt dubblett (importera som ny)",
-    "import_dup_start": "Starta import"
+    "import_dup_start": "Starta import",
+    "import_dup_action_merge": "Sammanfoga (synk-medveten)",
+    "import_dup_merge_rules_desc": "OFF-synkad produkt vinner. Båda synkade: importerad vinner.<br>Ingen synkad: använd reservregeln nedan.",
+    "import_dup_merge_priority_label": "När ingen är synkad med OFF",
+    "import_dup_merge_keep_existing": "Behåll befintliga värden",
+    "import_dup_merge_use_imported": "Använd importerade värden"
 }

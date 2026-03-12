@@ -290,6 +290,114 @@ class TestImportDuplicateControl:
         assert "1 skipped" in msg
 
 
+class TestImportMerge:
+    """Tests for the merge on_duplicate mode with sync-aware rules."""
+
+    def _insert_product(self, db, name, ean="", brand="", cat="Snacks", synced=False):
+        from config import INSERT_WITH_IMAGE_SQL
+
+        db.execute(
+            INSERT_WITH_IMAGE_SQL,
+            (cat, name, ean, brand, "", "", "", None, None, None, None, None,
+             None, None, None, None, None, None, None, None, None, None, None, ""),
+        )
+        pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if synced:
+            db.execute(
+                "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, 'is_synced_with_off')",
+                (pid,),
+            )
+        db.commit()
+        return pid
+
+    def test_merge_fills_empty_fields(self, app_ctx, seed_category, translations_dir):
+        """When existing field is empty, merge always fills it regardless of sync."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Product A", ean="1000000000001", brand="")
+        msg = import_products(
+            {"products": [{"type": "Snacks", "name": "Product A", "ean": "1000000000001", "brand": "NewBrand"}]},
+            on_duplicate="merge",
+        )
+        assert "1 merged" in msg
+        row = get_db().execute("SELECT brand FROM products WHERE ean = '1000000000001'").fetchone()
+        assert row["brand"] == "NewBrand"
+
+    def test_merge_existing_synced_keeps_existing(self, app_ctx, seed_category, translations_dir):
+        """Existing synced + imported not synced → existing values win on conflicts."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Synced P", ean="2000000000002", brand="OldBrand", synced=True)
+        import_products(
+            {"products": [{"type": "Snacks", "name": "Synced P", "ean": "2000000000002", "brand": "ImportBrand"}]},
+            on_duplicate="merge",
+        )
+        row = get_db().execute("SELECT brand FROM products WHERE ean = '2000000000002'").fetchone()
+        assert row["brand"] == "OldBrand"
+
+    def test_merge_imported_synced_overwrites(self, app_ctx, seed_category, translations_dir):
+        """Imported synced + existing not synced → imported values win."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Local P", ean="3000000000003", brand="OldBrand", synced=False)
+        import_products(
+            {"products": [{
+                "type": "Snacks", "name": "Local P", "ean": "3000000000003",
+                "brand": "ImportBrand", "flags": ["is_synced_with_off"],
+            }]},
+            on_duplicate="merge",
+        )
+        row = get_db().execute("SELECT brand FROM products WHERE ean = '3000000000003'").fetchone()
+        assert row["brand"] == "ImportBrand"
+
+    def test_merge_both_synced_imported_wins(self, app_ctx, seed_category, translations_dir):
+        """Both synced → imported wins."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Both Sync", ean="4000000000004", brand="OldBrand", synced=True)
+        import_products(
+            {"products": [{
+                "type": "Snacks", "name": "Both Sync", "ean": "4000000000004",
+                "brand": "ImportBrand", "flags": ["is_synced_with_off"],
+            }]},
+            on_duplicate="merge",
+        )
+        row = get_db().execute("SELECT brand FROM products WHERE ean = '4000000000004'").fetchone()
+        assert row["brand"] == "ImportBrand"
+
+    def test_merge_neither_synced_keep_existing(self, app_ctx, seed_category, translations_dir):
+        """Neither synced + keep_existing → existing values win."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Neither A", ean="5000000000005", brand="OldBrand", synced=False)
+        import_products(
+            {"products": [{"type": "Snacks", "name": "Neither A", "ean": "5000000000005", "brand": "ImportBrand"}]},
+            on_duplicate="merge",
+            merge_priority="keep_existing",
+        )
+        row = get_db().execute("SELECT brand FROM products WHERE ean = '5000000000005'").fetchone()
+        assert row["brand"] == "OldBrand"
+
+    def test_merge_neither_synced_use_imported(self, app_ctx, seed_category, translations_dir):
+        """Neither synced + use_imported → imported values win."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Neither B", ean="6000000000006", brand="OldBrand", synced=False)
+        import_products(
+            {"products": [{"type": "Snacks", "name": "Neither B", "ean": "6000000000006", "brand": "ImportBrand"}]},
+            on_duplicate="merge",
+            merge_priority="use_imported",
+        )
+        row = get_db().execute("SELECT brand FROM products WHERE ean = '6000000000006'").fetchone()
+        assert row["brand"] == "ImportBrand"
+
+
 class TestRestoreScoreWeights:
     def test_restore_weights(self, app_ctx, db):
         from services.backup_service import _restore_score_weights

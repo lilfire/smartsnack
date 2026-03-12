@@ -763,9 +763,36 @@ function showImportDuplicateDialog() {
     actionSection.appendChild(_buildRadioGroup('on_duplicate', [
       { value: 'skip', label: t('import_dup_action_skip') },
       { value: 'overwrite', label: t('import_dup_action_overwrite') },
+      { value: 'merge', label: t('import_dup_action_merge') },
       { value: 'allow_duplicate', label: t('import_dup_action_allow') },
     ], 'skip'));
     modal.appendChild(actionSection);
+
+    // Merge rules sub-section (shown only when "merge" selected)
+    const mergeSection = document.createElement('div');
+    mergeSection.className = 'import-dup-section import-dup-merge-rules';
+    mergeSection.style.display = 'none';
+
+    const mergeInfo = document.createElement('div');
+    mergeInfo.className = 'import-dup-merge-info';
+    mergeInfo.innerHTML = t('import_dup_merge_rules_desc');
+    mergeSection.appendChild(mergeInfo);
+
+    const mergePriorityLabel = document.createElement('div');
+    mergePriorityLabel.className = 'import-dup-section-label';
+    mergePriorityLabel.textContent = t('import_dup_merge_priority_label');
+    mergeSection.appendChild(mergePriorityLabel);
+    mergeSection.appendChild(_buildRadioGroup('merge_priority', [
+      { value: 'keep_existing', label: t('import_dup_merge_keep_existing') },
+      { value: 'use_imported', label: t('import_dup_merge_use_imported') },
+    ], 'keep_existing'));
+    modal.appendChild(mergeSection);
+
+    // Toggle merge rules visibility based on action selection
+    actionSection.addEventListener('change', () => {
+      const sel = modal.querySelector('input[name="on_duplicate"]:checked');
+      mergeSection.style.display = sel && sel.value === 'merge' ? '' : 'none';
+    });
 
     // Buttons
     const actions = document.createElement('div');
@@ -797,9 +824,11 @@ function showImportDuplicateDialog() {
     startBtn.onclick = () => {
       const mc = modal.querySelector('input[name="match_criteria"]:checked');
       const od = modal.querySelector('input[name="on_duplicate"]:checked');
+      const mp = modal.querySelector('input[name="merge_priority"]:checked');
       close({
         match_criteria: mc ? mc.value : 'both',
         on_duplicate: od ? od.value : 'skip',
+        merge_priority: mp ? mp.value : 'keep_existing',
       });
     };
     startBtn.focus();
@@ -816,6 +845,7 @@ export function handleImport(input) {
       if (!dupSettings) { input.value = ''; return; }
       data.match_criteria = dupSettings.match_criteria;
       data.on_duplicate = dupSettings.on_duplicate;
+      data.merge_priority = dupSettings.merge_priority;
       const res = await api('/api/import', { method: 'POST', body: JSON.stringify(data) });
       if (res.error) { showToast(res.error, 'error'); }
       else { state.imageCache = {}; showToast(res.message, 'success'); loadData(); if (state.currentView === 'settings') loadSettings(); }

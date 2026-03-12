@@ -694,5 +694,10 @@
     "import_dup_action_skip": "Skip",
     "import_dup_action_overwrite": "Overwrite (merge into existing)",
     "import_dup_action_allow": "Allow duplicate (import as new)",
-    "import_dup_start": "Start Import"
+    "import_dup_start": "Start Import",
+    "import_dup_action_merge": "Merge (sync-aware)",
+    "import_dup_merge_rules_desc": "OFF-synced product wins. Both synced: imported wins.<br>Neither synced: use fallback rule below.",
+    "import_dup_merge_priority_label": "When neither is synced with OFF",
+    "import_dup_merge_keep_existing": "Keep existing values",
+    "import_dup_merge_use_imported": "Use imported values"
 }

@@ -698,5 +698,10 @@
     "import_dup_action_skip": "Hopp over",
     "import_dup_action_overwrite": "Overskriv (flett inn i eksisterende)",
     "import_dup_action_allow": "Tillat duplikat (importer som ny)",
-    "import_dup_start": "Start import"
+    "import_dup_start": "Start import",
+    "import_dup_action_merge": "Flett (synk-bevisst)",
+    "import_dup_merge_rules_desc": "OFF-synkronisert produkt vinner. Begge synkronisert: importert vinner.<br>Ingen synkronisert: bruk reserveregelen nedenfor.",
+    "import_dup_merge_priority_label": "Når ingen er synkronisert med OFF",
+    "import_dup_merge_keep_existing": "Behold eksisterende verdier",
+    "import_dup_merge_use_imported": "Bruk importerte verdier"
 }

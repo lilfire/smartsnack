@@ -98,6 +98,11 @@ def _opt_float(v):
     return result
 
 
+def _is_empty(val):
+    """Return True if a value is considered empty (None, empty string, or zero)."""
+    return val is None or val == "" or val == 0
+
+
 def _overwrite_product(cur, existing_id, p, valid_flags=None):
     """Update an existing product with non-empty fields from import data ``p``."""
     fields = [f.strip() for f in INSERT_FIELDS.split(",")]
@@ -128,6 +133,92 @@ def _overwrite_product(cur, existing_id, p, valid_flags=None):
         cur.execute(
             f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
         )
+    if valid_flags is None:
+        valid_flags = flag_service.get_all_flag_names()
+    for flag in p.get("flags", []):
+        if flag in valid_flags:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+                (existing_id, flag),
+            )
+
+
+def _merge_product(cur, existing_id, p, merge_priority, valid_flags=None):
+    """Merge import data into an existing product using sync-aware rules.
+
+    Rules:
+    - Existing synced, imported not → existing wins (only fill empty fields)
+    - Imported synced, existing not → imported wins
+    - Both synced → imported wins
+    - Neither synced → ``merge_priority`` decides: "keep_existing" or "use_imported"
+    """
+    fields = [f.strip() for f in INSERT_FIELDS.split(",")]
+    text_fields = set(_TEXT_FIELD_LIMITS.keys())
+    for tf, max_len in _TEXT_FIELD_LIMITS.items():
+        val = p.get(tf, "")
+        if isinstance(val, str) and len(val) > max_len:
+            raise ValueError(f"{tf} exceeds max length of {max_len}")
+
+    # Determine sync status
+    existing_synced = bool(
+        cur.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (existing_id,),
+        ).fetchone()
+    )
+    imported_synced = "is_synced_with_off" in (p.get("flags") or [])
+
+    # Determine winner: who takes priority when both have a value
+    if existing_synced and not imported_synced:
+        imported_wins = False
+    elif imported_synced and not existing_synced:
+        imported_wins = True
+    elif existing_synced and imported_synced:
+        imported_wins = True
+    else:
+        # Neither synced — user-chosen fallback
+        imported_wins = merge_priority == "use_imported"
+
+    # Fetch existing product row for comparison
+    existing = cur.execute(
+        "SELECT * FROM products WHERE id = ?", (existing_id,)
+    ).fetchone()
+
+    updates, vals = [], []
+    for f in fields:
+        new_val = p.get(f)
+        if new_val is None or new_val == "":
+            continue
+        if f not in text_fields:
+            new_val = _opt_float(new_val)
+            if new_val is None or new_val == 0:
+                continue
+        existing_val = existing[f] if existing else None
+        if _is_empty(existing_val):
+            # Existing is empty → always fill
+            updates.append(f"{f} = ?")
+            vals.append(new_val)
+        elif imported_wins:
+            # Both have values, imported wins
+            updates.append(f"{f} = ?")
+            vals.append(new_val)
+        # else: existing wins, keep existing value
+
+    # Image: fill if empty, or replace if imported wins
+    img = p.get("image", "")
+    if img:
+        existing_img = existing["image"] if existing else ""
+        if _is_empty(existing_img) or imported_wins:
+            updates.append("image = ?")
+            vals.append(img)
+
+    if updates:
+        vals.append(existing_id)
+        cur.execute(
+            f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
+        )
+
+    # Merge flags (additive)
     if valid_flags is None:
         valid_flags = flag_service.get_all_flag_names()
     for flag in p.get("flags", []):
@@ -476,6 +567,7 @@ def import_products(
     data: dict,
     match_criteria: str = "both",
     on_duplicate: str = "skip",
+    merge_priority: str = "keep_existing",
 ) -> str:
     """Import products (and optionally categories) without deleting existing data."""
     from db import get_db
@@ -485,13 +577,16 @@ def import_products(
         raise ValueError("Invalid import file")
     if match_criteria not in ("ean", "name", "both"):
         match_criteria = "both"
-    if on_duplicate not in ("skip", "overwrite", "allow_duplicate"):
+    if on_duplicate not in ("skip", "overwrite", "allow_duplicate", "merge"):
         on_duplicate = "skip"
+    if merge_priority not in ("keep_existing", "use_imported"):
+        merge_priority = "keep_existing"
     conn = get_db()
     cur = conn.cursor()
     added = 0
     skipped = 0
     overwritten = 0
+    merged = 0
     pending_translations = []
     try:
         if "categories" in data:
@@ -576,6 +671,10 @@ def import_products(
                     _overwrite_product(cur, existing_id, p, valid_flags)
                     overwritten += 1
                     continue
+                elif on_duplicate == "merge":
+                    _merge_product(cur, existing_id, p, merge_priority, valid_flags)
+                    merged += 1
+                    continue
                 # "allow_duplicate" — fall through to insert
             _restore_product(cur, p, valid_flags=valid_flags)
             added += 1
@@ -587,6 +686,8 @@ def import_products(
     # Apply translation file writes only after DB commit succeeds
     _apply_pending_translations(pending_translations)
     msg = f"Imported {added} products"
+    if merged:
+        msg += f", {merged} merged"
     if overwritten:
         msg += f", {overwritten} overwritten"
     if skipped:
