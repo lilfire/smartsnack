@@ -352,19 +352,33 @@ class TestFindDuplicate:
 
 
 class TestAddProductDuplicate:
-    def test_synced_ean_duplicate_raises(self, app_ctx, seed_category, seed_product):
+    def test_synced_ean_duplicate_returns_409_no_actions(self, app_ctx, seed_category, seed_product):
         from services.product_service import add_product, set_system_flag
 
         set_system_flag(seed_product, "is_synced_with_off", True)
-        with pytest.raises(ValueError, match="EAN already exists"):
-            add_product({"type": "Snacks", "name": "New Name", "ean": "7000000000001"})
+        result = add_product({"type": "Snacks", "name": "New Name", "ean": "7000000000001"})
+        assert "duplicate" in result
+        assert result["duplicate"]["is_synced_with_off"] is True
+        assert result["actions"] == []
 
-    def test_synced_name_duplicate_raises(self, app_ctx, seed_category, seed_product):
+    def test_synced_name_duplicate_returns_409_no_actions(self, app_ctx, seed_category, seed_product):
         from services.product_service import add_product, set_system_flag
 
         set_system_flag(seed_product, "is_synced_with_off", True)
-        with pytest.raises(ValueError, match="synced with OFF"):
-            add_product({"type": "Snacks", "name": "Classic Popcorn"})
+        result = add_product({"type": "Snacks", "name": "Classic Popcorn"})
+        assert "duplicate" in result
+        assert result["duplicate"]["is_synced_with_off"] is True
+        assert result["actions"] == []
+
+    def test_synced_duplicate_overwrite_raises(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product, set_system_flag
+
+        set_system_flag(seed_product, "is_synced_with_off", True)
+        with pytest.raises(ValueError, match="Cannot overwrite"):
+            add_product(
+                {"type": "Snacks", "name": "New Name", "ean": "7000000000001"},
+                on_duplicate="overwrite",
+            )
 
     def test_unsynced_duplicate_returns_409_info(self, app_ctx, seed_category, seed_product):
         from services.product_service import add_product

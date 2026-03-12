@@ -173,19 +173,21 @@ function _showDuplicateModal(duplicate) {
     modal.appendChild(pEl);
     const actions = document.createElement('div');
     actions.className = 'scan-modal-actions';
-    const mergeBtn = document.createElement('button');
-    mergeBtn.className = 'scan-modal-btn-register confirm-yes';
-    mergeBtn.textContent = t('duplicate_action_merge');
-    mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
-    actions.appendChild(mergeBtn);
-    const createBtn = document.createElement('button');
-    createBtn.className = 'scan-modal-btn-register';
-    createBtn.textContent = t('duplicate_action_create_new');
-    createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
-    actions.appendChild(createBtn);
+    if (!duplicate.is_synced_with_off) {
+      const mergeBtn = document.createElement('button');
+      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
+      mergeBtn.textContent = t('duplicate_action_merge');
+      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
+      actions.appendChild(mergeBtn);
+      const createBtn = document.createElement('button');
+      createBtn.className = 'scan-modal-btn-register';
+      createBtn.textContent = t('duplicate_action_create_new');
+      createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
+      actions.appendChild(createBtn);
+    }
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
-    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.className = duplicate.is_synced_with_off ? 'scan-modal-btn-register confirm-yes' : 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = duplicate.is_synced_with_off ? t('btn_ok') : t('btn_cancel');
     cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
     actions.appendChild(cancelBtn);
     modal.appendChild(actions);
@@ -218,8 +220,13 @@ export async function registerProduct() {
     } catch(e) {
       if (e.status === 409 && e.data && e.data.duplicate) {
         const dup = e.data.duplicate;
+        if (dup.is_synced_with_off) {
+          // Synced with OFF — show info-only modal, no merge allowed
+          await _showDuplicateModal(dup);
+          return;
+        }
         if (body.from_off) {
-          // Scenario 1: barcode+OFF — auto-overwrite for unsynced
+          // Barcode+OFF — auto-overwrite for unsynced
           result = await _submitProduct(body, 'overwrite');
         } else {
           // Scenario 2: manual name entry — ask user
