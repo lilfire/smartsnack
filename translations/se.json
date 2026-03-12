@@ -683,5 +683,16 @@
     "duplicate_merge_keep_all_b": "Behåll alla från \"{name}\"",
     "duplicate_merge_source_editing": "{name} (redigerar)",
     "duplicate_merge_source_other": "{name}",
-    "duplicate_merge_confirm": "Bekräfta sammanslagning"
+    "duplicate_merge_confirm": "Bekräfta sammanslagning",
+    "import_dup_title": "Importinställningar",
+    "import_dup_desc": "Konfigurera hur dubbletter hanteras vid import",
+    "import_dup_match_label": "Matchningskriterier",
+    "import_dup_match_ean": "EAN (streckkod)",
+    "import_dup_match_name": "Namn (skiftlägeskänsligt)",
+    "import_dup_match_both": "Både EAN och namn",
+    "import_dup_action_label": "Vid dubblett",
+    "import_dup_action_skip": "Hoppa över",
+    "import_dup_action_overwrite": "Skriv över (sammanfoga med befintlig)",
+    "import_dup_action_allow": "Tillåt dubblett (importera som ny)",
+    "import_dup_start": "Starta import"
 }

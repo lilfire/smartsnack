@@ -687,5 +687,16 @@
     "duplicate_merge_keep_all_b": "Behold alle fra \"{name}\"",
     "duplicate_merge_source_editing": "{name} (redigerer)",
     "duplicate_merge_source_other": "{name}",
-    "duplicate_merge_confirm": "Bekreft sammenslåing"
+    "duplicate_merge_confirm": "Bekreft sammenslåing",
+    "import_dup_title": "Importinnstillinger",
+    "import_dup_desc": "Konfigurer hvordan duplikater håndteres ved import",
+    "import_dup_match_label": "Treffkriterier",
+    "import_dup_match_ean": "EAN (strekkode)",
+    "import_dup_match_name": "Navn (uavhengig av store/små bokstaver)",
+    "import_dup_match_both": "Både EAN og navn",
+    "import_dup_action_label": "Ved duplikat",
+    "import_dup_action_skip": "Hopp over",
+    "import_dup_action_overwrite": "Overskriv (flett inn i eksisterende)",
+    "import_dup_action_allow": "Tillat duplikat (importer som ny)",
+    "import_dup_start": "Start import"
 }

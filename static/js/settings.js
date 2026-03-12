@@ -696,12 +696,126 @@ export async function handleRestore(input) {
   reader.readAsText(input.files[0]);
 }
 
+function _buildRadioGroup(name, options, defaultValue) {
+  const wrap = document.createElement('div');
+  wrap.className = 'import-dup-radios';
+  for (const opt of options) {
+    const label = document.createElement('label');
+    label.className = 'import-dup-radio-label';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = name;
+    input.value = opt.value;
+    if (opt.value === defaultValue) input.checked = true;
+    label.appendChild(input);
+    const span = document.createElement('span');
+    span.textContent = opt.label;
+    label.appendChild(span);
+    wrap.appendChild(label);
+  }
+  return wrap;
+}
+
+function showImportDuplicateDialog() {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal import-dup-modal';
+
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u2699\uFE0F';
+    modal.appendChild(iconDiv);
+
+    const h3 = document.createElement('h3');
+    h3.textContent = t('import_dup_title');
+    modal.appendChild(h3);
+
+    const desc = document.createElement('p');
+    desc.className = 'import-dup-desc';
+    desc.textContent = t('import_dup_desc');
+    modal.appendChild(desc);
+
+    // Match criteria section
+    const matchSection = document.createElement('div');
+    matchSection.className = 'import-dup-section';
+    const matchLabel = document.createElement('div');
+    matchLabel.className = 'import-dup-section-label';
+    matchLabel.textContent = t('import_dup_match_label');
+    matchSection.appendChild(matchLabel);
+    matchSection.appendChild(_buildRadioGroup('match_criteria', [
+      { value: 'ean', label: t('import_dup_match_ean') },
+      { value: 'name', label: t('import_dup_match_name') },
+      { value: 'both', label: t('import_dup_match_both') },
+    ], 'both'));
+    modal.appendChild(matchSection);
+
+    // Action section
+    const actionSection = document.createElement('div');
+    actionSection.className = 'import-dup-section';
+    const actionLabel = document.createElement('div');
+    actionLabel.className = 'import-dup-section-label';
+    actionLabel.textContent = t('import_dup_action_label');
+    actionSection.appendChild(actionLabel);
+    actionSection.appendChild(_buildRadioGroup('on_duplicate', [
+      { value: 'skip', label: t('import_dup_action_skip') },
+      { value: 'overwrite', label: t('import_dup_action_overwrite') },
+      { value: 'allow_duplicate', label: t('import_dup_action_allow') },
+    ], 'skip'));
+    modal.appendChild(actionSection);
+
+    // Buttons
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const startBtn = document.createElement('button');
+    startBtn.className = 'scan-modal-btn-register';
+    startBtn.textContent = t('import_dup_start');
+    actions.appendChild(startBtn);
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel';
+    cancelBtn.textContent = t('btn_cancel');
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+
+    function close(val) {
+      document.removeEventListener('keydown', onKeyDown);
+      bg.remove();
+      resolve(val);
+    }
+    function onKeyDown(e) {
+      if (e.key === 'Escape') close(null);
+    }
+    document.addEventListener('keydown', onKeyDown);
+    bg.addEventListener('click', (e) => { if (e.target === bg) close(null); });
+    cancelBtn.onclick = () => close(null);
+    startBtn.onclick = () => {
+      const mc = modal.querySelector('input[name="match_criteria"]:checked');
+      const od = modal.querySelector('input[name="on_duplicate"]:checked');
+      close({
+        match_criteria: mc ? mc.value : 'both',
+        on_duplicate: od ? od.value : 'skip',
+      });
+    };
+    startBtn.focus();
+  });
+}
+
 export function handleImport(input) {
   if (!input.files.length) return;
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
       const data = JSON.parse(e.target.result);
+      const dupSettings = await showImportDuplicateDialog();
+      if (!dupSettings) { input.value = ''; return; }
+      data.match_criteria = dupSettings.match_criteria;
+      data.on_duplicate = dupSettings.on_duplicate;
       const res = await api('/api/import', { method: 'POST', body: JSON.stringify(data) });
       if (res.error) { showToast(res.error, 'error'); }
       else { state.imageCache = {}; showToast(res.message, 'success'); loadData(); if (state.currentView === 'settings') loadSettings(); }

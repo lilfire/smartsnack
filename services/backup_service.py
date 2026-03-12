@@ -10,6 +10,7 @@ from config import (
     APP_VERSION,
     SUPPORTED_LANGUAGES,
     SCORE_CONFIG_MAP,
+    INSERT_FIELDS,
     INSERT_WITH_IMAGE_SQL,
     _TEXT_FIELD_LIMITS,
 )
@@ -95,6 +96,46 @@ def _opt_float(v):
     if not math.isfinite(result):
         raise ValueError("Non-finite numeric value for product field")
     return result
+
+
+def _overwrite_product(cur, existing_id, p, valid_flags=None):
+    """Update an existing product with non-empty fields from import data ``p``."""
+    fields = [f.strip() for f in INSERT_FIELDS.split(",")]
+    text_fields = set(_TEXT_FIELD_LIMITS.keys())
+    for tf, max_len in _TEXT_FIELD_LIMITS.items():
+        val = p.get(tf, "")
+        if isinstance(val, str) and len(val) > max_len:
+            raise ValueError(f"{tf} exceeds max length of {max_len}")
+    updates, vals = [], []
+    for f in fields:
+        val = p.get(f)
+        if val is None or val == "":
+            continue
+        if f in text_fields:
+            updates.append(f"{f} = ?")
+            vals.append(val)
+        else:
+            fval = _opt_float(val)
+            if fval is not None and fval != 0:
+                updates.append(f"{f} = ?")
+                vals.append(fval)
+    img = p.get("image", "")
+    if img:
+        updates.append("image = ?")
+        vals.append(img)
+    if updates:
+        vals.append(existing_id)
+        cur.execute(
+            f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
+        )
+    if valid_flags is None:
+        valid_flags = flag_service.get_all_flag_names()
+    for flag in p.get("flags", []):
+        if flag in valid_flags:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+                (existing_id, flag),
+            )
 
 
 def _restore_product(cur, p, valid_flags=None):
@@ -431,17 +472,26 @@ def restore_backup(data: dict) -> str:
     return f"Restored {len(data['products'])} products successfully"
 
 
-def import_products(data: dict) -> str:
+def import_products(
+    data: dict,
+    match_criteria: str = "both",
+    on_duplicate: str = "skip",
+) -> str:
     """Import products (and optionally categories) without deleting existing data."""
     from db import get_db
     from translations import _category_key, _flag_key
 
     if not data or "products" not in data:
         raise ValueError("Invalid import file")
+    if match_criteria not in ("ean", "name", "both"):
+        match_criteria = "both"
+    if on_duplicate not in ("skip", "overwrite", "allow_duplicate"):
+        on_duplicate = "skip"
     conn = get_db()
     cur = conn.cursor()
     added = 0
     skipped = 0
+    overwritten = 0
     pending_translations = []
     try:
         if "categories" in data:
@@ -505,18 +555,28 @@ def import_products(data: dict) -> str:
                     existing_cats.add(cat)
             ean = p.get("ean", "").strip()
             name = p.get("name", "").strip()
-            if ean:
-                if cur.execute(
-                    "SELECT 1 FROM products WHERE ean = ?", (ean,)
-                ).fetchone():
+            existing_id = None
+            if match_criteria in ("ean", "both") and ean:
+                row = cur.execute(
+                    "SELECT id FROM products WHERE ean = ?", (ean,)
+                ).fetchone()
+                if row:
+                    existing_id = row["id"]
+            if existing_id is None and match_criteria in ("name", "both") and name:
+                row = cur.execute(
+                    "SELECT id FROM products WHERE LOWER(name) = LOWER(?)", (name,)
+                ).fetchone()
+                if row:
+                    existing_id = row["id"]
+            if existing_id is not None:
+                if on_duplicate == "skip":
                     skipped += 1
                     continue
-            if name:
-                if cur.execute(
-                    "SELECT 1 FROM products WHERE LOWER(name) = LOWER(?)", (name,)
-                ).fetchone():
-                    skipped += 1
+                elif on_duplicate == "overwrite":
+                    _overwrite_product(cur, existing_id, p, valid_flags)
+                    overwritten += 1
                     continue
+                # "allow_duplicate" — fall through to insert
             _restore_product(cur, p, valid_flags=valid_flags)
             added += 1
         conn.commit()
@@ -527,6 +587,8 @@ def import_products(data: dict) -> str:
     # Apply translation file writes only after DB commit succeeds
     _apply_pending_translations(pending_translations)
     msg = f"Imported {added} products"
+    if overwritten:
+        msg += f", {overwritten} overwritten"
     if skipped:
         msg += f", {skipped} skipped as duplicates"
     return msg
