@@ -51,6 +51,7 @@ export async function saveProduct(id) {
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   // Check for duplicate EAN/name before saving
+  let mergedOrDeleted = false;
   if (data.ean || data.name) {
     try {
       const dupResult = await api('/api/products/' + id + '/check-duplicate', {
@@ -61,11 +62,15 @@ export async function saveProduct(id) {
         if (choice === 'delete') {
           await api('/api/products/' + dupResult.duplicate.id, { method: 'DELETE' });
           showToast(t('toast_duplicate_deleted'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
         } else if (choice === 'merge') {
           await api('/api/products/' + id + '/merge', {
             method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id })
           });
           showToast(t('toast_duplicate_merged'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
         } else {
           return; // User cancelled — abort save
         }
@@ -84,6 +89,10 @@ export async function saveProduct(id) {
   } catch(e) {
     console.error(e);
     showToast(t('toast_save_error'), 'error');
+    if (mergedOrDeleted) {
+      state.editingId = null;
+      loadData();
+    }
   }
 }
 
