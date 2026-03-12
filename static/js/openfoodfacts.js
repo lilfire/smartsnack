@@ -840,10 +840,17 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
           const slider = document.createElement('div');
           slider.className = 'conflict-taste-slider';
 
+          const avg = Math.round(((c.aVal + c.bVal) / 2) * 2) / 2;
+          choices[c.field] = avg;
+
           const labelA = document.createElement('div');
-          labelA.className = 'conflict-taste-label conflict-taste-label-a selected';
+          labelA.className = 'conflict-taste-label conflict-taste-label-a';
           labelA.innerHTML = '<span class="conflict-taste-name">' + _esc(aLabel) + '</span>' +
             '<span class="conflict-taste-value">' + _esc(String(c.aVal)) + '</span>';
+
+          const valDisplay = document.createElement('div');
+          valDisplay.className = 'conflict-taste-current';
+          valDisplay.textContent = String(avg);
 
           const labelB = document.createElement('div');
           labelB.className = 'conflict-taste-label conflict-taste-label-b';
@@ -853,28 +860,31 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
           const range = document.createElement('input');
           range.type = 'range';
           range.min = '0';
-          range.max = '1';
-          range.step = '1';
-          range.value = '0';
+          range.max = '6';
+          range.step = '0.5';
+          range.value = String(avg);
           range.className = 'conflict-taste-range';
 
           const updateSlider = () => {
-            const isB = range.value === '1';
-            choices[c.field] = isB ? c.bVal : c.aVal;
-            labelA.classList.toggle('selected', !isB);
-            labelB.classList.toggle('selected', isB);
+            const v = parseFloat(range.value);
+            choices[c.field] = v;
+            valDisplay.textContent = String(v);
           };
           range.addEventListener('input', updateSlider);
 
           optionEls.push({
             field: c.field, aVal: c.aVal, bVal: c.bVal,
-            setA() { range.value = '0'; updateSlider(); },
-            setB() { range.value = '1'; updateSlider(); },
+            setA() { range.value = String(c.aVal); updateSlider(); },
+            setB() { range.value = String(c.bVal); updateSlider(); },
           });
 
-          slider.appendChild(labelA);
+          const labelsRow = document.createElement('div');
+          labelsRow.className = 'conflict-taste-labels';
+          labelsRow.appendChild(labelA);
+          labelsRow.appendChild(valDisplay);
+          labelsRow.appendChild(labelB);
+          slider.appendChild(labelsRow);
           slider.appendChild(range);
-          slider.appendChild(labelB);
           row.appendChild(slider);
         } else {
           // Standard click-to-pick options

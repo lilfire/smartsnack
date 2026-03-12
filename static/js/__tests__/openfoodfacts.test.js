@@ -855,8 +855,8 @@ describe('showDuplicateMergeModal', () => {
     const result = await promise;
     expect(result).not.toBeNull();
     expect(result.scenario).toBe('neither');
-    // Default is A's values
-    expect(result.choices.taste_score).toBe(0.5);
+    // Default: taste_score is avg rounded to nearest 0.5, price defaults to A
+    expect(result.choices.taste_score).toBe(2); // avg(0.5, 3) = 1.75 → rounded to 2
     expect(result.choices.price).toBe(123);
   });
 
@@ -945,9 +945,9 @@ describe('showDuplicateMergeModal', () => {
     const optionBs = bg.querySelectorAll('.conflict-option:not(.selected)');
     optionBs.forEach(opt => opt.click());
 
-    // Slide taste_score slider to B
+    // Slide taste_score slider to B's value (3)
     const slider = bg.querySelector('.conflict-taste-range');
-    slider.value = '1';
+    slider.value = '3';
     slider.dispatchEvent(new Event('input'));
 
     bg.querySelector('.conflict-apply-btn').click();
@@ -993,6 +993,6 @@ describe('showDuplicateMergeModal', () => {
     // Auto-resolved values should be in choices
     expect(result.choices.price).toBe(1000);  // from B (A was null)
     expect(result.choices.volume).toBe(2);     // from A (B was null)
-    expect(result.choices.taste_score).toBe(0.5); // default: A's value
+    expect(result.choices.taste_score).toBe(2); // default: avg(0.5, 3) = 1.75 → rounded to 2
   });
 });
