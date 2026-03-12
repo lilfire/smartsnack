@@ -30,32 +30,6 @@ let _offPickerProducts = null;
 
 const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
 
-async function _checkEditDuplicate(ean, name, productId) {
-  try {
-    const dupRes = await api('/api/products/' + productId + '/check-duplicate', {
-      method: 'POST', body: JSON.stringify({ ean: ean || '', name: name || '' })
-    });
-    if (!dupRes.duplicate) return 'no_duplicate';
-    const choice = await showEditDuplicateModal(dupRes.duplicate);
-    if (choice === 'delete') {
-      await api('/api/products/' + dupRes.duplicate.id, { method: 'DELETE' });
-      showToast(t('toast_duplicate_deleted'), 'success');
-      return 'resolved';
-    } else if (choice === 'merge') {
-      await api('/api/products/' + productId + '/merge', {
-        method: 'POST', body: JSON.stringify({ source_id: dupRes.duplicate.id })
-      });
-      showToast(t('toast_duplicate_merged'), 'success');
-      return 'resolved';
-    }
-    return false;
-  } catch (e) {
-    console.error('Duplicate check failed:', e);
-    showToast(t('toast_network_error'), 'error');
-    return false;
-  }
-}
-
 function _gatherNutrition(prefix) {
   const nutrition = {};
   _nutritionCompareFields.forEach((f) => {
@@ -83,16 +57,7 @@ export async function lookupOFF(prefix, productId) {
         updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
       }
-      let duplicateResolved = false;
-      if (prefix === 'ed' && productId) {
-        const dupResult = await _checkEditDuplicate(ean, data.product.product_name || '', productId);
-        if (!dupResult) {
-          closeOffPicker();
-          return;
-        }
-        if (dupResult === 'resolved') duplicateResolved = true;
-      }
-      await applyOffProduct(data.product, prefix, productId, duplicateResolved);
+      await applyOffProduct(data.product, prefix, productId, false);
       closeOffPicker();
     } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   } else if (name.length >= 2) {
@@ -319,14 +284,7 @@ export async function selectOffResult(idx, ctxSnapshot) {
   }
 
   try {
-    let duplicateResolved = false;
-    if (prefix === 'ed' && productId) {
-      const checkName = productToApply.product_name || productToApply.product_name_no || '';
-      const dupResult = await _checkEditDuplicate(resolvedEan, checkName, productId);
-      if (!dupResult) return;
-      if (dupResult === 'resolved') duplicateResolved = true;
-    }
-    await applyOffProduct(productToApply, prefix, productId, duplicateResolved);
+    await applyOffProduct(productToApply, prefix, productId, false);
   } finally {
     if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
   }
