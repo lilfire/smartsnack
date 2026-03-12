@@ -225,18 +225,12 @@ export async function registerProduct() {
           await _showDuplicateModal(dup);
           return;
         }
-        if (body.from_off) {
-          // Barcode+OFF — auto-overwrite for unsynced
+        const choice = await _showDuplicateModal(dup);
+        if (choice === 'cancel') { return; }
+        if (choice === 'overwrite') {
           result = await _submitProduct(body, 'overwrite');
         } else {
-          // Scenario 2: manual name entry — ask user
-          const choice = await _showDuplicateModal(dup);
-          if (choice === 'cancel') { return; }
-          if (choice === 'overwrite') {
-            result = await _submitProduct(body, 'overwrite');
-          } else {
-            result = await _submitProduct(body, 'allow_duplicate');
-          }
+          result = await _submitProduct(body, 'allow_duplicate');
         }
       } else {
         throw e;
