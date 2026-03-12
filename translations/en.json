@@ -647,5 +647,11 @@
     "bulk_report_no_new_data": "No new data",
     "bulk_report_no_results": "No results from OFF",
     "bulk_report_below_threshold": "Below threshold",
-    "bulk_report_fields": "Fields: {fields}"
+    "bulk_report_fields": "Fields: {fields}",
+    "duplicate_found_title": "Duplicate found",
+    "duplicate_found_synced": "A product with this {match_type} already exists and is synced with OFF: \"{name}\"",
+    "duplicate_found_unsynced": "A product with this {match_type} already exists: \"{name}\"",
+    "duplicate_action_merge": "Merge into existing",
+    "duplicate_action_create_new": "Create anyway",
+    "toast_product_merged": "\"{name}\" merged into existing product"
 }

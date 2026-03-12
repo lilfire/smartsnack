@@ -30,6 +30,68 @@ _TEXT_FIELD_SET = frozenset(_TEXT_FIELD_LIMITS.keys())
 _FLAG_FIELD_PREFIX = "flag:"
 
 
+def _find_duplicate(ean, name, exclude_id=None):
+    """Find an existing product matching by EAN or name.
+
+    Returns dict with id, name, ean, match_type, is_synced_with_off
+    or None if no duplicate found.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Check EAN match first (if ean is provided and non-empty)
+    if ean and ean.strip():
+        exclude_clause = "AND p.id != ?" if exclude_id else ""
+        params = [ean.strip()]
+        if exclude_id:
+            params.append(exclude_id)
+        row = cur.execute(
+            f"""SELECT p.id, p.name, p.ean,
+                   EXISTS(SELECT 1 FROM product_flags pf
+                          WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
+                   AS is_synced_with_off
+            FROM products p
+            WHERE p.ean = ? {exclude_clause}
+            LIMIT 1""",
+            params,
+        ).fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "ean": row["ean"],
+                "match_type": "ean",
+                "is_synced_with_off": bool(row["is_synced_with_off"]),
+            }
+
+    # Then check name match (case-insensitive)
+    if name and name.strip():
+        exclude_clause = "AND p.id != ?" if exclude_id else ""
+        params = [name.strip()]
+        if exclude_id:
+            params.append(exclude_id)
+        row = cur.execute(
+            f"""SELECT p.id, p.name, p.ean,
+                   EXISTS(SELECT 1 FROM product_flags pf
+                          WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
+                   AS is_synced_with_off
+            FROM products p
+            WHERE LOWER(p.name) = LOWER(?) {exclude_clause}
+            LIMIT 1""",
+            params,
+        ).fetchone()
+        if row:
+            return {
+                "id": row["id"],
+                "name": row["name"],
+                "ean": row["ean"],
+                "match_type": "name",
+                "is_synced_with_off": bool(row["is_synced_with_off"]),
+            }
+
+    return None
+
+
 def _get_product_flags(cur, product_ids: list) -> dict:
     """Batch-fetch flags for a list of product IDs. Returns {pid: [flag, ...]}."""
     if not product_ids:
@@ -558,7 +620,7 @@ def list_products(
     return results
 
 
-def add_product(data: dict) -> dict:
+def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     if not data.get("type", "").strip() or not data.get("name", "").strip():
         raise ValueError("type and name are required")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
@@ -576,17 +638,41 @@ def add_product(data: dict) -> dict:
     if not cat_exists:
         raise ValueError("Category does not exist")
     name = data["name"].strip()
-    if ean:
-        dup = cur.execute(
-            "SELECT id, name FROM products WHERE ean = ?", (ean,)
-        ).fetchone()
+
+    # Duplicate detection
+    if on_duplicate != "allow_duplicate":
+        dup = _find_duplicate(ean, name)
         if dup:
-            raise ValueError(f"A product with EAN {ean} already exists: {dup[1]}")
-    dup_name = cur.execute(
-        "SELECT id FROM products WHERE LOWER(name) = LOWER(?)", (name,)
-    ).fetchone()
-    if dup_name:
-        raise ValueError(f"A product with name '{name}' already exists")
+            if dup["is_synced_with_off"]:
+                if dup["match_type"] == "ean":
+                    raise ValueError(f"Product with this EAN already exists")
+                else:
+                    raise ValueError(f"Product with this name already exists (synced with OFF)")
+            # Duplicate found, not synced
+            if on_duplicate == "overwrite":
+                # Merge data into existing product
+                merge_data = dict(data)
+                merge_data.pop("on_duplicate", None)
+                from_off = merge_data.pop("from_off", False)
+                merge_data["from_off"] = from_off
+                update_product(dup["id"], merge_data)
+                return {"id": dup["id"], "merged": True, "message": "Product merged"}
+            # No on_duplicate set — return duplicate info for frontend
+            from_off = data.get("from_off", False)
+            actions = ["overwrite"]
+            if not from_off:
+                actions.append("create_new")
+            return {
+                "duplicate": {
+                    "id": dup["id"],
+                    "name": dup["name"],
+                    "ean": dup["ean"],
+                    "match_type": dup["match_type"],
+                    "is_synced_with_off": dup["is_synced_with_off"],
+                },
+                "actions": actions,
+            }
+
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
         (

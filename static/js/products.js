@@ -152,6 +152,54 @@ export function clearSearch() {
   document.getElementById('search-input').focus();
 }
 
+function _showDuplicateModal(duplicate) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+    const pEl = document.createElement('p');
+    const msgKey = duplicate.is_synced_with_off ? 'duplicate_found_synced' : 'duplicate_found_unsynced';
+    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
+    modal.appendChild(pEl);
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const mergeBtn = document.createElement('button');
+    mergeBtn.className = 'scan-modal-btn-register confirm-yes';
+    mergeBtn.textContent = t('duplicate_action_merge');
+    mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
+    actions.appendChild(mergeBtn);
+    const createBtn = document.createElement('button');
+    createBtn.className = 'scan-modal-btn-register';
+    createBtn.textContent = t('duplicate_action_create_new');
+    createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
+    actions.appendChild(createBtn);
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
+}
+
+async function _submitProduct(body, on_duplicate) {
+  const payload = Object.assign({}, body);
+  if (on_duplicate) payload.on_duplicate = on_duplicate;
+  return await api('/api/products', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export async function registerProduct() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast(t('toast_product_name_required'), 'error'); return; }
@@ -164,7 +212,29 @@ export async function registerProduct() {
     const body = collectFormFields('f');
     if (window._pendingOFFSync) { body.from_off = true; window._pendingOFFSync = null; }
     const registeredType = body.type;
-    const result = await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
+    let result;
+    try {
+      result = await _submitProduct(body);
+    } catch(e) {
+      if (e.status === 409 && e.data && e.data.duplicate) {
+        const dup = e.data.duplicate;
+        if (body.from_off) {
+          // Scenario 1: barcode+OFF — auto-overwrite for unsynced
+          result = await _submitProduct(body, 'overwrite');
+        } else {
+          // Scenario 2: manual name entry — ask user
+          const choice = await _showDuplicateModal(dup);
+          if (choice === 'cancel') { return; }
+          if (choice === 'overwrite') {
+            result = await _submitProduct(body, 'overwrite');
+          } else {
+            result = await _submitProduct(body, 'allow_duplicate');
+          }
+        }
+      } else {
+        throw e;
+      }
+    }
     const newProductId = result.id;
     if (window._pendingImage && newProductId) {
       try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
@@ -190,7 +260,8 @@ export async function registerProduct() {
     document.getElementById('f-price').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';
-    showToast(t('toast_product_added', { name: name }), 'success');
+    const toastKey = result.merged ? 'toast_product_merged' : 'toast_product_added';
+    showToast(t(toastKey, { name: name }), 'success');
 
     // Switch to search view filtered by the registered category
     state.currentFilter = [registeredType];

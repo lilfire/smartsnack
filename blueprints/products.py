@@ -24,10 +24,14 @@ def get_products():
 def add_product():
     try:
         data = _require_json()
-        result = product_service.add_product(data)
+        on_duplicate = data.pop("on_duplicate", None)
+        result = product_service.add_product(data, on_duplicate=on_duplicate)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(result), 201
+    if "duplicate" in result:
+        return jsonify(result), 409
+    status = 200 if result.get("merged") else 201
+    return jsonify(result), status
 
 
 @bp.route("/api/products/<int:pid>", methods=["PUT"])
