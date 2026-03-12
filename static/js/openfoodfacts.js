@@ -385,8 +385,8 @@ async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
       } else {
         const str = (typeof val === 'string' ? val : '').trim();
         if (!str) return;
-        // name and ean: only fill if empty
-        if ((key === 'name' || key === 'ean') && fieldEl.value.trim()) return;
+        // ean: only fill if empty (name is overwritten with OFF value)
+        if (key === 'ean' && fieldEl.value.trim()) return;
         fieldEl.value = str;
         filled.push(key);
         if (key === 'ingredients') updateEstimateBtn(prefix);
