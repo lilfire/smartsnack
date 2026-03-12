@@ -3,7 +3,7 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, sho
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan, showEditDuplicateModal, showMergeConflictModal } from './openfoodfacts.js';
+import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -59,28 +59,51 @@ export async function saveProduct(id) {
         method: 'POST', body: JSON.stringify({ ean: data.ean, name: data.name })
       });
       if (dupResult.duplicate) {
-        const choice = await showEditDuplicateModal(dupResult.duplicate);
-        if (choice === 'delete') {
-          await api('/api/products/' + dupResult.duplicate.id, { method: 'DELETE' });
-          showToast(t('toast_duplicate_deleted'), 'success');
-          mergedOrDeleted = true;
-          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
-        } else if (choice === 'merge') {
-          // Show conflict resolution for fields both products have values for
-          const conflictChoices = await showMergeConflictModal(data, dupResult.duplicate, offAppliedFields);
-          if (conflictChoices === null) return; // User cancelled conflict dialog
-          // Apply chosen values back into form data so the subsequent save uses them
-          for (const [field, val] of Object.entries(conflictChoices)) {
+        const aIsSynced = dupResult.a_is_synced_with_off;
+        const result = await showDuplicateMergeModal(data, dupResult.duplicate, aIsSynced);
+        if (result === null) return; // User cancelled
+        const { scenario, choices } = result;
+
+        if (scenario === 'b_synced') {
+          // B (duplicate) is synced with OFF — A will be deleted, merge into B
+          // If user fetched fresh OFF data, include OFF-provided fields so B gets updated
+          if (offAppliedFields) {
+            for (const f of offAppliedFields) {
+              if (data[f] != null && data[f] !== '') choices[f] = data[f];
+            }
+          }
+          await api('/api/products/' + dupResult.duplicate.id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          state.editingId = null;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== id);
+          loadData();
+          // Expand the surviving product (B)
+          setTimeout(() => { state.expandedId = dupResult.duplicate.id; }, 300);
+          return; // Don't save A — it's been deleted by the merge
+        } else if (scenario === 'a_synced') {
+          // A is synced, B is not — B will be deleted, merge into A
+          for (const [field, val] of Object.entries(choices)) {
             data[field] = val;
           }
           await api('/api/products/' + id + '/merge', {
-            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: conflictChoices })
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
           });
           showToast(t('toast_duplicate_merged'), 'success');
           mergedOrDeleted = true;
           state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
         } else {
-          return; // User cancelled — abort save
+          // Neither synced — merge into A (A becomes the merged product), delete B
+          for (const [field, val] of Object.entries(choices)) {
+            data[field] = val;
+          }
+          await api('/api/products/' + id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
         }
       }
     } catch (e) {

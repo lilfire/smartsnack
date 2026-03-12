@@ -781,8 +781,19 @@ def update_product(pid: int, data: dict) -> None:
 
 
 def check_duplicate_for_edit(pid: int, ean: str, name: str):
-    """Check if OFF data for an edited product matches a different existing product."""
-    return _find_duplicate(ean, name, exclude_id=pid)
+    """Check if OFF data for an edited product matches a different existing product.
+
+    Returns (duplicate_dict_or_None, a_is_synced_with_off).
+    """
+    dup = _find_duplicate(ean, name, exclude_id=pid)
+    conn = get_db()
+    a_synced = bool(
+        conn.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+    )
+    return dup, a_synced
 
 
 def merge_products(target_id: int, source_id: int, choices: dict | None = None) -> None:

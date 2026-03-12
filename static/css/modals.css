@@ -541,6 +541,88 @@
   -webkit-box-orient: vertical;
 }
 
+/* ── Taste score slider ─────────────────────────── */
+.conflict-taste-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.conflict-taste-labels {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.conflict-taste-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+
+.conflict-taste-name {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.conflict-taste-value {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.conflict-taste-current {
+  flex: 0 0 auto;
+  font-size: 22px;
+  font-weight: 800;
+  font-family: 'Space Mono', monospace;
+  color: #E8B84B;
+  padding: 0 8px;
+}
+
+.conflict-taste-range {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+  cursor: pointer;
+}
+
+.conflict-taste-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E8B84B, #C99A30);
+  border: 2px solid #1a1a1e;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.conflict-taste-range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #E8B84B, #C99A30);
+  border: 2px solid #1a1a1e;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
 .conflict-apply-btn {
   width: 100%;
   padding: 12px;
