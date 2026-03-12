@@ -72,6 +72,8 @@ export async function saveProduct(id) {
       }
     } catch (e) {
       console.error('Duplicate check failed:', e);
+      showToast(t('toast_network_error'), 'error');
+      return;
     }
   }
   try {
