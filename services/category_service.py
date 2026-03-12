@@ -6,17 +6,18 @@ from db import get_db
 from exceptions import ConflictError
 from helpers import _validate_category_name
 from translations import (
-    _category_label, _category_key, _get_current_lang,
-    _set_translation_key, _delete_translation_key,
+    _category_label,
+    _category_key,
+    _get_current_lang,
+    _set_translation_key,
+    _delete_translation_key,
 )
 
 
 def list_categories() -> list:
     """Return all categories with labels and product counts."""
     conn = get_db()
-    cats = conn.execute(
-        "SELECT name, emoji FROM categories ORDER BY name"
-    ).fetchall()
+    cats = conn.execute("SELECT name, emoji FROM categories ORDER BY name").fetchall()
     counts = {}
     for r in conn.execute(
         "SELECT type, COUNT(*) as count FROM products GROUP BY type"
@@ -24,7 +25,8 @@ def list_categories() -> list:
         counts[r["type"]] = r["count"]
     return [
         {
-            "name": c["name"], "emoji": c["emoji"],
+            "name": c["name"],
+            "emoji": c["emoji"],
             "label": _category_label(c["name"]),
             "count": counts.get(c["name"], 0),
         }
@@ -41,9 +43,7 @@ def add_category(name: str, label: str, emoji: str) -> None:
         raise ValueError(err)
     conn = get_db()
     try:
-        conn.execute(
-            "INSERT INTO categories (name, emoji) VALUES (?,?)", (name, emoji)
-        )
+        conn.execute("INSERT INTO categories (name, emoji) VALUES (?,?)", (name, emoji))
         conn.commit()
     except sqlite3.IntegrityError:
         raise ConflictError("Category already exists") from None
@@ -66,7 +66,7 @@ def update_category(name: str, label: str, emoji: str) -> None:
         _set_translation_key(_category_key(name), {lang: label})
 
 
-def delete_category(name: str, move_to: str = None) -> int:
+def delete_category(name: str, move_to: str | None = None) -> int:
     """Delete a category, optionally moving its products to another."""
     err = _validate_category_name(name)
     if err:
@@ -77,9 +77,7 @@ def delete_category(name: str, move_to: str = None) -> int:
     ).fetchone()[0]
     if count > 0:
         if not move_to:
-            raise ValueError(
-                f"Cannot delete: {count} products still use this category"
-            )
+            raise ValueError(f"Cannot delete: {count} products still use this category")
         if move_to == name:
             raise ValueError("Cannot move products to the same category")
         err = _validate_category_name(move_to)
@@ -90,9 +88,7 @@ def delete_category(name: str, move_to: str = None) -> int:
         ).fetchone()
         if not target:
             raise ValueError("Target category does not exist")
-        conn.execute(
-            "UPDATE products SET type = ? WHERE type = ?", (move_to, name)
-        )
+        conn.execute("UPDATE products SET type = ? WHERE type = ?", (move_to, name))
     conn.execute("DELETE FROM categories WHERE name = ?", (name,))
     conn.commit()
     # Translation cleanup is best-effort (file-based, not transactional)

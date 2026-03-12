@@ -539,7 +539,7 @@ export async function submitToOff(ean) {
   if (body.serving_size) body.serving_size = body.serving_size + ' g';
 
   try {
-    const res = await api('/api/off/add-product', {
+    await api('/api/off/add-product', {
       method: 'POST',
       body: JSON.stringify(body)
     });

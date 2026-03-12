@@ -42,6 +42,12 @@
   border-color: rgba(232, 184, 75, 0.3);
 }
 
+.edit-grid input:focus-visible,
+.edit-grid select:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+}
+
 .edit-grid input::-webkit-inner-spin-button,
 .edit-grid input::-webkit-outer-spin-button {
   -webkit-appearance: none;
@@ -90,6 +96,11 @@
 .btn-outline:hover {
   border-color: rgba(255, 255, 255, 0.25);
   color: #e8e6e3;
+}
+
+.btn-sm:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .btn-red {
@@ -185,6 +196,12 @@ label.field-label {
 .field-input:focus,
 .field-select:focus {
   border-color: rgba(232, 184, 75, 0.3);
+}
+
+.field-input:focus-visible,
+.field-select:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .field-input::-webkit-inner-spin-button,
@@ -314,18 +331,8 @@ label.field-label {
   }
 }
 
-.grid-2 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-}
-
+.grid-2,
+.grid-3,
 .grid-4 {
   display: grid;
   grid-template-columns: 1fr;

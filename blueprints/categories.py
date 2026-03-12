@@ -20,7 +20,7 @@ def add_category():
         data = _require_json()
         name = data.get("name", "").strip()
         label = data.get("label", "").strip()
-        emoji = data.get("emoji", "\U0001F4E6").strip()
+        emoji = data.get("emoji", "\U0001f4e6").strip()
         category_service.add_category(name, label, emoji)
     except ConflictError as e:
         return jsonify({"error": str(e)}), 409

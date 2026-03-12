@@ -56,9 +56,11 @@ import {
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
   showScanNotFoundModal, closeScanPicker, showScanOffConfirm, closeScanOffConfirm,
+  scanPickerSearch, scanPickerSelect, scanOffFetch,
 } from '../scanner.js';
-import { state } from '../state.js';
-import { showToast, switchView } from '../products.js';
+import { state, api, fetchProducts } from '../state.js';
+import { showToast, switchView, loadData } from '../products.js';
+import { rerender } from '../filters.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -203,5 +205,107 @@ describe('closeScanOffConfirm', () => {
     document.body.appendChild(bg);
     closeScanOffConfirm();
     expect(document.getElementById('scan-off-confirm-bg')).toBeNull();
+  });
+});
+
+describe('scanPickerSearch', () => {
+  beforeEach(() => {
+    // Set up picker modal DOM
+    const bg = document.createElement('div');
+    bg.id = 'scan-picker-bg';
+    const body = document.createElement('div');
+    body.id = 'scan-picker-body';
+    body.className = 'off-modal-body';
+    bg.appendChild(body);
+    const cnt = document.createElement('div');
+    cnt.id = 'scan-picker-count';
+    bg.appendChild(cnt);
+    const inp = document.createElement('input');
+    inp.id = 'scan-picker-input';
+    bg.appendChild(inp);
+    document.body.appendChild(bg);
+  });
+
+  it('shows error when query empty', async () => {
+    document.getElementById('scan-picker-input').value = '';
+    await scanPickerSearch();
+    expect(showToast).toHaveBeenCalledWith('toast_enter_product_name', 'error');
+  });
+
+  it('shows empty message when no results', async () => {
+    document.getElementById('scan-picker-input').value = 'nonexistent';
+    fetchProducts.mockResolvedValueOnce([]);
+    await scanPickerSearch();
+    const body = document.getElementById('scan-picker-body');
+    expect(body.innerHTML).toContain('off-modal-empty');
+  });
+
+  it('renders search results', async () => {
+    document.getElementById('scan-picker-input').value = 'Milk';
+    fetchProducts.mockResolvedValueOnce([
+      { id: 1, name: 'Milk', type: 'dairy', has_image: 0 },
+      { id: 2, name: 'Milk 2', type: 'dairy', has_image: 0 },
+    ]);
+    await scanPickerSearch();
+    const cnt = document.getElementById('scan-picker-count');
+    expect(cnt.textContent).toContain('2');
+  });
+
+  it('shows error on network failure', async () => {
+    document.getElementById('scan-picker-input').value = 'test';
+    fetchProducts.mockRejectedValueOnce(new Error('fail'));
+    await scanPickerSearch();
+    const body = document.getElementById('scan-picker-body');
+    expect(body.innerHTML).toContain('toast_network_error');
+  });
+});
+
+describe('scanPickerSelect', () => {
+  it('saves EAN to product', async () => {
+    // Trigger scanUpdateExisting to set _scanPickerEan
+    const modalBg = document.createElement('div');
+    modalBg.id = 'scan-modal-bg';
+    document.body.appendChild(modalBg);
+    scanUpdateExisting('1234567890123');
+
+    const prod = { id: 5, name: 'Test', ean: '' };
+    api.mockResolvedValueOnce(prod) // GET product
+       .mockResolvedValueOnce({}); // PUT product
+    await scanPickerSelect(5);
+    expect(api).toHaveBeenCalledWith('/api/products/5');
+    expect(api).toHaveBeenCalledWith('/api/products/5', expect.objectContaining({ method: 'PUT' }));
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+    // Should show OFF confirm modal
+    expect(document.getElementById('scan-off-confirm-bg')).not.toBeNull();
+  });
+
+  it('shows error when save fails', async () => {
+    const modalBg = document.createElement('div');
+    modalBg.id = 'scan-modal-bg';
+    document.body.appendChild(modalBg);
+    scanUpdateExisting('1234567890123');
+
+    api.mockResolvedValueOnce({ id: 5, name: 'Test' })
+       .mockRejectedValueOnce(new Error('fail'));
+    await scanPickerSelect(5);
+    expect(showToast).toHaveBeenCalledWith('toast_ean_save_error', 'error');
+  });
+});
+
+describe('scanOffFetch', () => {
+  it('sets up edit state and triggers OFF lookup', async () => {
+    state.currentView = 'search';
+    loadData.mockResolvedValueOnce();
+    await scanOffFetch('1234567890123', 42);
+    expect(state.expandedId).toBe(42);
+    expect(state.editingId).toBe(42);
+    expect(rerender).toHaveBeenCalled();
+  });
+
+  it('switches view if not on search', async () => {
+    state.currentView = 'settings';
+    loadData.mockResolvedValueOnce();
+    await scanOffFetch('1234567890123', 42);
+    expect(switchView).toHaveBeenCalledWith('search');
   });
 });

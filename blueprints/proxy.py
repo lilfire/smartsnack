@@ -1,8 +1,12 @@
 """Blueprint for proxying images and API requests from allowed external domains."""
 
+import logging
+
 from flask import Blueprint, request, jsonify, Response
 
 from services import proxy_service
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("proxy", __name__)
 
@@ -18,9 +22,14 @@ def proxy_image():
         return jsonify({"error": str(e)}), 403
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
-    return Response(data, mimetype=content_type, headers={
-        "Cache-Control": "public, max-age=86400",
-        "Access-Control-Allow-Origin": "*"})
+    return Response(
+        data,
+        mimetype=content_type,
+        headers={
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )
 
 
 @bp.route("/api/off/search", methods=["GET", "POST"])
@@ -51,6 +60,7 @@ def off_search():
     except RuntimeError as e:
         return jsonify({"error": str(e)}), 502
     except Exception:
+        logger.exception("OFF search failed")
         return jsonify({"error": "Search failed"}), 500
 
 

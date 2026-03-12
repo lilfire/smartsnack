@@ -22,11 +22,14 @@ def refresh_off():
 @bp.route("/api/bulk/refresh-off/start", methods=["POST"])
 def refresh_off_start():
     data = request.get_json(silent=True) or {}
-    options = {
-        "search_missing": bool(data.get("search_missing", False)),
-        "min_certainty": min(100, max(0, int(data.get("min_certainty", 50)))),
-        "min_completeness": min(100, max(0, int(data.get("min_completeness", 50)))),
-    }
+    try:
+        options = {
+            "search_missing": bool(data.get("search_missing", False)),
+            "min_certainty": min(100, max(0, int(data.get("min_certainty", 50)))),
+            "min_completeness": min(100, max(0, int(data.get("min_completeness", 50)))),
+        }
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid numeric parameter"}), 400
     started = bulk_service.start_refresh_from_off(options)
     if not started:
         return jsonify({"error": "already_running"}), 409
@@ -48,7 +51,7 @@ def refresh_off_stream():
             if snapshot != last_sent:
                 yield f"data: {snapshot}\n\n"
                 last_sent = snapshot
-            if status.get("done") or (not status.get("running") and not status.get("done")):
+            if not status.get("running"):
                 break
             time.sleep(0.3)
 

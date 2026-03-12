@@ -2,18 +2,31 @@
 
 import base64
 import io
-import json
 import logging
 import re
 import sqlite3
 import threading
 import time
 
-from config import DB_PATH
+from config import DB_PATH, _VALID_COLUMNS
 from db import get_db
-from services import proxy_service, protein_quality_service, image_service
+from services import proxy_service, protein_quality_service
 
 logger = logging.getLogger(__name__)
+
+
+def _build_update_sql(field_updates: dict) -> tuple[str, list]:
+    """Build a safe SET clause for UPDATE, validating all field names.
+
+    Raises ValueError if any field name is not in the column whitelist.
+    Returns (set_clause_string, ordered_values_list).
+    """
+    for f in field_updates:
+        if f not in _VALID_COLUMNS:
+            raise ValueError(f"Invalid column name in update: {f!r}")
+    set_clauses = [f"{f} = ?" for f in field_updates]
+    return ", ".join(set_clauses), list(field_updates.values())
+
 
 # ── In-memory refresh job state ──────────────────────
 _refresh_job = {
@@ -62,7 +75,12 @@ def _should_update(off_val, local_val):
         if not off_val.strip():
             return False
     elif isinstance(off_val, (int, float)):
-        if off_val == 0 and local_val is not None and local_val != "" and local_val != 0:
+        if (
+            off_val == 0
+            and local_val is not None
+            and local_val != ""
+            and local_val != 0
+        ):
             return False
     return True
 
@@ -109,17 +127,17 @@ def _map_off_product(product, local_row):
     if not stores and product.get("stores_tags"):
         tags = product["stores_tags"]
         if isinstance(tags, list) and tags:
-            stores = ", ".join(
-                t.replace("-", " ").title() for t in tags
-            )
+            stores = ", ".join(t.replace("-", " ").title() for t in tags)
     if _should_update(stores, local_row.get("stores")):
         updates["stores"] = stores.strip()
 
     # Ingredients
-    ing = (product.get("ingredients_text_no")
-           or product.get("ingredients_text_en")
-           or product.get("ingredients_text")
-           or "")
+    ing = (
+        product.get("ingredients_text_no")
+        or product.get("ingredients_text_en")
+        or product.get("ingredients_text")
+        or ""
+    )
     if _should_update(ing, local_row.get("ingredients")):
         updates["ingredients"] = ing.strip()
 
@@ -149,10 +167,12 @@ def _map_off_product(product, local_row):
 
 def _fetch_off_image(product):
     """Fetch and resize product image from OFF. Returns base64 data URI or None."""
-    img_url = (product.get("image_front_url")
-               or product.get("image_url")
-               or product.get("image_front_small_url")
-               or "")
+    img_url = (
+        product.get("image_front_url")
+        or product.get("image_url")
+        or product.get("image_front_small_url")
+        or ""
+    )
     if not img_url:
         return None
     try:
@@ -160,6 +180,7 @@ def _fetch_off_image(product):
         # Resize to max 400px using PIL if available
         try:
             from PIL import Image
+
             img = Image.open(io.BytesIO(img_data))
             max_dim = 400
             if img.width > max_dim or img.height > max_dim:
@@ -224,11 +245,10 @@ def refresh_from_off():
 
             # Update product fields
             if field_updates:
-                set_clauses = [f"{f} = ?" for f in field_updates]
-                vals = list(field_updates.values()) + [pid]
+                set_clause, vals = _build_update_sql(field_updates)
                 conn.execute(
-                    f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                    vals,
+                    f"UPDATE products SET {set_clause} WHERE id = ?",
+                    vals + [pid],
                 )
 
             # Update image separately
@@ -273,8 +293,16 @@ def start_refresh_from_off(options=None):
         if _refresh_job["running"]:
             return False
         _refresh_job.update(
-            running=True, current=0, total=0, name="", ean="",
-            status="", updated=0, skipped=0, errors=0, done=False,
+            running=True,
+            current=0,
+            total=0,
+            name="",
+            ean="",
+            status="",
+            updated=0,
+            skipped=0,
+            errors=0,
+            done=False,
         )
         _refresh_job.pop("report", None)
     t = threading.Thread(target=_run_refresh, args=(options or {},), daemon=True)
@@ -312,14 +340,24 @@ def _run_refresh(options=None):
 
             with _refresh_lock:
                 _refresh_job.update(
-                    current=i + 1, ean=ean, name=name, status="fetching",
+                    current=i + 1,
+                    ean=ean,
+                    name=name,
+                    status="fetching",
                 )
 
             try:
                 data = proxy_service.off_product(ean)
                 if not data.get("product"):
                     skipped += 1
-                    report.append({"name": name, "ean": ean, "status": "skipped", "reason": "not_found"})
+                    report.append(
+                        {
+                            "name": name,
+                            "ean": ean,
+                            "status": "skipped",
+                            "reason": "not_found",
+                        }
+                    )
                     with _refresh_lock:
                         _refresh_job.update(status="skipped", skipped=skipped)
                     time.sleep(0.5)
@@ -332,18 +370,24 @@ def _run_refresh(options=None):
 
                 if not field_updates and not image_uri:
                     skipped += 1
-                    report.append({"name": name, "ean": ean, "status": "skipped", "reason": "no_new_data"})
+                    report.append(
+                        {
+                            "name": name,
+                            "ean": ean,
+                            "status": "skipped",
+                            "reason": "no_new_data",
+                        }
+                    )
                     with _refresh_lock:
                         _refresh_job.update(status="skipped", skipped=skipped)
                     time.sleep(0.5)
                     continue
 
                 if field_updates:
-                    set_clauses = [f"{f} = ?" for f in field_updates]
-                    vals = list(field_updates.values()) + [pid]
+                    set_clause, vals = _build_update_sql(field_updates)
                     conn.execute(
-                        f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                        vals,
+                        f"UPDATE products SET {set_clause} WHERE id = ?",
+                        vals + [pid],
                     )
 
                 if image_uri:
@@ -358,7 +402,14 @@ def _run_refresh(options=None):
                 updated_fields = list(field_updates.keys())
                 if image_uri:
                     updated_fields.append("image")
-                report.append({"name": name, "ean": ean, "status": "updated", "fields": updated_fields})
+                report.append(
+                    {
+                        "name": name,
+                        "ean": ean,
+                        "status": "updated",
+                        "fields": updated_fields,
+                    }
+                )
 
                 with _refresh_lock:
                     _refresh_job.update(status="updated", updated=updated)
@@ -366,7 +417,9 @@ def _run_refresh(options=None):
             except Exception as e:
                 logger.error("Error refreshing product %s (EAN %s): %s", pid, ean, e)
                 errors += 1
-                report.append({"name": name, "ean": ean, "status": "error", "reason": str(e)})
+                report.append(
+                    {"name": name, "ean": ean, "status": "error", "reason": str(e)}
+                )
                 with _refresh_lock:
                     _refresh_job.update(status="error", errors=errors)
 
@@ -395,14 +448,24 @@ def _run_refresh(options=None):
 
                 with _refresh_lock:
                     _refresh_job.update(
-                        current=total + i + 1, ean="", name=name,
+                        current=total + i + 1,
+                        ean="",
+                        name=name,
                         status="searching",
                     )
 
                 try:
                     nutrition = {}
-                    for field in ("kcal", "fat", "saturated_fat", "carbs",
-                                  "sugar", "protein", "fiber", "salt"):
+                    for field in (
+                        "kcal",
+                        "fat",
+                        "saturated_fat",
+                        "carbs",
+                        "sugar",
+                        "protein",
+                        "fiber",
+                        "salt",
+                    ):
                         val = row[field]
                         if val is not None:
                             nutrition[field] = float(val)
@@ -414,6 +477,7 @@ def _run_refresh(options=None):
 
                     best = None
                     best_comp = -1
+                    best_cert = -1
                     for p in products:
                         cert = p.get("certainty", 0)
                         comp = float(p.get("completeness") or 0) * 100
@@ -432,16 +496,27 @@ def _run_refresh(options=None):
                     if not best:
                         skipped += 1
                         if not products:
-                            report.append({"name": name, "ean": "", "status": "skipped", "reason": "no_results"})
+                            report.append(
+                                {
+                                    "name": name,
+                                    "ean": "",
+                                    "status": "skipped",
+                                    "reason": "no_results",
+                                }
+                            )
                         else:
                             top = products[0]
                             top_cert = top.get("certainty", 0)
                             top_comp = round(float(top.get("completeness") or 0) * 100)
-                            report.append({
-                                "name": name, "ean": "", "status": "skipped",
-                                "reason": "below_threshold",
-                                "detail": f"best: {top_cert}% cert, {top_comp}% comp",
-                            })
+                            report.append(
+                                {
+                                    "name": name,
+                                    "ean": "",
+                                    "status": "skipped",
+                                    "reason": "below_threshold",
+                                    "detail": f"best: {top_cert}% cert, {top_comp}% comp",
+                                }
+                            )
                         with _refresh_lock:
                             _refresh_job.update(status="skipped", skipped=skipped)
                         time.sleep(1.0)
@@ -458,18 +533,24 @@ def _run_refresh(options=None):
 
                     if not field_updates and not image_uri:
                         skipped += 1
-                        report.append({"name": name, "ean": "", "status": "skipped", "reason": "no_new_data"})
+                        report.append(
+                            {
+                                "name": name,
+                                "ean": "",
+                                "status": "skipped",
+                                "reason": "no_new_data",
+                            }
+                        )
                         with _refresh_lock:
                             _refresh_job.update(status="skipped", skipped=skipped)
                         time.sleep(1.0)
                         continue
 
                     if field_updates:
-                        set_clauses = [f"{f} = ?" for f in field_updates]
-                        vals = list(field_updates.values()) + [pid]
+                        set_clause, vals = _build_update_sql(field_updates)
                         conn.execute(
-                            f"UPDATE products SET {', '.join(set_clauses)} WHERE id = ?",
-                            vals,
+                            f"UPDATE products SET {set_clause} WHERE id = ?",
+                            vals + [pid],
                         )
 
                     if image_uri:
@@ -484,14 +565,23 @@ def _run_refresh(options=None):
                     updated_fields = list(field_updates.keys())
                     if image_uri:
                         updated_fields.append("image")
-                    report.append({"name": name, "ean": matched_ean or "", "status": "updated", "fields": updated_fields})
+                    report.append(
+                        {
+                            "name": name,
+                            "ean": matched_ean or "",
+                            "status": "updated",
+                            "fields": updated_fields,
+                        }
+                    )
                     with _refresh_lock:
                         _refresh_job.update(status="updated", updated=updated)
 
                 except Exception as e:
                     logger.error("Error searching product %s (%s): %s", pid, name, e)
                     errors += 1
-                    report.append({"name": name, "ean": "", "status": "error", "reason": str(e)})
+                    report.append(
+                        {"name": name, "ean": "", "status": "error", "reason": str(e)}
+                    )
                     with _refresh_lock:
                         _refresh_job.update(status="error", errors=errors)
 
@@ -499,8 +589,11 @@ def _run_refresh(options=None):
 
         with _refresh_lock:
             _refresh_job.update(
-                done=True, running=False,
-                updated=updated, skipped=skipped, errors=errors,
+                done=True,
+                running=False,
+                updated=updated,
+                skipped=skipped,
+                errors=errors,
                 report=report,
             )
     except Exception as e:

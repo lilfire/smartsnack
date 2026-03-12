@@ -41,6 +41,7 @@ vi.mock('../filters.js', () => ({
 
 vi.mock('../render.js', () => ({
   renderResults: vi.fn(),
+  getFlagConfig: vi.fn(() => ({})),
 }));
 
 vi.mock('../openfoodfacts.js', () => ({
@@ -48,7 +49,7 @@ vi.mock('../openfoodfacts.js', () => ({
   validateOffBtn: vi.fn(),
 }));
 
-import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct } from '../products.js';
+import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
 import { rerender } from '../filters.js';
 import { renderResults } from '../render.js';
@@ -325,6 +326,7 @@ describe('registerProduct', () => {
       { tag: 'input', id: 'f-brand', value: '' },
       { tag: 'input', id: 'f-stores', value: '' },
       { tag: 'textarea', id: 'f-ingredients', value: '' },
+      { tag: 'input', id: 'f-taste_note', value: '' },
       { tag: 'input', id: 'f-smak', value: '3' },
       { tag: 'input', id: 'f-kcal', value: '' },
       { tag: 'input', id: 'f-energy_kj', value: '' },
@@ -391,5 +393,37 @@ describe('registerProduct', () => {
     });
     await registerProduct();
     expect(btn.disabled).toBe(false);
+  });
+});
+
+describe('loadData', () => {
+  beforeEach(() => {
+    // Ensure DOM elements required by loadData are present
+    if (!document.getElementById('stats-line')) {
+      const statsLine = document.createElement('div');
+      statsLine.id = 'stats-line';
+      document.body.appendChild(statsLine);
+    }
+    // Make cachedStats available after fetchStats resolves
+    fetchStats.mockResolvedValue({ total: 10, types: 3 });
+    state.cachedStats = { total: 10, types: 3 };
+  });
+
+  it('calls fetchStats, buildFilters, fetchProducts, and renderResults in sequence', async () => {
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy', total_score: 80, has_image: 0 }]);
+    await loadData();
+    expect(fetchStats).toHaveBeenCalled();
+    const { buildFilters } = await import('../filters.js');
+    expect(buildFilters).toHaveBeenCalled();
+    expect(fetchProducts).toHaveBeenCalled();
+    expect(renderResults).toHaveBeenCalled();
+  });
+
+  it('shows error toast when fetchStats fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchStats.mockRejectedValueOnce(new Error('network fail'));
+    await loadData();
+    expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
+    console.error.mockRestore();
   });
 });

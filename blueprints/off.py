@@ -13,7 +13,9 @@ def add_product_to_off():
     try:
         data = _require_json()
         result = off_service.add_product_to_off(data)
-        return jsonify({"ok": True, "status_verbose": result.get("status_verbose", "fields saved")})
+        return jsonify(
+            {"ok": True, "status_verbose": result.get("status_verbose", "fields saved")}
+        )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except RuntimeError as e:

@@ -52,7 +52,9 @@ def run_migrations(cur):
             applied_at TEXT NOT NULL DEFAULT (datetime('now'))
         )
     """)
-    applied = {r[0] for r in cur.execute("SELECT name FROM schema_migrations").fetchall()}
+    applied = {
+        r[0] for r in cur.execute("SELECT name FROM schema_migrations").fetchall()
+    }
     for name, statements in MIGRATIONS:
         if name in applied:
             continue

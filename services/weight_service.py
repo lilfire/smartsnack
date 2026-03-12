@@ -11,24 +11,48 @@ _VALID_FORMULAS = frozenset({"minmax", "direct"})
 
 def get_weights() -> list:
     conn = get_db()
-    rows = conn.execute("SELECT field, enabled, weight, direction, formula, formula_min, formula_max FROM score_weights ORDER BY field").fetchall()
-    db_map = {r["field"]: {"enabled": bool(r["enabled"]), "weight": r["weight"], "direction": r["direction"], "formula": r["formula"], "formula_min": r["formula_min"], "formula_max": r["formula_max"]} for r in rows}
+    rows = conn.execute(
+        "SELECT field, enabled, weight, direction, formula, formula_min, formula_max FROM score_weights ORDER BY field"
+    ).fetchall()
+    db_map = {
+        r["field"]: {
+            "enabled": bool(r["enabled"]),
+            "weight": r["weight"],
+            "direction": r["direction"],
+            "formula": r["formula"],
+            "formula_min": r["formula_min"],
+            "formula_max": r["formula_max"],
+        }
+        for r in rows
+    }
     lang = _get_current_lang()
     result = []
     for sc in SCORE_CONFIG:
         f = sc["field"]
-        w = db_map.get(f, {"enabled": False, "weight": 0, "direction": sc["direction"], "formula": sc["formula"], "formula_min": sc["formula_min"], "formula_max": sc["formula_max"]})
-        result.append({
-            "field": f,
-            "label": _t(sc["label_key"], lang),
-            "desc": _t(sc["desc_key"], lang),
-            "enabled": w["enabled"],
-            "weight": w["weight"],
-            "direction": w["direction"],
-            "formula": w["formula"],
-            "formula_min": w["formula_min"],
-            "formula_max": w["formula_max"],
-        })
+        w = db_map.get(
+            f,
+            {
+                "enabled": False,
+                "weight": 0,
+                "direction": sc["direction"],
+                "formula": sc["formula"],
+                "formula_min": sc["formula_min"],
+                "formula_max": sc["formula_max"],
+            },
+        )
+        result.append(
+            {
+                "field": f,
+                "label": _t(str(sc["label_key"]), lang),
+                "desc": _t(str(sc["desc_key"]), lang),
+                "enabled": w["enabled"],
+                "weight": w["weight"],
+                "direction": w["direction"],
+                "formula": w["formula"],
+                "formula_min": w["formula_min"],
+                "formula_max": w["formula_max"],
+            }
+        )
     return result
 
 
@@ -55,6 +79,6 @@ def update_weights(data: list) -> None:
         conn.execute(
             "INSERT INTO score_weights (field, enabled, weight, direction, formula, formula_min, formula_max) VALUES (?,?,?,?,?,?,?) "
             "ON CONFLICT(field) DO UPDATE SET enabled=excluded.enabled, weight=excluded.weight, direction=excluded.direction, formula=excluded.formula, formula_min=excluded.formula_min, formula_max=excluded.formula_max",
-            (f, enabled, weight, direction, formula, formula_min, formula_max)
+            (f, enabled, weight, direction, formula, formula_min, formula_max),
         )
     conn.commit()

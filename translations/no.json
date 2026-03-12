@@ -558,6 +558,12 @@
     "scan_searching": "Søker etter \"{query}\"...",
     "scan_fetch_data": "Ja, hent data",
     "scan_no_skip": "Nei, hopp over",
+    "scan_hold_barcode_hint": "Hold strekkoden foran kameraet",
+    "scan_find_product_title": "Finn produkt",
+    "scan_barcode_on_product_hint": "Skann strekkoden på produktet",
+    "scan_no_ean": "Ingen EAN",
+    "scan_fetch_off_title": "Hente data fra OpenFoodFacts?",
+    "scan_fetch_off_description": "Vi kan hente næringsinfo og bilde fra OpenFoodFacts for denne strekkoden.",
     "adv_filter_toggle": "Avansert filter",
     "adv_add_filter": "+ Legg til filter",
     "adv_remove_filter": "Fjern",
@@ -641,5 +647,9 @@
     "bulk_report_no_new_data": "Ingen nye data",
     "bulk_report_no_results": "Ingen resultater fra OFF",
     "bulk_report_below_threshold": "Under terskel",
-    "bulk_report_fields": "Felt: {fields}"
+    "bulk_report_fields": "Felt: {fields}",
+    "category_drinks": "Drikker",
+    "category_snacks": "Updated Snacks",
+    "pq_new_test_source_label": "New Test",
+    "pq_new_test_source_keywords": "new, test"
 }

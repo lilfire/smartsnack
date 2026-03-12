@@ -36,7 +36,12 @@ def get_off_credentials():
     if denied:
         return denied
     creds = settings_service.get_off_credentials()
-    return jsonify({"off_user_id": creds["off_user_id"], "has_password": bool(creds["off_password"])})
+    return jsonify(
+        {
+            "off_user_id": creds["off_user_id"],
+            "has_password": bool(creds["off_password"]),
+        }
+    )
 
 
 @bp.route("/api/settings/off-credentials", methods=["PUT"])

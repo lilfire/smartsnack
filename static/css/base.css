@@ -41,3 +41,13 @@ body {
 .accent {
   color: #E8B84B;
 }
+
+.version-badge {
+  position: fixed;
+  bottom: 4px;
+  right: 8px;
+  font-size: 11px;
+  color: #999;
+  pointer-events: none;
+  z-index: 9999;
+}

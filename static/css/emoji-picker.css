@@ -13,11 +13,15 @@
   cursor: pointer;
   outline: none;
   font-family: 'DM Sans', sans-serif;
-  box-sizing: border-box;
 }
 
 .emoji-picker-trigger:hover {
   border-color: rgba(232, 184, 75, 0.3);
+}
+
+.emoji-picker-trigger:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .emoji-picker-popup {
@@ -31,7 +35,6 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-sizing: border-box;
 }
 
 .emoji-picker-search {
@@ -52,6 +55,11 @@
 
 .emoji-picker-search:focus {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.emoji-picker-search:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .emoji-picker-grid {

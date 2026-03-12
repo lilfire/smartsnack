@@ -27,6 +27,12 @@ uploads/
 .DS_Store
 Thumbs.db
 
+# Coverage
+.coverage
+htmlcov/
+coverage/
+**/coverage/
+
 # Environment
 .env
 *.log

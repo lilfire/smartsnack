@@ -68,7 +68,6 @@
   border-color: rgba(232, 184, 75, 0.15);
 }
 
-
 .weight-header {
   display: flex;
   justify-content: space-between;
@@ -87,7 +86,6 @@
   flex: 1;
   min-width: 0;
 }
-
 
 .weight-val {
   font-size: 16px;
@@ -148,6 +146,11 @@
 
 .wc-select:focus {
   border-color: rgba(232, 184, 75, 0.3);
+}
+
+.wc-select:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .wc-select option {
@@ -284,7 +287,6 @@
   font-size: 18px;
 }
 
-
 /* ── Settings: Categories ───────────────────────── */
 .cat-item {
   display: flex;
@@ -329,6 +331,11 @@
 
 .cat-item-label-input:focus {
   border-color: rgba(232, 184, 75, 0.3);
+}
+
+.cat-item-label-input:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
 }
 
 .cat-item-key {
@@ -391,8 +398,23 @@
   margin: 24px 0;
 }
 
+.settings-divider {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin: 16px 0 12px;
+}
+
+.restore-warning {
+  font-size: 11px;
+  color: rgba(255, 68, 68, 0.6);
+  margin-top: 4px;
+  display: inline-block;
+}
+
 /* ── Settings: Protein Quality ────────────────────── */
-.pq-list {  
+.pq-list {
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -452,6 +474,7 @@
 .pq-inline-num::-webkit-inner-spin-button,
 .pq-inline-num::-webkit-outer-spin-button {
   -webkit-appearance: none;
+  margin: 0;
 }
 
 .pq-inline-num:hover {
@@ -475,7 +498,6 @@
   outline: none;
   margin-top: 4px;
   transition: border-color 0.2s;
-  box-sizing: border-box;
 }
 
 .pq-kw-input:hover {
@@ -594,5 +616,6 @@
   letter-spacing: 0.1em;
   font-family: 'Space Mono', monospace;
   padding-top: 8px;
+  margin: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }

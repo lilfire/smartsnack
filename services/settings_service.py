@@ -36,16 +36,18 @@ def _encrypt(plaintext: str) -> str:
 def _decrypt(stored: str) -> str:
     """Decrypt a stored value. Handles both Fernet and legacy XOR formats."""
     if stored.startswith(_FERNET_PREFIX):
-        token = stored[len(_FERNET_PREFIX):].encode("ascii")
+        token = stored[len(_FERNET_PREFIX) :].encode("ascii")
         return _get_fernet().decrypt(token).decode("utf-8")
     # Legacy XOR fallback for existing data -- migrate to Fernet on read
     try:
         key = os.environ.get("SMARTSNACK_SECRET_KEY", "")
+        if not key:
+            logger.warning("Cannot decrypt legacy value: SMARTSNACK_SECRET_KEY not set")
+            return stored
         key_bytes = key.encode("utf-8")[:32].ljust(32, b"\0")
         encrypted = base64.b64decode(stored)
         decrypted = bytes(
-            b ^ key_bytes[i % len(key_bytes)]
-            for i, b in enumerate(encrypted)
+            b ^ key_bytes[i % len(key_bytes)] for i, b in enumerate(encrypted)
         )
         plaintext = decrypted.decode("utf-8")
         # Re-encrypt with Fernet so legacy XOR encoding is replaced
@@ -82,8 +84,8 @@ def set_language(lang: str) -> str:
         )
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO user_settings (key, value) "
-        "VALUES ('language', ?)", (lang,),
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('language', ?)",
+        (lang,),
     )
     conn.commit()
     return lang
@@ -113,12 +115,12 @@ def get_off_credentials() -> dict:
 def set_off_credentials(user_id: str, password: str) -> None:
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO user_settings (key, value) "
-        "VALUES ('off_user_id', ?)", (user_id.strip(),),
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('off_user_id', ?)",
+        (user_id.strip(),),
     )
     encrypted_password = _encrypt(password.strip())
     conn.execute(
-        "INSERT OR REPLACE INTO user_settings (key, value) "
-        "VALUES ('off_password', ?)", (encrypted_password,),
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('off_password', ?)",
+        (encrypted_password,),
     )
     conn.commit()

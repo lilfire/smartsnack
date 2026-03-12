@@ -4,6 +4,34 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-03-12
+
+### Added
+
+- Playwright end-to-end tests using pytest-playwright with auto-install of Chromium browser
+- @vitest/coverage-v8 for JavaScript test coverage reporting
+- 6 missing scanner translation keys to all languages
+- Coverage output directories to .gitignore
+
+### Changed
+
+- Full-app code review: bug fixes, security hardening, accessibility improvements, and increased test coverage
+- Python code review: fixed issues and added 202 new tests (78% to 89% coverage)
+- JavaScript code review: security fixes, strict equality enforcement, and test improvements
+- JavaScript test coverage improved from 56.6% to 76.2%
+- All Python modules brought to 75%+ test coverage
+- HTML templates cleaned up: normalized indentation, improved accessibility, and better structure
+- CSS cleanup: removed duplicates, redundancies, and normalized formatting
+- Extracted inline style from version badge in base.html to CSS class
+
+### Fixed
+
+- Subtitle flashing "Loading" text on language change
+- Missing loadFlagConfig mock in app.test.js
+- Stderr warnings in i18n and settings tests by mocking render.js
+- Test pollution: use translations_dir fixture in flag/PQ tests
+- 3 failing JS tests
+
 ## [0.5.0] - 2026-03-11
 
 ### Added

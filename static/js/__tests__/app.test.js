@@ -40,6 +40,7 @@ vi.mock('../images.js', () => ({
 
 vi.mock('../render.js', () => ({
   renderResults: vi.fn(),
+  loadFlagConfig: vi.fn().mockResolvedValue(),
 }));
 
 vi.mock('../products.js', () => ({
@@ -73,6 +74,9 @@ vi.mock('../settings.js', () => ({
   updateCategoryLabel: vi.fn(),
   addCategory: vi.fn(),
   deleteCategory: vi.fn(),
+  addFlag: vi.fn(),
+  deleteFlag: vi.fn(),
+  updateFlagLabel: vi.fn(),
   autosavePq: vi.fn(),
   deletePq: vi.fn(),
   addPq: vi.fn(),
@@ -81,6 +85,8 @@ vi.mock('../settings.js', () => ({
   handleImport: vi.fn(),
   initRestoreDragDrop: vi.fn(),
   saveOffCredentials: vi.fn(),
+  refreshAllFromOff: vi.fn(),
+  estimateAllPq: vi.fn(),
 }));
 
 vi.mock('../scanner.js', () => ({

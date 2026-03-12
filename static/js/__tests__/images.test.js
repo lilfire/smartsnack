@@ -26,7 +26,7 @@ vi.mock('../filters.js', () => ({
   rerender: vi.fn(),
 }));
 
-import { loadProductImage, resizeImage, removeProductImage } from '../images.js';
+import { loadProductImage, resizeImage, removeProductImage, triggerImageUpload } from '../images.js';
 import { state, api, showConfirmModal, showToast } from '../state.js';
 import { rerender } from '../filters.js';
 
@@ -139,6 +139,152 @@ describe('resizeImage', () => {
     };
     const result = await resizeImage(uri, 400);
     expect(result).toBe(uri);
+    global.Image = origImage;
+  });
+});
+
+describe('triggerImageUpload', () => {
+  it('shows error for files larger than 10MB', async () => {
+    const clickSpy = vi.fn();
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') {
+        const inp = { type: '', accept: '', click: clickSpy, files: [], onchange: null };
+        // Simulate change after click
+        clickSpy.mockImplementation(() => {
+          inp.files = [{ size: 11 * 1024 * 1024, name: 'huge.jpg' }];
+          inp.onchange();
+        });
+        return inp;
+      }
+      return document.createElement.wrappedMethod
+        ? document.createElement.wrappedMethod.call(document, tag)
+        : Object.getPrototypeOf(document).createElement.call(document, tag);
+    });
+
+    triggerImageUpload(1);
+    expect(clickSpy).toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith('toast_image_too_large', 'error');
+    document.createElement.mockRestore?.();
+  });
+
+  it('uploads and saves resized image', async () => {
+    api.mockResolvedValueOnce({});
+    state.cachedResults = [{ id: 1, has_image: 0 }];
+
+    let capturedOnchange;
+    const origFileReader = global.FileReader;
+    const origImage = global.Image;
+
+    // Mock Image so resizeImage resolves immediately (small image path)
+    global.Image = class {
+      set src(val) {
+        this.width = 100;
+        this.height = 100;
+        Promise.resolve().then(() => this.onload && this.onload());
+      }
+    };
+
+    global.FileReader = class {
+      readAsDataURL() {
+        this.onload({ target: { result: 'data:image/png;base64,original' } });
+      }
+    };
+
+    const origCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') {
+        const inp = {
+          type: '', accept: '',
+          click: vi.fn(),
+          files: [{ size: 1024, name: 'photo.jpg' }],
+          set onchange(fn) { capturedOnchange = fn; },
+          get onchange() { return capturedOnchange; },
+        };
+        return inp;
+      }
+      return origCreate(tag);
+    });
+
+    triggerImageUpload(1);
+    await capturedOnchange();
+    // Let Image.onload microtask + resizeImage promise settle
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(api).toHaveBeenCalledWith('/api/products/1/image', expect.objectContaining({ method: 'PUT' }));
+    expect(showToast).toHaveBeenCalledWith('toast_image_saved', 'success');
+    expect(state.cachedResults[0].has_image).toBe(1);
+
+    document.createElement.mockRestore?.();
+    global.FileReader = origFileReader;
+    global.Image = origImage;
+  });
+
+  it('does nothing when no file selected', async () => {
+    let capturedOnchange;
+    const origCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') {
+        const inp = {
+          type: '', accept: '',
+          click: vi.fn(),
+          files: [],
+          set onchange(fn) { capturedOnchange = fn; },
+          get onchange() { return capturedOnchange; },
+        };
+        return inp;
+      }
+      return origCreate(tag);
+    });
+
+    triggerImageUpload(1);
+    await capturedOnchange();
+    expect(api).not.toHaveBeenCalled();
+    document.createElement.mockRestore?.();
+  });
+
+  it('shows error on upload failure', async () => {
+    api.mockRejectedValueOnce(new Error('fail'));
+
+    let capturedOnchange;
+    const origFileReader = global.FileReader;
+    const origImage = global.Image;
+
+    global.Image = class {
+      set src(val) {
+        this.width = 100;
+        this.height = 100;
+        Promise.resolve().then(() => this.onload && this.onload());
+      }
+    };
+
+    global.FileReader = class {
+      readAsDataURL() {
+        this.onload({ target: { result: 'data:image/png;base64,original' } });
+      }
+    };
+
+    const origCreate = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') {
+        const inp = {
+          type: '', accept: '',
+          click: vi.fn(),
+          files: [{ size: 1024, name: 'photo.jpg' }],
+          set onchange(fn) { capturedOnchange = fn; },
+          get onchange() { return capturedOnchange; },
+        };
+        return inp;
+      }
+      return origCreate(tag);
+    });
+
+    triggerImageUpload(1);
+    await capturedOnchange();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(showToast).toHaveBeenCalledWith('toast_image_upload_error', 'error');
+    document.createElement.mockRestore?.();
+    global.FileReader = origFileReader;
     global.Image = origImage;
   });
 });
