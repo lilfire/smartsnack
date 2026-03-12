@@ -66,6 +66,12 @@ export async function saveProduct(id) {
 
         if (scenario === 'b_synced') {
           // B (duplicate) is synced with OFF — A will be deleted, merge into B
+          // If user fetched fresh OFF data, include OFF-provided fields so B gets updated
+          if (offAppliedFields) {
+            for (const f of offAppliedFields) {
+              if (data[f] != null && data[f] !== '') choices[f] = data[f];
+            }
+          }
           await api('/api/products/' + dupResult.duplicate.id + '/merge', {
             method: 'POST', body: JSON.stringify({ source_id: id, choices: choices })
           });
