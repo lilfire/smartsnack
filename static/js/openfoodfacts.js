@@ -363,37 +363,11 @@ async function applyOffProduct(prod, prefix, productId) {
     } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
   }
 
-  // Duplicate check in edit mode
-  if (productId) {
-    const offEan = prod.code || '';
-    const offName = prod.product_name_no || prod.product_name || '';
-    if (offEan || offName) {
-      try {
-        const dupResult = await api('/api/products/' + productId + '/check-duplicate', {
-          method: 'POST', body: JSON.stringify({ ean: offEan, name: offName })
-        });
-        if (dupResult.duplicate) {
-          const dup = dupResult.duplicate;
-          const choice = await _showEditDuplicateModal(dup);
-          if (choice === 'delete') {
-            await api('/api/products/' + dup.id, { method: 'DELETE' });
-            showToast(t('toast_duplicate_deleted'), 'success');
-          } else if (choice === 'merge') {
-            await api('/api/products/' + productId + '/merge', {
-              method: 'POST', body: JSON.stringify({ source_id: dup.id })
-            });
-            showToast(t('toast_duplicate_merged'), 'success');
-          }
-        }
-      } catch(e) { console.error('Duplicate check failed:', e); }
-    }
-  }
-
   showToast(t('toast_off_fetched', { fields: filled.join(', ') }), 'success');
   if (ing) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
 }
 
-function _showEditDuplicateModal(duplicate) {
+export function showEditDuplicateModal(duplicate) {
   return new Promise((resolve) => {
     const bg = document.createElement('div');
     bg.className = 'scan-modal-bg';

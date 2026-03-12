@@ -3,7 +3,7 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, sho
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan } from './openfoodfacts.js';
+import { isValidEan, showEditDuplicateModal } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -50,6 +50,30 @@ export async function saveProduct(id) {
   if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
+  // Check for duplicate EAN/name before saving
+  if (data.ean || data.name) {
+    try {
+      const dupResult = await api('/api/products/' + id + '/check-duplicate', {
+        method: 'POST', body: JSON.stringify({ ean: data.ean, name: data.name })
+      });
+      if (dupResult.duplicate) {
+        const choice = await showEditDuplicateModal(dupResult.duplicate);
+        if (choice === 'delete') {
+          await api('/api/products/' + dupResult.duplicate.id, { method: 'DELETE' });
+          showToast(t('toast_duplicate_deleted'), 'success');
+        } else if (choice === 'merge') {
+          await api('/api/products/' + id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+        } else {
+          return; // User cancelled — abort save
+        }
+      }
+    } catch (e) {
+      console.error('Duplicate check failed:', e);
+    }
+  }
   try {
     await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
     state.editingId = null;
