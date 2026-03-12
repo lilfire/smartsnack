@@ -733,6 +733,10 @@ export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
  */
 export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
   const bIsSynced = duplicate.is_synced_with_off;
+  const aName = formData.name || '?';
+  const bName = duplicate.name || '?';
+  const aLabel = t('duplicate_merge_source_editing', { name: aName });
+  const bLabel = t('duplicate_merge_source_other', { name: bName });
 
   let scenario, messageKey, fieldsToCheck;
   if (bIsSynced) {
@@ -796,7 +800,7 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
 
     // Scenario message
     const msgEl = document.createElement('p');
-    msgEl.textContent = t(messageKey, { match_type: duplicate.match_type, name: duplicate.name });
+    msgEl.textContent = t(messageKey, { match_type: duplicate.match_type, name: bName });
     modal.appendChild(msgEl);
 
     // Only show field choices section if there are conflicts
@@ -812,10 +816,10 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
       const bulk = document.createElement('div');
       bulk.className = 'conflict-bulk';
       const keepAllA = document.createElement('button');
-      keepAllA.textContent = t('duplicate_merge_keep_all_a');
+      keepAllA.textContent = t('duplicate_merge_keep_all_a', { name: aName });
       keepAllA.type = 'button';
       const keepAllB = document.createElement('button');
-      keepAllB.textContent = t('duplicate_merge_keep_all_b');
+      keepAllB.textContent = t('duplicate_merge_keep_all_b', { name: bName });
       keepAllB.type = 'button';
       bulk.appendChild(keepAllA);
       bulk.appendChild(keepAllB);
@@ -831,52 +835,98 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
         label.textContent = t('adv_field_' + c.field) || c.field;
         row.appendChild(label);
 
-        const opts = document.createElement('div');
-        opts.className = 'conflict-row-options';
+        if (c.field === 'taste_score') {
+          // Taste score uses a slider spanning both columns
+          const slider = document.createElement('div');
+          slider.className = 'conflict-taste-slider';
 
-        const optA = document.createElement('div');
-        optA.className = 'conflict-option selected';
-        optA.innerHTML =
-          '<div class="conflict-option-source">' + t('duplicate_merge_source_a') + '</div>' +
-          '<div class="conflict-option-value">' + _esc(String(c.aVal)) + '</div>';
+          const labelA = document.createElement('div');
+          labelA.className = 'conflict-taste-label conflict-taste-label-a selected';
+          labelA.innerHTML = '<span class="conflict-taste-name">' + _esc(aLabel) + '</span>' +
+            '<span class="conflict-taste-value">' + _esc(String(c.aVal)) + '</span>';
 
-        const optB = document.createElement('div');
-        optB.className = 'conflict-option';
-        optB.innerHTML =
-          '<div class="conflict-option-source">' + t('duplicate_merge_source_b') + '</div>' +
-          '<div class="conflict-option-value">' + _esc(String(c.bVal)) + '</div>';
+          const labelB = document.createElement('div');
+          labelB.className = 'conflict-taste-label conflict-taste-label-b';
+          labelB.innerHTML = '<span class="conflict-taste-name">' + _esc(bLabel) + '</span>' +
+            '<span class="conflict-taste-value">' + _esc(String(c.bVal)) + '</span>';
 
-        optionEls.push({ field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB });
+          const range = document.createElement('input');
+          range.type = 'range';
+          range.min = '0';
+          range.max = '1';
+          range.step = '1';
+          range.value = '0';
+          range.className = 'conflict-taste-range';
 
-        optA.addEventListener('click', () => {
-          choices[c.field] = c.aVal;
-          optA.classList.add('selected');
-          optB.classList.remove('selected');
-        });
-        optB.addEventListener('click', () => {
-          choices[c.field] = c.bVal;
-          optB.classList.add('selected');
-          optA.classList.remove('selected');
-        });
+          const updateSlider = () => {
+            const isB = range.value === '1';
+            choices[c.field] = isB ? c.bVal : c.aVal;
+            labelA.classList.toggle('selected', !isB);
+            labelB.classList.toggle('selected', isB);
+          };
+          range.addEventListener('input', updateSlider);
 
-        opts.appendChild(optA);
-        opts.appendChild(optB);
-        row.appendChild(opts);
+          optionEls.push({
+            field: c.field, aVal: c.aVal, bVal: c.bVal,
+            setA() { range.value = '0'; updateSlider(); },
+            setB() { range.value = '1'; updateSlider(); },
+          });
+
+          slider.appendChild(labelA);
+          slider.appendChild(range);
+          slider.appendChild(labelB);
+          row.appendChild(slider);
+        } else {
+          // Standard click-to-pick options
+          const opts = document.createElement('div');
+          opts.className = 'conflict-row-options';
+
+          const optA = document.createElement('div');
+          optA.className = 'conflict-option selected';
+          optA.innerHTML =
+            '<div class="conflict-option-source">' + _esc(aLabel) + '</div>' +
+            '<div class="conflict-option-value">' + _esc(String(c.aVal)) + '</div>';
+
+          const optB = document.createElement('div');
+          optB.className = 'conflict-option';
+          optB.innerHTML =
+            '<div class="conflict-option-source">' + _esc(bLabel) + '</div>' +
+            '<div class="conflict-option-value">' + _esc(String(c.bVal)) + '</div>';
+
+          optionEls.push({
+            field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB,
+            setA() { optA.classList.add('selected'); optB.classList.remove('selected'); },
+            setB() { optB.classList.add('selected'); optA.classList.remove('selected'); },
+          });
+
+          optA.addEventListener('click', () => {
+            choices[c.field] = c.aVal;
+            optA.classList.add('selected');
+            optB.classList.remove('selected');
+          });
+          optB.addEventListener('click', () => {
+            choices[c.field] = c.bVal;
+            optB.classList.add('selected');
+            optA.classList.remove('selected');
+          });
+
+          opts.appendChild(optA);
+          opts.appendChild(optB);
+          row.appendChild(opts);
+        }
         fieldsContainer.appendChild(row);
       }
 
       keepAllA.addEventListener('click', () => {
         for (const o of optionEls) {
           choices[o.field] = o.aVal;
-          o.optA.classList.add('selected');
-          o.optB.classList.remove('selected');
+          o.setA();
         }
       });
       keepAllB.addEventListener('click', () => {
         for (const o of optionEls) {
           choices[o.field] = o.bVal;
-          o.optB.classList.add('selected');
-          o.optA.classList.remove('selected');
+          o.setB();
         }
       });
 

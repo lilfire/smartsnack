@@ -683,9 +683,9 @@
     "duplicate_merge_a_synced": "Et produkt med samme {match_type} finnes allerede: \"{name}\". Siden ditt produkt er synkronisert med OFF, vil duplikatet bli slettet og slått sammen med ditt.",
     "duplicate_merge_neither": "Et produkt med samme {match_type} finnes allerede: \"{name}\". Produktene vil bli slått sammen til ett.",
     "duplicate_merge_choose_values": "Velg hvilke verdier du vil beholde:",
-    "duplicate_merge_keep_all_a": "Behold alle fra A",
-    "duplicate_merge_keep_all_b": "Behold alle fra B",
-    "duplicate_merge_source_a": "Nåværende (A)",
-    "duplicate_merge_source_b": "Duplikat (B)",
+    "duplicate_merge_keep_all_a": "Behold alle fra \"{name}\"",
+    "duplicate_merge_keep_all_b": "Behold alle fra \"{name}\"",
+    "duplicate_merge_source_editing": "{name} (redigerer)",
+    "duplicate_merge_source_other": "{name}",
     "duplicate_merge_confirm": "Bekreft sammenslåing"
 }

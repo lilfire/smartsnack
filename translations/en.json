@@ -679,9 +679,9 @@
     "duplicate_merge_a_synced": "A product with the same {match_type} already exists: \"{name}\". Since your product is synced with OFF, the duplicate will be deleted and merged into yours.",
     "duplicate_merge_neither": "A product with the same {match_type} already exists: \"{name}\". The products will be merged into one.",
     "duplicate_merge_choose_values": "Choose which values to keep:",
-    "duplicate_merge_keep_all_a": "Keep all from A",
-    "duplicate_merge_keep_all_b": "Keep all from B",
-    "duplicate_merge_source_a": "Current (A)",
-    "duplicate_merge_source_b": "Duplicate (B)",
+    "duplicate_merge_keep_all_a": "Keep all from \"{name}\"",
+    "duplicate_merge_keep_all_b": "Keep all from \"{name}\"",
+    "duplicate_merge_source_editing": "{name} (editing)",
+    "duplicate_merge_source_other": "{name}",
     "duplicate_merge_confirm": "Confirm merge"
 }

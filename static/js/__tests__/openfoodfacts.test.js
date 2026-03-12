@@ -838,13 +838,16 @@ describe('showDuplicateMergeModal', () => {
     expect(labelTexts).toContain('adv_field_taste_score');
     expect(labelTexts).toContain('adv_field_price');
 
-    // Should show conflict option values
+    // Should show conflict option values (price uses click options, taste uses slider)
     const optionValues = modal.querySelectorAll('.conflict-option-value');
     const values = Array.from(optionValues).map(el => el.textContent);
-    expect(values).toContain('0.5');
-    expect(values).toContain('3');
     expect(values).toContain('123');
     expect(values).toContain('1000');
+    // Taste score uses a slider with labeled values
+    const tasteValues = modal.querySelectorAll('.conflict-taste-value');
+    const tValues = Array.from(tasteValues).map(el => el.textContent);
+    expect(tValues).toContain('0.5');
+    expect(tValues).toContain('3');
 
     // Click confirm to resolve the promise
     const confirmBtn = modal.querySelector('.conflict-apply-btn');
@@ -928,8 +931,8 @@ describe('showDuplicateMergeModal', () => {
     expect(result.scenario).toBe('a_synced');
   });
 
-  it('allows user to pick B values by clicking', async () => {
-    const formData = { taste_score: 0.5, price: 123 };
+  it('allows user to pick B values by clicking and sliding', async () => {
+    const formData = { taste_score: 0.5, price: 123, name: 'Product A' };
     const duplicate = {
       id: 99, name: 'Dup', match_type: 'ean',
       is_synced_with_off: false,
@@ -938,9 +941,14 @@ describe('showDuplicateMergeModal', () => {
     const promise = showDuplicateMergeModal(formData, duplicate, false);
 
     const bg = document.querySelector('.scan-modal-bg');
-    // Click the B option for each conflict field
+    // Click the B option for price (standard click option)
     const optionBs = bg.querySelectorAll('.conflict-option:not(.selected)');
     optionBs.forEach(opt => opt.click());
+
+    // Slide taste_score slider to B
+    const slider = bg.querySelector('.conflict-taste-range');
+    slider.value = '1';
+    slider.dispatchEvent(new Event('input'));
 
     bg.querySelector('.conflict-apply-btn').click();
     const result = await promise;
