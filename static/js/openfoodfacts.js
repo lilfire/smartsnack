@@ -30,63 +30,25 @@ let _offPickerProducts = null;
 
 const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
 
-function _collectMergeFormData(prefix) {
-  const _num = (id) => { const el = document.getElementById(id); if (!el) return null; const v = el.value; return v === '' ? null : +v; };
-  const _str = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
-  return {
-    name: _str(prefix + '-name'),
-    ean: _str(prefix + '-ean'),
-    brand: _str(prefix + '-brand'),
-    stores: _str(prefix + '-stores'),
-    ingredients: _str(prefix + '-ingredients'),
-    taste_note: _str(prefix + '-taste_note'),
-    taste_score: _num(prefix + '-smak'),
-    kcal: _num(prefix + '-kcal'),
-    energy_kj: _num(prefix + '-energy_kj'),
-    fat: _num(prefix + '-fat'),
-    saturated_fat: _num(prefix + '-saturated_fat'),
-    carbs: _num(prefix + '-carbs'),
-    sugar: _num(prefix + '-sugar'),
-    protein: _num(prefix + '-protein'),
-    fiber: _num(prefix + '-fiber'),
-    salt: _num(prefix + '-salt'),
-    weight: _num(prefix + '-weight'),
-    portion: _num(prefix + '-portion'),
-    volume: _num(prefix + '-volume'),
-    price: _num(prefix + '-price'),
-    est_pdcaas: _num(prefix + '-est_pdcaas'),
-    est_diaas: _num(prefix + '-est_diaas'),
-  };
-}
-
 async function _checkEditDuplicate(ean, name, productId) {
   try {
     const dupRes = await api('/api/products/' + productId + '/check-duplicate', {
       method: 'POST', body: JSON.stringify({ ean: ean || '', name: name || '' })
     });
     if (!dupRes.duplicate) return 'no_duplicate';
-
-    const formData = _collectMergeFormData(_offCtx.prefix || 'ed');
-    const aIsSynced = dupRes.a_is_synced_with_off;
-    const result = await showDuplicateMergeModal(formData, dupRes.duplicate, aIsSynced);
-    if (result === null) return false; // User cancelled
-
-    const { scenario, choices } = result;
-    if (scenario === 'b_synced') {
-      // B is synced with OFF — merge A into B, A gets deleted
-      await api('/api/products/' + dupRes.duplicate.id + '/merge', {
-        method: 'POST', body: JSON.stringify({ source_id: productId, choices })
-      });
-      showToast(t('toast_duplicate_merged'), 'success');
-      return 'a_deleted';
-    } else {
-      // A survives (a_synced or neither) — merge B into A, B gets deleted
+    const choice = await showEditDuplicateModal(dupRes.duplicate);
+    if (choice === 'delete') {
+      await api('/api/products/' + dupRes.duplicate.id, { method: 'DELETE' });
+      showToast(t('toast_duplicate_deleted'), 'success');
+      return 'resolved';
+    } else if (choice === 'merge') {
       await api('/api/products/' + productId + '/merge', {
-        method: 'POST', body: JSON.stringify({ source_id: dupRes.duplicate.id, choices })
+        method: 'POST', body: JSON.stringify({ source_id: dupRes.duplicate.id })
       });
       showToast(t('toast_duplicate_merged'), 'success');
       return 'resolved';
     }
+    return false;
   } catch (e) {
     console.error('Duplicate check failed:', e);
     showToast(t('toast_network_error'), 'error');
@@ -126,11 +88,6 @@ export async function lookupOFF(prefix, productId) {
         const dupResult = await _checkEditDuplicate(ean, data.product.product_name || '', productId);
         if (!dupResult) {
           closeOffPicker();
-          return;
-        }
-        if (dupResult === 'a_deleted') {
-          closeOffPicker();
-          window.location.reload();
           return;
         }
         if (dupResult === 'resolved') duplicateResolved = true;
@@ -367,10 +324,6 @@ export async function selectOffResult(idx, ctxSnapshot) {
       const checkName = productToApply.product_name || productToApply.product_name_no || '';
       const dupResult = await _checkEditDuplicate(resolvedEan, checkName, productId);
       if (!dupResult) return;
-      if (dupResult === 'a_deleted') {
-        window.location.reload();
-        return;
-      }
       if (dupResult === 'resolved') duplicateResolved = true;
     }
     await applyOffProduct(productToApply, prefix, productId, duplicateResolved);
