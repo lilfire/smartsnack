@@ -72,6 +72,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  document.body.innerHTML = '';
 });
 
 describe('SCORE_COLORS', () => {
