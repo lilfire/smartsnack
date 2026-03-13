@@ -30,6 +30,66 @@ _TEXT_FIELD_SET = frozenset(_TEXT_FIELD_LIMITS.keys())
 _FLAG_FIELD_PREFIX = "flag:"
 
 
+def _find_duplicate(ean, name, exclude_id=None):
+    """Find an existing product matching by EAN or name.
+
+    Returns dict with id, name, ean, match_type, is_synced_with_off,
+    and all product field values — or None if no duplicate found.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    fields_sql = ", ".join(f"p.{f}" for f in ALL_PRODUCT_FIELDS)
+
+    # Check EAN match first (if ean is provided and non-empty)
+    if ean and ean.strip():
+        exclude_clause = "AND p.id != ?" if exclude_id else ""
+        params = [ean.strip()]
+        if exclude_id:
+            params.append(exclude_id)
+        row = cur.execute(
+            f"""SELECT p.id, {fields_sql},
+                   EXISTS(SELECT 1 FROM product_flags pf
+                          WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
+                   AS is_synced_with_off
+            FROM products p
+            WHERE p.ean = ? {exclude_clause}
+            LIMIT 1""",
+            params,
+        ).fetchone()
+        if row:
+            result = {f: row[f] for f in ALL_PRODUCT_FIELDS}
+            result["id"] = row["id"]
+            result["match_type"] = "ean"
+            result["is_synced_with_off"] = bool(row["is_synced_with_off"])
+            return result
+
+    # Then check name match (case-insensitive)
+    if name and name.strip():
+        exclude_clause = "AND p.id != ?" if exclude_id else ""
+        params = [name.strip()]
+        if exclude_id:
+            params.append(exclude_id)
+        row = cur.execute(
+            f"""SELECT p.id, {fields_sql},
+                   EXISTS(SELECT 1 FROM product_flags pf
+                          WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
+                   AS is_synced_with_off
+            FROM products p
+            WHERE LOWER(p.name) = LOWER(?) {exclude_clause}
+            LIMIT 1""",
+            params,
+        ).fetchone()
+        if row:
+            result = {f: row[f] for f in ALL_PRODUCT_FIELDS}
+            result["id"] = row["id"]
+            result["match_type"] = "name"
+            result["is_synced_with_off"] = bool(row["is_synced_with_off"])
+            return result
+
+    return None
+
+
 def _get_product_flags(cur, product_ids: list) -> dict:
     """Batch-fetch flags for a list of product IDs. Returns {pid: [flag, ...]}."""
     if not product_ids:
@@ -558,7 +618,7 @@ def list_products(
     return results
 
 
-def add_product(data: dict) -> dict:
+def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     if not data.get("type", "").strip() or not data.get("name", "").strip():
         raise ValueError("type and name are required")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
@@ -576,17 +636,56 @@ def add_product(data: dict) -> dict:
     if not cat_exists:
         raise ValueError("Category does not exist")
     name = data["name"].strip()
-    if ean:
-        dup = cur.execute(
-            "SELECT id, name FROM products WHERE ean = ?", (ean,)
-        ).fetchone()
+
+    # Duplicate detection
+    if on_duplicate != "allow_duplicate":
+        dup = _find_duplicate(ean, name)
         if dup:
-            raise ValueError(f"A product with EAN {ean} already exists: {dup[1]}")
-    dup_name = cur.execute(
-        "SELECT id FROM products WHERE LOWER(name) = LOWER(?)", (name,)
-    ).fetchone()
-    if dup_name:
-        raise ValueError(f"A product with name '{name}' already exists")
+            if dup["is_synced_with_off"]:
+                if on_duplicate == "overwrite":
+                    raise ValueError(
+                        "Cannot overwrite a product synced with OpenFoodFacts"
+                    )
+                return {
+                    "duplicate": {
+                        "id": dup["id"],
+                        "name": dup["name"],
+                        "ean": dup["ean"],
+                        "match_type": dup["match_type"],
+                        "is_synced_with_off": True,
+                    },
+                    "actions": [],
+                }
+            # Duplicate found, not synced
+            if on_duplicate == "overwrite":
+                # Merge data into existing product — only non-empty fields
+                merge_data = dict(data)
+                merge_data.pop("on_duplicate", None)
+                from_off = merge_data.pop("from_off", False)
+                merge_data = {
+                    k: v for k, v in merge_data.items()
+                    if v is not None and v != ""
+                    and (not isinstance(v, str) or v.strip() != "")
+                }
+                merge_data["from_off"] = from_off
+                update_product(dup["id"], merge_data)
+                return {"id": dup["id"], "merged": True, "message": "Product merged"}
+            # No on_duplicate set — return duplicate info for frontend
+            from_off = data.get("from_off", False)
+            actions = ["overwrite"]
+            if not from_off:
+                actions.append("create_new")
+            return {
+                "duplicate": {
+                    "id": dup["id"],
+                    "name": dup["name"],
+                    "ean": dup["ean"],
+                    "match_type": dup["match_type"],
+                    "is_synced_with_off": dup["is_synced_with_off"],
+                },
+                "actions": actions,
+            }
+
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
         (
@@ -679,6 +778,79 @@ def update_product(pid: int, data: dict) -> None:
     conn.commit()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
+
+
+def check_duplicate_for_edit(pid: int, ean: str, name: str):
+    """Check if OFF data for an edited product matches a different existing product.
+
+    Returns (duplicate_dict_or_None, a_is_synced_with_off).
+    """
+    dup = _find_duplicate(ean, name, exclude_id=pid)
+    conn = get_db()
+    a_synced = bool(
+        conn.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+    )
+    return dup, a_synced
+
+
+def merge_products(target_id: int, source_id: int, choices: dict | None = None) -> None:
+    """Merge source product into target, filling empty target fields, then delete source.
+
+    ``choices`` is an optional dict of {field: value} for fields where both
+    products had values and the user picked which to keep.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+    target = cur.execute(
+        "SELECT * FROM products WHERE id = ?", (target_id,)
+    ).fetchone()
+    if not target:
+        raise LookupError("Target product not found")
+    source = cur.execute(
+        "SELECT * FROM products WHERE id = ?", (source_id,)
+    ).fetchone()
+    if not source:
+        raise LookupError("Source product not found")
+
+    choices = choices or {}
+    merge_fields = [f for f in ALL_PRODUCT_FIELDS if f not in ("type",)]
+    updates, vals = [], []
+    for f in merge_fields:
+        if f in choices:
+            # User explicitly chose a value for this conflicting field
+            updates.append(f"{f} = ?")
+            vals.append(choices[f])
+        else:
+            target_val = target[f]
+            source_val = source[f]
+            if (target_val is None or target_val == "" or target_val == 0) and source_val not in (None, "", 0):
+                updates.append(f"{f} = ?")
+                vals.append(source_val)
+    if target["image"] in (None, "") and source["image"] not in (None, ""):
+        updates.append("image = ?")
+        vals.append(source["image"])
+
+    if updates:
+        vals.append(target_id)
+        cur.execute(
+            f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
+        )
+
+    # Copy flags from source to target
+    source_flags = cur.execute(
+        "SELECT flag FROM product_flags WHERE product_id = ?", (source_id,)
+    ).fetchall()
+    for row in source_flags:
+        cur.execute(
+            "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
+            (target_id, row["flag"]),
+        )
+
+    cur.execute("DELETE FROM products WHERE id = ?", (source_id,))
+    conn.commit()
 
 
 def delete_product(pid: int) -> bool:

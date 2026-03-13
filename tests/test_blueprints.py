@@ -332,6 +332,75 @@ class TestProxyBlueprint:
         assert resp.status_code == 403
 
 
+class TestCheckDuplicateBlueprint:
+    def test_check_duplicate_returns_match(self, client):
+        products = client.get("/api/products").get_json()
+        pid = products[0]["id"]
+        # Add another product to be found as duplicate
+        add_resp = client.post(
+            "/api/products",
+            json={"type": "Snacks", "name": "Another Product", "ean": "8000000000099"},
+        )
+        other_id = add_resp.get_json()["id"]
+        resp = client.post(
+            f"/api/products/{other_id}/check-duplicate",
+            json={"ean": products[0]["ean"], "name": ""},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["duplicate"] is not None
+        assert data["duplicate"]["id"] == pid
+
+    def test_check_duplicate_returns_null(self, client):
+        products = client.get("/api/products").get_json()
+        pid = products[0]["id"]
+        resp = client.post(
+            f"/api/products/{pid}/check-duplicate",
+            json={"ean": "9999999999999", "name": "Nonexistent"},
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["duplicate"] is None
+
+
+class TestMergeBlueprint:
+    def test_merge_products(self, client):
+        target_resp = client.post(
+            "/api/products",
+            json={"type": "Snacks", "name": "Merge Target", "ean": "8000000000001"},
+        )
+        source_resp = client.post(
+            "/api/products",
+            json={"type": "Snacks", "name": "Merge Source", "ean": "8000000000002", "brand": "SourceBrand"},
+        )
+        target_id = target_resp.get_json()["id"]
+        source_id = source_resp.get_json()["id"]
+        resp = client.post(
+            f"/api/products/{target_id}/merge",
+            json={"source_id": source_id},
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+    def test_merge_source_not_found(self, client):
+        products = client.get("/api/products").get_json()
+        pid = products[0]["id"]
+        resp = client.post(
+            f"/api/products/{pid}/merge",
+            json={"source_id": 99999},
+        )
+        assert resp.status_code == 404
+
+    def test_merge_missing_source_id(self, client):
+        products = client.get("/api/products").get_json()
+        pid = products[0]["id"]
+        resp = client.post(
+            f"/api/products/{pid}/merge",
+            json={},
+        )
+        assert resp.status_code == 400
+
+
 class TestOffBlueprint:
     def test_missing_json(self, client):
         resp = client.post("/api/off/add-product")

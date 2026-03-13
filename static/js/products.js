@@ -3,7 +3,7 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, sho
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan } from './openfoodfacts.js';
+import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -48,8 +48,70 @@ export function startEdit(id) { state.editingId = id; rerender(); }
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
   if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
+  const offAppliedFields = window._offAppliedFields; window._offAppliedFields = null;
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
+  // Check for duplicate EAN/name before saving
+  let mergedOrDeleted = false;
+  if (data.ean || data.name) {
+    try {
+      const dupResult = await api('/api/products/' + id + '/check-duplicate', {
+        method: 'POST', body: JSON.stringify({ ean: data.ean, name: data.name })
+      });
+      if (dupResult.duplicate) {
+        const aIsSynced = dupResult.a_is_synced_with_off;
+        const result = await showDuplicateMergeModal(data, dupResult.duplicate, aIsSynced);
+        if (result === null) return; // User cancelled
+        const { scenario, choices } = result;
+
+        if (scenario === 'b_synced') {
+          // B (duplicate) is synced with OFF — A will be deleted, merge into B
+          // If user fetched fresh OFF data, include OFF-provided fields so B gets updated
+          if (offAppliedFields) {
+            for (const f of offAppliedFields) {
+              if (data[f] != null && data[f] !== '') choices[f] = data[f];
+            }
+          }
+          await api('/api/products/' + dupResult.duplicate.id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          state.editingId = null;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== id);
+          loadData();
+          // Expand the surviving product (B)
+          setTimeout(() => { state.expandedId = dupResult.duplicate.id; }, 300);
+          return; // Don't save A — it's been deleted by the merge
+        } else if (scenario === 'a_synced') {
+          // A is synced, B is not — B will be deleted, merge into A
+          for (const [field, val] of Object.entries(choices)) {
+            data[field] = val;
+          }
+          await api('/api/products/' + id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
+        } else {
+          // Neither synced — merge into A (A becomes the merged product), delete B
+          for (const [field, val] of Object.entries(choices)) {
+            data[field] = val;
+          }
+          await api('/api/products/' + id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
+        }
+      }
+    } catch (e) {
+      console.error('Duplicate check failed:', e);
+      showToast(t('toast_network_error'), 'error');
+      return;
+    }
+  }
   try {
     await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
     state.editingId = null;
@@ -58,6 +120,10 @@ export async function saveProduct(id) {
   } catch(e) {
     console.error(e);
     showToast(t('toast_save_error'), 'error');
+    if (mergedOrDeleted) {
+      state.editingId = null;
+      loadData();
+    }
   }
 }
 
@@ -152,6 +218,56 @@ export function clearSearch() {
   document.getElementById('search-input').focus();
 }
 
+function _showDuplicateModal(duplicate) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+    const pEl = document.createElement('p');
+    const msgKey = duplicate.is_synced_with_off ? 'duplicate_found_synced' : 'duplicate_found_unsynced';
+    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
+    modal.appendChild(pEl);
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    if (!duplicate.is_synced_with_off) {
+      const mergeBtn = document.createElement('button');
+      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
+      mergeBtn.textContent = t('duplicate_action_merge');
+      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
+      actions.appendChild(mergeBtn);
+      const createBtn = document.createElement('button');
+      createBtn.className = 'scan-modal-btn-register';
+      createBtn.textContent = t('duplicate_action_create_new');
+      createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
+      actions.appendChild(createBtn);
+    }
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = duplicate.is_synced_with_off ? 'scan-modal-btn-register confirm-yes' : 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = duplicate.is_synced_with_off ? t('btn_ok') : t('btn_cancel');
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
+}
+
+async function _submitProduct(body, on_duplicate) {
+  const payload = Object.assign({}, body);
+  if (on_duplicate) payload.on_duplicate = on_duplicate;
+  return await api('/api/products', { method: 'POST', body: JSON.stringify(payload) });
+}
+
 export async function registerProduct() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { showToast(t('toast_product_name_required'), 'error'); return; }
@@ -164,7 +280,28 @@ export async function registerProduct() {
     const body = collectFormFields('f');
     if (window._pendingOFFSync) { body.from_off = true; window._pendingOFFSync = null; }
     const registeredType = body.type;
-    const result = await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
+    let result;
+    try {
+      result = await _submitProduct(body);
+    } catch(e) {
+      if (e.status === 409 && e.data && e.data.duplicate) {
+        const dup = e.data.duplicate;
+        if (dup.is_synced_with_off) {
+          // Synced with OFF — show info-only modal, no merge allowed
+          await _showDuplicateModal(dup);
+          return;
+        }
+        const choice = await _showDuplicateModal(dup);
+        if (choice === 'cancel') { return; }
+        if (choice === 'overwrite') {
+          result = await _submitProduct(body, 'overwrite');
+        } else {
+          result = await _submitProduct(body, 'allow_duplicate');
+        }
+      } else {
+        throw e;
+      }
+    }
     const newProductId = result.id;
     if (window._pendingImage && newProductId) {
       try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
@@ -190,7 +327,8 @@ export async function registerProduct() {
     document.getElementById('f-price').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';
-    showToast(t('toast_product_added', { name: name }), 'success');
+    const toastKey = result.merged ? 'toast_product_merged' : 'toast_product_added';
+    showToast(t(toastKey, { name: name }), 'success');
 
     // Switch to search view filtered by the registered category
     state.currentFilter = [registeredType];

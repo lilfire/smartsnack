@@ -24,10 +24,14 @@ def get_products():
 def add_product():
     try:
         data = _require_json()
-        result = product_service.add_product(data)
+        on_duplicate = data.pop("on_duplicate", None)
+        result = product_service.add_product(data, on_duplicate=on_duplicate)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(result), 201
+    if "duplicate" in result:
+        return jsonify(result), 409
+    status = 200 if result.get("merged") else 201
+    return jsonify(result), status
 
 
 @bp.route("/api/products/<int:pid>", methods=["PUT"])
@@ -40,6 +44,34 @@ def update_product(pid):
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "message": "Product updated"})
+
+
+@bp.route("/api/products/<int:pid>/check-duplicate", methods=["POST"])
+def check_duplicate(pid):
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    ean = data.get("ean", "")
+    name = data.get("name", "")
+    dup, a_synced = product_service.check_duplicate_for_edit(pid, ean, name)
+    return jsonify({"duplicate": dup, "a_is_synced_with_off": a_synced})
+
+
+@bp.route("/api/products/<int:pid>/merge", methods=["POST"])
+def merge_product(pid):
+    try:
+        data = _require_json()
+        source_id = data.get("source_id")
+        if not source_id or not isinstance(source_id, int):
+            raise ValueError("source_id is required and must be an integer")
+        choices = data.get("choices") or {}
+        product_service.merge_products(pid, source_id, choices=choices)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True, "message": "Products merged"})
 
 
 @bp.route("/api/products/<int:pid>", methods=["DELETE"])

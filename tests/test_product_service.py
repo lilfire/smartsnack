@@ -305,6 +305,131 @@ class TestUpdateProduct:
         assert row["kcal"] is None
 
 
+class TestFindDuplicate:
+    def test_ean_match(self, app_ctx, seed_product):
+        from services.product_service import _find_duplicate
+
+        # The seed product has EAN "7000000000001"
+        result = _find_duplicate("7000000000001", "Some Other Name")
+        assert result is not None
+        assert result["match_type"] == "ean"
+        assert result["id"] == seed_product
+
+    def test_name_match_case_insensitive(self, app_ctx, seed_product):
+        from services.product_service import _find_duplicate
+
+        result = _find_duplicate("", "classic popcorn")
+        assert result is not None
+        assert result["match_type"] == "name"
+        assert result["id"] == seed_product
+
+    def test_no_match(self, app_ctx, seed_product):
+        from services.product_service import _find_duplicate
+
+        result = _find_duplicate("9999999999999", "Nonexistent Product")
+        assert result is None
+
+    def test_exclude_id(self, app_ctx, seed_product):
+        from services.product_service import _find_duplicate
+
+        result = _find_duplicate("7000000000001", "Classic Popcorn", exclude_id=seed_product)
+        assert result is None
+
+    def test_synced_flag_detected(self, app_ctx, seed_product):
+        from services.product_service import _find_duplicate, set_system_flag
+
+        set_system_flag(seed_product, "is_synced_with_off", True)
+        result = _find_duplicate("7000000000001", "")
+        assert result is not None
+        assert result["is_synced_with_off"] is True
+
+    def test_unsynced_flag(self, app_ctx, seed_product):
+        from services.product_service import _find_duplicate
+
+        result = _find_duplicate("7000000000001", "")
+        assert result is not None
+        assert result["is_synced_with_off"] is False
+
+
+class TestAddProductDuplicate:
+    def test_synced_ean_duplicate_returns_409_no_actions(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product, set_system_flag
+
+        set_system_flag(seed_product, "is_synced_with_off", True)
+        result = add_product({"type": "Snacks", "name": "New Name", "ean": "7000000000001"})
+        assert "duplicate" in result
+        assert result["duplicate"]["is_synced_with_off"] is True
+        assert result["actions"] == []
+
+    def test_synced_name_duplicate_returns_409_no_actions(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product, set_system_flag
+
+        set_system_flag(seed_product, "is_synced_with_off", True)
+        result = add_product({"type": "Snacks", "name": "Classic Popcorn"})
+        assert "duplicate" in result
+        assert result["duplicate"]["is_synced_with_off"] is True
+        assert result["actions"] == []
+
+    def test_synced_duplicate_overwrite_raises(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product, set_system_flag
+
+        set_system_flag(seed_product, "is_synced_with_off", True)
+        with pytest.raises(ValueError, match="Cannot overwrite"):
+            add_product(
+                {"type": "Snacks", "name": "New Name", "ean": "7000000000001"},
+                on_duplicate="overwrite",
+            )
+
+    def test_unsynced_duplicate_returns_409_info(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product
+
+        result = add_product({"type": "Snacks", "name": "Classic Popcorn"})
+        assert "duplicate" in result
+        assert result["duplicate"]["id"] == seed_product
+        assert "overwrite" in result["actions"]
+
+    def test_unsynced_duplicate_from_off_no_create_new(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product
+
+        result = add_product({"type": "Snacks", "name": "Classic Popcorn", "from_off": True})
+        assert "duplicate" in result
+        assert "create_new" not in result["actions"]
+
+    def test_unsynced_duplicate_manual_has_create_new(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product
+
+        result = add_product({"type": "Snacks", "name": "Classic Popcorn"})
+        assert "duplicate" in result
+        assert "create_new" in result["actions"]
+
+    def test_overwrite_merges_into_existing(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product
+        from db import get_db
+
+        result = add_product(
+            {"type": "Snacks", "name": "Classic Popcorn", "brand": "NewBrand", "kcal": 999},
+            on_duplicate="overwrite",
+        )
+        assert result["merged"] is True
+        assert result["id"] == seed_product
+        row = get_db().execute("SELECT brand, kcal FROM products WHERE id=?", (seed_product,)).fetchone()
+        assert row["brand"] == "NewBrand"
+        assert row["kcal"] == 999
+
+    def test_allow_duplicate_creates_new(self, app_ctx, seed_category, seed_product):
+        from services.product_service import add_product
+        from db import get_db
+
+        result = add_product(
+            {"type": "Snacks", "name": "Classic Popcorn"},
+            on_duplicate="allow_duplicate",
+        )
+        assert "id" in result
+        assert result["id"] != seed_product
+        count = get_db().execute("SELECT COUNT(*) FROM products WHERE LOWER(name) = LOWER('Classic Popcorn')").fetchone()[0]
+        assert count == 2
+
+
 class TestDeleteProduct:
     def test_delete_existing(self, app_ctx, seed_product):
         from services.product_service import delete_product
@@ -315,3 +440,95 @@ class TestDeleteProduct:
         from services.product_service import delete_product
 
         assert delete_product(99999) is False
+
+
+class TestCheckDuplicateForEdit:
+    def test_returns_duplicate_ean_match(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit, add_product
+        from db import get_db
+
+        other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
+        result, a_synced = check_duplicate_for_edit(other["id"], "7000000000001", "No Match")
+        assert result is not None
+        assert result["match_type"] == "ean"
+        assert result["id"] == seed_product
+        assert a_synced is False
+
+    def test_returns_duplicate_name_match(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit, add_product
+
+        other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
+        result, a_synced = check_duplicate_for_edit(other["id"], "", "Classic Popcorn")
+        assert result is not None
+        assert result["match_type"] == "name"
+        assert result["id"] == seed_product
+        assert a_synced is False
+
+    def test_returns_none_no_match(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit
+
+        result, a_synced = check_duplicate_for_edit(seed_product, "9999999999999", "Nonexistent")
+        assert result is None
+        assert a_synced is False
+
+    def test_excludes_current_product(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit
+
+        result, a_synced = check_duplicate_for_edit(seed_product, "7000000000001", "Classic Popcorn")
+        assert result is None
+        assert a_synced is False
+
+    def test_returns_a_synced_status(self, app_ctx, seed_product):
+        from services.product_service import check_duplicate_for_edit, add_product, set_system_flag
+
+        other = add_product({"type": "Snacks", "name": "Other Product", "ean": "7000000000002"})
+        set_system_flag(other["id"], "is_synced_with_off", True)
+        result, a_synced = check_duplicate_for_edit(other["id"], "7000000000001", "No Match")
+        assert result is not None
+        assert a_synced is True
+
+
+class TestMergeProducts:
+    def test_merges_fields_into_target(self, app_ctx, seed_category):
+        from services.product_service import add_product, merge_products
+        from db import get_db
+
+        target = add_product({"type": "Snacks", "name": "Target", "ean": "8000000000001", "brand": ""})
+        source = add_product({"type": "Snacks", "name": "Source", "ean": "8000000000002", "brand": "SourceBrand", "kcal": 200})
+        merge_products(target["id"], source["id"])
+        row = get_db().execute("SELECT brand, kcal FROM products WHERE id=?", (target["id"],)).fetchone()
+        assert row["brand"] == "SourceBrand"
+        assert row["kcal"] == 200
+
+    def test_does_not_overwrite_existing_fields(self, app_ctx, seed_category):
+        from services.product_service import add_product, merge_products
+        from db import get_db
+
+        target = add_product({"type": "Snacks", "name": "Target", "ean": "8000000000001", "brand": "TargetBrand"})
+        source = add_product({"type": "Snacks", "name": "Source", "ean": "8000000000002", "brand": "SourceBrand"})
+        merge_products(target["id"], source["id"])
+        row = get_db().execute("SELECT brand FROM products WHERE id=?", (target["id"],)).fetchone()
+        assert row["brand"] == "TargetBrand"
+
+    def test_deletes_source_after_merge(self, app_ctx, seed_category):
+        from services.product_service import add_product, merge_products
+        from db import get_db
+
+        target = add_product({"type": "Snacks", "name": "Target", "ean": "8000000000001"})
+        source = add_product({"type": "Snacks", "name": "Source", "ean": "8000000000002"})
+        source_id = source["id"]
+        merge_products(target["id"], source_id)
+        row = get_db().execute("SELECT id FROM products WHERE id=?", (source_id,)).fetchone()
+        assert row is None
+
+    def test_source_not_found_raises(self, app_ctx, seed_product):
+        from services.product_service import merge_products
+
+        with pytest.raises(LookupError):
+            merge_products(seed_product, 99999)
+
+    def test_target_not_found_raises(self, app_ctx, seed_product):
+        from services.product_service import merge_products
+
+        with pytest.raises(LookupError):
+            merge_products(99999, seed_product)

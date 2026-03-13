@@ -4,6 +4,8 @@ import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
 const OFF_FETCH_TIMEOUT = 45000;
+const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
+function _volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
 function fetchWithTimeout(url, opts) {
   const controller = new AbortController();
@@ -57,7 +59,7 @@ export async function lookupOFF(prefix, productId) {
         updateOffPickerResults([], t('no_products_found') + ' (EAN ' + ean + ')', ean);
         return;
       }
-      await applyOffProduct(data.product, prefix, productId);
+      await applyOffProduct(data.product, prefix, productId, false);
       closeOffPicker();
     } catch(e) { showToast(t('toast_network_error'), 'error'); updateOffPickerResults([], t('toast_network_error')); }
   } else if (name.length >= 2) {
@@ -265,6 +267,8 @@ export async function selectOffResult(idx, ctxSnapshot) {
   const btn = document.getElementById(prefix + '-off-btn');
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
 
+  let productToApply = selected;
+  let resolvedEan = code || '';
   try {
     if (code) {
       const res = await fetchWithTimeout('/api/off/product/' + code);
@@ -273,26 +277,58 @@ export async function selectOffResult(idx, ctxSnapshot) {
         if (data.status === 1 && data.product) {
           const eanEl = document.getElementById(prefix + '-ean');
           if (eanEl) eanEl.value = code;
-          await applyOffProduct(data.product, prefix, productId);
-        } else {
-          await applyOffProduct(selected, prefix, productId);
+          productToApply = data.product;
         }
-      } else {
-        await applyOffProduct(selected, prefix, productId);
       }
-    } else {
-      await applyOffProduct(selected, prefix, productId);
     }
   } catch(e) {
     showToast(t('toast_network_error'), 'error');
-    await applyOffProduct(selected, prefix, productId);
+  }
+
+  try {
+    await applyOffProduct(productToApply, prefix, productId, false);
   } finally {
     if (btn) { btn.classList.remove('loading'); validateOffBtn(prefix); }
   }
 }
 
-async function applyOffProduct(prod, prefix, productId) {
+const _numericFields = new Set(['kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt', 'weight', 'portion']);
+
+function _formatNumeric(key, val) {
+  return (key === 'kcal' || key === 'energy_kj' || key === 'weight' || key === 'portion')
+    ? String(Math.round(val))
+    : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
+}
+
+function _detectConflicts(offValues, prefix) {
+  const autoApply = {};
+  const conflicts = [];
+  Object.keys(offValues).forEach((key) => {
+    const offVal = offValues[key];
+    const fieldEl = document.getElementById(prefix + '-' + key);
+    if (!fieldEl) return;
+    const localRaw = fieldEl.value.trim();
+    const isNum = _numericFields.has(key);
+
+    if (isNum) {
+      const offNum = offVal != null ? parseFloat(offVal) : NaN;
+      const offEmpty = isNaN(offNum) || offNum === 0;
+
+      if (offEmpty) return; // keep local (or both empty)
+      autoApply[key] = _formatNumeric(key, offNum);
+    } else {
+      const offStr = (offVal || '').trim();
+
+      if (offStr === '') return; // keep local (or both empty)
+      autoApply[key] = offStr;
+    }
+  });
+  return { autoApply, conflicts };
+}
+
+async function applyOffProduct(prod, prefix, productId, duplicateResolved) {
   window._pendingOFFSync = true;
+  window._offAppliedFields = null;
   const n = prod.nutriments || {};
   const offMap = {
     kcal: n['energy-kcal_100g'] ?? n['energy-kcal'] ?? null,
@@ -306,43 +342,59 @@ async function applyOffProduct(prod, prefix, productId) {
     salt: n['salt_100g'] ?? n['salt'] ?? null,
   };
 
-  const filled = [];
-  Object.keys(offMap).forEach((key) => {
-    const val = offMap[key];
-    if (val == null) return;
-    const fieldEl = document.getElementById(prefix + '-' + key);
-    if (!fieldEl) return;
-    // Don't overwrite existing local values with 0 from OFF (likely missing data)
-    if (val === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
-    fieldEl.value = (key === 'kcal' || key === 'energy_kj') ? Math.round(val) : parseFloat(val).toFixed(key === 'salt' ? 2 : 1);
-    filled.push(key);
-  });
-
+  // Build unified OFF values map (nutrition + metadata)
   const serving = prod.serving_size || '';
   const servMatch = serving.match(/([\d.]+)\s*g/);
-  if (servMatch) { const portionEl = document.getElementById(prefix + '-portion'); if (portionEl) { portionEl.value = Math.round(parseFloat(servMatch[1])); filled.push('portion'); } }
-
+  if (servMatch) offMap.portion = parseFloat(servMatch[1]);
   const qty = prod.product_quantity || 0;
-  if (qty) { const weightEl = document.getElementById(prefix + '-weight'); if (weightEl) { weightEl.value = Math.round(parseFloat(qty)); filled.push('weight'); } }
-
-  const nameEl = document.getElementById(prefix + '-name');
-  if (nameEl && !nameEl.value.trim()) { const pname = prod.product_name_no || prod.product_name || ''; if (pname) { nameEl.value = pname; filled.push('name'); } }
-
-  if (prod.code) {
-    const codeEl = document.getElementById(prefix + '-ean');
-    if (codeEl && !codeEl.value.trim()) { codeEl.value = prod.code; filled.push('ean'); }
-  }
-
-  const brand = prod.brands || '';
-  if (brand) { const brandEl = document.getElementById(prefix + '-brand'); if (brandEl) { brandEl.value = brand; filled.push('brand'); } }
-
+  if (qty) offMap.weight = parseFloat(qty);
+  offMap.name = prod.product_name_no || prod.product_name || '';
+  offMap.ean = prod.code || '';
+  offMap.brand = prod.brands || '';
   let stores = '';
   if (prod.stores) stores = prod.stores;
   else if (prod.stores_tags?.length) stores = prod.stores_tags.map((s) => s.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())).join(', ');
-  if (stores) { const storesEl = document.getElementById(prefix + '-stores'); if (storesEl) { storesEl.value = stores; filled.push('stores'); } }
+  offMap.stores = stores;
+  offMap.ingredients = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
 
-  const ing = prod.ingredients_text_no || prod.ingredients_text_en || prod.ingredients_text || '';
-  if (ing) { const ingEl = document.getElementById(prefix + '-ingredients'); if (ingEl) { ingEl.value = ing; filled.push('ingredients'); updateEstimateBtn(prefix); } }
+  const filled = [];
+
+  if (duplicateResolved) {
+    // OFF is authoritative: auto-apply all OFF values, no conflict modal
+    const { autoApply } = _detectConflicts(offMap, prefix);
+
+    Object.keys(autoApply).forEach((key) => {
+      const el = document.getElementById(prefix + '-' + key);
+      if (el) { el.value = autoApply[key]; filled.push(key); }
+    });
+
+    if (offMap.ingredients) updateEstimateBtn(prefix);
+  } else {
+    // Normal flow (no duplicate): OFF overwrites, but skip OFF 0 over local non-zero
+    Object.keys(offMap).forEach((key) => {
+      if (!_numericFields.has(key) && !['name', 'ean', 'brand', 'stores', 'ingredients'].includes(key)) return;
+      const val = offMap[key];
+      const fieldEl = document.getElementById(prefix + '-' + key);
+      if (!fieldEl) return;
+
+      if (_numericFields.has(key)) {
+        if (val == null || val === '') return;
+        const num = parseFloat(val);
+        if (isNaN(num)) return;
+        if (num === 0 && fieldEl.value !== '' && parseFloat(fieldEl.value) !== 0) return;
+        fieldEl.value = _formatNumeric(key, num);
+        filled.push(key);
+      } else {
+        const str = (typeof val === 'string' ? val : '').trim();
+        if (!str) return;
+        // ean: only fill if empty (name is overwritten with OFF value)
+        if (key === 'ean' && fieldEl.value.trim()) return;
+        fieldEl.value = str;
+        filled.push(key);
+        if (key === 'ingredients') updateEstimateBtn(prefix);
+      }
+    });
+  }
 
   const imgUrl = prod.image_front_url || prod.image_url || prod.image_front_small_url || '';
   if (imgUrl && isValidImageUrl(imgUrl)) {
@@ -363,8 +415,479 @@ async function applyOffProduct(prod, prefix, productId) {
     } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
   }
 
+  window._offAppliedFields = new Set(filled.filter(f => f !== 'image'));
   showToast(t('toast_off_fetched', { fields: filled.join(', ') }), 'success');
-  if (ing) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
+  if (offMap.ingredients) { setTimeout(() => { estimateProteinQuality(prefix); }, 300); }
+}
+
+export function showEditDuplicateModal(duplicate) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+    const pEl = document.createElement('p');
+    const msgKey = duplicate.is_synced_with_off ? 'duplicate_edit_synced' : 'duplicate_edit_unsynced';
+    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
+    modal.appendChild(pEl);
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    if (duplicate.is_synced_with_off) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'scan-modal-btn-register confirm-yes';
+      deleteBtn.textContent = t('duplicate_action_delete');
+      deleteBtn.addEventListener('click', () => { bg.remove(); resolve('delete'); });
+      actions.appendChild(deleteBtn);
+    } else {
+      const mergeBtn = document.createElement('button');
+      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
+      mergeBtn.textContent = t('duplicate_action_merge_into');
+      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('merge'); });
+      actions.appendChild(mergeBtn);
+    }
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
+}
+
+/**
+ * Fields eligible for conflict resolution during merge (excludes identity fields).
+ */
+const MERGE_CONFLICT_FIELDS = [
+  'brand', 'stores', 'ingredients', 'taste_note', 'taste_score',
+  'kcal', 'energy_kj', 'carbs', 'sugar', 'fat', 'saturated_fat',
+  'protein', 'fiber', 'salt', 'weight', 'portion', 'volume', 'price',
+  'est_pdcaas', 'est_diaas',
+];
+
+/**
+ * Fields whose values originate from OpenFoodFacts when a product is synced.
+ */
+const OFF_PROVIDED_FIELDS = new Set([
+  'name', 'ean', 'brand', 'stores', 'ingredients',
+  'kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar',
+  'protein', 'fiber', 'salt', 'weight', 'portion',
+]);
+
+/**
+ * Non-OFF (user-only) merge fields — used when one product is OFF-synced.
+ */
+const USER_ONLY_MERGE_FIELDS = MERGE_CONFLICT_FIELDS.filter(f => !OFF_PROVIDED_FIELDS.has(f));
+
+/**
+ * Show a conflict resolution modal when merging two products that both have
+ * values for the same fields.  Returns a dict of {field: chosenValue} or null
+ * if the user cancels.
+ */
+export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
+  // Build list of conflicting fields
+  const resolved = {};  // fields auto-resolved by OFF data
+  const conflicts = [];
+  for (const f of MERGE_CONFLICT_FIELDS) {
+    const formVal = formData[f];
+    const dupVal = duplicate[f];
+    const formEmpty = formVal === null || formVal === undefined || formVal === '' || formVal === 0;
+    const dupEmpty = dupVal === null || dupVal === undefined || dupVal === '' || dupVal === 0;
+
+    // If OFF provided this field, auto-resolve to form value (which has the OFF value)
+    if (offAppliedFields && offAppliedFields.has(f) && !formEmpty) {
+      resolved[f] = formVal;
+      continue;
+    }
+
+    if (!formEmpty && !dupEmpty && String(formVal) !== String(dupVal)) {
+      conflicts.push({ field: f, formVal, dupVal });
+    }
+  }
+
+  if (conflicts.length === 0) return Promise.resolve(resolved);
+
+  return new Promise((resolve) => {
+    const choices = {};
+    // Default: keep current (form) values
+    for (const c of conflicts) choices[c.field] = c.formVal;
+
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'conflict-modal';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = t('merge_conflict_title');
+    modal.appendChild(h3);
+    const desc = document.createElement('p');
+    desc.textContent = t('merge_conflict_desc', { name: duplicate.name });
+    modal.appendChild(desc);
+
+    // Bulk buttons
+    const bulk = document.createElement('div');
+    bulk.className = 'conflict-bulk';
+    const keepAllCurrent = document.createElement('button');
+    keepAllCurrent.textContent = t('merge_keep_all_current');
+    keepAllCurrent.type = 'button';
+    const keepAllDup = document.createElement('button');
+    keepAllDup.textContent = t('merge_keep_all_other');
+    keepAllDup.type = 'button';
+    bulk.appendChild(keepAllCurrent);
+    bulk.appendChild(keepAllDup);
+    modal.appendChild(bulk);
+
+    const fieldsContainer = document.createElement('div');
+    fieldsContainer.className = 'conflict-fields';
+
+    const optionEls = [];
+
+    for (const c of conflicts) {
+      const row = document.createElement('div');
+      const label = document.createElement('div');
+      label.className = 'conflict-row-label';
+      label.textContent = t('adv_field_' + c.field) || c.field;
+      row.appendChild(label);
+
+      const opts = document.createElement('div');
+      opts.className = 'conflict-row-options';
+
+      const optCurrent = document.createElement('div');
+      optCurrent.className = 'conflict-option selected';
+      optCurrent.innerHTML =
+        '<div class="conflict-option-source">' + t('merge_source_current') + '</div>' +
+        '<div class="conflict-option-value">' + _esc(String(c.formVal)) + '</div>';
+
+      const optDup = document.createElement('div');
+      optDup.className = 'conflict-option';
+      optDup.innerHTML =
+        '<div class="conflict-option-source">' + t('merge_source_other') + '</div>' +
+        '<div class="conflict-option-value">' + _esc(String(c.dupVal)) + '</div>';
+
+      optionEls.push({ field: c.field, formVal: c.formVal, dupVal: c.dupVal, optCurrent, optDup });
+
+      optCurrent.addEventListener('click', () => {
+        choices[c.field] = c.formVal;
+        optCurrent.classList.add('selected');
+        optDup.classList.remove('selected');
+      });
+      optDup.addEventListener('click', () => {
+        choices[c.field] = c.dupVal;
+        optDup.classList.add('selected');
+        optCurrent.classList.remove('selected');
+      });
+
+      opts.appendChild(optCurrent);
+      opts.appendChild(optDup);
+      row.appendChild(opts);
+      fieldsContainer.appendChild(row);
+    }
+
+    keepAllCurrent.addEventListener('click', () => {
+      for (const o of optionEls) {
+        choices[o.field] = o.formVal;
+        o.optCurrent.classList.add('selected');
+        o.optDup.classList.remove('selected');
+      }
+    });
+    keepAllDup.addEventListener('click', () => {
+      for (const o of optionEls) {
+        choices[o.field] = o.dupVal;
+        o.optDup.classList.add('selected');
+        o.optCurrent.classList.remove('selected');
+      }
+    });
+
+    modal.appendChild(fieldsContainer);
+
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'conflict-apply-btn';
+    applyBtn.textContent = t('merge_apply');
+    applyBtn.type = 'button';
+    applyBtn.addEventListener('click', () => { bg.remove(); resolve(Object.assign({}, resolved, choices)); });
+    actions.appendChild(applyBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.type = 'button';
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve(null); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
+}
+
+/**
+ * Show a combined duplicate-detection + merge-conflict modal for the edit-save flow.
+ *
+ * Three scenarios:
+ *  1. B (duplicate) is synced with OFF → A will be deleted, merged into B
+ *  2. A (current) is synced but B is not → B will be deleted, merged into A
+ *  3. Neither is synced → products merge (A survives, B deleted)
+ *
+ * Returns { scenario, choices: {field: value}, survivorId } or null on cancel.
+ */
+export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
+  const bIsSynced = duplicate.is_synced_with_off;
+  const aName = formData.name || '?';
+  const bName = duplicate.name || '?';
+  const aLabel = t('duplicate_merge_source_editing', { name: aName });
+  const bLabel = t('duplicate_merge_source_other', { name: bName });
+
+  let scenario, messageKey, fieldsToCheck;
+  if (bIsSynced) {
+    scenario = 'b_synced';
+    messageKey = 'duplicate_merge_b_synced';
+    fieldsToCheck = USER_ONLY_MERGE_FIELDS;
+  } else if (aIsSynced) {
+    scenario = 'a_synced';
+    messageKey = 'duplicate_merge_a_synced';
+    fieldsToCheck = USER_ONLY_MERGE_FIELDS;
+  } else {
+    scenario = 'neither';
+    messageKey = 'duplicate_merge_neither';
+    fieldsToCheck = MERGE_CONFLICT_FIELDS;
+  }
+
+  // Build auto-resolved values and conflicts
+  const autoResolved = {};
+  const conflicts = [];
+  for (const f of fieldsToCheck) {
+    const aVal = formData[f];
+    const bVal = duplicate[f];
+    const aEmpty = aVal === null || aVal === undefined || aVal === '';
+    const bEmpty = bVal === null || bVal === undefined || bVal === '';
+
+    if (aEmpty && bEmpty) continue;
+    if (!aEmpty && !bEmpty && String(aVal) === String(bVal)) continue;
+
+    if (aEmpty && !bEmpty) {
+      autoResolved[f] = bVal;
+    } else if (!aEmpty && bEmpty) {
+      autoResolved[f] = aVal;
+    } else {
+      conflicts.push({ field: f, aVal, bVal });
+    }
+  }
+
+  // Always show the dialog so the user can confirm the merge action
+  return new Promise((resolve) => {
+    const choices = {};
+    // Default: keep A's values for conflicts
+    for (const c of conflicts) choices[c.field] = c.aVal;
+
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'conflict-modal';
+
+    // Icon
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+
+    // Title
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+
+    // Scenario message
+    const msgEl = document.createElement('p');
+    msgEl.textContent = t(messageKey, { match_type: duplicate.match_type, name: bName });
+    modal.appendChild(msgEl);
+
+    // Only show field choices section if there are conflicts
+    const optionEls = [];
+    if (conflicts.length > 0) {
+      // Section header for field choices
+      const chooseHeader = document.createElement('p');
+      chooseHeader.style.cssText = 'font-size:13px;opacity:0.7;margin-top:12px';
+      chooseHeader.textContent = t('duplicate_merge_choose_values');
+      modal.appendChild(chooseHeader);
+
+      // Bulk buttons
+      const bulk = document.createElement('div');
+      bulk.className = 'conflict-bulk';
+      const keepAllA = document.createElement('button');
+      keepAllA.textContent = t('duplicate_merge_keep_all_a', { name: aName });
+      keepAllA.type = 'button';
+      const keepAllB = document.createElement('button');
+      keepAllB.textContent = t('duplicate_merge_keep_all_b', { name: bName });
+      keepAllB.type = 'button';
+      bulk.appendChild(keepAllA);
+      bulk.appendChild(keepAllB);
+      modal.appendChild(bulk);
+
+      const fieldsContainer = document.createElement('div');
+      fieldsContainer.className = 'conflict-fields';
+
+      for (const c of conflicts) {
+        const row = document.createElement('div');
+        const label = document.createElement('div');
+        label.className = 'conflict-row-label';
+        label.textContent = t('adv_field_' + c.field) || c.field;
+        row.appendChild(label);
+
+        if (c.field === 'taste_score') {
+          // Taste score uses a slider spanning both columns
+          const slider = document.createElement('div');
+          slider.className = 'conflict-taste-slider';
+
+          const avg = Math.round(((c.aVal + c.bVal) / 2) * 2) / 2;
+          choices[c.field] = avg;
+
+          const labelA = document.createElement('div');
+          labelA.className = 'conflict-taste-label conflict-taste-label-a';
+          labelA.innerHTML = '<span class="conflict-taste-name">' + _esc(aLabel) + '</span>' +
+            '<span class="conflict-taste-value">' + _esc(String(c.aVal)) + '</span>';
+
+          const valDisplay = document.createElement('div');
+          valDisplay.className = 'conflict-taste-current';
+          valDisplay.textContent = String(avg);
+
+          const labelB = document.createElement('div');
+          labelB.className = 'conflict-taste-label conflict-taste-label-b';
+          labelB.innerHTML = '<span class="conflict-taste-name">' + _esc(bLabel) + '</span>' +
+            '<span class="conflict-taste-value">' + _esc(String(c.bVal)) + '</span>';
+
+          const range = document.createElement('input');
+          range.type = 'range';
+          range.min = '0';
+          range.max = '6';
+          range.step = '0.5';
+          range.value = String(avg);
+          range.className = 'conflict-taste-range';
+
+          const updateSlider = () => {
+            const v = parseFloat(range.value);
+            choices[c.field] = v;
+            valDisplay.textContent = String(v);
+          };
+          range.addEventListener('input', updateSlider);
+
+          optionEls.push({
+            field: c.field, aVal: c.aVal, bVal: c.bVal,
+            setA() { range.value = String(c.aVal); updateSlider(); },
+            setB() { range.value = String(c.bVal); updateSlider(); },
+          });
+
+          const labelsRow = document.createElement('div');
+          labelsRow.className = 'conflict-taste-labels';
+          labelsRow.appendChild(labelA);
+          labelsRow.appendChild(valDisplay);
+          labelsRow.appendChild(labelB);
+          slider.appendChild(labelsRow);
+          slider.appendChild(range);
+          row.appendChild(slider);
+        } else {
+          // Standard click-to-pick options
+          const opts = document.createElement('div');
+          opts.className = 'conflict-row-options';
+
+          const displayA = c.field === 'volume' ? _volumeLabel(c.aVal) : c.aVal;
+          const displayB = c.field === 'volume' ? _volumeLabel(c.bVal) : c.bVal;
+
+          const optA = document.createElement('div');
+          optA.className = 'conflict-option selected';
+          optA.innerHTML =
+            '<div class="conflict-option-source">' + _esc(aLabel) + '</div>' +
+            '<div class="conflict-option-value">' + _esc(String(displayA)) + '</div>';
+
+          const optB = document.createElement('div');
+          optB.className = 'conflict-option';
+          optB.innerHTML =
+            '<div class="conflict-option-source">' + _esc(bLabel) + '</div>' +
+            '<div class="conflict-option-value">' + _esc(String(displayB)) + '</div>';
+
+          optionEls.push({
+            field: c.field, aVal: c.aVal, bVal: c.bVal, optA, optB,
+            setA() { optA.classList.add('selected'); optB.classList.remove('selected'); },
+            setB() { optB.classList.add('selected'); optA.classList.remove('selected'); },
+          });
+
+          optA.addEventListener('click', () => {
+            choices[c.field] = c.aVal;
+            optA.classList.add('selected');
+            optB.classList.remove('selected');
+          });
+          optB.addEventListener('click', () => {
+            choices[c.field] = c.bVal;
+            optB.classList.add('selected');
+            optA.classList.remove('selected');
+          });
+
+          opts.appendChild(optA);
+          opts.appendChild(optB);
+          row.appendChild(opts);
+        }
+        fieldsContainer.appendChild(row);
+      }
+
+      keepAllA.addEventListener('click', () => {
+        for (const o of optionEls) {
+          choices[o.field] = o.aVal;
+          o.setA();
+        }
+      });
+      keepAllB.addEventListener('click', () => {
+        for (const o of optionEls) {
+          choices[o.field] = o.bVal;
+          o.setB();
+        }
+      });
+
+      modal.appendChild(fieldsContainer);
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'conflict-apply-btn';
+    applyBtn.textContent = t('duplicate_merge_confirm');
+    applyBtn.type = 'button';
+    applyBtn.addEventListener('click', () => {
+      bg.remove();
+      resolve({ scenario, choices: Object.assign({}, autoResolved, choices) });
+    });
+    actions.appendChild(applyBtn);
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
+    cancelBtn.textContent = t('btn_cancel');
+    cancelBtn.type = 'button';
+    cancelBtn.addEventListener('click', () => { bg.remove(); resolve(null); });
+    actions.appendChild(cancelBtn);
+    modal.appendChild(actions);
+
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+  });
+}
+
+function _esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 // Validate image URLs to prevent SSRF via the proxy endpoint

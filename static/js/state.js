@@ -74,7 +74,12 @@ export async function api(path, opts) {
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch(e) { data = {}; }
-    if (!res.ok) throw new Error(data.error || 'Request failed: ' + res.status);
+    if (!res.ok) {
+      const err = new Error(data.error || 'Request failed: ' + res.status);
+      err.status = res.status;
+      err.data = data;
+      throw err;
+    }
     return data;
   } finally {
     clearTimeout(timeoutId);

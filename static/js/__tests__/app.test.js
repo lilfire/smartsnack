@@ -14,10 +14,22 @@ vi.mock('../state.js', () => {
     sortDir: 'desc',
     categories: [],
     imageCache: {},
+    advancedFilters: null,
   };
   return {
     state: _state,
+    NUTRI_IDS: ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'],
+    catEmoji: vi.fn(() => '\u{1F4E6}'),
+    catLabel: vi.fn((t) => t),
+    esc: (s) => String(s ?? ''),
+    safeDataUri: vi.fn((uri) => uri || ''),
+    fmtNum: vi.fn((v) => v == null ? '-' : String(v)),
+    showToast: vi.fn(),
     api: vi.fn().mockResolvedValue([]),
+    fetchProducts: vi.fn().mockResolvedValue([]),
+    fetchStats: vi.fn().mockResolvedValue({}),
+    showConfirmModal: vi.fn().mockResolvedValue(true),
+    upgradeSelect: vi.fn(),
   };
 });
 
@@ -27,11 +39,15 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((k) => k),
 }));
 
-vi.mock('../filters.js', () => ({
-  toggleFilters: vi.fn(),
-  setSort: vi.fn(),
-  rerender: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    toggleFilters: vi.fn(),
+    setSort: vi.fn(),
+    rerender: vi.fn(),
+  };
+});
 
 vi.mock('../images.js', () => ({
   triggerImageUpload: vi.fn(),
@@ -104,6 +120,10 @@ vi.mock('../scanner.js', () => ({
   scanOffFetch: vi.fn(),
 }));
 
+vi.mock('../advanced-filters.js', () => ({
+  toggleAdvancedFilters: vi.fn(),
+}));
+
 vi.mock('../openfoodfacts.js', () => ({
   validateOffBtn: vi.fn(),
   lookupOFF: vi.fn(),
@@ -131,23 +151,51 @@ describe('app.js', () => {
     // Import app.js which assigns functions to window
     await import('../app.js');
 
-    // Verify key functions are exposed
-    expect(typeof window.switchView).toBe('function');
-    expect(typeof window.setFilter).toBe('function');
-    expect(typeof window.toggleExpand).toBe('function');
-    expect(typeof window.startEdit).toBe('function');
-    expect(typeof window.saveProduct).toBe('function');
-    expect(typeof window.deleteProduct).toBe('function');
-    expect(typeof window.loadData).toBe('function');
-    expect(typeof window.registerProduct).toBe('function');
-    expect(typeof window.openScanner).toBe('function');
-    expect(typeof window.closeScanner).toBe('function');
-    expect(typeof window.toggleFilters).toBe('function');
-    expect(typeof window.setSort).toBe('function');
-    expect(typeof window.changeLanguage).toBe('function');
-    expect(typeof window.downloadBackup).toBe('function');
-    expect(typeof window.lookupOFF).toBe('function');
-    expect(typeof window.submitToOff).toBe('function');
+    // Verify ALL functions exposed via Object.assign(window, {...})
+    const expectedFunctions = [
+      // i18n
+      'changeLanguage',
+      // filters
+      'toggleFilters', 'setSort', 'toggleAdvancedFilters',
+      // images
+      'triggerImageUpload', 'removeProductImage',
+      // products
+      'showToast', 'startEdit', 'saveProduct', 'deleteProduct',
+      'switchView', 'setFilter', 'toggleExpand',
+      'onSearchInput', 'clearSearch', 'registerProduct',
+      'rerender',
+      // settings — sections
+      'toggleSettingsSection',
+      // settings — weights
+      'toggleWeightConfig', 'removeWeight', 'addWeightFromDropdown',
+      'onWeightDirection', 'onWeightFormula', 'onWeightMin', 'onWeightMax', 'onWeightSlider',
+      // settings — categories
+      'updateCategoryLabel', 'addCategory', 'deleteCategory',
+      // settings — flags
+      'addFlag', 'deleteFlag', 'updateFlagLabel',
+      // settings — protein quality
+      'autosavePq', 'deletePq', 'addPq',
+      // settings — backup
+      'downloadBackup', 'handleRestore', 'handleImport',
+      // settings — OFF credentials
+      'saveOffCredentials',
+      // settings — bulk operations
+      'refreshAllFromOff', 'estimateAllPq',
+      // scanner
+      'openScanner', 'closeScanner', 'openSearchScanner',
+      'closeScanModal', 'scanRegisterNew', 'scanUpdateExisting',
+      'closeScanPicker', 'scanPickerSearch', 'scanPickerSelect',
+      'scanOffFetch', 'closeScanOffConfirm',
+      // openfoodfacts
+      'validateOffBtn', 'lookupOFF', 'closeOffPicker', 'offModalSearch',
+      'selectOffResult', 'estimateProteinQuality', 'updateEstimateBtn',
+      'showOffAddReview', 'closeOffAddReview', 'submitToOff',
+      // state access
+      'loadData',
+    ];
+    for (const fn of expectedFunctions) {
+      expect(typeof window[fn]).toBe('function');
+    }
   });
 
   it('exposes editingId as getter/setter on window', async () => {
@@ -159,5 +207,56 @@ describe('app.js', () => {
 
     state.editingId = 99;
     expect(window.editingId).toBe(99);
+  });
+});
+
+const flushPromises = () => new Promise((r) => setTimeout(r, 0));
+
+describe('app.js initialization', () => {
+  it('skips focus when search-input element is absent', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    await import('../app.js');
+    await flushPromises();
+
+    // No error thrown means the if (searchInput) false branch executed safely
+  });
+
+  it('calls showToast when api /api/weights rejects', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    const { api } = await import('../state.js');
+    api.mockRejectedValueOnce(new Error('network fail'));
+
+    await import('../app.js');
+    await flushPromises();
+
+    const { showToast } = await import('../products.js');
+    expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
+  });
+
+  it('populates weightData and SCORE_CFG_MAP from api response', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    const { api } = await import('../state.js');
+    api.mockResolvedValueOnce([
+      { field: 'fat', label: 'Fat', desc: 'Fat desc', direction: 'lower' },
+      { field: 'sugar', label: 'Sugar', desc: 'Sugar desc', direction: 'lower' },
+    ]);
+
+    await import('../app.js');
+    await flushPromises();
+
+    const { weightData, SCORE_CFG_MAP } = await import('../settings.js');
+
+    expect(weightData).toHaveLength(2);
+    expect(weightData[0]).toEqual({ field: 'fat', label: 'Fat', desc: 'Fat desc', direction: 'lower' });
+    expect(weightData[1]).toEqual({ field: 'sugar', label: 'Sugar', desc: 'Sugar desc', direction: 'lower' });
+
+    expect(SCORE_CFG_MAP.fat).toEqual({ label: 'Fat', desc: 'Fat desc', direction: 'lower' });
+    expect(SCORE_CFG_MAP.sugar).toEqual({ label: 'Sugar', desc: 'Sugar desc', direction: 'lower' });
   });
 });
