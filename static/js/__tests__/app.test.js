@@ -120,6 +120,10 @@ vi.mock('../scanner.js', () => ({
   scanOffFetch: vi.fn(),
 }));
 
+vi.mock('../advanced-filters.js', () => ({
+  toggleAdvancedFilters: vi.fn(),
+}));
+
 vi.mock('../openfoodfacts.js', () => ({
   validateOffBtn: vi.fn(),
   lookupOFF: vi.fn(),
@@ -147,23 +151,51 @@ describe('app.js', () => {
     // Import app.js which assigns functions to window
     await import('../app.js');
 
-    // Verify key functions are exposed
-    expect(typeof window.switchView).toBe('function');
-    expect(typeof window.setFilter).toBe('function');
-    expect(typeof window.toggleExpand).toBe('function');
-    expect(typeof window.startEdit).toBe('function');
-    expect(typeof window.saveProduct).toBe('function');
-    expect(typeof window.deleteProduct).toBe('function');
-    expect(typeof window.loadData).toBe('function');
-    expect(typeof window.registerProduct).toBe('function');
-    expect(typeof window.openScanner).toBe('function');
-    expect(typeof window.closeScanner).toBe('function');
-    expect(typeof window.toggleFilters).toBe('function');
-    expect(typeof window.setSort).toBe('function');
-    expect(typeof window.changeLanguage).toBe('function');
-    expect(typeof window.downloadBackup).toBe('function');
-    expect(typeof window.lookupOFF).toBe('function');
-    expect(typeof window.submitToOff).toBe('function');
+    // Verify ALL functions exposed via Object.assign(window, {...})
+    const expectedFunctions = [
+      // i18n
+      'changeLanguage',
+      // filters
+      'toggleFilters', 'setSort', 'toggleAdvancedFilters',
+      // images
+      'triggerImageUpload', 'removeProductImage',
+      // products
+      'showToast', 'startEdit', 'saveProduct', 'deleteProduct',
+      'switchView', 'setFilter', 'toggleExpand',
+      'onSearchInput', 'clearSearch', 'registerProduct',
+      'rerender',
+      // settings — sections
+      'toggleSettingsSection',
+      // settings — weights
+      'toggleWeightConfig', 'removeWeight', 'addWeightFromDropdown',
+      'onWeightDirection', 'onWeightFormula', 'onWeightMin', 'onWeightMax', 'onWeightSlider',
+      // settings — categories
+      'updateCategoryLabel', 'addCategory', 'deleteCategory',
+      // settings — flags
+      'addFlag', 'deleteFlag', 'updateFlagLabel',
+      // settings — protein quality
+      'autosavePq', 'deletePq', 'addPq',
+      // settings — backup
+      'downloadBackup', 'handleRestore', 'handleImport',
+      // settings — OFF credentials
+      'saveOffCredentials',
+      // settings — bulk operations
+      'refreshAllFromOff', 'estimateAllPq',
+      // scanner
+      'openScanner', 'closeScanner', 'openSearchScanner',
+      'closeScanModal', 'scanRegisterNew', 'scanUpdateExisting',
+      'closeScanPicker', 'scanPickerSearch', 'scanPickerSelect',
+      'scanOffFetch', 'closeScanOffConfirm',
+      // openfoodfacts
+      'validateOffBtn', 'lookupOFF', 'closeOffPicker', 'offModalSearch',
+      'selectOffResult', 'estimateProteinQuality', 'updateEstimateBtn',
+      'showOffAddReview', 'closeOffAddReview', 'submitToOff',
+      // state access
+      'loadData',
+    ];
+    for (const fn of expectedFunctions) {
+      expect(typeof window[fn]).toBe('function');
+    }
   });
 
   it('exposes editingId as getter/setter on window', async () => {

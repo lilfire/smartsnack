@@ -1199,6 +1199,69 @@ describe('showEditDuplicateModal', () => {
     const result = await promise;
     expect(result).toBe('cancel');
   });
+
+  it('sets ARIA dialog attributes on the modal background', async () => {
+    const duplicate = { id: 1, name: 'Test', match_type: 'ean', is_synced_with_off: false };
+    const promise = showEditDuplicateModal(duplicate);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg.getAttribute('role')).toBe('dialog');
+    expect(bg.getAttribute('aria-modal')).toBe('true');
+
+    bg.querySelector('.confirm-no').click();
+    await promise;
+  });
+
+  it('uses correct translation key for synced vs unsynced message', async () => {
+    // Synced
+    const syncedDup = { id: 1, name: 'A', match_type: 'ean', is_synced_with_off: true };
+    const p1 = showEditDuplicateModal(syncedDup);
+    const bg1 = document.querySelector('.scan-modal-bg');
+    expect(bg1.querySelector('p').textContent).toBe('duplicate_edit_synced');
+    expect(bg1.querySelector('h3').textContent).toBe('duplicate_found_title');
+    bg1.querySelector('.confirm-no').click();
+    await p1;
+
+    // Unsynced
+    const unsyncedDup = { id: 2, name: 'B', match_type: 'name', is_synced_with_off: false };
+    const p2 = showEditDuplicateModal(unsyncedDup);
+    const bg2 = document.querySelector('.scan-modal-bg');
+    expect(bg2.querySelector('p').textContent).toBe('duplicate_edit_unsynced');
+    bg2.querySelector('.confirm-no').click();
+    await p2;
+  });
+
+  it('removes modal from DOM after button click', async () => {
+    const duplicate = { id: 1, name: 'Test', match_type: 'ean', is_synced_with_off: true };
+    const promise = showEditDuplicateModal(duplicate);
+
+    expect(document.querySelector('.scan-modal-bg')).not.toBeNull();
+    document.querySelector('.confirm-yes').click();
+    await promise;
+    expect(document.querySelector('.scan-modal-bg')).toBeNull();
+  });
+
+  it('synced modal has no merge button and unsynced has no delete button', async () => {
+    // Synced: only delete, no merge
+    const syncedDup = { id: 1, name: 'A', match_type: 'ean', is_synced_with_off: true };
+    const p1 = showEditDuplicateModal(syncedDup);
+    const bg1 = document.querySelector('.scan-modal-bg');
+    const buttons1 = Array.from(bg1.querySelectorAll('button'));
+    expect(buttons1.some(b => b.textContent === 'duplicate_action_delete')).toBe(true);
+    expect(buttons1.some(b => b.textContent === 'duplicate_action_merge_into')).toBe(false);
+    bg1.querySelector('.confirm-no').click();
+    await p1;
+
+    // Unsynced: only merge, no delete
+    const unsyncedDup = { id: 2, name: 'B', match_type: 'ean', is_synced_with_off: false };
+    const p2 = showEditDuplicateModal(unsyncedDup);
+    const bg2 = document.querySelector('.scan-modal-bg');
+    const buttons2 = Array.from(bg2.querySelectorAll('button'));
+    expect(buttons2.some(b => b.textContent === 'duplicate_action_merge_into')).toBe(true);
+    expect(buttons2.some(b => b.textContent === 'duplicate_action_delete')).toBe(false);
+    bg2.querySelector('.confirm-no').click();
+    await p2;
+  });
 });
 
 describe('showOffAddReview without name', () => {
@@ -1448,3 +1511,4 @@ describe('lookupOFF name search edge cases', () => {
     expect(global.fetch).toHaveBeenCalled();
   });
 });
+
