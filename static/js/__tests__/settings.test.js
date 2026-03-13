@@ -1604,3 +1604,858 @@ describe('loadSettings - loadOffCredentials paths', () => {
     api.mockReset().mockResolvedValue({});
   });
 });
+
+// ══════════════════════════════════════════════════════
+// NEW TESTS: Cover falsy branches of null-check guards
+// ══════════════════════════════════════════════════════
+
+describe('_connectRefreshStream with NO DOM elements', () => {
+  let mockES;
+  beforeEach(() => {
+    // Intentionally NO DOM elements — covers all if(btn), if(bar), if(status), if(progressWrap) falsy branches
+    mockES = { onmessage: null, onerror: null, close: vi.fn() };
+    vi.stubGlobal('EventSource', vi.fn(() => mockES));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.mockReset().mockResolvedValue({});
+  });
+
+  it('handles onmessage with running data and no DOM elements', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // Fire onmessage with running data — bar/status are null, falsy branches hit
+    mockES.onmessage({ data: JSON.stringify({ running: true, total: 10, current: 3, name: 'TestProduct' }) });
+    expect(mockES.close).not.toHaveBeenCalled();
+  });
+
+  it('handles onmessage with running data using ean instead of name', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // data.name is falsy, falls back to data.ean
+    mockES.onmessage({ data: JSON.stringify({ running: true, total: 5, current: 2, ean: '12345' }) });
+    expect(mockES.close).not.toHaveBeenCalled();
+  });
+
+  it('handles onmessage with done data, no report, no DOM', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // done without report — covers data.report falsy branch + all DOM falsy branches
+    mockES.onmessage({ data: JSON.stringify({ done: true, total: 10, updated: 5, skipped: 3, errors: 2 }) });
+    expect(mockES.close).toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalled();
+  });
+
+  it('handles onmessage with done data and report but no container', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // done with report — _renderRefreshReport called but container missing -> early return
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 5, updated: 3, skipped: 1, errors: 1,
+      report: [{ name: 'P1', status: 'updated', fields: ['kcal'] }]
+    }) });
+    expect(mockES.close).toHaveBeenCalled();
+  });
+
+  it('handles onmessage with invalid JSON data', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // Invalid JSON triggers the catch and returns early
+    mockES.onmessage({ data: 'not json' });
+    expect(mockES.close).not.toHaveBeenCalled();
+  });
+
+  it('handles onmessage with running=true but total=0', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // data.running && data.total > 0 is false when total is 0
+    mockES.onmessage({ data: JSON.stringify({ running: true, total: 0, current: 0 }) });
+    expect(mockES.close).not.toHaveBeenCalled();
+  });
+
+  it('handles onerror with no DOM elements', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // onerror — btn and progressWrap are null, falsy branches hit
+    mockES.onerror();
+    expect(mockES.close).toHaveBeenCalled();
+  });
+
+  it('closes previous EventSource when reconnecting', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    const firstES = mockES;
+    // Create a new mock for the second connection
+    const mockES2 = { onmessage: null, onerror: null, close: vi.fn() };
+    EventSource.mockImplementation(() => mockES2);
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    expect(firstES.close).toHaveBeenCalled();
+  });
+});
+
+describe('_renderRefreshReport with container present', () => {
+  let mockES;
+  beforeEach(() => {
+    const container = document.createElement('div');
+    container.id = 'refresh-off-progress';
+    document.body.appendChild(container);
+    mockES = { onmessage: null, onerror: null, close: vi.fn() };
+    vi.stubGlobal('EventSource', vi.fn(() => mockES));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.mockReset().mockResolvedValue({});
+  });
+
+  it('renders report with updated status and fields', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 3, updated: 2, skipped: 1, errors: 0,
+      report: [
+        { name: 'Product A', status: 'updated', fields: ['kcal', 'protein'] },
+      ]
+    }) });
+    const report = document.querySelector('.refresh-report');
+    expect(report).not.toBeNull();
+    const toggle = report.querySelector('.refresh-report-toggle');
+    expect(toggle).not.toBeNull();
+  });
+
+  it('renders report with various statuses and report items visible in modal', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 4, updated: 1, skipped: 2, errors: 1,
+      report: [
+        { name: 'P1', status: 'updated', fields: ['kcal'] },
+        { name: 'P2', status: 'skipped', reason: 'not_found' },
+        { ean: '999', status: 'error', reason: 'some_unknown_reason', detail: 'extra info' },
+        { status: 'skipped', reason: 'no_results' },
+      ]
+    }) });
+    const report = document.querySelector('.refresh-report');
+    expect(report).not.toBeNull();
+    // The toggle button should exist
+    const toggle = report.querySelector('.refresh-report-toggle');
+    expect(toggle).not.toBeNull();
+  });
+
+  it('opens report modal when toggle button is clicked', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 1, updated: 1, skipped: 0, errors: 0,
+      report: [{ name: 'P1', status: 'updated', fields: ['fat'] }]
+    }) });
+    const toggle = document.querySelector('.refresh-report-toggle');
+    toggle.click();
+    const modalBg = document.getElementById('refresh-report-modal-bg');
+    expect(modalBg).not.toBeNull();
+    expect(document.body.style.overflow).toBe('hidden');
+  });
+
+  it('closes report modal via close button', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 1, updated: 1, skipped: 0, errors: 0,
+      report: [{ name: 'P1', status: 'updated', fields: ['fat'] }]
+    }) });
+    document.querySelector('.refresh-report-toggle').click();
+    const closeBtn = document.querySelector('.off-modal-close');
+    closeBtn.click();
+    expect(document.getElementById('refresh-report-modal-bg')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('closes report modal via Escape key', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 1, updated: 1, skipped: 0, errors: 0,
+      report: [{ name: 'P1', status: 'updated', fields: ['fat'] }]
+    }) });
+    document.querySelector('.refresh-report-toggle').click();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.getElementById('refresh-report-modal-bg')).toBeNull();
+  });
+
+  it('closes report modal via background click', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 1, updated: 1, skipped: 0, errors: 0,
+      report: [{ name: 'P1', status: 'updated', fields: ['fat'] }]
+    }) });
+    document.querySelector('.refresh-report-toggle').click();
+    const bg = document.getElementById('refresh-report-modal-bg');
+    bg.dispatchEvent(new MouseEvent('click', { bubbles: false }));
+    expect(document.getElementById('refresh-report-modal-bg')).toBeNull();
+  });
+
+  it('removes previous report when new one arrives', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    // First report
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 1, updated: 1, skipped: 0, errors: 0,
+      report: [{ name: 'P1', status: 'updated', fields: ['fat'] }]
+    }) });
+    expect(document.querySelectorAll('.refresh-report').length).toBe(1);
+    // Reconnect and send second report
+    const mockES2 = { onmessage: null, onerror: null, close: vi.fn() };
+    EventSource.mockImplementation(() => mockES2);
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES2.onmessage({ data: JSON.stringify({
+      done: true, total: 2, updated: 2, skipped: 0, errors: 0,
+      report: [{ name: 'P2', status: 'updated', fields: ['salt'] }]
+    }) });
+    // Old report replaced by new
+    expect(document.querySelectorAll('.refresh-report').length).toBe(1);
+  });
+});
+
+describe('handleImport error and cancel paths', () => {
+  it('shows error toast for invalid JSON in file', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: 'not valid json' } });
+        }, 0);
+      }
+    };
+    const input = { files: [new Blob(['x'])], value: 'bad.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(showToast).toHaveBeenCalledWith('toast_invalid_file', 'error');
+    global.FileReader = origFileReader;
+  });
+
+  it('cancels import when duplicate dialog is cancelled', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(0);
+    // Click cancel button on the duplicate dialog
+    const cancelBtn = document.querySelector('.scan-modal-btn-cancel');
+    expect(cancelBtn).not.toBeNull();
+    cancelBtn.click();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(api).not.toHaveBeenCalledWith('/api/import', expect.anything());
+    expect(input.value).toBe('');
+    global.FileReader = origFileReader;
+  });
+
+  it('shows error when import API returns error', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    api.mockResolvedValueOnce({ error: 'Import failed' });
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(0);
+    const startBtn = document.querySelector('.scan-modal-btn-register');
+    startBtn.click();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(showToast).toHaveBeenCalledWith('Import failed', 'error');
+    global.FileReader = origFileReader;
+  });
+
+  it('loads settings when import succeeds and currentView is settings', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    // Set up DOM for loadSettings to work
+    ['settings-loading', 'settings-content', 'weight-items', 'cat-list',
+     'flag-list', 'pq-list', 'cat-emoji-trigger', 'cat-emoji'].forEach((id) => {
+      const el = document.createElement('div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+    state.currentView = 'settings';
+    api.mockResolvedValueOnce({ message: 'Imported 5 products' }); // /api/import
+    // loadSettings will call many apis
+    api.mockImplementation(() => Promise.resolve([]));
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(0);
+    const startBtn = document.querySelector('.scan-modal-btn-register');
+    startBtn.click();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(showToast).toHaveBeenCalledWith('Imported 5 products', 'success');
+    state.currentView = 'search';
+    api.mockReset().mockResolvedValue({});
+    global.FileReader = origFileReader;
+  });
+});
+
+describe('showImportDuplicateDialog edge cases', () => {
+  it('closes dialog via Escape key', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(0);
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg).not.toBeNull();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await vi.advanceTimersByTimeAsync(10);
+    expect(document.querySelector('.scan-modal-bg')).toBeNull();
+    expect(api).not.toHaveBeenCalledWith('/api/import', expect.anything());
+    global.FileReader = origFileReader;
+  });
+
+  it('closes dialog via background click', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(0);
+    const bg = document.querySelector('.scan-modal-bg');
+    bg.dispatchEvent(new MouseEvent('click', { bubbles: false }));
+    await vi.advanceTimersByTimeAsync(10);
+    expect(document.querySelector('.scan-modal-bg')).toBeNull();
+    global.FileReader = origFileReader;
+  });
+
+  it('shows merge section when merge action is selected', async () => {
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    const input = { files: [new Blob(['{}'])], value: 'import.json' };
+    handleImport(input);
+    await vi.advanceTimersByTimeAsync(0);
+    // Select merge radio
+    const mergeRadio = document.querySelector('input[name="on_duplicate"][value="merge"]');
+    expect(mergeRadio).not.toBeNull();
+    mergeRadio.checked = true;
+    // Trigger change on the action section
+    const actionSection = mergeRadio.closest('.import-dup-section');
+    actionSection.dispatchEvent(new Event('change', { bubbles: true }));
+    // Merge rules should now be visible
+    const mergeRules = document.querySelector('.import-dup-merge-rules');
+    expect(mergeRules.style.display).toBe('');
+    // Clean up
+    document.querySelector('.scan-modal-btn-cancel').click();
+    await vi.advanceTimersByTimeAsync(10);
+    global.FileReader = origFileReader;
+  });
+});
+
+describe('initRestoreDragDrop missing element', () => {
+  it('returns early when restore-drop element is missing', () => {
+    const { initRestoreDragDrop } = require('../settings.js');
+    // No DOM element created — should return early without error
+    expect(() => initRestoreDragDrop()).not.toThrow();
+  });
+
+  it('handles drop event with no files', () => {
+    const { initRestoreDragDrop } = require('../settings.js');
+    const drop = document.createElement('div');
+    drop.id = 'restore-drop';
+    document.body.appendChild(drop);
+    initRestoreDragDrop();
+    // Simulate drop with no files
+    const dropEvent = new Event('drop');
+    dropEvent.preventDefault = vi.fn();
+    dropEvent.dataTransfer = { files: [] };
+    drop.dispatchEvent(dropEvent);
+    expect(drop.classList.contains('dragover')).toBe(false);
+  });
+
+  it('handles dragleave event', () => {
+    const { initRestoreDragDrop } = require('../settings.js');
+    const drop = document.createElement('div');
+    drop.id = 'restore-drop';
+    document.body.appendChild(drop);
+    initRestoreDragDrop();
+    drop.classList.add('dragover');
+    drop.dispatchEvent(new Event('dragleave'));
+    expect(drop.classList.contains('dragover')).toBe(false);
+  });
+});
+
+describe('loadSettings with missing DOM elements', () => {
+  it('works without settings-loading, settings-content, or language-select', async () => {
+    // Only create weight-items and cat-list (minimum for renderWeightItems/loadCategories)
+    const container = document.createElement('div');
+    container.id = 'weight-items';
+    document.body.appendChild(container);
+    const catList = document.createElement('div');
+    catList.id = 'cat-list';
+    document.body.appendChild(catList);
+    const flagList = document.createElement('div');
+    flagList.id = 'flag-list';
+    document.body.appendChild(flagList);
+    const pqList = document.createElement('div');
+    pqList.id = 'pq-list';
+    document.body.appendChild(pqList);
+
+    api.mockImplementation((url) => {
+      if (url === '/api/weights') return Promise.resolve([]);
+      if (url === '/api/categories') return Promise.resolve([]);
+      if (url === '/api/flags') return Promise.resolve([]);
+      if (url === '/api/protein-quality') return Promise.resolve([]);
+      if (url === '/api/settings/off-credentials') return Promise.resolve({ off_user_id: '', has_password: false });
+      if (url === '/api/bulk/refresh-off/status') return Promise.resolve({ running: false });
+      return Promise.resolve([]);
+    });
+    await loadSettings();
+    // settingsLoading and settingsContent are null — falsy branches hit
+    // langSelect is null — entire block skipped
+    expect(weightData.length).toBe(0);
+    api.mockReset().mockResolvedValue({});
+  });
+
+  it('handles language API failure', async () => {
+    ['settings-loading', 'settings-content', 'weight-items', 'cat-list',
+     'flag-list', 'pq-list', 'cat-emoji-trigger', 'cat-emoji'].forEach((id) => {
+      const el = document.createElement('div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+    const langSelect = document.createElement('select');
+    langSelect.id = 'language-select';
+    document.body.appendChild(langSelect);
+
+    api.mockImplementation((url) => {
+      if (url === '/api/weights') return Promise.resolve([]);
+      if (url === '/api/languages') return Promise.reject(new Error('lang fail'));
+      if (url === '/api/categories') return Promise.resolve([]);
+      if (url === '/api/flags') return Promise.resolve([]);
+      if (url === '/api/protein-quality') return Promise.resolve([]);
+      if (url === '/api/settings/off-credentials') return Promise.resolve({ off_user_id: '', has_password: false });
+      if (url === '/api/bulk/refresh-off/status') return Promise.resolve({ running: false });
+      return Promise.resolve([]);
+    });
+    await loadSettings();
+    expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
+    api.mockReset().mockResolvedValue({});
+  });
+
+  it('renders language option without flag property', async () => {
+    ['settings-loading', 'settings-content', 'weight-items', 'cat-list',
+     'flag-list', 'pq-list', 'cat-emoji-trigger', 'cat-emoji'].forEach((id) => {
+      const el = document.createElement('div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+    const langSelect = document.createElement('select');
+    langSelect.id = 'language-select';
+    document.body.appendChild(langSelect);
+
+    api.mockImplementation((url) => {
+      if (url === '/api/weights') return Promise.resolve([]);
+      // Language without flag — covers l.flag falsy branch (line 61)
+      if (url === '/api/languages') return Promise.resolve([{ code: 'en', label: 'English' }]);
+      if (url === '/api/categories') return Promise.resolve([]);
+      if (url === '/api/flags') return Promise.resolve([]);
+      if (url === '/api/protein-quality') return Promise.resolve([]);
+      if (url === '/api/settings/off-credentials') return Promise.resolve({ off_user_id: '', has_password: false });
+      if (url === '/api/bulk/refresh-off/status') return Promise.resolve({ running: false });
+      return Promise.resolve([]);
+    });
+    await loadSettings();
+    const opt = langSelect.querySelector('option');
+    expect(opt.textContent).toBe('English'); // No flag prefix
+    api.mockReset().mockResolvedValue({});
+  });
+});
+
+describe('estimateAllPq with no DOM elements', () => {
+  it('succeeds with no btn or status element', async () => {
+    // No DOM elements — all if(btn)/if(status) falsy branches hit
+    api.mockResolvedValueOnce({ total: 10, updated: 8, skipped: 2 });
+    await estimateAllPq();
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+  });
+
+  it('handles error with no btn or status element', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.mockRejectedValueOnce(new Error('fail'));
+    await estimateAllPq();
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    console.error.mockRestore();
+  });
+
+  it('handles API error field with no btn or status', async () => {
+    api.mockResolvedValueOnce({ error: 'pq error' });
+    await estimateAllPq();
+    expect(showToast).toHaveBeenCalledWith('pq error', 'error');
+  });
+});
+
+describe('refreshAllFromOff with missing bar and prevReport', () => {
+  let mockES;
+  beforeEach(() => {
+    // Only create the button, NOT the bar or progress elements
+    const btn = document.createElement('button');
+    btn.id = 'btn-refresh-all-off';
+    document.body.appendChild(btn);
+    mockES = { onmessage: null, onerror: null, close: vi.fn() };
+    vi.stubGlobal('EventSource', vi.fn(() => mockES));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.mockReset().mockResolvedValue({});
+  });
+
+  it('starts refresh without bar or prevReport elements', async () => {
+    api.mockResolvedValueOnce({});
+    const p = refreshAllFromOff();
+    document.querySelector('.confirm-yes').click();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+    expect(api).toHaveBeenCalledWith('/api/bulk/refresh-off/start', expect.anything());
+  });
+});
+
+describe('saveWeights with disabled weights and missing slider elements', () => {
+  it('preserves disabled weight values without DOM elements', async () => {
+    weightData.push(
+      { field: 'kcal', enabled: false, weight: 0, direction: 'lower', formula: 'minmax', formula_min: 5, formula_max: 100 },
+    );
+    api.mockResolvedValueOnce({});
+    await saveWeights();
+    const payload = JSON.parse(api.mock.calls[0][1].body);
+    expect(payload[0].enabled).toBe(false);
+    expect(payload[0].formula_min).toBe(5);
+  });
+
+  it('handles enabled weight without slider/min/max elements (ternary fallbacks)', async () => {
+    weightData.push(
+      { field: 'protein', enabled: true, weight: 30, direction: 'higher', formula: 'direct', formula_min: 0, formula_max: 50 },
+    );
+    // No DOM elements for protein — sliderEl/minEl/maxEl are null, ternary fallback used
+    api.mockResolvedValueOnce({});
+    await saveWeights();
+    const payload = JSON.parse(api.mock.calls[0][1].body);
+    expect(payload[0].weight).toBe(30); // Falls back to w.weight
+    expect(payload[0].formula_min).toBe(0); // Falls back to 0
+    expect(payload[0].formula_max).toBe(0);
+  });
+});
+
+describe('onWeightFormula with missing min/max elements', () => {
+  it('does not throw when min/max elements are missing', () => {
+    weightData.push({ field: 'salt', formula: 'minmax' });
+    const sel = document.createElement('select');
+    sel.id = 'wf-salt';
+    const opt = document.createElement('option');
+    opt.value = 'direct';
+    sel.appendChild(opt);
+    sel.value = 'direct';
+    document.body.appendChild(sel);
+    // No wn-salt or wm-salt elements — falsy branches for minEl/maxEl
+    expect(() => onWeightFormula('salt')).not.toThrow();
+    expect(weightData[0].formula).toBe('direct');
+  });
+});
+
+describe('savePqField with missing DOM elements', () => {
+  it('returns early when label element is missing', async () => {
+    // Only create some elements, not all — early return on line 631
+    const kw = document.createElement('input');
+    kw.id = 'pqe-kw-99';
+    kw.value = 'test';
+    document.body.appendChild(kw);
+    await savePqField(99);
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleRestore error and settings paths', () => {
+  it('shows error when restore API returns error field', async () => {
+    showConfirmModal.mockResolvedValue(true);
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    api.mockResolvedValueOnce({ error: 'Restore failed' });
+    const input = { files: [new Blob(['{}'])], value: 'file.json' };
+    await handleRestore(input);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(showToast).toHaveBeenCalledWith('Restore failed', 'error');
+    global.FileReader = origFileReader;
+  });
+
+  it('shows invalid file toast for corrupt JSON on restore', async () => {
+    showConfirmModal.mockResolvedValue(true);
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: 'corrupt data' } });
+        }, 0);
+      }
+    };
+    const input = { files: [new Blob(['x'])], value: 'file.json' };
+    await handleRestore(input);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(showToast).toHaveBeenCalledWith('toast_invalid_file', 'error');
+    global.FileReader = origFileReader;
+  });
+
+  it('reloads settings when restore succeeds and currentView is settings', async () => {
+    showConfirmModal.mockResolvedValue(true);
+    state.currentView = 'settings';
+    // Create minimum DOM for loadSettings
+    ['settings-loading', 'settings-content', 'weight-items', 'cat-list',
+     'flag-list', 'pq-list', 'cat-emoji-trigger', 'cat-emoji'].forEach((id) => {
+      const el = document.createElement('div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+    const origFileReader = global.FileReader;
+    global.FileReader = class {
+      readAsText() {
+        setTimeout(() => {
+          this.onload({ target: { result: '{"products":[]}' } });
+        }, 0);
+      }
+    };
+    api.mockResolvedValueOnce({ message: 'Restored!' });
+    api.mockImplementation(() => Promise.resolve([]));
+    const input = { files: [new Blob(['{}'])], value: 'file.json' };
+    await handleRestore(input);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(showToast).toHaveBeenCalledWith('Restored!', 'success');
+    state.currentView = 'search';
+    api.mockReset().mockResolvedValue({});
+    global.FileReader = origFileReader;
+  });
+});
+
+describe('deleteCategory reassignment error paths', () => {
+  beforeEach(() => {
+    const list = document.createElement('div');
+    list.id = 'cat-list';
+    document.body.appendChild(list);
+  });
+
+  it('shows error when reassignment delete returns error field', async () => {
+    api.mockResolvedValueOnce([
+      { name: 'dairy', emoji: '', label: 'Dairy' },
+      { name: 'meat', emoji: '', label: 'Meat' },
+    ]);
+    api.mockResolvedValueOnce({ error: 'Move failed' });
+    const p = deleteCategory('dairy', 'Dairy', 3);
+    await vi.advanceTimersByTimeAsync(0);
+    const confirmBtn = document.querySelector('.cat-move-confirm');
+    confirmBtn.click();
+    await p;
+    expect(showToast).toHaveBeenCalledWith('Move failed', 'error');
+  });
+
+  it('shows network error when reassignment delete throws', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.mockResolvedValueOnce([
+      { name: 'dairy', emoji: '', label: 'Dairy' },
+      { name: 'meat', emoji: '', label: 'Meat' },
+    ]);
+    api.mockRejectedValueOnce(new Error('network'));
+    const p = deleteCategory('dairy', 'Dairy', 3);
+    await vi.advanceTimersByTimeAsync(0);
+    document.querySelector('.cat-move-confirm').click();
+    await p;
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    console.error.mockRestore();
+  });
+
+  it('handles categories API failure in deleteCategory', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.mockRejectedValueOnce(new Error('fail'));
+    await deleteCategory('dairy', 'Dairy', 3);
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    console.error.mockRestore();
+  });
+});
+
+describe('renderWeightItems with direct formula and formula_min/max null', () => {
+  it('renders with formula_min and formula_max as null', () => {
+    const container = document.createElement('div');
+    container.id = 'weight-items';
+    document.body.appendChild(container);
+    weightData.push({
+      field: 'kcal', label: 'Kcal', enabled: true, weight: 50,
+      direction: 'higher', formula: 'direct', formula_min: null, formula_max: null
+    });
+    renderWeightItems();
+    const minInput = document.getElementById('wn-kcal');
+    const maxInput = document.getElementById('wm-kcal');
+    expect(minInput.value).toBe('');
+    expect(maxInput.value).toBe('');
+    // Also verify direct formula shows the inputs
+    expect(minInput.style.display).toBe('');
+    expect(maxInput.style.display).toBe('');
+  });
+
+  it('renders all disabled weights (no enabled)', () => {
+    const container = document.createElement('div');
+    container.id = 'weight-items';
+    document.body.appendChild(container);
+    weightData.push(
+      { field: 'kcal', label: 'Kcal', enabled: false, weight: 0, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 0 },
+    );
+    renderWeightItems();
+    expect(container.querySelectorAll('.weight-item').length).toBe(0);
+    expect(document.getElementById('weight-add-select')).not.toBeNull();
+  });
+});
+
+describe('addWeightFromDropdown with missing select', () => {
+  it('returns early when weight-add-select element is missing', () => {
+    const container = document.createElement('div');
+    container.id = 'weight-items';
+    document.body.appendChild(container);
+    // No weight-add-select element
+    expect(() => addWeightFromDropdown()).not.toThrow();
+  });
+});
+
+describe('updateStatsLine falsy paths', () => {
+  it('handles updateStatsLine when stats-line element is missing', async () => {
+    // updateStatsLine is called by updateCategoryLabel after success
+    // No stats-line element — falsy branch for el
+    api.mockResolvedValueOnce({});
+    await updateCategoryLabel('dairy', 'Meieri');
+    expect(showToast).toHaveBeenCalledWith('toast_category_updated', 'success');
+  });
+
+  it('handles updateStatsLine when cachedStats is null', async () => {
+    const el = document.createElement('div');
+    el.id = 'stats-line';
+    document.body.appendChild(el);
+    const origStats = state.cachedStats;
+    state.cachedStats = null;
+    api.mockResolvedValueOnce({});
+    await updateCategoryLabel('dairy', 'Meieri');
+    state.cachedStats = origStats;
+  });
+});
+
+describe('deleteCategory with count=0 and delete error from API exception', () => {
+  it('shows network error when delete API throws for zero-product category', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    showConfirmModal.mockResolvedValue(true);
+    const list = document.createElement('div');
+    list.id = 'cat-list';
+    document.body.appendChild(list);
+    api.mockRejectedValueOnce(new Error('network fail'));
+    await deleteCategory('snack', 'Snacks', 0);
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    console.error.mockRestore();
+  });
+});
+
+describe('_connectRefreshStream with some DOM elements', () => {
+  let mockES;
+  beforeEach(() => {
+    // Create bar and status but NOT btn or progressWrap
+    const bar = document.createElement('div');
+    bar.id = 'refresh-off-bar';
+    document.body.appendChild(bar);
+    const status = document.createElement('div');
+    status.id = 'refresh-off-status';
+    document.body.appendChild(status);
+    mockES = { onmessage: null, onerror: null, close: vi.fn() };
+    vi.stubGlobal('EventSource', vi.fn(() => mockES));
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    api.mockReset().mockResolvedValue({});
+  });
+
+  it('updates bar and status on running message', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({ running: true, total: 10, current: 5, name: 'Test' }) });
+    expect(document.getElementById('refresh-off-bar').style.width).toBe('50%');
+  });
+
+  it('sets bar to 100% on done', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({ done: true, total: 10, updated: 5, skipped: 3, errors: 2 }) });
+    expect(document.getElementById('refresh-off-bar').style.width).toBe('100%');
+  });
+});
+
+describe('saveWeights with mixed enabled/disabled and formula_max 0', () => {
+  it('handles disabled weight with formula_min/max as 0 (falsy)', async () => {
+    weightData.push(
+      { field: 'sugar', enabled: false, weight: 0, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 0 },
+    );
+    api.mockResolvedValueOnce({});
+    await saveWeights();
+    const payload = JSON.parse(api.mock.calls[0][1].body);
+    expect(payload[0].formula_min).toBe(0);
+    expect(payload[0].formula_max).toBe(0);
+  });
+});
+
+describe('loadSettings - loadOffCredentials with missing off-user-id/off-password', () => {
+  it('handles missing OFF credential DOM elements gracefully', async () => {
+    ['settings-loading', 'settings-content', 'weight-items', 'cat-list',
+     'flag-list', 'pq-list', 'cat-emoji-trigger', 'cat-emoji'].forEach((id) => {
+      const el = document.createElement('div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+    // Intentionally NOT creating off-user-id or off-password elements
+    api.mockImplementation((url) => {
+      if (url === '/api/weights') return Promise.resolve([]);
+      if (url === '/api/categories') return Promise.resolve([]);
+      if (url === '/api/flags') return Promise.resolve([]);
+      if (url === '/api/protein-quality') return Promise.resolve([]);
+      if (url === '/api/settings/off-credentials') return Promise.resolve({ off_user_id: 'test', has_password: false });
+      if (url === '/api/bulk/refresh-off/status') return Promise.resolve({ running: false });
+      return Promise.resolve([]);
+    });
+    await loadSettings();
+    // Should not throw — if(el) and if(pw) falsy branches hit in loadOffCredentials
+    api.mockReset().mockResolvedValue({});
+  });
+});

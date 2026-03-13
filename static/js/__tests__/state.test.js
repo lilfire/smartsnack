@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { state, NUTRI_IDS, catEmoji, catLabel, esc, safeDataUri, fmtNum, showToast, api, fetchProducts, fetchStats, showConfirmModal, upgradeSelect } from '../state.js';
 
+// jsdom does not implement scrollIntoView
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function() {};
+}
+
 beforeEach(() => {
   state.currentView = 'search';
   state.currentFilter = [];
@@ -408,5 +413,335 @@ describe('upgradeSelect', () => {
     upgradeSelect(sel);
     const options = parent.querySelectorAll('.custom-select-option');
     expect(options.length).toBe(3);
+  });
+
+  it('preserves onSelect callback when re-called without one', () => {
+    const cb = vi.fn();
+    upgradeSelect(sel, cb);
+    // Re-call without passing onSelect
+    upgradeSelect(sel);
+    const options = parent.querySelectorAll('.custom-select-option');
+    options[1].click();
+    expect(cb).toHaveBeenCalledWith('b');
+  });
+
+  it('opens dropdown on trigger click and toggles open class', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    trigger.click();
+    expect(wrap.classList.contains('open')).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    // Click again to close
+    trigger.click();
+    expect(wrap.classList.contains('open')).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('opens dropdown on Enter key when closed', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(true);
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('opens dropdown on Space key when closed', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(true);
+  });
+
+  it('navigates with ArrowDown and ArrowUp when open', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    // Open with ArrowDown (sets highlighted to 0)
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(true);
+    let options = wrap.querySelectorAll('.custom-select-option');
+    expect(options[0].classList.contains('highlighted')).toBe(true);
+
+    // ArrowDown to move to second item
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    options = wrap.querySelectorAll('.custom-select-option');
+    expect(options[1].classList.contains('highlighted')).toBe(true);
+    expect(options[0].classList.contains('highlighted')).toBe(false);
+
+    // ArrowDown at last item stays at last item
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    options = wrap.querySelectorAll('.custom-select-option');
+    expect(options[1].classList.contains('highlighted')).toBe(true);
+
+    // ArrowUp to move back to first item
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    options = wrap.querySelectorAll('.custom-select-option');
+    expect(options[0].classList.contains('highlighted')).toBe(true);
+
+    // ArrowUp at first item stays at first item
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    options = wrap.querySelectorAll('.custom-select-option');
+    expect(options[0].classList.contains('highlighted')).toBe(true);
+  });
+
+  it('selects highlighted item on Enter when open', () => {
+    const cb = vi.fn();
+    upgradeSelect(sel, cb);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    // Open and highlight first item
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    // Move to second item
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    // Select with Enter
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(cb).toHaveBeenCalledWith('b');
+    expect(wrap.classList.contains('open')).toBe(false);
+  });
+
+  it('closes dropdown on Escape key', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    trigger.click();
+    expect(wrap.classList.contains('open')).toBe(true);
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(false);
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('closes other open selects when opening a new one', () => {
+    // Create first select
+    upgradeSelect(sel);
+    const trigger1 = parent.querySelector('.custom-select-trigger');
+    const wrap1 = parent.querySelector('.custom-select-wrap');
+
+    // Create second select
+    const sel2 = document.createElement('select');
+    const opt = document.createElement('option');
+    opt.value = 'x';
+    opt.textContent = 'X-ray';
+    sel2.appendChild(opt);
+    parent.appendChild(sel2);
+    upgradeSelect(sel2);
+
+    // Open first
+    trigger1.click();
+    expect(wrap1.classList.contains('open')).toBe(true);
+
+    // Open second - first should close
+    const trigger2 = parent.querySelectorAll('.custom-select-trigger')[1];
+    trigger2.click();
+    expect(wrap1.classList.contains('open')).toBe(false);
+  });
+
+  it('handles optgroup elements', () => {
+    // Create select with optgroups
+    const grpSel = document.createElement('select');
+    const group = document.createElement('optgroup');
+    group.label = 'Group 1';
+    const gOpt = document.createElement('option');
+    gOpt.value = 'g1';
+    gOpt.textContent = 'G-One';
+    group.appendChild(gOpt);
+    grpSel.appendChild(group);
+    parent.appendChild(grpSel);
+
+    upgradeSelect(grpSel);
+    const groupHeader = parent.querySelector('.custom-select-group');
+    expect(groupHeader).not.toBeNull();
+    expect(groupHeader.textContent).toBe('Group 1');
+    const options = parent.querySelectorAll('.custom-select-option');
+    // Should have the option from the optgroup
+    expect(options.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('skips empty options in _addOption', () => {
+    const emptySel = document.createElement('select');
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '';
+    emptySel.appendChild(emptyOpt);
+    const realOpt = document.createElement('option');
+    realOpt.value = 'real';
+    realOpt.textContent = 'Real';
+    emptySel.appendChild(realOpt);
+    parent.appendChild(emptySel);
+
+    upgradeSelect(emptySel);
+    const wrap = emptySel.parentNode;
+    const options = wrap.querySelectorAll('.custom-select-option');
+    // Empty option should be skipped
+    expect(options.length).toBe(1);
+    expect(options[0].textContent).toBe('Real');
+  });
+
+  it('closes all custom selects on document click', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    trigger.click();
+    expect(wrap.classList.contains('open')).toBe(true);
+    // Click elsewhere on document
+    document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(false);
+  });
+});
+
+describe('safeDataUri - additional branches', () => {
+  it('handles HTTP URLs (not just HTTPS)', () => {
+    const url = 'http://example.com/image.png';
+    const result = safeDataUri(url);
+    expect(result).toContain('http://example.com/image.png');
+  });
+
+  it('returns empty string when URL constructor throws on malformed URL-like string', () => {
+    // A string that matches /^https?:\/\// but is an invalid URL
+    const result = safeDataUri('http://');
+    expect(result).toBe('');
+  });
+
+  it('returns valid data URI for gif', () => {
+    const uri = 'data:image/gif;base64,R0lGODlh';
+    expect(safeDataUri(uri)).toBe(uri);
+  });
+
+  it('returns valid data URI for webp', () => {
+    const uri = 'data:image/webp;base64,UklGR';
+    expect(safeDataUri(uri)).toBe(uri);
+  });
+
+  it('returns empty for data URI with invalid characters', () => {
+    expect(safeDataUri('data:image/png;base64,invalid chars!')).toBe('');
+  });
+});
+
+describe('esc - additional branches', () => {
+  it('returns empty string for null', () => {
+    expect(esc(null)).toBe('');
+  });
+
+  it('returns empty string for undefined', () => {
+    expect(esc(undefined)).toBe('');
+  });
+
+  it('handles string with already-escaped-looking content', () => {
+    // &amp; in input should be double-escaped
+    expect(esc('&amp;')).toBe('&amp;amp;');
+  });
+
+  it('handles empty string', () => {
+    expect(esc('')).toBe('');
+  });
+
+  it('handles numeric input coerced to string', () => {
+    // Numbers are not null, so they go through textContent
+    expect(esc(0)).toBe('0');
+  });
+});
+
+describe('fmtNum - additional edge cases', () => {
+  it('formats negative numbers', () => {
+    expect(fmtNum(-5)).toBe('-5');
+  });
+
+  it('formats negative decimals', () => {
+    expect(fmtNum(-3.7)).toBe('-3.7');
+  });
+
+  it('formats very large numbers', () => {
+    expect(fmtNum(1000000)).toBe('1000000');
+  });
+
+  it('formats very small decimals', () => {
+    expect(fmtNum(0.1)).toBe('0.1');
+  });
+
+  it('returns dash for empty string', () => {
+    expect(fmtNum('')).toBe('-');
+  });
+
+  it('formats string integer', () => {
+    expect(fmtNum('42')).toBe('42');
+  });
+});
+
+describe('showToast - additional branches', () => {
+  let toastEl;
+
+  beforeEach(() => {
+    toastEl = document.createElement('div');
+    toastEl.id = 'toast';
+    document.body.appendChild(toastEl);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    toastEl.remove();
+    vi.useRealTimers();
+  });
+
+  it('does nothing when toast element is missing', () => {
+    toastEl.remove();
+    expect(() => showToast('msg', 'info')).not.toThrow();
+  });
+
+  it('clears previous timer when called twice rapidly', () => {
+    const clearSpy = vi.spyOn(global, 'clearTimeout');
+    showToast('First', 'info');
+    showToast('Second', 'success');
+    // clearTimeout should have been called for the first timer
+    expect(clearSpy).toHaveBeenCalled();
+    expect(toastEl.textContent).toBe('Second');
+    // Only the second timer should fire
+    vi.advanceTimersByTime(3000);
+    expect(toastEl.classList.contains('show')).toBe(false);
+  });
+});
+
+describe('api - additional branches', () => {
+  it('uses generic error message when response has no error field', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => Promise.resolve('{}'),
+    });
+    try {
+      await api('/fail');
+    } catch (e) {
+      expect(e.message).toBe('Request failed: 500');
+      expect(e.status).toBe(500);
+    }
+  });
+
+  it('merges custom headers with defaults', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{}'),
+    });
+    await api('/test', { headers: { 'X-Custom': 'yes' } });
+    expect(global.fetch).toHaveBeenCalledWith('/test', expect.objectContaining({
+      headers: { 'Content-Type': 'application/json', 'X-Custom': 'yes' },
+    }));
+  });
+});
+
+describe('fetchProducts - additional branches', () => {
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('[]'),
+    });
+  });
+
+  it('includes advancedFilters when set', async () => {
+    state.advancedFilters = 'sugar<10';
+    await fetchProducts('', []);
+    const url = global.fetch.mock.calls[0][0];
+    expect(url).toContain('filters=sugar%3C10');
+    state.advancedFilters = null;
   });
 });
