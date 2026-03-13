@@ -253,6 +253,11 @@ class TestImportDuplicateControl:
         from db import get_db
 
         self._insert_product(get_db(), "Overwrite Me", ean="2222222222222")
+        # Give the existing product a brand value
+        get_db().execute(
+            "UPDATE products SET brand = 'OldBrand' WHERE ean = '2222222222222'"
+        )
+        get_db().commit()
         msg = import_products(
             {"products": [{"type": "Snacks", "name": "Overwrite Me", "ean": "2222222222222", "brand": "NewBrand"}]},
             on_duplicate="overwrite",
@@ -262,6 +267,27 @@ class TestImportDuplicateControl:
             "SELECT brand FROM products WHERE ean = '2222222222222'"
         ).fetchone()
         assert row["brand"] == "NewBrand"
+
+    def test_overwrite_clears_fields_not_in_import(self, app_ctx, seed_category, translations_dir):
+        """Overwrite replaces ALL fields — blank imported values clear existing data."""
+        from services.backup_service import import_products
+        from db import get_db
+
+        self._insert_product(get_db(), "Full Product", ean="2222222222223")
+        get_db().execute(
+            "UPDATE products SET brand = 'ExistingBrand' WHERE ean = '2222222222223'"
+        )
+        get_db().commit()
+        # Import without brand — should clear the existing brand
+        msg = import_products(
+            {"products": [{"type": "Snacks", "name": "Full Product", "ean": "2222222222223"}]},
+            on_duplicate="overwrite",
+        )
+        assert "1 overwritten" in msg
+        row = get_db().execute(
+            "SELECT brand FROM products WHERE ean = '2222222222223'"
+        ).fetchone()
+        assert row["brand"] == ""
 
     def test_allow_duplicate_creates_new(self, app_ctx, seed_category, translations_dir):
         from services.backup_service import import_products

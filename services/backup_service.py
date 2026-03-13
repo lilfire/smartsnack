@@ -104,7 +104,11 @@ def _is_empty(val):
 
 
 def _overwrite_product(cur, existing_id, p, valid_flags=None):
-    """Update an existing product with non-empty fields from import data ``p``."""
+    """Overwrite an existing product with all values from import data ``p``.
+
+    Unlike merge, this replaces every field unconditionally — even if the
+    imported value is blank/zero and the existing product has data.
+    """
     fields = [f.strip() for f in INSERT_FIELDS.split(",")]
     text_fields = set(_TEXT_FIELD_LIMITS.keys())
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
@@ -114,25 +118,25 @@ def _overwrite_product(cur, existing_id, p, valid_flags=None):
     updates, vals = [], []
     for f in fields:
         val = p.get(f)
-        if val is None or val == "":
-            continue
         if f in text_fields:
             updates.append(f"{f} = ?")
-            vals.append(val)
+            vals.append(val if val is not None else "")
         else:
-            fval = _opt_float(val)
-            if fval is not None and fval != 0:
-                updates.append(f"{f} = ?")
-                vals.append(fval)
-    img = p.get("image", "")
-    if img:
-        updates.append("image = ?")
-        vals.append(img)
+            fval = _opt_float(val) if val is not None and val != "" else None
+            updates.append(f"{f} = ?")
+            vals.append(fval)
+    # Image: always overwrite (may clear it)
+    updates.append("image = ?")
+    vals.append(p.get("image") or "")
     if updates:
         vals.append(existing_id)
         cur.execute(
             f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
         )
+    # Replace flags: remove existing, then insert imported
+    cur.execute(
+        "DELETE FROM product_flags WHERE product_id = ?", (existing_id,)
+    )
     if valid_flags is None:
         valid_flags = flag_service.get_all_flag_names()
     for flag in p.get("flags", []):
