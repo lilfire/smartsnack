@@ -173,3 +173,54 @@ describe('app.js', () => {
     expect(window.editingId).toBe(99);
   });
 });
+
+const flushPromises = () => new Promise((r) => setTimeout(r, 0));
+
+describe('app.js initialization', () => {
+  it('skips focus when search-input element is absent', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    await import('../app.js');
+    await flushPromises();
+
+    // No error thrown means the if (searchInput) false branch executed safely
+  });
+
+  it('calls showToast when api /api/weights rejects', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    const { api } = await import('../state.js');
+    api.mockRejectedValueOnce(new Error('network fail'));
+
+    await import('../app.js');
+    await flushPromises();
+
+    const { showToast } = await import('../products.js');
+    expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
+  });
+
+  it('populates weightData and SCORE_CFG_MAP from api response', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    const { api } = await import('../state.js');
+    api.mockResolvedValueOnce([
+      { field: 'fat', label: 'Fat', desc: 'Fat desc', direction: 'lower' },
+      { field: 'sugar', label: 'Sugar', desc: 'Sugar desc', direction: 'lower' },
+    ]);
+
+    await import('../app.js');
+    await flushPromises();
+
+    const { weightData, SCORE_CFG_MAP } = await import('../settings.js');
+
+    expect(weightData).toHaveLength(2);
+    expect(weightData[0]).toEqual({ field: 'fat', label: 'Fat', desc: 'Fat desc', direction: 'lower' });
+    expect(weightData[1]).toEqual({ field: 'sugar', label: 'Sugar', desc: 'Sugar desc', direction: 'lower' });
+
+    expect(SCORE_CFG_MAP.fat).toEqual({ label: 'Fat', desc: 'Fat desc', direction: 'lower' });
+    expect(SCORE_CFG_MAP.sugar).toEqual({ label: 'Sugar', desc: 'Sugar desc', direction: 'lower' });
+  });
+});

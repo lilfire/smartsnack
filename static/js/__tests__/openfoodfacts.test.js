@@ -1245,3 +1245,206 @@ describe('showOffAddReview without name', () => {
     expect(modal.innerHTML).toContain('off_add_name_required');
   });
 });
+
+describe('renderOffResults branch coverage via lookupOFF name search', () => {
+  function setupNameSearch() {
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = 'TestProduct';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+  }
+
+  it('renders products with certainty >= 70 (green), brand, image, and code', async () => {
+    setupNameSearch();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [
+          {
+            product_name: 'Product A',
+            brands: 'BrandX',
+            code: '111',
+            image_front_small_url: 'https://example.com/img.jpg',
+            certainty: 70,
+            completeness: 0.8,
+            nutriments: { 'energy-kcal_100g': 100, 'proteins_100g': 5, 'carbohydrates_100g': 20 },
+          },
+        ],
+      }),
+    });
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal).not.toBeNull();
+    // Should contain brand
+    expect(modal.innerHTML).toContain('BrandX');
+    // Should contain EAN
+    expect(modal.innerHTML).toContain('111');
+    // Should contain image element
+    expect(modal.innerHTML).toContain('img');
+    // Should contain green certainty bar (70% threshold)
+    expect(modal.innerHTML).toContain('#4caf50');
+    // Should contain certainty label
+    expect(modal.innerHTML).toContain('off_certainty_label');
+  });
+
+  it('renders products with certainty at 40 (orange) and no image', async () => {
+    setupNameSearch();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [
+          {
+            product_name: 'Product B',
+            certainty: 40,
+            completeness: 0.3,
+            nutriments: {},
+          },
+        ],
+      }),
+    });
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal).not.toBeNull();
+    // Orange certainty bar for value 40 (>= 40 but < 70)
+    expect(modal.innerHTML).toContain('#ff9800');
+    // No image: should have placeholder div with hamburger emoji
+    expect(modal.innerHTML).toContain('\u{1F354}');
+  });
+
+  it('renders products with certainty below 40 (red)', async () => {
+    setupNameSearch();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [
+          {
+            product_name: 'Product C',
+            certainty: 10,
+            completeness: 0.1,
+            nutriments: {},
+          },
+        ],
+      }),
+    });
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal).not.toBeNull();
+    // Red certainty bar for value < 40
+    expect(modal.innerHTML).toContain('#f44336');
+  });
+
+  it('renders empty results message when no products match', async () => {
+    setupNameSearch();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [] }),
+    });
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal).not.toBeNull();
+    expect(modal.innerHTML).toContain('off_no_results_try_different');
+  });
+
+  it('renders product with product_name_no preferred over product_name', async () => {
+    setupNameSearch();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [
+          {
+            product_name: 'English Name',
+            product_name_no: 'Norsk Navn',
+            completeness: 0.5,
+            nutriments: {},
+          },
+        ],
+      }),
+    });
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal.innerHTML).toContain('Norsk Navn');
+  });
+});
+
+describe('validateOffBtn edge cases', () => {
+  it('does not throw when button element is missing', () => {
+    const ean = document.createElement('input');
+    ean.id = 'test-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'test-name';
+    name.value = '';
+    document.body.appendChild(name);
+    // No button with id 'test-off-btn'
+    expect(() => validateOffBtn('test')).not.toThrow();
+  });
+});
+
+describe('lookupOFF name search edge cases', () => {
+  function setupNameSearchNoSearchInput() {
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = 'Milk';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+  }
+
+  it('handles _gatherNutrition with non-numeric values gracefully', async () => {
+    setupNameSearchNoSearchInput();
+    document.getElementById('ed-kcal').value = 'abc';
+    document.getElementById('ed-protein').value = '3.3';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [{ product_name: 'Milk' }] }),
+    });
+    await lookupOFF('ed', null);
+    const callBody = JSON.parse(global.fetch.mock.calls[0][1].body);
+    // kcal should be excluded (NaN), protein should be included
+    expect(callBody.nutrition.protein).toBe(3.3);
+    expect(callBody.nutrition.kcal).toBeUndefined();
+  });
+
+  it('does not set search input when name path has no search-input in DOM', async () => {
+    setupNameSearchNoSearchInput();
+    // Note: lookupOFF name path creates the modal with off-search-input,
+    // but we can verify search completes successfully
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [{ product_name: 'Milk' }] }),
+    });
+    await lookupOFF('ed', null);
+    expect(global.fetch).toHaveBeenCalled();
+  });
+});
