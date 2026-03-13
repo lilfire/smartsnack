@@ -2,6 +2,9 @@
 
 A mobile-first web app for tracking and scoring food products. Search by name or scan barcodes, pull nutrition data from OpenFoodFacts, and compare products using a fully configurable weighted scoring system.
 
+![demo](https://github.com/user-attachments/assets/8d28ed3c-15eb-4cb2-9106-6fc5e5dc4844)
+
+
 ## Features
 
 - **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera. Detected codes auto-lookup product data from OpenFoodFacts.
