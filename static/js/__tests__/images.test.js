@@ -36,9 +36,13 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((key) => key),
 }));
 
-vi.mock('../filters.js', () => ({
-  rerender: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    rerender: vi.fn(),
+  };
+});
 
 import { loadProductImage, resizeImage, removeProductImage, triggerImageUpload } from '../images.js';
 import { state, api, showConfirmModal, showToast } from '../state.js';

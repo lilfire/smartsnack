@@ -36,10 +36,14 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((key) => key),
 }));
 
-vi.mock('../filters.js', () => ({
-  buildFilters: vi.fn(),
-  rerender: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    buildFilters: vi.fn(),
+    rerender: vi.fn(),
+  };
+});
 
 vi.mock('../images.js', () => ({
   loadProductImage: vi.fn().mockResolvedValue(null),
