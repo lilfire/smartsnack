@@ -4,6 +4,29 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.7.0] - 2026-03-13
+
+### Added
+
+- Duplicate detection when saving products: detects existing products by EAN or name, with merge/overwrite/allow-duplicate options
+- 3-scenario duplicate handling when editing products with OFF data, merging intelligently based on OFF sync status
+- Field-level conflict resolution modal letting users pick values per field when merging duplicate products, with bulk "keep all" buttons
+- Merge products API endpoint (`POST /api/products/<pid>/merge`) and check-duplicate endpoint (`POST /api/products/<pid>/check-duplicate`)
+- Duplicate control dialog for product import with configurable match criteria (EAN/name/both) and duplicate action (skip/overwrite/merge/allow)
+- Sync-aware merge logic for imports: uses OFF sync status to determine field priority, with configurable fallback
+- Import result reporting for merged, overwritten, and skipped products
+- Cache-busting headers for JavaScript files to prevent stale module caching
+- ~40 new translation keys across all languages for duplicate, merge, conflict, and import flows
+- New `modals.css` with styles for all merge/conflict/duplicate modals
+- Expanded UI test coverage for app, openfoodfacts, settings, and other frontend modules
+- Improved backend and frontend test coverage to 75%+ branch for all files
+
+### Changed
+
+- OpenFoodFacts integration now fills additional metadata fields (name, EAN, brand, stores, ingredients) and tracks applied fields
+- API error responses now include HTTP status code and response data for proper 409 conflict handling
+- Taste score slider changed to 0–6 range with average default rounded to nearest 0.5
+
 ## [0.6.0] - 2026-03-12
 
 ### Added
