@@ -55,7 +55,15 @@ def import_products():
         return denied
     try:
         data = _require_json()
-        message = backup_service.import_products(data)
+        match_criteria = data.pop("match_criteria", "both")
+        on_duplicate = data.pop("on_duplicate", "skip")
+        merge_priority = data.pop("merge_priority", "keep_existing")
+        message = backup_service.import_products(
+            data,
+            match_criteria=match_criteria,
+            on_duplicate=on_duplicate,
+            merge_priority=merge_priority,
+        )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except (OSError, RuntimeError):
