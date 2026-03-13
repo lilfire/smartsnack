@@ -2437,6 +2437,73 @@ describe('saveWeights with mixed enabled/disabled and formula_max 0', () => {
   });
 });
 
+describe('autosavePq', () => {
+  it('calls savePqField after 400ms debounce', () => {
+    // Set up DOM elements that savePqField needs
+    ['label', 'kw', 'pdcaas', 'diaas'].forEach((suffix) => {
+      const el = document.createElement('input');
+      el.id = 'pqe-' + suffix + '-1';
+      el.value = suffix === 'kw' ? 'milk' : suffix === 'label' ? 'Milk' : '0.8';
+      document.body.appendChild(el);
+    });
+    api.mockResolvedValue({ id: 1 });
+
+    autosavePq(1);
+    // Should not have called API yet
+    expect(api).not.toHaveBeenCalled();
+
+    // Advance past the 400ms debounce
+    vi.advanceTimersByTime(400);
+    expect(api).toHaveBeenCalledWith('/api/protein-quality/1', expect.objectContaining({ method: 'PUT' }));
+  });
+
+  it('debounces multiple rapid calls for the same id', () => {
+    ['label', 'kw', 'pdcaas', 'diaas'].forEach((suffix) => {
+      const el = document.createElement('input');
+      el.id = 'pqe-' + suffix + '-2';
+      el.value = suffix === 'kw' ? 'whey' : suffix === 'label' ? 'Whey' : '1.0';
+      document.body.appendChild(el);
+    });
+    api.mockResolvedValue({ id: 2 });
+
+    autosavePq(2);
+    vi.advanceTimersByTime(200);
+    autosavePq(2); // reset the timer
+    vi.advanceTimersByTime(200);
+    // Only 200ms since last call — should not have fired yet
+    expect(api).not.toHaveBeenCalled();
+
+    vi.advanceTimersByTime(200);
+    // Now 400ms since last call — should fire exactly once
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('handles different ids independently', () => {
+    [3, 4].forEach((id) => {
+      ['label', 'kw', 'pdcaas', 'diaas'].forEach((suffix) => {
+        const el = document.createElement('input');
+        el.id = 'pqe-' + suffix + '-' + id;
+        el.value = suffix === 'kw' ? 'soy' : suffix === 'label' ? 'Soy' : '0.9';
+        document.body.appendChild(el);
+      });
+    });
+    api.mockResolvedValue({});
+
+    autosavePq(3);
+    vi.advanceTimersByTime(200);
+    autosavePq(4);
+    vi.advanceTimersByTime(200);
+    // id 3 should have fired (400ms elapsed), id 4 should not (only 200ms)
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith('/api/protein-quality/3', expect.anything());
+
+    vi.advanceTimersByTime(200);
+    // Now id 4 should also have fired
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(api).toHaveBeenCalledWith('/api/protein-quality/4', expect.anything());
+  });
+});
+
 describe('loadSettings - loadOffCredentials with missing off-user-id/off-password', () => {
   it('handles missing OFF credential DOM elements gracefully', async () => {
     ['settings-loading', 'settings-content', 'weight-items', 'cat-list',
