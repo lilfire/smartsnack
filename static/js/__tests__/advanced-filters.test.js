@@ -35,9 +35,13 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((key) => key),
 }));
 
-vi.mock('../filters.js', () => ({
-  updateFilterToggle: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    updateFilterToggle: vi.fn(),
+  };
+});
 
 vi.mock('../render.js', () => ({
   getFlagConfig: vi.fn(() => ({})),

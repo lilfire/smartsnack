@@ -36,11 +36,15 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((key) => key),
 }));
 
-vi.mock('../filters.js', () => ({
-  applySorting: vi.fn((results) => results),
-  sortIndicator: vi.fn((col) => '↕'),
-  rerender: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    applySorting: vi.fn((results) => results),
+    sortIndicator: vi.fn((col) => '↕'),
+    rerender: vi.fn(),
+  };
+});
 
 vi.mock('../images.js', () => ({
   loadProductImage: vi.fn().mockResolvedValue(null),

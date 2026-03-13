@@ -39,11 +39,15 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((k) => k),
 }));
 
-vi.mock('../filters.js', () => ({
-  toggleFilters: vi.fn(),
-  setSort: vi.fn(),
-  rerender: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    toggleFilters: vi.fn(),
+    setSort: vi.fn(),
+    rerender: vi.fn(),
+  };
+});
 
 vi.mock('../images.js', () => ({
   triggerImageUpload: vi.fn(),

@@ -33,11 +33,15 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((key) => key),
 }));
 
-vi.mock('../filters.js', () => ({
-  buildFilters: vi.fn(),
-  rerender: vi.fn(),
-  buildTypeSelect: vi.fn(),
-}));
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    buildFilters: vi.fn(),
+    rerender: vi.fn(),
+    buildTypeSelect: vi.fn(),
+  };
+});
 
 vi.mock('../render.js', () => ({
   renderResults: vi.fn(),
