@@ -8,7 +8,8 @@ export default defineConfig({
     pool: 'forks',
     poolOptions: {
       forks: {
-        execArgv: ['--max-old-space-size=4096'],
+        maxForks: 2,
+        execArgv: ['--max-old-space-size=4096', '--max-semi-space-size=64'],
       },
     },
     coverage: {
