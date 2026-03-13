@@ -13,13 +13,21 @@ vi.mock('../state.js', () => {
     sortDir: 'desc',
     categories: [],
     imageCache: {},
+    advancedFilters: null,
   };
   return {
     state: _state,
-    esc: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
-    safeDataUri: (uri) => typeof uri === 'string' && uri.startsWith('data:') ? uri : '',
+    NUTRI_IDS: ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'],
     catEmoji: vi.fn((type) => '📦'),
     catLabel: vi.fn((type) => type),
+    esc: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
+    safeDataUri: (uri) => typeof uri === 'string' && uri.startsWith('data:') ? uri : '',
+    fmtNum: vi.fn((v) => v == null ? '-' : String(v)),
+    showToast: vi.fn(),
+    api: vi.fn().mockResolvedValue({}),
+    fetchProducts: vi.fn().mockResolvedValue([]),
+    fetchStats: vi.fn().mockResolvedValue({}),
+    showConfirmModal: vi.fn().mockResolvedValue(true),
     upgradeSelect: vi.fn(),
   };
 });
@@ -31,6 +39,7 @@ vi.mock('../i18n.js', () => ({
 vi.mock('../filters.js', () => ({
   applySorting: vi.fn((results) => results),
   sortIndicator: vi.fn((col) => '↕'),
+  rerender: vi.fn(),
 }));
 
 vi.mock('../images.js', () => ({
@@ -341,6 +350,384 @@ describe('renderResults - expanded view', () => {
       { id: 2, name: 'Milk 2', type: 'dairy', total_score: 80, has_image: 0 },
     ], 'milk');
     expect(document.getElementById('result-count').textContent).toContain('result_count_search_plural');
+  });
+});
+
+describe('renderResults - event delegation', () => {
+  beforeEach(() => {
+    const count = document.createElement('div');
+    count.id = 'result-count';
+    document.body.appendChild(count);
+    const container = document.createElement('div');
+    container.id = 'results-container';
+    document.body.appendChild(container);
+    window.setSort = vi.fn();
+    window.toggleExpand = vi.fn();
+    window.triggerImageUpload = vi.fn();
+    window.saveProduct = vi.fn();
+    window.startEdit = vi.fn();
+    window.removeProductImage = vi.fn();
+    window.deleteProduct = vi.fn();
+    window.openScanner = vi.fn();
+    window.lookupOFF = vi.fn();
+    window.estimateProteinQuality = vi.fn();
+    window.switchView = vi.fn();
+    window.validateOffBtn = vi.fn();
+    window.updateEstimateBtn = vi.fn();
+  });
+
+  it('handles sort action via delegation', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const sortEl = document.querySelector('[data-action="sort"]');
+    sortEl.click();
+    expect(window.setSort).toHaveBeenCalled();
+  });
+
+  it('handles start-edit action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = null;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const editBtn = document.querySelector('[data-action="start-edit"]');
+    editBtn.click();
+    expect(window.startEdit).toHaveBeenCalledWith(1);
+  });
+
+  it('handles delete action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = null;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const deleteBtn = document.querySelector('[data-action="delete"]');
+    deleteBtn.click();
+    expect(window.deleteProduct).toHaveBeenCalledWith(1);
+  });
+
+  it('handles remove-image action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = null;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 1,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const removeBtn = document.querySelector('[data-action="remove-image"]');
+    removeBtn.click();
+    expect(window.removeProductImage).toHaveBeenCalledWith(1);
+  });
+
+  it('handles trigger-image action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = null;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const imgArea = document.querySelector('[data-action="trigger-image"]');
+    imgArea.click();
+    expect(window.triggerImageUpload).toHaveBeenCalledWith(1);
+  });
+
+  it('handles save-product action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '', brand: '', stores: '', ingredients: '',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: [],
+    }];
+    renderResults(products, '');
+    const saveBtn = document.querySelector('[data-action="save-product"]');
+    saveBtn.click();
+    expect(window.saveProduct).toHaveBeenCalledWith(1);
+  });
+
+  it('handles cancel-edit action via delegation', async () => {
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '', brand: '', stores: '', ingredients: '',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: [],
+    }];
+    renderResults(products, '');
+    const cancelBtn = document.querySelector('[data-action="cancel-edit"]');
+    cancelBtn.click();
+    expect(state.editingId).toBeNull();
+  });
+
+  it('handles open-scanner action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '', brand: '', stores: '', ingredients: '',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: [],
+    }];
+    renderResults(products, '');
+    const scanBtn = document.querySelector('[data-action="open-scanner"]');
+    scanBtn.click();
+    expect(window.openScanner).toHaveBeenCalledWith('ed', 1);
+  });
+
+  it('handles lookup-off action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '1234567890123', brand: '', stores: '', ingredients: '',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: [],
+    }];
+    renderResults(products, '');
+    const offBtn = document.querySelector('[data-action="lookup-off"]');
+    offBtn.click();
+    expect(window.lookupOFF).toHaveBeenCalledWith('ed', 1);
+  });
+
+  it('handles estimate-protein action via delegation', () => {
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '', brand: '', stores: '', ingredients: 'milk, water',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: [],
+    }];
+    renderResults(products, '');
+    const estimateBtn = document.querySelector('[data-action="estimate-protein"]');
+    estimateBtn.click();
+    expect(window.estimateProteinQuality).toHaveBeenCalledWith('ed');
+  });
+
+  it('wires input validation handlers on edit form fields', () => {
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '', brand: '', stores: '', ingredients: 'milk',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: [],
+    }];
+    renderResults(products, '');
+
+    const edName = document.getElementById('ed-name');
+    edName.dispatchEvent(new Event('input'));
+    expect(window.validateOffBtn).toHaveBeenCalledWith('ed');
+
+    const edEan = document.getElementById('ed-ean');
+    edEan.dispatchEvent(new Event('input'));
+    expect(window.validateOffBtn).toHaveBeenCalledTimes(2);
+
+    const edIngredients = document.getElementById('ed-ingredients');
+    edIngredients.dispatchEvent(new Event('input'));
+    expect(window.updateEstimateBtn).toHaveBeenCalledWith('ed');
+  });
+
+  it('creates button click sets name field for non-EAN search', () => {
+    const fName = document.createElement('input');
+    fName.id = 'f-name';
+    document.body.appendChild(fName);
+    const fEan = document.createElement('input');
+    fEan.id = 'f-ean';
+    document.body.appendChild(fEan);
+    window.switchView = vi.fn();
+
+    renderResults([], 'my product');
+    const createBtn = document.querySelector('[data-action="create-from-search"]');
+    createBtn.click();
+    expect(fName.value).toBe('my product');
+    expect(window.switchView).toHaveBeenCalledWith('register');
+  });
+
+  it('creates button click sets ean field for EAN search', () => {
+    const fName = document.createElement('input');
+    fName.id = 'f-name';
+    document.body.appendChild(fName);
+    const fEan = document.createElement('input');
+    fEan.id = 'f-ean';
+    document.body.appendChild(fEan);
+    window.switchView = vi.fn();
+
+    renderResults([], '1234567890123');
+    const createBtn = document.querySelector('[data-action="create-from-search"]');
+    createBtn.click();
+    expect(fEan.value).toBe('1234567890123');
+    expect(window.switchView).toHaveBeenCalledWith('register');
+  });
+
+  it('loads images for products with has_image', async () => {
+    const { loadProductImage } = await import('../images.js');
+    loadProductImage.mockResolvedValue('data:image/png;base64,abc');
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 1 },
+    ];
+    renderResults(products, '');
+    await vi.waitFor(() => {
+      expect(loadProductImage).toHaveBeenCalledWith(1);
+    });
+  });
+
+  it('renders plural count without search', () => {
+    renderResults([
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 },
+      { id: 2, name: 'Bread', type: 'bakery', total_score: 70, has_image: 0 },
+    ], '');
+    expect(document.getElementById('result-count').textContent).toContain('result_count_plural');
+  });
+
+  it('does not call toggleExpand when clicking inside expanded area', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const expandedDiv = document.querySelector('.expanded');
+    expandedDiv.click();
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
+  it('renders has_missing_scores asterisk in score cell', () => {
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      has_missing_scores: true,
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('*');
+    expect(container.innerHTML).toContain('Score based on incomplete data');
+  });
+
+  it('renders EAN and brand in product row', () => {
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '7038010000', brand: 'Tine',
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010000');
+    expect(container.innerHTML).toContain('Tine');
+  });
+
+  it('renders completeness badge with color coding', () => {
+    const products = [{
+      id: 1, name: 'Complete', type: 'dairy', total_score: 85, has_image: 0,
+      completeness: 100,
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('100%');
+    expect(container.innerHTML).toContain('#4ecdc4');
+  });
+
+  it('renders thumbnail for product with image', () => {
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 1,
+    }];
+    renderResults(products, '');
+    const thumb = document.getElementById('thumb-1');
+    expect(thumb).not.toBeNull();
+    expect(thumb.tagName).toBe('IMG');
+  });
+
+  it('renders no_weights message when scores object is empty', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('expanded_no_weights');
+  });
+
+  it('renders flag badges in expanded view', async () => {
+    // Load flag config first
+    const mockConfig = { vegan: { type: 'user', label: 'Vegan' }, processed: { type: 'system', label: 'Processed' } };
+    global.fetch = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue(mockConfig),
+    });
+    await loadFlagConfig();
+
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {},
+      flags: ['vegan', 'processed'],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('flag-badge');
+    expect(container.innerHTML).toContain('Vegan');
+    expect(container.innerHTML).toContain('Processed');
+  });
+
+  it('renders edit form with user flag checkboxes', async () => {
+    const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
+    global.fetch = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue(mockConfig),
+    });
+    await loadFlagConfig();
+
+    state.expandedId = 1;
+    state.editingId = 1;
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '', brand: '', stores: '', ingredients: '',
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
+      taste_score: 4, taste_note: '', flags: ['vegan'],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('flag-toggle');
+    expect(container.innerHTML).toContain('ed-flag-vegan');
+    expect(container.innerHTML).toContain('checked');
+  });
+
+  it('renders completeness bar with low percentage color', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+      completeness: 30,
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('rgba(255,140,0,0.7)');
   });
 });
 

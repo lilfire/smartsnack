@@ -6,16 +6,29 @@ vi.mock('../state.js', () => {
     currentFilter: [],
     expandedId: null,
     editingId: null,
+    searchTimeout: null,
+    cachedStats: null,
     cachedResults: [],
+    sortCol: 'total_score',
+    sortDir: 'desc',
     categories: [],
     imageCache: {},
+    advancedFilters: null,
   };
   return {
     state: _state,
-    api: vi.fn().mockResolvedValue({}),
+    NUTRI_IDS: ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'],
+    catEmoji: vi.fn(() => '\u{1F4E6}'),
+    catLabel: vi.fn((t) => t),
     esc: (s) => String(s),
     safeDataUri: (uri) => uri || '',
+    fmtNum: vi.fn((v) => v == null ? '-' : String(v)),
     showToast: vi.fn(),
+    api: vi.fn().mockResolvedValue({}),
+    fetchProducts: vi.fn().mockResolvedValue([]),
+    fetchStats: vi.fn().mockResolvedValue({}),
+    showConfirmModal: vi.fn().mockResolvedValue(true),
+    upgradeSelect: vi.fn(),
   };
 });
 
@@ -994,5 +1007,241 @@ describe('showDuplicateMergeModal', () => {
     expect(result.choices.price).toBe(1000);  // from B (A was null)
     expect(result.choices.volume).toBe(2);     // from A (B was null)
     expect(result.choices.taste_score).toBe(2); // default: avg(0.5, 3) = 1.75 → rounded to 2
+  });
+
+  it('selects all A values when keepAllA is clicked', async () => {
+    const formData = { taste_score: 1, price: 100, brand: 'A-Brand' };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 5, price: 999, brand: 'B-Brand',
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const bulkBtns = bg.querySelectorAll('.conflict-bulk button');
+    // First bulk button = keep all A
+    bulkBtns[0].click();
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.choices.taste_score).toBe(1);
+    expect(result.choices.price).toBe(100);
+    expect(result.choices.brand).toBe('A-Brand');
+  });
+
+  it('selects all B values when keepAllB is clicked', async () => {
+    const formData = { taste_score: 1, price: 100, brand: 'A-Brand' };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      taste_score: 5, price: 999, brand: 'B-Brand',
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const bulkBtns = bg.querySelectorAll('.conflict-bulk button');
+    // Second bulk button = keep all B
+    bulkBtns[1].click();
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.choices.taste_score).toBe(5);
+    expect(result.choices.price).toBe(999);
+    expect(result.choices.brand).toBe('B-Brand');
+  });
+});
+
+describe('showMergeConflictModal', () => {
+  afterEach(() => {
+    document.querySelectorAll('.scan-modal-bg').forEach(el => el.remove());
+  });
+
+  it('resolves immediately when no conflicts exist', async () => {
+    const formData = { kcal: 100, protein: 5 };
+    const duplicate = { kcal: 100, protein: 5 };
+    const result = await showMergeConflictModal(formData, duplicate, null);
+    expect(result).toEqual({});
+  });
+
+  it('shows conflict modal when fields differ', async () => {
+    const formData = { kcal: 100, protein: 5 };
+    const duplicate = { kcal: 200, protein: 10 };
+    const promise = showMergeConflictModal(formData, duplicate, null);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg).not.toBeNull();
+    const modal = bg.querySelector('.conflict-modal');
+    expect(modal).not.toBeNull();
+
+    // Default is to keep form (current) values
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.kcal).toBe(100);
+    expect(result.protein).toBe(5);
+  });
+
+  it('returns null when cancelled', async () => {
+    const formData = { kcal: 100 };
+    const duplicate = { kcal: 200 };
+    const promise = showMergeConflictModal(formData, duplicate, null);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    bg.querySelector('.confirm-no').click();
+    const result = await promise;
+    expect(result).toBeNull();
+  });
+
+  it('allows picking duplicate values', async () => {
+    const formData = { brand: 'A', stores: 'Store A' };
+    const duplicate = { brand: 'B', stores: 'Store B' };
+    const promise = showMergeConflictModal(formData, duplicate, null);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    // Click all "other" (dup) options
+    const dupOptions = bg.querySelectorAll('.conflict-option:not(.selected)');
+    dupOptions.forEach(opt => opt.click());
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.brand).toBe('B');
+    expect(result.stores).toBe('Store B');
+  });
+
+  it('uses bulk keep-all-current button', async () => {
+    const formData = { kcal: 100, protein: 5 };
+    const duplicate = { kcal: 200, protein: 10 };
+    const promise = showMergeConflictModal(formData, duplicate, null);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const bulkBtns = bg.querySelectorAll('.conflict-bulk button');
+    // First = keep all current
+    bulkBtns[0].click();
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.kcal).toBe(100);
+    expect(result.protein).toBe(5);
+  });
+
+  it('uses bulk keep-all-other button', async () => {
+    const formData = { kcal: 100, protein: 5 };
+    const duplicate = { kcal: 200, protein: 10 };
+    const promise = showMergeConflictModal(formData, duplicate, null);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const bulkBtns = bg.querySelectorAll('.conflict-bulk button');
+    // Second = keep all other
+    bulkBtns[1].click();
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.kcal).toBe(200);
+    expect(result.protein).toBe(10);
+  });
+
+  it('auto-resolves OFF-applied fields to form values', async () => {
+    const formData = { kcal: 150, protein: 8, brand: 'X' };
+    const duplicate = { kcal: 200, protein: 10, brand: 'Y' };
+    const offApplied = new Set(['kcal', 'protein']);
+    const promise = showMergeConflictModal(formData, duplicate, offApplied);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    // Only brand should be a conflict row (kcal and protein auto-resolved)
+    const labels = bg.querySelectorAll('.conflict-row-label');
+    expect(labels.length).toBe(1);
+    expect(labels[0].textContent).toContain('brand');
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.kcal).toBe(150);
+    expect(result.protein).toBe(8);
+    expect(result.brand).toBe('X');
+  });
+});
+
+describe('showEditDuplicateModal', () => {
+  afterEach(() => {
+    document.querySelectorAll('.scan-modal-bg').forEach(el => el.remove());
+  });
+
+  it('shows merge button for unsynced duplicate', async () => {
+    const duplicate = { id: 1, name: 'Test', match_type: 'ean', is_synced_with_off: false };
+    const promise = showEditDuplicateModal(duplicate);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg).not.toBeNull();
+    const mergeBtn = bg.querySelector('.confirm-yes');
+    expect(mergeBtn.textContent).toBe('duplicate_action_merge_into');
+
+    mergeBtn.click();
+    const result = await promise;
+    expect(result).toBe('merge');
+  });
+
+  it('shows delete button for synced duplicate', async () => {
+    const duplicate = { id: 1, name: 'Test', match_type: 'ean', is_synced_with_off: true };
+    const promise = showEditDuplicateModal(duplicate);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const deleteBtn = bg.querySelector('.confirm-yes');
+    expect(deleteBtn.textContent).toBe('duplicate_action_delete');
+
+    deleteBtn.click();
+    const result = await promise;
+    expect(result).toBe('delete');
+  });
+
+  it('returns cancel when cancel button clicked', async () => {
+    const duplicate = { id: 1, name: 'Test', match_type: 'ean', is_synced_with_off: false };
+    const promise = showEditDuplicateModal(duplicate);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    bg.querySelector('.confirm-no').click();
+    const result = await promise;
+    expect(result).toBe('cancel');
+  });
+});
+
+describe('showOffAddReview without name', () => {
+  it('shows name required warning when no name is filled', () => {
+    // Set up _offCtx by triggering lookupOFF context
+    const eanEl = document.createElement('input');
+    eanEl.id = 'ed-ean';
+    eanEl.value = '1234567890123';
+    document.body.appendChild(eanEl);
+    const nameEl = document.createElement('input');
+    nameEl.id = 'ed-name';
+    nameEl.value = '';
+    document.body.appendChild(nameEl);
+    const offBtn = document.createElement('button');
+    offBtn.id = 'ed-off-btn';
+    document.body.appendChild(offBtn);
+
+    // Set _offCtx.prefix via lookupOFF
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 0, product: null }),
+    });
+    lookupOFF('ed', null);
+
+    // Set up all review fields with empty values (no name)
+    const fields = [
+      'brand', 'stores', 'ingredients', 'kcal', 'energy_kj',
+      'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt',
+      'weight', 'portion',
+    ];
+    fields.forEach((f) => {
+      if (!document.getElementById('ed-' + f)) {
+        const el = document.createElement('input');
+        el.id = 'ed-' + f;
+        el.value = '';
+        document.body.appendChild(el);
+      }
+    });
+
+    showOffAddReview('9999999999999');
+    const modal = document.getElementById('off-add-review-bg');
+    expect(modal).not.toBeNull();
+    // Should contain the name required warning
+    expect(modal.innerHTML).toContain('off_add_name_required');
   });
 });

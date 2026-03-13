@@ -14,20 +14,25 @@ vi.mock('../state.js', () => {
     sortDir: 'desc',
     categories: [],
     imageCache: {},
+    advancedFilters: null,
   };
   return {
     state: _state,
+    NUTRI_IDS: ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'],
+    catEmoji: vi.fn(() => '\u{1F4E6}'),
+    catLabel: vi.fn((t) => t),
+    esc: (s) => String(s),
+    safeDataUri: vi.fn((uri) => uri || ''),
+    fmtNum: vi.fn((v) => v == null ? '-' : String(v)),
+    showToast: vi.fn(),
     api: vi.fn(),
+    fetchProducts: vi.fn().mockResolvedValue([]),
     fetchStats: vi.fn().mockImplementation(async () => {
       _state.cachedStats = { total: 0, types: 0, categories: [] };
       return _state.cachedStats;
     }),
-    fetchProducts: vi.fn().mockResolvedValue([]),
-    NUTRI_IDS: [],
     showConfirmModal: vi.fn(),
-    showToast: vi.fn(),
     upgradeSelect: vi.fn(),
-    esc: (s) => String(s),
   };
 });
 
