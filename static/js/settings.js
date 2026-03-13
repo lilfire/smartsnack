@@ -585,6 +585,7 @@ export async function loadPq() {
 
 export function renderPqTable() {
   const container = document.getElementById('pq-list');
+  if (!container) return;
   if (!pqData.length) { container.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px;text-align:center;padding:20px">No protein sources</p>'; return; }
   let h = '';
   pqData.forEach((row) => {

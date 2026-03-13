@@ -44,6 +44,10 @@ vi.mock('../render.js', () => ({
   getFlagConfig: vi.fn(() => ({})),
 }));
 
+vi.mock('../settings.js', () => ({
+  loadSettings: vi.fn(),
+}));
+
 vi.mock('../openfoodfacts.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
   validateOffBtn: vi.fn(),
