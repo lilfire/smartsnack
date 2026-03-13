@@ -6,7 +6,7 @@ Implement smart duplicate detection across all product creation flows, using the
 
 ---
 
-## Scenario 1: Register New Product by Barcode + OFF Fetch
+## ~~Scenario 1: Register New Product by Barcode + OFF Fetch~~ ✅ COMPLETED
 
 Search for duplicate by EAN and name before inserting.
 
@@ -37,7 +37,7 @@ Search for duplicate by EAN and name before inserting.
 
 ---
 
-## Scenario 2: Register New Product by Name (No OFF)
+## ~~Scenario 2: Register New Product by Name (No OFF)~~ ✅ COMPLETED
 
 Search for duplicate by name only (no EAN to check).
 
