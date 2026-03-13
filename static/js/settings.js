@@ -773,13 +773,33 @@ function showImportDuplicateDialog() {
     mergeSection.className = 'import-dup-section import-dup-merge-rules';
     mergeSection.style.display = 'none';
 
-    const mergeInfo = document.createElement('div');
-    mergeInfo.className = 'import-dup-merge-info';
-    mergeInfo.innerHTML = t('import_dup_merge_rules_desc');
-    mergeSection.appendChild(mergeInfo);
+    const mergeRulesTitle = document.createElement('div');
+    mergeRulesTitle.className = 'import-dup-section-label';
+    mergeRulesTitle.textContent = t('import_dup_merge_winner_title');
+    mergeSection.appendChild(mergeRulesTitle);
+
+    const rulesList = document.createElement('ul');
+    rulesList.className = 'import-dup-merge-rules-list';
+    const rules = [
+      t('import_dup_merge_rule_one_synced'),
+      t('import_dup_merge_rule_both_synced'),
+      t('import_dup_merge_rule_neither_synced'),
+    ];
+    rules.forEach(r => {
+      const li = document.createElement('li');
+      li.innerHTML = r;
+      rulesList.appendChild(li);
+    });
+    mergeSection.appendChild(rulesList);
+
+    const mergeNote = document.createElement('div');
+    mergeNote.className = 'import-dup-merge-note';
+    mergeNote.textContent = t('import_dup_merge_single_value_note');
+    mergeSection.appendChild(mergeNote);
 
     const mergePriorityLabel = document.createElement('div');
     mergePriorityLabel.className = 'import-dup-section-label';
+    mergePriorityLabel.style.marginTop = '10px';
     mergePriorityLabel.textContent = t('import_dup_merge_priority_label');
     mergeSection.appendChild(mergePriorityLabel);
     mergeSection.appendChild(_buildRadioGroup('merge_priority', [
