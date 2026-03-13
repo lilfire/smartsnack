@@ -6,20 +6,29 @@ vi.mock('../state.js', () => {
     currentFilter: [],
     expandedId: null,
     editingId: null,
+    searchTimeout: null,
+    cachedStats: null,
     cachedResults: [],
-    categories: [],
-    imageCache: {},
     sortCol: 'total_score',
     sortDir: 'desc',
+    categories: [],
+    imageCache: {},
+    advancedFilters: null,
   };
   return {
     state: _state,
-    api: vi.fn().mockResolvedValue({}),
-    esc: (s) => String(s),
+    NUTRI_IDS: ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'],
     catEmoji: vi.fn(() => '📦'),
     catLabel: vi.fn((t) => t),
+    esc: (s) => String(s),
     safeDataUri: vi.fn((u) => u || ''),
+    fmtNum: vi.fn((v) => v == null ? '-' : String(v)),
+    showToast: vi.fn(),
+    api: vi.fn().mockResolvedValue({}),
     fetchProducts: vi.fn().mockResolvedValue([]),
+    fetchStats: vi.fn().mockResolvedValue({}),
+    showConfirmModal: vi.fn().mockResolvedValue(true),
+    upgradeSelect: vi.fn(),
   };
 });
 
@@ -307,5 +316,95 @@ describe('scanOffFetch', () => {
     loadData.mockResolvedValueOnce();
     await scanOffFetch('1234567890123', 42);
     expect(switchView).toHaveBeenCalledWith('search');
+  });
+});
+
+describe('startScannerHardware error handling', () => {
+  it('shows error UI when scanner.start() rejects', async () => {
+    const mockStart = vi.fn().mockRejectedValue(new Error('Camera denied'));
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    openScanner('ed', 1);
+    // Wait for the rejected promise in the catch block
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('toast_scanner_load_error', 'error');
+    });
+    const errDiv = document.querySelector('.scanner-error');
+    expect(errDiv).not.toBeNull();
+    expect(errDiv.querySelector('.scanner-error-icon')).not.toBeNull();
+    expect(errDiv.querySelector('p')).not.toBeNull();
+    const cancelBtn = errDiv.querySelector('.btn-sm.btn-outline');
+    expect(cancelBtn).not.toBeNull();
+    // Click the cancel button to close the scanner
+    cancelBtn.click();
+    expect(document.getElementById('scanner-bg')).toBeNull();
+  });
+});
+
+describe('onBarcodeDetected via openScanner', () => {
+  it('vibrates, sets EAN, shows toast, and closes scanner', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    // Set up EAN input element
+    const eanInput = document.createElement('input');
+    eanInput.id = 'ed-ean';
+    document.body.appendChild(eanInput);
+
+    openScanner('ed', 1);
+    await vi.waitFor(() => {
+      expect(capturedOnSuccess).toBeDefined();
+    });
+
+    // Simulate barcode detection
+    capturedOnSuccess('7038010055720');
+
+    expect(navigator.vibrate).toHaveBeenCalledWith(100);
+    expect(eanInput.value).toBe('7038010055720');
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_barcode_scanned'), 'success');
+    expect(document.getElementById('scanner-bg')).toBeNull();
+  });
+});
+
+describe('showScanNotFoundModal button interactions', () => {
+  it('cancel button closes the modal', () => {
+    showScanNotFoundModal('1234567890123');
+    const cancelBtn = document.querySelector('.scan-modal-btn-cancel');
+    cancelBtn.click();
+    expect(document.getElementById('scan-modal-bg')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it('background click closes the modal', () => {
+    showScanNotFoundModal('1234567890123');
+    const bg = document.getElementById('scan-modal-bg');
+    // Simulate clicking the background itself (not a child)
+    bg.onclick({ target: bg });
+    expect(document.getElementById('scan-modal-bg')).toBeNull();
+  });
+
+  it('register button calls scanRegisterNew flow', () => {
+    showScanNotFoundModal('1234567890123');
+    const regBtn = document.querySelector('.scan-modal-btn-register');
+    regBtn.click();
+    expect(switchView).toHaveBeenCalledWith('register');
   });
 });
