@@ -327,6 +327,8 @@ export async function registerProduct() {
     document.getElementById('f-price').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';
+    const tasteLabel = document.getElementById('smak-label-text');
+    if (tasteLabel) { tasteLabel.setAttribute('data-i18n-param-val', '3'); tasteLabel.textContent = t('label_taste', { val: '3' }); }
     const toastKey = result.merged ? 'toast_product_merged' : 'toast_product_added';
     showToast(t(toastKey, { name: name }), 'success');
 
