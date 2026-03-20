@@ -154,14 +154,21 @@ class TestOffProduct:
 
         assert result["status"] == 1
 
-    def test_runtime_error_returns_not_found(self):
-        from services.proxy_service import off_product
+    def test_not_found_error_returns_not_found(self):
+        from services.proxy_service import off_product, _OffNotFoundError
 
-        with patch("services.proxy_service._off_get_json", side_effect=RuntimeError("404")):
+        with patch("services.proxy_service._off_get_json", side_effect=_OffNotFoundError("Not found")):
             result = off_product("1234567890123")
 
         assert result["status"] == 0
         assert "not found" in result["status_verbose"]
+
+    def test_runtime_error_propagates(self):
+        from services.proxy_service import off_product
+
+        with patch("services.proxy_service._off_get_json", side_effect=RuntimeError("Server error")):
+            with pytest.raises(RuntimeError):
+                off_product("1234567890123")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

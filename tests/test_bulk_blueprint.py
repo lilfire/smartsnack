@@ -215,14 +215,12 @@ class TestParseOffNutriment:
         result = _parse_off_nutriment({"fiber_100g": "trace"}, "fiber")
         assert result is None
 
-    def test_zero_value_returns_none_due_to_or_chaining(self):
-        """The implementation uses ``or`` to chain the two dict lookups, so a
-        stored integer 0 (falsy) is treated as absent and None is returned.
-        This test documents that known edge-case behaviour."""
+    def test_zero_value_returns_zero(self):
+        """A per-100g value of 0 is valid and should return 0.0, not None."""
         from services.bulk_service import _parse_off_nutriment
 
         result = _parse_off_nutriment({"sugars_100g": 0}, "sugars")
-        assert result is None
+        assert result == 0.0
 
     def test_integer_value_is_coerced_to_float(self):
         from services.bulk_service import _parse_off_nutriment

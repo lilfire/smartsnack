@@ -55,7 +55,9 @@ def _set_off_sync_flag(conn, pid):
 
 def _parse_off_nutriment(nutriments, key):
     """Extract a nutriment value from OFF data, preferring per-100g."""
-    val = nutriments.get(f"{key}_100g") or nutriments.get(key)
+    val = nutriments.get(f"{key}_100g")
+    if val is None:
+        val = nutriments.get(key)
     if val is None:
         return None
     try:
@@ -214,7 +216,7 @@ def refresh_from_off():
     rows = conn.execute(
         "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
         "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-        "weight, portion "
+        "weight, portion, image "
         "FROM products WHERE ean IS NOT NULL AND ean != ''"
     ).fetchall()
 
@@ -227,7 +229,22 @@ def refresh_from_off():
         ean = row["ean"]
         pid = row["id"]
         try:
-            data = proxy_service.off_product(ean)
+            # Retry with backoff for transient API errors
+            data = None
+            last_err = None
+            for attempt in range(3):
+                try:
+                    data = proxy_service.off_product(ean)
+                    break
+                except RuntimeError as e:
+                    last_err = e
+                    time.sleep(2 * (attempt + 1))
+
+            if data is None:
+                errors.append({"id": pid, "ean": ean, "error": str(last_err)})
+                time.sleep(1)
+                continue
+
             if not data.get("product"):
                 skipped += 1
                 continue
@@ -236,11 +253,13 @@ def refresh_from_off():
             local = dict(row)
             field_updates = _map_off_product(product, local)
 
-            # Fetch image
-            image_uri = _fetch_off_image(product)
+            # Fetch image only if product doesn't already have one
+            has_image = bool(row["image"])
+            image_uri = _fetch_off_image(product) if not has_image else None
 
             if not field_updates and not image_uri:
                 skipped += 1
+                _set_off_sync_flag(conn, pid)
                 continue
 
             # Update product fields
@@ -267,7 +286,7 @@ def refresh_from_off():
             errors.append({"id": pid, "ean": ean, "error": str(e)})
 
         # Be respectful to the OFF API
-        time.sleep(0.5)
+        time.sleep(1)
 
     return {
         "total": total,
@@ -320,7 +339,7 @@ def _run_refresh(options=None):
         rows = conn.execute(
             "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
             "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-            "weight, portion "
+            "weight, portion, image "
             "FROM products WHERE ean IS NOT NULL AND ean != ''"
         ).fetchall()
 
@@ -337,6 +356,7 @@ def _run_refresh(options=None):
             ean = row["ean"]
             pid = row["id"]
             name = row["name"] or ""
+            has_image = bool(row["image"])
 
             with _refresh_lock:
                 _refresh_job.update(
@@ -347,7 +367,36 @@ def _run_refresh(options=None):
                 )
 
             try:
-                data = proxy_service.off_product(ean)
+                # Retry with backoff for transient API errors
+                data = None
+                last_err = None
+                for attempt in range(3):
+                    try:
+                        data = proxy_service.off_product(ean)
+                        break
+                    except RuntimeError as e:
+                        last_err = e
+                        logger.warning(
+                            "OFF API attempt %d/3 failed for EAN %s: %s",
+                            attempt + 1, ean, e,
+                        )
+                        time.sleep(2 * (attempt + 1))  # 2s, 4s backoff
+
+                if data is None:
+                    errors += 1
+                    report.append(
+                        {
+                            "name": name,
+                            "ean": ean,
+                            "status": "error",
+                            "reason": str(last_err),
+                        }
+                    )
+                    with _refresh_lock:
+                        _refresh_job.update(status="error", errors=errors)
+                    time.sleep(1)
+                    continue
+
                 if not data.get("product"):
                     skipped += 1
                     report.append(
@@ -360,13 +409,13 @@ def _run_refresh(options=None):
                     )
                     with _refresh_lock:
                         _refresh_job.update(status="skipped", skipped=skipped)
-                    time.sleep(0.5)
+                    time.sleep(1)
                     continue
 
                 product = data["product"]
                 local = dict(row)
                 field_updates = _map_off_product(product, local)
-                image_uri = _fetch_off_image(product)
+                image_uri = _fetch_off_image(product) if not has_image else None
 
                 if not field_updates and not image_uri:
                     skipped += 1
@@ -378,9 +427,10 @@ def _run_refresh(options=None):
                             "reason": "no_new_data",
                         }
                     )
+                    _set_off_sync_flag(conn, pid)
                     with _refresh_lock:
                         _refresh_job.update(status="skipped", skipped=skipped)
-                    time.sleep(0.5)
+                    time.sleep(1)
                     continue
 
                 if field_updates:
@@ -423,7 +473,7 @@ def _run_refresh(options=None):
                 with _refresh_lock:
                     _refresh_job.update(status="error", errors=errors)
 
-            time.sleep(0.5)
+            time.sleep(1)
 
         # Phase 2: Search by name for products without EAN
         if options and options.get("search_missing"):
@@ -433,7 +483,7 @@ def _run_refresh(options=None):
             missing_rows = conn.execute(
                 "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
                 "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-                "weight, portion "
+                "weight, portion, image "
                 "FROM products WHERE (ean IS NULL OR ean = '') "
                 "AND name IS NOT NULL AND name != ''"
             ).fetchall()
@@ -524,7 +574,8 @@ def _run_refresh(options=None):
 
                     local = dict(row)
                     field_updates = _map_off_product(best, local)
-                    image_uri = _fetch_off_image(best)
+                    has_image = bool(row["image"])
+                    image_uri = _fetch_off_image(best) if not has_image else None
 
                     # Store matched EAN for future lookups
                     matched_ean = best.get("code", "")
@@ -541,6 +592,7 @@ def _run_refresh(options=None):
                                 "reason": "no_new_data",
                             }
                         )
+                        _set_off_sync_flag(conn, pid)
                         with _refresh_lock:
                             _refresh_job.update(status="skipped", skipped=skipped)
                         time.sleep(1.0)
