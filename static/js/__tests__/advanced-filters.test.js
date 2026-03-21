@@ -1327,7 +1327,7 @@ describe('_updateOps fallback when previous op is not in new ops list', () => {
     const newRow = panel.querySelector('.adv-row');
     const newOpSel = newRow.querySelector('.adv-op-select');
     // Default field is 'type' (category), so ops should be category ops
-    // First option should be '=' (is)
-    expect(newOpSel.options[0].value).toBe('=');
+    // First option should be '' (placeholder from CATEGORY_OPS)
+    expect(newOpSel.options[0].value).toBe('');
   });
 });
