@@ -29,6 +29,7 @@ export function validateOffBtn(prefix) {
 
 let _offCtx = { prefix: null, productId: null };
 let _offPickerProducts = null;
+let _offReviewResolve = null;
 
 const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
 
@@ -949,8 +950,10 @@ const _offReviewFields = [
   { key: 'portion', offKey: 'serving_size', label: 'label_portion' },
 ];
 
-export function showOffAddReview(ean) {
-  const prefix = _offCtx.prefix;
+export function showOffAddReview(ean, prefixOverride) {
+  if (_offReviewResolve) _offReviewResolve();
+  const prefix = prefixOverride || _offCtx.prefix;
+  const reviewPromise = new Promise((resolve) => { _offReviewResolve = resolve; });
   const filled = [];
   const empty = [];
   _offReviewFields.forEach((f) => {
@@ -1036,22 +1039,24 @@ export function showOffAddReview(ean) {
   submitBtn.id = 'off-submit-btn';
   submitBtn.style.cssText = 'padding:8px 20px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '');
   submitBtn.textContent = '\u{1F30E} ' + t('off_submit_btn');
-  submitBtn.addEventListener('click', () => { submitToOff(ean); });
+  submitBtn.addEventListener('click', () => { submitToOff(ean, prefix); });
   btnRow.appendChild(submitBtn);
   bodyDiv.appendChild(btnRow);
 
   modalDiv.appendChild(bodyDiv);
   bg.innerHTML = '';
   bg.appendChild(modalDiv);
+  return reviewPromise;
 }
 
 export function closeOffAddReview() {
   const el = document.getElementById('off-add-review-bg');
   if (el) el.remove();
+  if (_offReviewResolve) { _offReviewResolve(); _offReviewResolve = null; }
 }
 
-export async function submitToOff(ean) {
-  const prefix = _offCtx.prefix;
+export async function submitToOff(ean, prefixOverride) {
+  const prefix = prefixOverride || _offCtx.prefix;
   const btn = document.getElementById('off-submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 
