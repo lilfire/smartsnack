@@ -717,5 +717,7 @@
     "import_dup_merge_use_imported": "Use imported values",
     "off_not_found_auto": "Not found on OpenFoodFacts — fill in the form manually",
     "category_e2ecat": "E2E Category",
-    "flag_e2e_flag": "E2E Flag"
+    "flag_e2e_flag": "E2E Flag",
+    "pq_e2e_ui_source_label": "E2E UI Source",
+    "pq_e2e_ui_source_keywords": "e2euisource, e2e ui"
 }

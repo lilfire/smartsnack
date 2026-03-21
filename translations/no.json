@@ -719,5 +719,7 @@
     "import_dup_merge_priority_label": "Reserveregel når ingen er synkronisert med OFF",
     "import_dup_merge_keep_existing": "Behold eksisterende verdier",
     "import_dup_merge_use_imported": "Bruk importerte verdier",
-    "off_not_found_auto": "Ikke funnet på OpenFoodFacts — fyll inn skjemaet manuelt"
+    "off_not_found_auto": "Ikke funnet på OpenFoodFacts — fyll inn skjemaet manuelt",
+    "category_e2ereassigncat": "Reassign Cat",
+    "category_e2epillcat": "Pill Filter Cat"
 }
