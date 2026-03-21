@@ -277,7 +277,7 @@ export function scanRegisterNew(ean) {
   if (eanEl) eanEl.value = ean;
   import('./openfoodfacts.js').then((mod) => {
     mod.validateOffBtn('f');
-    setTimeout(() => { mod.lookupOFF('f'); }, 300);
+    setTimeout(() => { mod.lookupOFF('f', null, { autoClose: true }); }, 300);
   });
 }
 

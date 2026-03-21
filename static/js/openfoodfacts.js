@@ -44,10 +44,10 @@ function _gatherNutrition(prefix) {
   return Object.keys(nutrition).length > 0 ? nutrition : null;
 }
 
-export async function lookupOFF(prefix, productId) {
+export async function lookupOFF(prefix, productId, opts) {
   const ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
   const name = document.getElementById(prefix + '-name').value.trim();
-  _offCtx = { prefix: prefix, productId: productId || null };
+  _offCtx = { prefix: prefix, productId: productId || null, autoClose: opts?.autoClose || false };
 
   if (isValidEan(ean)) {
     showOffPickerLoading(t('off_searching_ean', { ean: ean }));
@@ -141,6 +141,11 @@ function updateOffPickerResults(products, errorMsg, ean) {
   // Capture context snapshot at render time to avoid race conditions
   const ctxSnapshot = { prefix: _offCtx.prefix, productId: _offCtx.productId };
   if (errorMsg) {
+    if (_offCtx.autoClose && ean) {
+      closeOffPicker();
+      showToast(t('off_not_found_auto'), 'info');
+      return;
+    }
     const errDiv = document.createElement('div');
     errDiv.className = 'off-modal-empty';
     errDiv.textContent = errorMsg;

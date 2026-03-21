@@ -97,14 +97,15 @@ def live_url(app_server):
 
 
 @pytest.fixture()
-def page(page, live_url):
-    """Override the default Playwright page fixture to navigate to the app.
+def page(browser, live_url):
+    """Create a Playwright page that navigates to the app.
 
     External CDN requests (Google Fonts, cdnjs, etc.) are blocked so that
     the page doesn't hang waiting for unreachable hosts.
     """
+    _page = browser.new_page()
     # Block external resources that can hang in sandboxed environments
-    page.route(
+    _page.route(
         "**/*",
         lambda route: (
             route.abort()
@@ -112,15 +113,16 @@ def page(page, live_url):
             else route.continue_()
         ),
     )
-    page.goto(live_url, wait_until="domcontentloaded")
+    _page.goto(live_url, wait_until="domcontentloaded")
     # Wait for the app to finish initial load (products list populated)
-    page.wait_for_selector("#results-container", state="attached", timeout=10000)
+    _page.wait_for_selector("#results-container", state="attached", timeout=10000)
     # Wait for loading spinners to disappear
-    page.wait_for_function(
+    _page.wait_for_function(
         "() => !document.querySelector('#results-container .loading')",
         timeout=10000,
     )
-    return page
+    yield _page
+    _page.close()
 
 
 # ---------------------------------------------------------------------------

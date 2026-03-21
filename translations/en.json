@@ -710,5 +710,8 @@
     "import_dup_merge_single_value_note": "If only one side has a value, that value is always kept — the fallback only applies when both have a value for the same field.",
     "import_dup_merge_priority_label": "Fallback when neither is synced with OFF",
     "import_dup_merge_keep_existing": "Keep existing values",
-    "import_dup_merge_use_imported": "Use imported values"
+    "import_dup_merge_use_imported": "Use imported values",
+    "off_not_found_auto": "Not found on OpenFoodFacts — fill in the form manually",
+    "category_e2ecat": "E2E Category",
+    "flag_e2e_flag": "E2E Flag"
 }

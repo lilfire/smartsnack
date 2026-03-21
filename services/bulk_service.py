@@ -195,8 +195,8 @@ def _fetch_off_image(product):
                     content_type = "image/jpeg"
                 else:
                     content_type = "image/png"
-        except ImportError:
-            pass  # PIL not available, use original size
+        except Exception:
+            pass  # PIL not available or image can't be processed, use original size
 
         b64 = base64.b64encode(img_data).decode("ascii")
         mime = content_type.split(";")[0].strip()

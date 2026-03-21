@@ -710,5 +710,6 @@
     "import_dup_merge_single_value_note": "Om bara en sida har ett värde behålls det alltid — reservregeln gäller bara när båda har ett värde för samma fält.",
     "import_dup_merge_priority_label": "Reservregel när ingen är synkad med OFF",
     "import_dup_merge_keep_existing": "Behåll befintliga värden",
-    "import_dup_merge_use_imported": "Använd importerade värden"
+    "import_dup_merge_use_imported": "Använd importerade värden",
+    "off_not_found_auto": "Hittades inte på OpenFoodFacts — fyll i formuläret manuellt"
 }
