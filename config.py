@@ -274,6 +274,8 @@ ADVANCED_FILTER_OPS = {
     "<=": "<=",
     ">=": ">=",
     "contains": "LIKE",
+    "is_not_set": "IS_NOT_SET",
+    "is_set": "IS_SET",
 }
 MAX_FILTER_DEPTH = 4
 MAX_FILTER_CONDITIONS = 20

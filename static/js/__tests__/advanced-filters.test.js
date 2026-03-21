@@ -1137,14 +1137,16 @@ describe('_updateOps and _syncValInput branch coverage via upgradeSelect callbac
     const row = panel.querySelector('.adv-row');
     const opSel = row.querySelector('.adv-op-select');
 
-    // NUMERIC_OPS: <, >, =, <=, >=, !=
-    expect(opSel.options.length).toBe(6);
+    // NUMERIC_OPS: <, >, =, <=, >=, !=, is_not_set, is_set
+    expect(opSel.options.length).toBe(8);
     expect(opSel.options[0].value).toBe('<');
     expect(opSel.options[1].value).toBe('>');
     expect(opSel.options[2].value).toBe('=');
     expect(opSel.options[3].value).toBe('<=');
     expect(opSel.options[4].value).toBe('>=');
     expect(opSel.options[5].value).toBe('!=');
+    expect(opSel.options[6].value).toBe('is_not_set');
+    expect(opSel.options[7].value).toBe('is_set');
 
     // Value input should be visible and type number
     const valInput = row.querySelector('.adv-value-input');
@@ -1277,8 +1279,8 @@ describe('_updateOps fallback when previous op is not in new ops list', () => {
 
     const newRow = panel.querySelector('.adv-row');
     const newOpSel = newRow.querySelector('.adv-op-select');
-    // Default field is 'name' (text), so ops should be text ops
-    // First option should be 'contains'
-    expect(newOpSel.options[0].value).toBe('contains');
+    // Default field is 'type' (category), so ops should be category ops
+    // First option should be '=' (is)
+    expect(newOpSel.options[0].value).toBe('=');
   });
 });

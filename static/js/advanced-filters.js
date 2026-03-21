@@ -11,7 +11,11 @@ const TEXT_FIELDS = [
   ['stores', 'label_stores'],
   ['ingredients', 'label_ingredients'],
   ['ean', 'edit_label_ean'],
-  ['type', 'label_category'],
+];
+const CATEGORY_FIELD = ['type', 'label_category'];
+const CATEGORY_OPS = [
+  ['=', 'adv_op_is'],
+  ['!=', 'adv_op_is_not'],
 ];
 const NUMERIC_FIELDS = [
   ['kcal', 'label_kcal'],
@@ -38,6 +42,8 @@ const TEXT_OPS = [
   ['contains', 'adv_op_contains'],
   ['=', 'adv_op_eq'],
   ['!=', 'adv_op_neq'],
+  ['is_not_set', 'adv_op_is_not_set'],
+  ['is_set', 'adv_op_has_value'],
 ];
 const NUMERIC_OPS = [
   ['<', 'adv_op_lt'],
@@ -46,6 +52,8 @@ const NUMERIC_OPS = [
   ['<=', 'adv_op_lte'],
   ['>=', 'adv_op_gte'],
   ['!=', 'adv_op_neq'],
+  ['is_not_set', 'adv_op_is_not_set'],
+  ['is_set', 'adv_op_has_value'],
 ];
 
 function _getFlagFields() {
@@ -59,6 +67,7 @@ const FLAG_OPS = [
 ];
 
 const _TEXT_FIELD_SET = new Set(TEXT_FIELDS.map(f => f[0]));
+const _CATEGORY_FIELD_NAME = CATEGORY_FIELD[0];
 function _getFlagFieldSet() {
   return new Set(_getFlagFields().map(f => f[0]));
 }
@@ -213,6 +222,15 @@ function _addRow(container) {
   // Field select
   const fieldSel = document.createElement('select');
   fieldSel.className = 'adv-field-select';
+  // Category field (standalone group)
+  const catGroup = document.createElement('optgroup');
+  catGroup.label = t('adv_group_category');
+  const catOpt = document.createElement('option');
+  catOpt.value = CATEGORY_FIELD[0];
+  catOpt.textContent = t(CATEGORY_FIELD[1]);
+  catGroup.appendChild(catOpt);
+  fieldSel.appendChild(catGroup);
+
   const textGroup = document.createElement('optgroup');
   textGroup.label = t('adv_group_text');
   TEXT_FIELDS.forEach(([val, key]) => {
@@ -295,7 +313,9 @@ function _addRow(container) {
 
 function _updateOps(opSel, fieldValue) {
   let ops;
-  if (_getFlagFieldSet().has(fieldValue)) {
+  if (fieldValue === _CATEGORY_FIELD_NAME) {
+    ops = CATEGORY_OPS;
+  } else if (_getFlagFieldSet().has(fieldValue)) {
     ops = FLAG_OPS;
   } else if (_TEXT_FIELD_SET.has(fieldValue)) {
     ops = TEXT_OPS;
@@ -317,10 +337,60 @@ function _updateOps(opSel, fieldValue) {
 }
 
 function _syncValInput(valInput, fieldValue, opValue) {
-  if (_getFlagFieldSet().has(fieldValue)) {
+  const row = valInput.closest('.adv-row');
+  // Remove any existing category select (may be inside a custom-select-wrap wrapper)
+  if (row) {
+    const existingWrapper = row.querySelector('.adv-category-wrapper');
+    const existingCatSel = row.querySelector('.adv-category-select');
+    if (existingWrapper || existingCatSel) {
+      if (existingWrapper) existingWrapper.remove();
+      if (existingCatSel) existingCatSel.remove();
+      valInput.value = '';
+    }
+  }
+
+  if (fieldValue === _CATEGORY_FIELD_NAME) {
+    // Category field: show a combobox instead of text input
+    valInput.style.display = 'none';
+    const catSel = document.createElement('select');
+    catSel.className = 'adv-category-select adv-value-input';
+    // Populate from state.categories
+    state.categories.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.name;
+      o.textContent = (c.emoji ? c.emoji + ' ' : '') + c.label;
+      catSel.appendChild(o);
+    });
+    // Restore previous value if valid
+    if (valInput.value) {
+      for (let i = 0; i < catSel.options.length; i++) {
+        if (catSel.options[i].value === valInput.value) { catSel.value = valInput.value; break; }
+      }
+    }
+    // Sync hidden input value
+    valInput.value = catSel.value;
+    // Insert before the remove button
+    const removeBtn = row.querySelector('.adv-remove-btn');
+    row.insertBefore(catSel, removeBtn);
+    catSel.addEventListener('change', () => {
+      valInput.value = catSel.value;
+      _onFilterChange();
+    });
+    upgradeSelect(catSel, (val) => {
+      valInput.value = val;
+      _onFilterChange();
+    });
+    // Add a marker class on the wrapper for cleanup
+    const wrapper = catSel.closest('.custom-select-wrap');
+    if (wrapper) wrapper.classList.add('adv-category-wrapper');
+  } else if (_getFlagFieldSet().has(fieldValue)) {
     // Flag fields: value is encoded in the operator, hide the input
     valInput.style.display = 'none';
     valInput.value = opValue === '= true' ? 'true' : opValue === '= false' ? 'false' : '';
+  } else if (opValue === 'is_not_set' || opValue === 'is_set') {
+    // "is not set" / "has value" needs no value
+    valInput.style.display = 'none';
+    valInput.value = '';
   } else {
     valInput.style.display = '';
     valInput.type = _TEXT_FIELD_SET.has(fieldValue) ? 'text' : 'number';
@@ -416,6 +486,9 @@ function _serializeGroup(groupEl) {
         if (opRaw === '') continue; // no selection yet
         const value = opRaw === '= true' ? 'true' : 'false';
         children.push({ field, op: '=', value });
+      } else if (opRaw === 'is_not_set' || opRaw === 'is_set') {
+        // "is not set" / "has value" needs no value
+        children.push({ field, op: opRaw, value: '' });
       } else {
         const value = valInput.value.trim();
         if (field && opRaw && value !== '') {

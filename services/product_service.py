@@ -291,6 +291,8 @@ def _parse_condition(c: dict) -> tuple:
 
     if op not in ADVANCED_FILTER_OPS:
         raise ValueError(f"Invalid filter operator: {op}")
+    if op in ("is_not_set", "is_set"):
+        return field, op, "", ADVANCED_FILTER_OPS[op]
     if value is None or str(value).strip() == "":
         raise ValueError(f"Filter value required for {field}")
 
@@ -309,6 +311,18 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
             return f"EXISTS ({subquery})", flag_name
         else:
             return f"NOT EXISTS ({subquery})", flag_name
+
+    if op == "is_not_set":
+        if field in TEXT_FIELDS:
+            return f"({field} IS NULL OR {field} = '')", None
+        else:
+            return f"{field} IS NULL", None
+
+    if op == "is_set":
+        if field in TEXT_FIELDS:
+            return f"({field} IS NOT NULL AND {field} != '')", None
+        else:
+            return f"{field} IS NOT NULL", None
 
     if field in TEXT_FIELDS:
         if op == "contains":
@@ -339,6 +353,8 @@ def _condition_to_post(field: str, op: str, value: str) -> tuple:
 
     Returns (field, op, num_val).
     """
+    if op in ("is_not_set", "is_set"):
+        return field, op, None
     if op == "contains":
         raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
     try:
@@ -416,7 +432,7 @@ def _process_node(node: dict, depth: int = 0) -> tuple:
                 },
             )
         frag, param = _condition_to_sql(field, op, value, sql_op)
-        return f"({frag})", [param], None
+        return f"({frag})", [] if param is None else [param], None
 
     # Group node
     logic = node.get("logic", "and").upper()
@@ -530,6 +546,10 @@ def _evaluate_post_node(node: dict, product: dict) -> bool:
     """Recursively evaluate a post-filter node against a product."""
     if "field" in node:
         pval = product.get(node["field"])
+        if node["op"] == "is_not_set":
+            return pval is None or pval == ""
+        if node["op"] == "is_set":
+            return pval is not None and pval != ""
         if pval is None:
             return False
         return _OP_FNS[node["op"]](float(pval), node["val"])
