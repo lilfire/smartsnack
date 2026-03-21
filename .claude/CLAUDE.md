@@ -44,3 +44,14 @@ DB_PATH=./smartsnack.sqlite python app.py
 - **Frontend**: Vanilla JavaScript, no frameworks, no bundler. Modular files in `static/js/`.
 - **Language**: Default is Norwegian (`"no"`). Supported: Norwegian, English, Swedish.
 - **Images**: Stored as base64 data URIs in the SQLite `image` column, not as files on disk.
+
+## Scoring Formula
+
+The total score formula in `_score_product` (`services/product_service.py`) is intentional — **do not change it**.
+
+- Each field's score `s` is 0–100 (normalized via minmax or direct formula).
+- `scores[field] = s * weight / 100` — the field's weighted contribution.
+- `weighted_score_sum += s * weight` — accumulated across all scored fields.
+- `total_score = weighted_score_sum / (num_scored_fields * 100)`.
+
+The denominator is `num_scored_fields * 100`, NOT the sum of weights. This treats 100 as the baseline weight: fields with `weight > 100` boost the total above a simple average, fields with `weight < 100` reduce it. This is the intended design — weights act as amplifiers relative to a 100-baseline, not as proportional shares.

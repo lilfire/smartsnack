@@ -40,6 +40,7 @@ vi.mock('../state.js', () => {
 vi.mock('../products.js', () => ({ loadData: vi.fn() }));
 vi.mock('../settings.js', () => ({ loadSettings: vi.fn() }));
 vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn() }));
+vi.mock('../advanced-filters.js', () => ({ rebuildAdvancedFilters: vi.fn() }));
 
 import { t, getCurrentLang, initLanguage, applyStaticTranslations, changeLanguage } from '../i18n.js';
 import { state, api } from '../state.js';
@@ -170,6 +171,19 @@ describe('applyStaticTranslations', () => {
     await initLanguage();
     expect(document.documentElement.lang).toBe('se');
   });
+
+  it('passes data-i18n-param-* attributes as params to t()', async () => {
+    api.mockResolvedValueOnce({ language: 'en' })
+       .mockResolvedValueOnce({ welcome: 'Welcome {name}, you have {count} items' });
+    await initLanguage();
+    const el = document.createElement('span');
+    el.setAttribute('data-i18n', 'welcome');
+    el.setAttribute('data-i18n-param-name', 'Alice');
+    el.setAttribute('data-i18n-param-count', '5');
+    document.body.appendChild(el);
+    applyStaticTranslations();
+    expect(el.textContent).toBe('Welcome Alice, you have 5 items');
+  });
 });
 
 describe('changeLanguage', () => {
@@ -195,6 +209,43 @@ describe('changeLanguage', () => {
     api.mockRejectedValueOnce(new Error('fail'));
     await changeLanguage('xx').catch(() => {});
     expect(getCurrentLang()).toBe('no');
+  });
+
+  it('updates stats-line when cachedStats is set', async () => {
+    api.mockResolvedValueOnce({ language: 'no' })
+       .mockResolvedValueOnce({ stats_line: '{total} products, {types} types' });
+    await initLanguage();
+
+    state.cachedStats = { total: 42, types: 3 };
+    const statsEl = document.createElement('div');
+    statsEl.id = 'stats-line';
+    document.body.appendChild(statsEl);
+
+    api.mockResolvedValueOnce({ stats_line: '{total} products, {types} types' }) // loadTranslations
+       .mockResolvedValueOnce({}); // save language
+    await changeLanguage('en').catch(() => {});
+    expect(statsEl.textContent).toBe('42 products, 3 types');
+    statsEl.remove();
+    state.cachedStats = null;
+  });
+
+  it('rebuilds advanced filters when panel is open', async () => {
+    api.mockResolvedValueOnce({ language: 'no' })
+       .mockResolvedValueOnce({});
+    await initLanguage();
+
+    const panel = document.createElement('div');
+    panel.id = 'advanced-filters';
+    panel.classList.add('open');
+    document.body.appendChild(panel);
+
+    api.mockResolvedValueOnce({}) // loadTranslations
+       .mockResolvedValueOnce({}); // save language
+    await changeLanguage('en').catch(() => {});
+
+    const { rebuildAdvancedFilters } = await import('../advanced-filters.js');
+    expect(rebuildAdvancedFilters).toHaveBeenCalled();
+    panel.remove();
   });
 
   it('calls loadSettings when in settings view', async () => {

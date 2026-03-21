@@ -209,8 +209,9 @@ describe('api', () => {
     vi.useRealTimers();
     const data = await api('/test');
     expect(data).toEqual({ result: 'ok' });
+    // GET requests (no body) should not send Content-Type
     expect(global.fetch).toHaveBeenCalledWith('/test', expect.objectContaining({
-      headers: { 'Content-Type': 'application/json' },
+      headers: {},
     }));
   });
 
@@ -723,8 +724,9 @@ describe('api - additional branches', () => {
       text: () => Promise.resolve('{}'),
     });
     await api('/test', { headers: { 'X-Custom': 'yes' } });
+    // GET requests (no body) should not send Content-Type, only custom headers
     expect(global.fetch).toHaveBeenCalledWith('/test', expect.objectContaining({
-      headers: { 'Content-Type': 'application/json', 'X-Custom': 'yes' },
+      headers: { 'X-Custom': 'yes' },
     }));
   });
 });

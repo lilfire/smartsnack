@@ -125,10 +125,10 @@
 
       <div>
         <label class="field-label" for="f-smak">
-          <span id="smak-label-text" data-i18n="label_taste">Smakskarakter ({val}/6)</span>
+          <span id="smak-label-text" data-i18n="label_taste" data-i18n-param-val="3">Smakskarakter (3/6)</span>
         </label>
         <div class="range-row">
-          <input type="range" min="0" max="6" step="0.5" value="3" id="f-smak" oninput="document.getElementById('smak-display').textContent=this.value;document.getElementById('smak-val').textContent=this.value">
+          <input type="range" min="0" max="6" step="0.5" value="3" id="f-smak" oninput="document.getElementById('smak-val').textContent=this.value;var v=this.value;requestAnimationFrame(function(){var lbl=document.getElementById('smak-label-text');lbl.setAttribute('data-i18n-param-val',v);if(window.__t)lbl.textContent=window.__t('label_taste',{val:v})})">
           <span class="range-val" id="smak-val">3</span>
         </div>
       </div>

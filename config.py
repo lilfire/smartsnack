@@ -2,7 +2,7 @@
 
 import os
 
-APP_VERSION = "0.7"
+APP_VERSION = "0.8"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 TRANSLATIONS_DIR = os.path.join(
@@ -119,7 +119,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "energy_kj",
-        "label_key": "weight_label_energy_kj",
+        "label_key": "label_energy_kj",
         "desc_key": "weight_desc_energy_kj",
         "direction": "lower",
         "formula": "minmax",
@@ -128,7 +128,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "carbs",
-        "label_key": "weight_label_carbs",
+        "label_key": "nutri_carbs",
         "desc_key": "weight_desc_carbs",
         "direction": "lower",
         "formula": "minmax",
@@ -146,7 +146,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "fat",
-        "label_key": "weight_label_fat",
+        "label_key": "nutri_fat",
         "desc_key": "weight_desc_fat",
         "direction": "lower",
         "formula": "minmax",
@@ -155,7 +155,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "saturated_fat",
-        "label_key": "weight_label_saturated_fat",
+        "label_key": "edit_label_saturated_fat",
         "desc_key": "weight_desc_saturated_fat",
         "direction": "lower",
         "formula": "minmax",
@@ -164,7 +164,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "protein",
-        "label_key": "weight_label_protein",
+        "label_key": "nutri_protein",
         "desc_key": "weight_desc_protein",
         "direction": "higher",
         "formula": "minmax",
@@ -173,7 +173,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "fiber",
-        "label_key": "weight_label_fiber",
+        "label_key": "nutri_fiber",
         "desc_key": "weight_desc_fiber",
         "direction": "higher",
         "formula": "minmax",
@@ -182,7 +182,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "salt",
-        "label_key": "weight_label_salt",
+        "label_key": "nutri_salt",
         "desc_key": "weight_desc_salt",
         "direction": "lower",
         "formula": "minmax",
@@ -200,7 +200,7 @@ SCORE_CONFIG = [
     },
     {
         "field": "volume",
-        "label_key": "weight_label_volume",
+        "label_key": "label_volume",
         "desc_key": "weight_desc_volume",
         "direction": "higher",
         "formula": "direct",
@@ -274,6 +274,8 @@ ADVANCED_FILTER_OPS = {
     "<=": "<=",
     ">=": ">=",
     "contains": "LIKE",
+    "is_not_set": "IS_NOT_SET",
+    "is_set": "IS_SET",
 }
 MAX_FILTER_DEPTH = 4
 MAX_FILTER_CONDITIONS = 20

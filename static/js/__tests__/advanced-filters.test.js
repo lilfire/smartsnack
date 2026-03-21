@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../state.js', () => {
   const _state = {
@@ -1076,6 +1076,167 @@ describe('_onFilterChange when root group is removed from DOM', () => {
   });
 });
 
+describe('_updateOps and _syncValInput branch coverage via upgradeSelect callback', () => {
+  it('populates FLAG_OPS when field is a flag field', async () => {
+    const { getFlagConfig } = await import('../render.js');
+    const { upgradeSelect } = await import('../state.js');
+    getFlagConfig.mockReturnValue({ organic: { label: 'Organic', type: 'user' } });
+
+    // Make upgradeSelect invoke the callback for the field select
+    // upgradeSelect is called with (selectEl, callback). The first call per row
+    // is the field select, the second is the op select.
+    let fieldCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList.contains('adv-field-select') && cb) {
+        fieldCallback = cb;
+      }
+    });
+
+    const { panel } = openPanel();
+    expect(fieldCallback).toBeDefined();
+
+    // Simulate user selecting a flag field
+    fieldCallback('flag:organic');
+    vi.runAllTimers();
+
+    const row = panel.querySelector('.adv-row');
+    const opSel = row.querySelector('.adv-op-select');
+
+    // FLAG_OPS: ['', 'adv_op_flag_select'], ['= true', 'adv_op_is_set'], ['= false', 'adv_op_is_not_set']
+    expect(opSel.options.length).toBe(3);
+    expect(opSel.options[0].value).toBe('');
+    expect(opSel.options[1].value).toBe('= true');
+    expect(opSel.options[2].value).toBe('= false');
+
+    // Value input should be hidden (flag field)
+    const valInput = row.querySelector('.adv-value-input');
+    expect(valInput.style.display).toBe('none');
+
+    // Restore mocks
+    getFlagConfig.mockReturnValue({});
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+
+  it('populates NUMERIC_OPS when field is a numeric field', async () => {
+    const { upgradeSelect } = await import('../state.js');
+
+    let fieldCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList.contains('adv-field-select') && cb) {
+        fieldCallback = cb;
+      }
+    });
+
+    const { panel } = openPanel();
+    expect(fieldCallback).toBeDefined();
+
+    // Simulate user selecting a numeric field
+    fieldCallback('kcal');
+    vi.runAllTimers();
+
+    const row = panel.querySelector('.adv-row');
+    const opSel = row.querySelector('.adv-op-select');
+
+    // NUMERIC_OPS: <, >, =, <=, >=, !=, is_not_set, is_set
+    expect(opSel.options.length).toBe(8);
+    expect(opSel.options[0].value).toBe('<');
+    expect(opSel.options[1].value).toBe('>');
+    expect(opSel.options[2].value).toBe('=');
+    expect(opSel.options[3].value).toBe('<=');
+    expect(opSel.options[4].value).toBe('>=');
+    expect(opSel.options[5].value).toBe('!=');
+    expect(opSel.options[6].value).toBe('is_not_set');
+    expect(opSel.options[7].value).toBe('is_set');
+
+    // Value input should be visible and type number
+    const valInput = row.querySelector('.adv-value-input');
+    expect(valInput.style.display).toBe('');
+    expect(valInput.type).toBe('number');
+
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+
+  it('sets valInput.value to empty string when flag op is neither "= true" nor "= false"', async () => {
+    const { getFlagConfig } = await import('../render.js');
+    const { upgradeSelect } = await import('../state.js');
+    getFlagConfig.mockReturnValue({ organic: { label: 'Organic', type: 'user' } });
+
+    let fieldCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList.contains('adv-field-select') && cb) {
+        fieldCallback = cb;
+      }
+    });
+
+    const { panel } = openPanel();
+    expect(fieldCallback).toBeDefined();
+
+    // Simulate selecting a flag field -- this calls _updateOps (FLAG_OPS)
+    // and _syncValInput. After _updateOps, opSel.value will be '' (the first
+    // FLAG_OPS option), which is neither '= true' nor '= false', so the
+    // ternary fallback sets valInput.value to ''.
+    fieldCallback('flag:organic');
+    vi.runAllTimers();
+
+    const row = panel.querySelector('.adv-row');
+    const valInput = row.querySelector('.adv-value-input');
+
+    // The opSel value after _updateOps is '' (first option), so _syncValInput
+    // hits the fallback branch: valInput.value = ''
+    expect(valInput.value).toBe('');
+    expect(valInput.style.display).toBe('none');
+
+    getFlagConfig.mockReturnValue({});
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+
+  it('calls _syncValInput via op select callback', async () => {
+    const { getFlagConfig } = await import('../render.js');
+    const { upgradeSelect } = await import('../state.js');
+    getFlagConfig.mockReturnValue({ organic: { label: 'Organic', type: 'user' } });
+
+    let fieldCallback;
+    let opCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList.contains('adv-field-select') && cb) {
+        fieldCallback = cb;
+      } else if (sel.classList.contains('adv-op-select') && cb) {
+        opCallback = cb;
+      }
+    });
+
+    const { panel } = openPanel();
+
+    // First select a flag field to get FLAG_OPS
+    fieldCallback('flag:organic');
+    vi.runAllTimers();
+
+    const row = panel.querySelector('.adv-row');
+    const fieldSel = row.querySelector('.adv-field-select');
+    const valInput = row.querySelector('.adv-value-input');
+
+    // The fieldCallback updated ops but fieldSel.value in DOM is still 'name'.
+    // _syncValInput via opCallback reads fieldSel.value, so set it to the flag field.
+    fieldSel.value = 'flag:organic';
+
+    // Now simulate selecting '= true' via the op callback
+    opCallback('= true');
+    vi.runAllTimers();
+
+    expect(valInput.value).toBe('true');
+    expect(valInput.style.display).toBe('none');
+
+    // Simulate selecting '= false'
+    opCallback('= false');
+    vi.runAllTimers();
+
+    expect(valInput.value).toBe('false');
+
+    getFlagConfig.mockReturnValue({});
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+});
+
 describe('_updateOps fallback when previous op is not in new ops list', () => {
   it('does not restore previous op when switching from text to numeric field', () => {
     const { panel } = openPanel();
@@ -1118,8 +1279,8 @@ describe('_updateOps fallback when previous op is not in new ops list', () => {
 
     const newRow = panel.querySelector('.adv-row');
     const newOpSel = newRow.querySelector('.adv-op-select');
-    // Default field is 'name' (text), so ops should be text ops
-    // First option should be 'contains'
-    expect(newOpSel.options[0].value).toBe('contains');
+    // Default field is 'type' (category), so ops should be category ops
+    // First option should be '=' (is)
+    expect(newOpSel.options[0].value).toBe('=');
   });
 });

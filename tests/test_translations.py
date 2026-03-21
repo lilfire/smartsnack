@@ -1,7 +1,11 @@
 """Tests for translations.py — i18n system."""
 
 import json
+import os
+import re
 import pytest
+
+ROOT_DIR = os.path.dirname(os.path.dirname(__file__))
 
 
 class TestCategoryKey:
@@ -142,3 +146,155 @@ class TestGetCurrentLang:
 
         lang = _get_current_lang()
         assert lang == "no"
+
+
+class TestTranslationKeyConsistency:
+    """Ensure all translation files have the same keys."""
+
+    @staticmethod
+    def _load_all():
+        import os
+
+        translations = {}
+        trans_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "translations")
+        for filename in sorted(os.listdir(trans_dir)):
+            if filename.endswith(".json"):
+                lang = filename.removesuffix(".json")
+                with open(os.path.join(trans_dir, filename), encoding="utf-8") as f:
+                    translations[lang] = json.load(f)
+        return translations
+
+    def test_all_files_have_same_keys(self):
+        translations = self._load_all()
+        assert len(translations) >= 2, "Need at least 2 translation files"
+
+        all_keys = {lang: set(data.keys()) for lang, data in translations.items()}
+        reference_lang = "no"
+        reference_keys = all_keys[reference_lang]
+
+        errors = []
+        for lang, keys in all_keys.items():
+            if lang == reference_lang:
+                continue
+            missing = reference_keys - keys
+            extra = keys - reference_keys
+            if missing:
+                errors.append(f"{lang}.json missing keys: {sorted(missing)}")
+            if extra:
+                errors.append(f"{lang}.json has extra keys not in {reference_lang}.json: {sorted(extra)}")
+
+        assert not errors, "Translation key mismatches:\n" + "\n".join(errors)
+
+    def test_no_empty_values(self):
+        translations = self._load_all()
+        errors = []
+        for lang, data in translations.items():
+            for key, value in data.items():
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"{lang}.json: key '{key}' has empty or non-string value")
+        assert not errors, "Empty translation values:\n" + "\n".join(errors)
+
+
+class TestTranslationKeysUsedInSource:
+    """Ensure every translation key used in source code exists in translation files."""
+
+    # Dynamic key prefixes generated at runtime from DB data (category names, flags, etc.)
+    DYNAMIC_PREFIXES = ("category_", "flag_", "pq_", "bulk_report_")
+
+    @staticmethod
+    def _load_all_translation_keys():
+        trans_dir = os.path.join(ROOT_DIR, "translations")
+        all_keys = set()
+        for filename in os.listdir(trans_dir):
+            if filename.endswith(".json"):
+                with open(os.path.join(trans_dir, filename), encoding="utf-8") as f:
+                    all_keys.update(json.load(f).keys())
+        return all_keys
+
+    @staticmethod
+    def _extract_keys_from_js():
+        """Extract translation keys from t('key') calls and lookup tables in JS."""
+        keys = set()
+        js_dir = os.path.join(ROOT_DIR, "static", "js")
+        # Match t('key') or t("key") — also window.__t('key')
+        t_call_re = re.compile(r"""\bt\(\s*['"]([a-z_][a-z0-9_]*)['"]""")
+        # Match string values in object literals like { foo: 'translation_key' }
+        obj_value_re = re.compile(r""":\s*['"]([a-z_][a-z0-9_]*)['"]""")
+
+        for filename in os.listdir(js_dir):
+            if not filename.endswith(".js") or filename.endswith(".test.js"):
+                continue
+            filepath = os.path.join(js_dir, filename)
+            with open(filepath, encoding="utf-8") as f:
+                content = f.read()
+
+            # Direct t() calls
+            keys.update(t_call_re.findall(content))
+
+            # Lookup table values (e.g. _VOLUME_LABELS, _FIELD_LABEL_KEYS)
+            for match in re.finditer(
+                r"(?:const|let|var)\s+_[A-Z_]+\s*=\s*\{([^}]+)\}", content
+            ):
+                block = match.group(1)
+                for val in obj_value_re.findall(block):
+                    # Only include values that look like translation keys
+                    if "_" in val:
+                        keys.add(val)
+
+        return keys
+
+    @staticmethod
+    def _extract_keys_from_html():
+        """Extract translation keys from data-i18n* attributes in HTML templates."""
+        keys = set()
+        templates_dir = os.path.join(ROOT_DIR, "templates")
+        attr_re = re.compile(r'data-i18n(?:-(?:html|placeholder|title))?="([a-z_][a-z0-9_]*)"')
+
+        for dirpath, _, filenames in os.walk(templates_dir):
+            for filename in filenames:
+                if not filename.endswith(".html"):
+                    continue
+                filepath = os.path.join(dirpath, filename)
+                with open(filepath, encoding="utf-8") as f:
+                    keys.update(attr_re.findall(f.read()))
+
+        return keys
+
+    @staticmethod
+    def _extract_keys_from_python():
+        """Extract translation keys from _t('key') calls in Python source."""
+        keys = set()
+        t_call_re = re.compile(r"""_t\(\s*['"]([a-z_][a-z0-9_]*)['"]""")
+
+        # Scan blueprints and services
+        for subdir in ["blueprints", "services"]:
+            scan_dir = os.path.join(ROOT_DIR, subdir)
+            if not os.path.isdir(scan_dir):
+                continue
+            for filename in os.listdir(scan_dir):
+                if not filename.endswith(".py"):
+                    continue
+                with open(os.path.join(scan_dir, filename), encoding="utf-8") as f:
+                    keys.update(t_call_re.findall(f.read()))
+
+        return keys
+
+    def test_all_source_keys_exist_in_translations(self):
+        translation_keys = self._load_all_translation_keys()
+
+        source_keys = set()
+        source_keys.update(self._extract_keys_from_js())
+        source_keys.update(self._extract_keys_from_html())
+        source_keys.update(self._extract_keys_from_python())
+
+        # Filter out dynamic keys that are built at runtime from DB data
+        static_keys = {
+            k for k in source_keys
+            if not any(k.startswith(p) for p in self.DYNAMIC_PREFIXES)
+        }
+
+        missing = static_keys - translation_keys
+        assert not missing, (
+            "Translation keys used in source code but missing from all translation files:\n"
+            + "\n".join(f"  - {k}" for k in sorted(missing))
+        )

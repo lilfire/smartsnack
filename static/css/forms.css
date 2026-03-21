@@ -348,6 +348,7 @@ label.field-label {
 .range-row input[type="range"] {
   flex: 1;
   accent-color: #E8B84B;
+  touch-action: none;
 }
 
 .range-val {

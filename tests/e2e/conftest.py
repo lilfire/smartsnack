@@ -5,6 +5,7 @@ Playwright can drive a real browser against it.
 """
 
 import os
+import shutil
 import sys
 import threading
 import time
@@ -46,6 +47,16 @@ def app_server(tmp_path_factory):
 
     config.DB_PATH = db_file
 
+    # Redirect translations to a temp directory so e2e tests don't
+    # pollute the real translation files.
+    trans_dir = str(tmp_path_factory.mktemp("translations"))
+    real_dir = config.TRANSLATIONS_DIR
+    if os.path.isdir(real_dir):
+        for f in os.listdir(real_dir):
+            if f.endswith(".json"):
+                shutil.copy(os.path.join(real_dir, f), trans_dir)
+    config.TRANSLATIONS_DIR = trans_dir
+
     # Now import db module — it does `from config import DB_PATH` at
     # module level, but since config is already imported and patched,
     # Python's import will re-read the patched value.  However, the
@@ -53,6 +64,10 @@ def app_server(tmp_path_factory):
     import db as db_mod
 
     db_mod.DB_PATH = db_file
+
+    # Also patch translations module if already imported
+    if "translations" in sys.modules:
+        sys.modules["translations"].TRANSLATIONS_DIR = trans_dir
 
     # Now import the app.  `create_app()` calls `init_db()` which reads
     # db.DB_PATH (a module global).  Since we patched it above, the DB
@@ -65,6 +80,11 @@ def app_server(tmp_path_factory):
     # the test server anyway.
     application = create_app()
     application.config["TESTING"] = True
+
+    # Ensure the translations module uses the temp directory
+    import translations as trans_mod
+
+    trans_mod.TRANSLATIONS_DIR = trans_dir
 
     host, port = "127.0.0.1", 5199
 
@@ -97,14 +117,15 @@ def live_url(app_server):
 
 
 @pytest.fixture()
-def page(page, live_url):
-    """Override the default Playwright page fixture to navigate to the app.
+def page(browser, live_url):
+    """Create a Playwright page that navigates to the app.
 
     External CDN requests (Google Fonts, cdnjs, etc.) are blocked so that
     the page doesn't hang waiting for unreachable hosts.
     """
+    _page = browser.new_page()
     # Block external resources that can hang in sandboxed environments
-    page.route(
+    _page.route(
         "**/*",
         lambda route: (
             route.abort()
@@ -112,15 +133,16 @@ def page(page, live_url):
             else route.continue_()
         ),
     )
-    page.goto(live_url, wait_until="domcontentloaded")
+    _page.goto(live_url, wait_until="domcontentloaded")
     # Wait for the app to finish initial load (products list populated)
-    page.wait_for_selector("#results-container", state="attached", timeout=10000)
+    _page.wait_for_selector("#results-container", state="attached", timeout=10000)
     # Wait for loading spinners to disappear
-    page.wait_for_function(
+    _page.wait_for_function(
         "() => !document.querySelector('#results-container .loading')",
         timeout=10000,
     )
-    return page
+    yield _page
+    _page.close()
 
 
 # ---------------------------------------------------------------------------

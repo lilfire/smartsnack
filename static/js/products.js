@@ -3,7 +3,7 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, sho
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal } from './openfoodfacts.js';
+import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal, showOffAddReview } from './openfoodfacts.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -307,6 +307,17 @@ export async function registerProduct() {
       try { await api('/api/products/' + newProductId + '/image', { method: 'PUT', body: JSON.stringify({ image: window._pendingImage }) }); } catch(ie) { showToast(t('toast_image_upload_error'), 'error'); }
       window._pendingImage = null;
     }
+    // Ask if user wants to add product to OFF (only if not already from OFF and has EAN)
+    if (!body.from_off && ean) {
+      const wantsOff = await showConfirmModal(
+        '\u{1F30E}', t('off_ask_add_to_off_title'),
+        t('off_ask_add_to_off'),
+        t('btn_yes'), t('btn_no')
+      );
+      if (wantsOff) {
+        await showOffAddReview(ean, 'f');
+      }
+    }
     document.getElementById('f-name').value = '';
     document.getElementById('f-ean').value = '';
     document.getElementById('f-brand').value = '';
@@ -327,6 +338,8 @@ export async function registerProduct() {
     document.getElementById('f-price').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';
+    const tasteLabel = document.getElementById('smak-label-text');
+    if (tasteLabel) { tasteLabel.setAttribute('data-i18n-param-val', '3'); tasteLabel.textContent = t('label_taste', { val: '3' }); }
     const toastKey = result.merged ? 'toast_product_merged' : 'toast_product_added';
     showToast(t(toastKey, { name: name }), 'success');
 

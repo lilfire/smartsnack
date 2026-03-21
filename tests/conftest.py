@@ -87,9 +87,14 @@ def seed_product(db, seed_category):
     return row["id"]
 
 
-@pytest.fixture()
-def translations_dir(tmp_path, monkeypatch):
-    """Create a temporary translations directory with minimal files."""
+@pytest.fixture(autouse=True)
+def translations_dir(request, tmp_path, monkeypatch):
+    """Redirect translations to a temp directory so tests don't pollute real files.
+
+    Skipped for e2e tests, which manage their own setup.
+    """
+    if "e2e" in str(request.fspath):
+        return None
     import config
 
     trans_dir = str(tmp_path / "translations")

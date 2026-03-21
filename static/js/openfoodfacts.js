@@ -4,6 +4,18 @@ import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
 const OFF_FETCH_TIMEOUT = 45000;
+const _FIELD_LABEL_KEYS = {
+  name: 'label_name', brand: 'label_brand', stores: 'label_stores',
+  ingredients: 'label_ingredients', ean: 'edit_label_ean', type: 'label_category',
+  kcal: 'label_kcal', energy_kj: 'label_energy_kj', protein: 'label_protein',
+  fat: 'label_fat', saturated_fat: 'label_saturated_fat', carbs: 'label_carbs',
+  sugar: 'label_sugar', fiber: 'label_fiber', salt: 'label_salt',
+  price: 'label_price', weight: 'label_weight', portion: 'label_portion',
+  volume: 'label_volume', taste_score: 'weight_label_taste_score',
+  est_pdcaas: 'weight_label_est_pdcaas', est_diaas: 'weight_label_est_diaas',
+  total_score: 'adv_field_total_score', completeness: 'completeness_label',
+};
+function _fieldLabel(field) { return t(_FIELD_LABEL_KEYS[field] || field) || field; }
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function _volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
@@ -29,6 +41,7 @@ export function validateOffBtn(prefix) {
 
 let _offCtx = { prefix: null, productId: null };
 let _offPickerProducts = null;
+let _offReviewResolve = null;
 
 const _nutritionCompareFields = ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'];
 
@@ -44,10 +57,10 @@ function _gatherNutrition(prefix) {
   return Object.keys(nutrition).length > 0 ? nutrition : null;
 }
 
-export async function lookupOFF(prefix, productId) {
+export async function lookupOFF(prefix, productId, opts) {
   const ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
   const name = document.getElementById(prefix + '-name').value.trim();
-  _offCtx = { prefix: prefix, productId: productId || null };
+  _offCtx = { prefix: prefix, productId: productId || null, autoClose: opts?.autoClose || false };
 
   if (isValidEan(ean)) {
     showOffPickerLoading(t('off_searching_ean', { ean: ean }));
@@ -141,6 +154,11 @@ function updateOffPickerResults(products, errorMsg, ean) {
   // Capture context snapshot at render time to avoid race conditions
   const ctxSnapshot = { prefix: _offCtx.prefix, productId: _offCtx.productId };
   if (errorMsg) {
+    if (_offCtx.autoClose && ean) {
+      closeOffPicker();
+      showToast(t('off_not_found_auto'), 'info');
+      return;
+    }
     const errDiv = document.createElement('div');
     errDiv.className = 'off-modal-empty';
     errDiv.textContent = errorMsg;
@@ -558,7 +576,7 @@ export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
       const row = document.createElement('div');
       const label = document.createElement('div');
       label.className = 'conflict-row-label';
-      label.textContent = t('adv_field_' + c.field) || c.field;
+      label.textContent = _fieldLabel(c.field);
       row.appendChild(label);
 
       const opts = document.createElement('div');
@@ -745,7 +763,7 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
         const row = document.createElement('div');
         const label = document.createElement('div');
         label.className = 'conflict-row-label';
-        label.textContent = t('adv_field_' + c.field) || c.field;
+        label.textContent = _fieldLabel(c.field);
         row.appendChild(label);
 
         if (c.field === 'taste_score') {
@@ -944,8 +962,10 @@ const _offReviewFields = [
   { key: 'portion', offKey: 'serving_size', label: 'label_portion' },
 ];
 
-export function showOffAddReview(ean) {
-  const prefix = _offCtx.prefix;
+export function showOffAddReview(ean, prefixOverride) {
+  if (_offReviewResolve) _offReviewResolve();
+  const prefix = prefixOverride || _offCtx.prefix;
+  const reviewPromise = new Promise((resolve) => { _offReviewResolve = resolve; });
   const filled = [];
   const empty = [];
   _offReviewFields.forEach((f) => {
@@ -1031,22 +1051,24 @@ export function showOffAddReview(ean) {
   submitBtn.id = 'off-submit-btn';
   submitBtn.style.cssText = 'padding:8px 20px;font-size:13px' + (!hasName ? ';opacity:0.4;pointer-events:none' : '');
   submitBtn.textContent = '\u{1F30E} ' + t('off_submit_btn');
-  submitBtn.addEventListener('click', () => { submitToOff(ean); });
+  submitBtn.addEventListener('click', () => { submitToOff(ean, prefix); });
   btnRow.appendChild(submitBtn);
   bodyDiv.appendChild(btnRow);
 
   modalDiv.appendChild(bodyDiv);
   bg.innerHTML = '';
   bg.appendChild(modalDiv);
+  return reviewPromise;
 }
 
 export function closeOffAddReview() {
   const el = document.getElementById('off-add-review-bg');
   if (el) el.remove();
+  if (_offReviewResolve) { _offReviewResolve(); _offReviewResolve = null; }
 }
 
-export async function submitToOff(ean) {
-  const prefix = _offCtx.prefix;
+export async function submitToOff(ean, prefixOverride) {
+  const prefix = prefixOverride || _offCtx.prefix;
   const btn = document.getElementById('off-submit-btn');
   if (btn) { btn.disabled = true; btn.textContent = '...'; }
 

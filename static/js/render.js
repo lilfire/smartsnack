@@ -190,7 +190,7 @@ export function renderResults(results, search) {
           + '</div>';
       }
       // Nutrition table
-      h += '<p class="nutri-section-title">' + t('expanded_nutrition_title') + '</p>';
+      h += '<p class="nutri-section-title">' + t('section_nutrition') + '</p>';
       h += renderNutriTable(p);
       if (p.brand || p.stores || p.ingredients || p.taste_note || p.taste_score != null) {
         h += '<p class="nutri-section-title">' + t('expanded_product_info') + '</p>';
@@ -218,31 +218,31 @@ export function renderResults(results, search) {
         state.categories.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach((c) => { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
         const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
-          + '<div class="edit-grid-2"><label>' + t('edit_label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
+          + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
           + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"></div><button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'
-          + '<div><label>' + t('edit_label_category') + '</label><select id="ed-type">' + opts + '</select></div>'
-          + '<div><label>' + t('edit_label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
-          + '<div><label>' + t('edit_label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
-          + '<div class="edit-grid-2"><label>' + t('edit_label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
-        h += '<div><label>' + t('edit_label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
+          + '<div><label>' + t('label_category') + '</label><select id="ed-type">' + opts + '</select></div>'
+          + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
+          + '<div><label>' + t('label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
+          + '<div class="edit-grid-2"><label>' + t('label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
+        h += '<div><label>' + t('label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
-          + '<div><label>' + t('edit_label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
+          + '<div><label>' + t('label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
           + '<div><label>' + t('edit_label_saturated_fat') + '</label><input type="number" step="0.1" id="ed-saturated_fat" value="' + ev(p.saturated_fat) + '"></div>'
-          + '<div><label>' + t('edit_label_carbs') + '</label><input type="number" step="0.1" id="ed-carbs" value="' + ev(p.carbs) + '"></div>'
-          + '<div><label>' + t('edit_label_sugar') + '</label><input type="number" step="0.1" id="ed-sugar" value="' + ev(p.sugar) + '"></div>'
-          + '<div><label>' + t('edit_label_protein') + '</label><input type="number" step="0.1" id="ed-protein" value="' + ev(p.protein) + '"></div>'
-          + '<div><label>' + t('edit_label_fiber') + '</label><input type="number" step="0.1" id="ed-fiber" value="' + ev(p.fiber) + '"></div>'
-          + '<div><label>' + t('edit_label_salt') + '</label><input type="number" step="0.01" id="ed-salt" value="' + ev(p.salt) + '"></div>'
-          + '<div><label>' + t('edit_label_weight') + '</label><input type="number" step="1" id="ed-weight" value="' + ev(p.weight) + '"></div>'
-          + '<div><label>' + t('edit_label_portion') + '</label><input type="number" step="1" id="ed-portion" value="' + ev(p.portion) + '"></div>'
-          + '<div><label>' + t('edit_label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume === 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume === 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume === 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
-          + '<div><label>' + t('edit_label_price') + '</label><input type="number" step="1" id="ed-price" value="' + ev(p.price) + '"></div>'
+          + '<div><label>' + t('label_carbs') + '</label><input type="number" step="0.1" id="ed-carbs" value="' + ev(p.carbs) + '"></div>'
+          + '<div><label>' + t('label_sugar') + '</label><input type="number" step="0.1" id="ed-sugar" value="' + ev(p.sugar) + '"></div>'
+          + '<div><label>' + t('label_protein') + '</label><input type="number" step="0.1" id="ed-protein" value="' + ev(p.protein) + '"></div>'
+          + '<div><label>' + t('label_fiber') + '</label><input type="number" step="0.1" id="ed-fiber" value="' + ev(p.fiber) + '"></div>'
+          + '<div><label>' + t('label_salt') + '</label><input type="number" step="0.01" id="ed-salt" value="' + ev(p.salt) + '"></div>'
+          + '<div><label>' + t('label_weight') + '</label><input type="number" step="1" id="ed-weight" value="' + ev(p.weight) + '"></div>'
+          + '<div><label>' + t('label_portion') + '</label><input type="number" step="1" id="ed-portion" value="' + ev(p.portion) + '"></div>'
+          + '<div><label>' + t('label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume === 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume === 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume === 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
+          + '<div><label>' + t('label_price') + '</label><input type="number" step="1" id="ed-price" value="' + ev(p.price) + '"></div>'
           + '<div><label>' + t('edit_label_taste') + '</label><div class="range-row"><input type="range" min="0" max="6" step="0.5" value="' + (p.taste_score != null ? p.taste_score : 3) + '" id="ed-smak" oninput="document.getElementById(\'ed-smak-val\').textContent=this.value"><span class="range-val" id="ed-smak-val">' + (p.taste_score != null ? p.taste_score : 3) + '</span></div></div>'
-          + '<div class="edit-grid-2"><label>' + t('edit_label_taste_note') + '</label><textarea id="ed-taste_note" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.taste_note || '') + '</textarea></div>'
+          + '<div class="edit-grid-2"><label>' + t('label_taste_note') + '</label><textarea id="ed-taste_note" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.taste_note || '') + '</textarea></div>'
           + '</div>'
           + (p.ingredients
             ? '<div style="display:flex;align-items:center;justify-content:space-between;margin:10px 0 4px">'
-              + '<span style="font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.06em;font-family:\'Space Mono\',monospace">' + t('protein_quality_estimated') + '</span>'
+              + '<span style="font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:0.06em;font-family:\'Space Mono\',monospace">' + t('label_protein_quality_est') + '</span>'
               + '<button type="button" class="btn-off" id="ed-estimate-btn" data-action="estimate-protein" style="font-size:11px;padding:5px 10px"><span class="off-spin"></span><span class="off-label">&#9881; ' + t('btn_estimate') + '</span></button></div>'
               + '<div id="ed-pq-result" style="' + (p.est_pdcaas || p.est_diaas ? '' : 'display:none;') + 'padding:10px;border-radius:8px;background:rgba(0,229,204,0.06);border:1px solid rgba(0,229,204,0.15);margin-bottom:8px">'
               + '<div style="display:flex;gap:16px;margin-bottom:4px"><span style="font-size:11px;color:rgba(255,255,255,0.4)">PDCAAS: <span id="ed-pdcaas-val" style="color:#00e5cc;font-weight:700;font-family:\'Space Mono\',monospace">' + (p.est_pdcaas ? parseFloat(p.est_pdcaas).toFixed(2) : '\u2013') + '</span></span>'

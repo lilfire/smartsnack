@@ -748,7 +748,7 @@ function showImportDuplicateDialog() {
     matchLabel.textContent = t('import_dup_match_label');
     matchSection.appendChild(matchLabel);
     matchSection.appendChild(_buildRadioGroup('match_criteria', [
-      { value: 'ean', label: t('import_dup_match_ean') },
+      { value: 'ean', label: t('label_ean') },
       { value: 'name', label: t('import_dup_match_name') },
       { value: 'both', label: t('import_dup_match_both') },
     ], 'both'));

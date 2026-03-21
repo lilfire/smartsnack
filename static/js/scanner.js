@@ -277,7 +277,7 @@ export function scanRegisterNew(ean) {
   if (eanEl) eanEl.value = ean;
   import('./openfoodfacts.js').then((mod) => {
     mod.validateOffBtn('f');
-    setTimeout(() => { mod.lookupOFF('f'); }, 300);
+    setTimeout(() => { mod.lookupOFF('f', null, { autoClose: true }); }, 300);
   });
 }
 
@@ -364,7 +364,7 @@ export async function scanPickerSearch() {
       if (cnt) cnt.textContent = t('off_zero_results');
       return;
     }
-    if (cnt) cnt.textContent = results.length + ' resultat' + (results.length !== 1 ? 'er' : '');
+    if (cnt) cnt.textContent = t(results.length === 1 ? 'scan_result_count_one' : 'scan_result_count_other', { count: results.length });
     let h = '';
     results.forEach((p) => {
       const imgTag = p.has_image ? '<div class="off-result-img" id="scan-pick-img-' + p.id + '" style="background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center"><span style="opacity:0.2">' + esc(catEmoji(p.type)) + '</span></div>'

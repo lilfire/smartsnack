@@ -339,11 +339,15 @@ def off_product(code: str) -> dict:
     url = f"{_OFF_API_BASE}/product/{code.strip()}.json"
     try:
         return _off_get_json(url)
-    except RuntimeError:
+    except _OffNotFoundError:
         # OFF API v2 returns 404 for unknown products;
         # return a "not found" payload so the frontend shows
         # "No products found" instead of "Network error".
         return {"status": 0, "status_verbose": "product not found"}
+
+
+class _OffNotFoundError(Exception):
+    """Raised when the OFF API returns 404 for an unknown product."""
 
 
 def _off_get_json(url: str, timeout: int = 30) -> dict:
@@ -353,6 +357,11 @@ def _off_get_json(url: str, timeout: int = 30) -> dict:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = resp.read(2 * 1024 * 1024)  # 2 MB max
             return json.loads(data)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            raise _OffNotFoundError("Product not found") from e
+        logger.error("OFF API HTTP %s for %s: %s", e.code, url, e)
+        raise RuntimeError(f"OFF API error (HTTP {e.code})") from e
     except Exception as e:
         logger.error("OFF API proxy error for %s: %s", url, e)
         raise RuntimeError("Failed to fetch from OpenFoodFacts") from e

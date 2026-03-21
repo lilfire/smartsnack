@@ -123,7 +123,7 @@ describe('applySorting', () => {
     expect(sorted.map((r) => r.kcal)).toEqual([200, 100, null]);
   });
 
-  it('handles null string values', () => {
+  it('handles null string values in ascending sort', () => {
     state.sortCol = 'name';
     state.sortDir = 'asc';
     const results = [{ name: null }, { name: 'Apple' }];
@@ -131,6 +131,62 @@ describe('applySorting', () => {
     // null coerced to '' for comparison but original value stays null
     expect(sorted[0].name).toBeNull();
     expect(sorted[1].name).toBe('Apple');
+  });
+
+  it('handles null string values in descending sort', () => {
+    state.sortCol = 'name';
+    state.sortDir = 'desc';
+    const results = [{ name: 'Apple' }, { name: null }];
+    const sorted = applySorting(results);
+    expect(sorted[0].name).toBe('Apple');
+    expect(sorted[1].name).toBeNull();
+  });
+
+  it('handles only va null in numeric ascending sort (va gets Infinity)', () => {
+    state.sortCol = 'kcal';
+    state.sortDir = 'asc';
+    const results = [{ kcal: null }, { kcal: 50 }];
+    const sorted = applySorting(results);
+    expect(sorted[0].kcal).toBe(50);
+    expect(sorted[1].kcal).toBeNull();
+  });
+
+  it('handles only vb null in numeric ascending sort (vb gets Infinity)', () => {
+    state.sortCol = 'kcal';
+    state.sortDir = 'asc';
+    const results = [{ kcal: 50 }, { kcal: null }];
+    const sorted = applySorting(results);
+    expect(sorted[0].kcal).toBe(50);
+    expect(sorted[1].kcal).toBeNull();
+  });
+
+  it('handles only va null in numeric descending sort (va gets -Infinity)', () => {
+    state.sortCol = 'kcal';
+    state.sortDir = 'desc';
+    const results = [{ kcal: null }, { kcal: 50 }];
+    const sorted = applySorting(results);
+    expect(sorted[0].kcal).toBe(50);
+    expect(sorted[1].kcal).toBeNull();
+  });
+
+  it('handles only vb null in numeric descending sort (vb gets -Infinity)', () => {
+    state.sortCol = 'kcal';
+    state.sortDir = 'desc';
+    const results = [{ kcal: 50 }, { kcal: null }];
+    const sorted = applySorting(results);
+    expect(sorted[0].kcal).toBe(50);
+    expect(sorted[1].kcal).toBeNull();
+  });
+
+  it('handles mixed string and null where one value is string and other is null', () => {
+    state.sortCol = 'name';
+    state.sortDir = 'asc';
+    const results = [{ name: 'Zebra' }, { name: null }, { name: 'Apple' }];
+    const sorted = applySorting(results);
+    // null coerces to '' which sorts before 'apple' and 'zebra'
+    expect(sorted[0].name).toBeNull();
+    expect(sorted[1].name).toBe('Apple');
+    expect(sorted[2].name).toBe('Zebra');
   });
 
   it('does not mutate original array', () => {
@@ -144,13 +200,20 @@ describe('applySorting', () => {
 });
 
 describe('setSort', () => {
-  it('toggles direction when same column', () => {
+  it('toggles direction from desc to asc when same column', () => {
     state.sortCol = 'name';
     state.sortDir = 'desc';
     // setSort calls rerender which does a dynamic import; mock it
     vi.mock('../render.js', () => ({ renderResults: vi.fn() }));
     setSort('name');
     expect(state.sortDir).toBe('asc');
+  });
+
+  it('toggles direction from asc to desc when same column', () => {
+    state.sortCol = 'name';
+    state.sortDir = 'asc';
+    setSort('name');
+    expect(state.sortDir).toBe('desc');
   });
 
   it('changes column and sets default direction (desc for non-name)', () => {
@@ -187,6 +250,20 @@ describe('buildFilters', () => {
     state.cachedStats = null;
     buildFilters();
     expect(document.getElementById('filter-row').children.length).toBe(0);
+  });
+
+  it('returns early when filter-row element is missing', () => {
+    document.body.innerHTML = '';
+    state.cachedStats = { total: 1, type_counts: {} };
+    expect(() => buildFilters()).not.toThrow();
+  });
+
+  it('uses 0 count when category has no type_counts entry', () => {
+    state.cachedStats = { total: 5, type_counts: {} };
+    state.categories = [{ name: 'fruit', emoji: '🍎', label: 'Fruit' }];
+    buildFilters();
+    const pills = document.getElementById('filter-row').querySelectorAll('button');
+    expect(pills[1].textContent).toContain('(0)');
   });
 
   it('creates All button and category pills', () => {
@@ -231,6 +308,19 @@ describe('updateFilterToggle', () => {
     const label = document.createElement('span');
     label.id = 'filter-toggle-label';
     document.body.appendChild(label);
+  });
+
+  it('returns early when toggle or label elements are missing', () => {
+    document.body.innerHTML = '';
+    state.currentFilter = ['dairy'];
+    expect(() => updateFilterToggle()).not.toThrow();
+  });
+
+  it('falls back to raw filter name when category is not found', () => {
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    state.currentFilter = ['unknown_cat'];
+    updateFilterToggle();
+    expect(document.getElementById('filter-toggle-label').textContent).toBe('unknown_cat');
   });
 
   it('shows filter_all when no filters active', () => {
@@ -356,5 +446,15 @@ describe('rerender', () => {
     rerender();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mockRenderResults).toHaveBeenCalledWith([], '');
+  });
+
+  it('catches and logs error when dynamic import fails', async () => {
+    vi.doMock('../render.js', () => { throw new Error('module load failure'); });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    rerender();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(errorSpy).toHaveBeenCalledWith('Failed to load render module:', expect.any(Error));
+    errorSpy.mockRestore();
   });
 });

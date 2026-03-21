@@ -33,12 +33,22 @@ export async function initLanguage() {
     currentLang = data.language || 'no';
   } catch(e) { currentLang = 'no'; }
   await loadTranslations(currentLang);
+  window.__t = t;
   applyStaticTranslations();
 }
 
 export function applyStaticTranslations() {
   document.querySelectorAll('[data-i18n]').forEach((el) => {
-    el.textContent = t(el.getAttribute('data-i18n'));
+    const key = el.getAttribute('data-i18n');
+    const params = {};
+    let hasParams = false;
+    for (const attr of el.attributes) {
+      if (attr.name.startsWith('data-i18n-param-')) {
+        params[attr.name.slice(16)] = attr.value;
+        hasParams = true;
+      }
+    }
+    el.textContent = t(key, hasParams ? params : undefined);
   });
   document.querySelectorAll('[data-i18n-html]').forEach((el) => {
     el.innerHTML = t(el.getAttribute('data-i18n-html'));
