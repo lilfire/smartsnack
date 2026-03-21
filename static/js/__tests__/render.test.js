@@ -981,7 +981,7 @@ describe('renderResults - additional branch coverage', () => {
     renderResults(products, '');
     const container = document.getElementById('results-container');
     // Should show protein quality section since ingredients exist
-    expect(container.innerHTML).toContain('protein_quality_estimated');
+    expect(container.innerHTML).toContain('label_protein_quality_est');
     expect(container.innerHTML).toContain('ed-estimate-btn');
     // est_pdcaas present, est_diaas null
     expect(container.innerHTML).toContain('0.85');
@@ -1005,7 +1005,7 @@ describe('renderResults - additional branch coverage', () => {
     renderResults(products, '');
     const container = document.getElementById('results-container');
     // No protein quality section since no ingredients
-    expect(container.innerHTML).not.toContain('protein_quality_estimated');
+    expect(container.innerHTML).not.toContain('label_protein_quality_est');
   });
 
   it('renders edit form with est_diaas but no est_pdcaas', () => {

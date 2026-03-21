@@ -1048,8 +1048,8 @@ describe('showDuplicateMergeModal', () => {
     // Should contain field choice rows for taste_score and price
     const fieldLabels = modal.querySelectorAll('.conflict-row-label');
     const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
-    expect(labelTexts).toContain('adv_field_taste_score');
-    expect(labelTexts).toContain('adv_field_price');
+    expect(labelTexts).toContain('weight_label_taste_score');
+    expect(labelTexts).toContain('label_price');
 
     // Should show conflict option values (price uses click options, taste uses slider)
     const optionValues = modal.querySelectorAll('.conflict-option-value');
@@ -1111,11 +1111,11 @@ describe('showDuplicateMergeModal', () => {
     const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
 
     // taste_score and price should show (user-only fields)
-    expect(labelTexts).toContain('adv_field_taste_score');
-    expect(labelTexts).toContain('adv_field_price');
+    expect(labelTexts).toContain('weight_label_taste_score');
+    expect(labelTexts).toContain('label_price');
     // kcal and brand should NOT show (OFF-provided fields)
-    expect(labelTexts).not.toContain('adv_field_kcal');
-    expect(labelTexts).not.toContain('adv_field_brand');
+    expect(labelTexts).not.toContain('label_kcal');
+    expect(labelTexts).not.toContain('label_brand');
 
     bg.querySelector('.conflict-apply-btn').click();
     const result = await promise;
@@ -1135,9 +1135,9 @@ describe('showDuplicateMergeModal', () => {
     const fieldLabels = bg.querySelectorAll('.conflict-row-label');
     const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
 
-    expect(labelTexts).toContain('adv_field_taste_score');
-    expect(labelTexts).toContain('adv_field_price');
-    expect(labelTexts).not.toContain('adv_field_kcal');
+    expect(labelTexts).toContain('weight_label_taste_score');
+    expect(labelTexts).toContain('label_price');
+    expect(labelTexts).not.toContain('label_kcal');
 
     bg.querySelector('.conflict-apply-btn').click();
     const result = await promise;
@@ -1197,9 +1197,9 @@ describe('showDuplicateMergeModal', () => {
     // Only taste_score should show as conflict (price and volume auto-resolve)
     const fieldLabels = bg.querySelectorAll('.conflict-row-label');
     const labelTexts = Array.from(fieldLabels).map(el => el.textContent);
-    expect(labelTexts).toContain('adv_field_taste_score');
-    expect(labelTexts).not.toContain('adv_field_price');
-    expect(labelTexts).not.toContain('adv_field_volume');
+    expect(labelTexts).toContain('weight_label_taste_score');
+    expect(labelTexts).not.toContain('label_price');
+    expect(labelTexts).not.toContain('label_volume');
 
     bg.querySelector('.conflict-apply-btn').click();
     const result = await promise;

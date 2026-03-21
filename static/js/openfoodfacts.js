@@ -4,6 +4,18 @@ import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
 const OFF_FETCH_TIMEOUT = 45000;
+const _FIELD_LABEL_KEYS = {
+  name: 'label_name', brand: 'label_brand', stores: 'label_stores',
+  ingredients: 'label_ingredients', ean: 'edit_label_ean', type: 'label_category',
+  kcal: 'label_kcal', energy_kj: 'label_energy_kj', protein: 'label_protein',
+  fat: 'label_fat', saturated_fat: 'label_saturated_fat', carbs: 'label_carbs',
+  sugar: 'label_sugar', fiber: 'label_fiber', salt: 'label_salt',
+  price: 'label_price', weight: 'label_weight', portion: 'label_portion',
+  volume: 'label_volume', taste_score: 'weight_label_taste_score',
+  est_pdcaas: 'weight_label_est_pdcaas', est_diaas: 'weight_label_est_diaas',
+  total_score: 'adv_field_total_score', completeness: 'completeness_label',
+};
+function _fieldLabel(field) { return t(_FIELD_LABEL_KEYS[field] || field) || field; }
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
 function _volumeLabel(val) { return _VOLUME_LABELS[val] ? t(_VOLUME_LABELS[val]) : val; }
 
@@ -564,7 +576,7 @@ export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
       const row = document.createElement('div');
       const label = document.createElement('div');
       label.className = 'conflict-row-label';
-      label.textContent = t('adv_field_' + c.field) || c.field;
+      label.textContent = _fieldLabel(c.field);
       row.appendChild(label);
 
       const opts = document.createElement('div');
@@ -751,7 +763,7 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
         const row = document.createElement('div');
         const label = document.createElement('div');
         label.className = 'conflict-row-label';
-        label.textContent = t('adv_field_' + c.field) || c.field;
+        label.textContent = _fieldLabel(c.field);
         row.appendChild(label);
 
         if (c.field === 'taste_score') {
