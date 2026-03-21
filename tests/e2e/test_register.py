@@ -98,6 +98,52 @@ def test_taste_slider_updates_display(page):
     expect(slider).to_have_value("5")
 
 
+def test_taste_slider_keeps_value_and_focus_on_release(page):
+    """Sliding the taste slider and releasing should keep the value and focus."""
+    _go_to_register(page)
+
+    slider = page.locator("#f-smak")
+    display = page.locator("#smak-val")
+
+    # Scroll slider into view so bounding box is available
+    slider.scroll_into_view_if_needed()
+    box = slider.bounding_box()
+    assert box is not None
+
+    # Simulate a real mouse drag from center to the right (~5/6 of the track)
+    start_x = box["x"] + box["width"] * 0.5
+    start_y = box["y"] + box["height"] / 2
+    end_x = box["x"] + box["width"] * 0.83
+    end_y = start_y
+
+    page.mouse.move(start_x, start_y)
+    page.mouse.down()
+    # Move in small steps to trigger oninput events
+    steps = 5
+    for i in range(1, steps + 1):
+        page.mouse.move(
+            start_x + (end_x - start_x) * i / steps,
+            end_y,
+        )
+    page.mouse.up()
+
+    # Allow requestAnimationFrame to fire
+    page.wait_for_timeout(100)
+
+    # The value should NOT have snapped back to the default "3"
+    val = slider.input_value()
+    assert float(val) > 3, f"Slider should have moved right of default (3), got {val}"
+
+    # The display span should match the slider value
+    expect(display).to_have_text(val)
+
+    # Focus should still be on the slider, not on a previous field like f-price
+    focused_id = page.evaluate("document.activeElement?.id")
+    assert focused_id != "f-price", (
+        f"Focus jumped to previous field f-price instead of staying on slider"
+    )
+
+
 def test_ean_enables_fetch_button(page):
     """Entering an EAN should enable the Fetch button."""
     _go_to_register(page)
