@@ -393,9 +393,11 @@ describe('buildTypeSelect', () => {
     ];
     buildTypeSelect();
     const options = sel.querySelectorAll('option');
-    expect(options.length).toBe(2);
+    expect(options.length).toBe(3);
     expect(options[0].textContent).toContain('Dairy');
     expect(options[1].textContent).toContain('Meat');
+    expect(options[2].value).toBe('');
+    expect(options[2].textContent).toContain('uncategorized');
   });
 
   it('preserves previous selection', () => {

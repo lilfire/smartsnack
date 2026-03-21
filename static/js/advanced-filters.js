@@ -14,6 +14,7 @@ const TEXT_FIELDS = [
 ];
 const CATEGORY_FIELD = ['type', 'label_category'];
 const CATEGORY_OPS = [
+  ['', 'adv_op_flag_select'],
   ['=', 'adv_op_is'],
   ['!=', 'adv_op_is_not'],
 ];
@@ -354,6 +355,11 @@ function _syncValInput(valInput, fieldValue, opValue) {
     valInput.style.display = 'none';
     const catSel = document.createElement('select');
     catSel.className = 'adv-category-select adv-value-input';
+    // Add "not selected" placeholder
+    const placeholderOpt = document.createElement('option');
+    placeholderOpt.value = '__none__';
+    placeholderOpt.textContent = t('adv_op_flag_select');
+    catSel.appendChild(placeholderOpt);
     // Populate from state.categories
     state.categories.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach(c => {
       const o = document.createElement('option');
@@ -361,6 +367,11 @@ function _syncValInput(valInput, fieldValue, opValue) {
       o.textContent = (c.emoji ? c.emoji + ' ' : '') + c.label;
       catSel.appendChild(o);
     });
+    // Add "Uncategorized" option for products with no category
+    const uncatOpt = document.createElement('option');
+    uncatOpt.value = '';
+    uncatOpt.textContent = '\u{1F4E6} ' + t('uncategorized');
+    catSel.appendChild(uncatOpt);
     // Restore previous value if valid
     if (valInput.value) {
       for (let i = 0; i < catSel.options.length; i++) {
@@ -491,7 +502,7 @@ function _serializeGroup(groupEl) {
         children.push({ field, op: opRaw, value: '' });
       } else {
         const value = valInput.value.trim();
-        if (field && opRaw && value !== '') {
+        if (field && opRaw && value !== '' && value !== '__none__') {
           children.push({ field, op: opRaw, value });
         }
       }

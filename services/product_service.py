@@ -293,6 +293,9 @@ def _parse_condition(c: dict) -> tuple:
         raise ValueError(f"Invalid filter operator: {op}")
     if op in ("is_not_set", "is_set"):
         return field, op, "", ADVANCED_FILTER_OPS[op]
+    # Allow empty value for type field (uncategorized products)
+    if field == "type" and op in ("=", "!=") and (value is None or str(value).strip() == ""):
+        return field, op, "", ADVANCED_FILTER_OPS[op]
     if value is None or str(value).strip() == "":
         raise ValueError(f"Filter value required for {field}")
 
@@ -589,15 +592,24 @@ def list_products(
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         conditions.append("(name LIKE ? ESCAPE '\\' OR ean LIKE ? ESCAPE '\\')")
         params.extend([f"%{escaped}%", f"%{escaped}%"])
-    if type_filter:
-        types = [t.strip() for t in type_filter.split(",") if t.strip()]
-        if len(types) == 1:
-            conditions.append("type = ?")
-            params.append(types[0])
-        elif types:
-            placeholders = ",".join("?" * len(types))
-            conditions.append(f"type IN ({placeholders})")
-            params.extend(types)
+    if type_filter is not None:
+        types = [t.strip() for t in type_filter.split(",")]
+        # Support filtering by empty type (uncategorized products)
+        has_empty = "" in types
+        named = [t for t in types if t]
+        parts = []
+        if named:
+            if len(named) == 1:
+                parts.append("type = ?")
+                params.append(named[0])
+            else:
+                placeholders = ",".join("?" * len(named))
+                parts.append(f"type IN ({placeholders})")
+                params.extend(named)
+        if has_empty:
+            parts.append("type = ''")
+        if parts:
+            conditions.append("(" + " OR ".join(parts) + ")")
     post_filter_spec = None
     if advanced_filters:
         af_sql, af_params, post_filter_spec = _parse_advanced_filters(advanced_filters)
@@ -639,8 +651,8 @@ def list_products(
 
 
 def add_product(data: dict, on_duplicate: str | None = None) -> dict:
-    if not data.get("type", "").strip() or not data.get("name", "").strip():
-        raise ValueError("type and name are required")
+    if not data.get("name", "").strip():
+        raise ValueError("name is required")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
         val = data.get(tf, "")
         if isinstance(val, str) and len(val) > max_len:
@@ -650,11 +662,13 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         raise ValueError("EAN must be 8-13 digits")
     conn = get_db()
     cur = conn.cursor()
-    cat_exists = cur.execute(
-        "SELECT 1 FROM categories WHERE name = ?", (data["type"].strip(),)
-    ).fetchone()
-    if not cat_exists:
-        raise ValueError("Category does not exist")
+    product_type = data.get("type", "").strip()
+    if product_type:
+        cat_exists = cur.execute(
+            "SELECT 1 FROM categories WHERE name = ?", (product_type,)
+        ).fetchone()
+        if not cat_exists:
+            raise ValueError("Category does not exist")
     name = data["name"].strip()
 
     # Duplicate detection
@@ -709,7 +723,7 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
         (
-            data["type"].strip(),
+            data.get("type", "").strip(),
             data["name"].strip(),
             data.get("ean", "").strip(),
             data.get("brand", "").strip(),
@@ -775,7 +789,7 @@ def update_product(pid: int, data: dict) -> None:
     if not updates and incoming_flags is None:
         raise ValueError("Nothing to update")
     conn = get_db()
-    if "type" in data:
+    if "type" in data and data["type"]:
         cat_exists = conn.execute(
             "SELECT 1 FROM categories WHERE name = ?", (data["type"],)
         ).fetchone()

@@ -1,5 +1,5 @@
 // ── Filters & Sorting ───────────────────────────────
-import { state, esc, upgradeSelect } from './state.js';
+import { state, esc, catLabel, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
 export function buildFilters() {
@@ -23,6 +23,17 @@ export function buildFilters() {
     btn.addEventListener('click', () => window.setFilter(c.name));
     row.appendChild(btn);
   });
+
+  // Show "Uncategorized" pill if any products have empty type
+  const uncatCount = state.cachedStats.type_counts[''] || 0;
+  if (uncatCount > 0) {
+    const active = state.currentFilter.indexOf('') >= 0;
+    const btn = document.createElement('button');
+    btn.className = 'pill' + (active ? ' active' : '');
+    btn.textContent = '\u{1F4E6} ' + t('uncategorized') + ' (' + uncatCount + ')';
+    btn.addEventListener('click', () => window.setFilter(''));
+    row.appendChild(btn);
+  }
   updateFilterToggle();
 }
 
@@ -32,6 +43,7 @@ export function updateFilterToggle() {
   if (!tog || !label) return;
   if (state.currentFilter.length > 0) {
     const names = state.currentFilter.map((f) => {
+      if (f === '') return '\u{1F4E6} ' + t('uncategorized');
       const cat = state.categories.find((c) => c.name === f);
       return cat ? (cat.emoji + ' ' + cat.label) : f;
     });
@@ -61,7 +73,12 @@ export function buildTypeSelect() {
     o.textContent = c.emoji + ' ' + c.label;
     sel.appendChild(o);
   });
-  if (prev) {
+  // Add "Uncategorized" option
+  const uncatOpt = document.createElement('option');
+  uncatOpt.value = '';
+  uncatOpt.textContent = '\u{1F4E6} ' + t('uncategorized');
+  sel.appendChild(uncatOpt);
+  if (prev !== undefined) {
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === prev) { sel.value = prev; break; }
     }

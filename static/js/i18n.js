@@ -1,5 +1,5 @@
 // ── i18n (Internationalization) ─────────────────────
-import { state, api } from './state.js';
+import { state, api, setTranslationFunc } from './state.js';
 
 let currentLang = 'no';
 let translations = {};
@@ -14,6 +14,9 @@ export function t(key, params) {
   }
   return text;
 }
+
+// Register t() with state.js so catLabel() can translate without circular imports
+setTranslationFunc(t);
 
 export function getCurrentLang() { return currentLang; }
 

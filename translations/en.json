@@ -10,6 +10,7 @@
   "search_placeholder": "Search for product or EAN...",
   "search_scan_title": "Scan barcode to find product",
   "filter_all": "All categories",
+  "uncategorized": "Uncategorized",
   "filter_count": "{count} categories",
   "result_count": "{count} result",
   "result_count_plural": "{count} results",

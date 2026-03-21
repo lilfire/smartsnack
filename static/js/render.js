@@ -216,6 +216,7 @@ export function renderResults(results, search) {
       if (state.editingId === p.id) {
         let opts = '';
         state.categories.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach((c) => { opts += '<option value="' + esc(c.name) + '"' + (c.name === p.type ? ' selected' : '') + '>' + esc(c.emoji) + ' ' + esc(c.label) + '</option>'; });
+        opts += '<option value=""' + (!p.type ? ' selected' : '') + '>\u{1F4E6} ' + esc(t('uncategorized')) + '</option>';
         const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'

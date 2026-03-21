@@ -211,16 +211,16 @@ class TestAddProduct:
         assert "id" in result
         assert result["id"] > 0
 
-    def test_missing_type(self, app_ctx):
+    def test_missing_type_creates_uncategorized(self, app_ctx):
         from services.product_service import add_product
 
-        with pytest.raises(ValueError, match="type and name"):
-            add_product({"name": "Test"})
+        result = add_product({"name": "Test Uncategorized"})
+        assert result["id"] is not None
 
     def test_missing_name(self, app_ctx):
         from services.product_service import add_product
 
-        with pytest.raises(ValueError, match="type and name"):
+        with pytest.raises(ValueError, match="name is required"):
             add_product({"type": "Snacks"})
 
     def test_invalid_ean(self, app_ctx, seed_category):
