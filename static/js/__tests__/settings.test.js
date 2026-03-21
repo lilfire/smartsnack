@@ -1743,6 +1743,31 @@ describe('_renderRefreshReport with container present', () => {
     expect(toggle).not.toBeNull();
   });
 
+  it('renders report rows with unknown reason and detail text in modal', async () => {
+    api.mockResolvedValueOnce({ running: true });
+    await checkRefreshStatus();
+    mockES.onmessage({ data: JSON.stringify({
+      done: true, total: 3, updated: 0, skipped: 1, errors: 2,
+      report: [
+        { name: 'P1', status: 'skipped', reason: 'not_found' },
+        { ean: '999', status: 'error', reason: 'some_unknown_reason', detail: 'extra info' },
+        { name: 'P3', status: 'error', reason: 'another_reason' },
+      ]
+    }) });
+    const toggle = document.querySelector('.refresh-report-toggle');
+    toggle.click();
+    const modalBg = document.getElementById('refresh-report-modal-bg');
+    expect(modalBg).not.toBeNull();
+    // The unknown reason should appear as-is (not translated via key lookup)
+    expect(modalBg.innerHTML).toContain('some_unknown_reason');
+    // The detail should appear in parentheses
+    expect(modalBg.innerHTML).toContain('(extra info)');
+    // Known reason 'not_found' should use the translation key
+    expect(modalBg.innerHTML).toContain('bulk_report_not_found');
+    // Item with ean but no name should show ean
+    expect(modalBg.innerHTML).toContain('999');
+  });
+
   it('opens report modal when toggle button is clicked', async () => {
     api.mockResolvedValueOnce({ running: true });
     await checkRefreshStatus();
@@ -1999,6 +2024,22 @@ describe('initRestoreDragDrop missing element', () => {
     dropEvent.preventDefault = vi.fn();
     dropEvent.dataTransfer = { files: [] };
     drop.dispatchEvent(dropEvent);
+    expect(drop.classList.contains('dragover')).toBe(false);
+  });
+
+  it('handles drop event with files and calls handleRestore', () => {
+    const { initRestoreDragDrop } = require('../settings.js');
+    const drop = document.createElement('div');
+    drop.id = 'restore-drop';
+    document.body.appendChild(drop);
+    initRestoreDragDrop();
+    drop.classList.add('dragover');
+    const file = new File(['{"products":[]}'], 'backup.json', { type: 'application/json' });
+    const dropEvent = new Event('drop');
+    dropEvent.preventDefault = vi.fn();
+    dropEvent.dataTransfer = { files: [file] };
+    drop.dispatchEvent(dropEvent);
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
     expect(drop.classList.contains('dragover')).toBe(false);
   });
 

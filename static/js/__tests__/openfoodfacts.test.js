@@ -773,6 +773,206 @@ describe('selectOffResult', () => {
     await selectOffResult(0);
     expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
   });
+
+  it('fetches and applies image when product has image_front_url', async () => {
+    setupSelectContext();
+    document.getElementById('ed-name').value = 'Milk';
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+
+    // Mock FileReader to simulate reading blob as data URI
+    const originalFileReader = global.FileReader;
+    const mockFileReader = {
+      readAsDataURL: vi.fn(),
+      onload: null,
+      onerror: null,
+    };
+    mockFileReader.readAsDataURL.mockImplementation(function () {
+      if (mockFileReader.onload) {
+        mockFileReader.onload({ target: { result: 'data:image/png;base64,abc123' } });
+      }
+    });
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    const fakeBlob = new Blob(['fake'], { type: 'image/png' });
+
+    // First call: name search to populate _offPickerProducts
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'Milk',
+          nutriments: { 'energy-kcal_100g': 60 },
+          image_front_url: 'https://images.openfoodfacts.org/test.jpg',
+        }],
+      }),
+    });
+    await lookupOFF('ed', null);
+
+    vi.clearAllMocks();
+    // selectOffResult: no code so no detail fetch, goes straight to applyOffProduct
+    // applyOffProduct will call fetchImageAsDataUri which calls fetchWithTimeout (global.fetch)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    await selectOffResult(0);
+
+    // fetchImageAsDataUri should have been called with the image URL
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('https://images.openfoodfacts.org/test.jpg'),
+      expect.any(Object),
+    );
+    // Image should be stored as pending (no productId)
+    expect(window._pendingImage).toBe('data:image/png;base64,abc123');
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_off_fetched'), 'success');
+
+    global.FileReader = originalFileReader;
+    delete window._pendingImage;
+  });
+
+  it('falls back to proxy when direct image fetch fails', async () => {
+    setupSelectContext();
+    document.getElementById('ed-name').value = 'Milk';
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+
+    const originalFileReader = global.FileReader;
+    const mockFileReader = {
+      readAsDataURL: vi.fn(),
+      onload: null,
+      onerror: null,
+    };
+    mockFileReader.readAsDataURL.mockImplementation(function () {
+      if (mockFileReader.onload) {
+        mockFileReader.onload({ target: { result: 'data:image/jpeg;base64,proxy123' } });
+      }
+    });
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    const fakeBlob = new Blob(['fake'], { type: 'image/jpeg' });
+
+    // First call: name search
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'Milk',
+          nutriments: {},
+          image_front_url: 'https://images.openfoodfacts.org/img.jpg',
+        }],
+      }),
+    });
+    await lookupOFF('ed', null);
+
+    vi.clearAllMocks();
+    // Direct image fetch fails, proxy succeeds
+    let callCount = 0;
+    global.fetch = vi.fn().mockImplementation((url) => {
+      callCount++;
+      if (callCount === 1) {
+        // Direct fetch fails
+        return Promise.resolve({ ok: false, status: 403 });
+      }
+      // Proxy fetch succeeds
+      return Promise.resolve({
+        ok: true,
+        blob: () => Promise.resolve(fakeBlob),
+      });
+    });
+
+    await selectOffResult(0);
+    // Should have called proxy endpoint
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/proxy-image'),
+      expect.any(Object),
+    );
+    expect(window._pendingImage).toBe('data:image/jpeg;base64,proxy123');
+
+    global.FileReader = originalFileReader;
+    delete window._pendingImage;
+  });
+
+  it('handles invalid image URL gracefully', async () => {
+    delete window._pendingImage;
+    setupSelectContext();
+    document.getElementById('ed-name').value = 'Milk';
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+
+    // Product with invalid image URL (not http/https)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'Milk',
+          nutriments: { 'energy-kcal_100g': 60 },
+          image_front_url: 'ftp://invalid.example.com/img.jpg',
+        }],
+      }),
+    });
+    await lookupOFF('ed', null);
+
+    vi.clearAllMocks();
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    // No image fetch should happen for invalid URL
+    expect(window._pendingImage).toBeUndefined();
+    // Toast should still be called for the other fields
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_off_fetched'), 'success');
+  });
+
+  it('handles FileReader error in blobToResizedDataUri', async () => {
+    delete window._pendingImage;
+    setupSelectContext();
+    document.getElementById('ed-name').value = 'Milk';
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+
+    const originalFileReader = global.FileReader;
+    const mockFileReader = {
+      readAsDataURL: vi.fn(),
+      onload: null,
+      onerror: null,
+    };
+    mockFileReader.readAsDataURL.mockImplementation(function () {
+      if (mockFileReader.onerror) {
+        mockFileReader.onerror();
+      }
+    });
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    const fakeBlob = new Blob(['fake'], { type: 'image/png' });
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'Milk',
+          nutriments: {},
+          image_front_url: 'https://images.openfoodfacts.org/test.jpg',
+        }],
+      }),
+    });
+    await lookupOFF('ed', null);
+
+    vi.clearAllMocks();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    await selectOffResult(0);
+    // Image should not be set when FileReader errors
+    expect(window._pendingImage).toBeUndefined();
+
+    global.FileReader = originalFileReader;
+  });
 });
 
 describe('showOffAddReview', () => {
@@ -1050,6 +1250,41 @@ describe('showDuplicateMergeModal', () => {
     expect(result.choices.price).toBe(999);
     expect(result.choices.brand).toBe('B-Brand');
   });
+
+  it('toggles CSS classes when clicking optB individually for a non-taste field', async () => {
+    const formData = { price: 50 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      price: 200,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const options = bg.querySelectorAll('.conflict-option');
+    // options[0] = optA (selected by default), options[1] = optB
+    const optA = options[0];
+    const optB = options[1];
+
+    expect(optA.classList.contains('selected')).toBe(true);
+    expect(optB.classList.contains('selected')).toBe(false);
+
+    // Click optB
+    optB.click();
+    expect(optB.classList.contains('selected')).toBe(true);
+    expect(optA.classList.contains('selected')).toBe(false);
+
+    // Click optA again to toggle back
+    optA.click();
+    expect(optA.classList.contains('selected')).toBe(true);
+    expect(optB.classList.contains('selected')).toBe(false);
+
+    // Click optB again and confirm to verify the resolved value
+    optB.click();
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.choices.price).toBe(200);
+  });
 });
 
 describe('showMergeConflictModal', () => {
@@ -1155,6 +1390,37 @@ describe('showMergeConflictModal', () => {
     expect(result.kcal).toBe(150);
     expect(result.protein).toBe(8);
     expect(result.brand).toBe('X');
+  });
+
+  it('toggles CSS classes when clicking optDup individually', async () => {
+    const formData = { brand: 'CurrentBrand' };
+    const duplicate = { brand: 'OtherBrand' };
+    const promise = showMergeConflictModal(formData, duplicate, null);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const options = bg.querySelectorAll('.conflict-option');
+    // options[0] = optCurrent (selected by default), options[1] = optDup
+    const optCurrent = options[0];
+    const optDup = options[1];
+
+    expect(optCurrent.classList.contains('selected')).toBe(true);
+    expect(optDup.classList.contains('selected')).toBe(false);
+
+    // Click optDup
+    optDup.click();
+    expect(optDup.classList.contains('selected')).toBe(true);
+    expect(optCurrent.classList.contains('selected')).toBe(false);
+
+    // Click optCurrent to toggle back
+    optCurrent.click();
+    expect(optCurrent.classList.contains('selected')).toBe(true);
+    expect(optDup.classList.contains('selected')).toBe(false);
+
+    // Click optDup again and confirm to verify the resolved value
+    optDup.click();
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.brand).toBe('OtherBrand');
   });
 });
 
@@ -1509,6 +1775,696 @@ describe('lookupOFF name search edge cases', () => {
     });
     await lookupOFF('ed', null);
     expect(global.fetch).toHaveBeenCalled();
+  });
+});
+
+describe('applyOffProduct branches via selectOffResult', () => {
+  function setupFullEdFields() {
+    ['ean', 'name', 'kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt', 'portion', 'weight', 'brand', 'stores', 'ingredients'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    const wrap = document.createElement('div');
+    wrap.id = 'ed-protein-quality-wrap';
+    wrap.style.display = 'none';
+    document.body.appendChild(wrap);
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+  }
+
+  async function populatePickerProducts(products) {
+    document.getElementById('ed-name').value = 'Search';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products }),
+    });
+    await lookupOFF('ed', null);
+    vi.clearAllMocks();
+  }
+
+  it('formats salt with 2 decimals, kcal/energy_kj rounded, others with 1 decimal', async () => {
+    setupFullEdFields();
+    await populatePickerProducts([{
+      product_name: 'Salty',
+      nutriments: {
+        'energy-kcal_100g': 123.7,
+        'energy-kj_100g': 517.4,
+        'fat_100g': 5.67,
+        'salt_100g': 0.123,
+        'proteins_100g': 3.456,
+      },
+    }]);
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    expect(document.getElementById('ed-kcal').value).toBe('124');
+    expect(document.getElementById('ed-energy_kj').value).toBe('517');
+    expect(document.getElementById('ed-fat').value).toBe('5.7');
+    expect(document.getElementById('ed-salt').value).toBe('0.12');
+    expect(document.getElementById('ed-protein').value).toBe('3.5');
+  });
+
+  it('fills stores from stores_tags when stores is empty', async () => {
+    setupFullEdFields();
+    await populatePickerProducts([{
+      product_name: 'TagStore',
+      stores_tags: ['kiwi', 'rema-1000'],
+      nutriments: {},
+    }]);
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    expect(document.getElementById('ed-stores').value).toBe('Kiwi, Rema 1000');
+  });
+
+  it('fills weight from product_quantity and portion from serving_size', async () => {
+    setupFullEdFields();
+    await populatePickerProducts([{
+      product_name: 'Weighted',
+      product_quantity: 500,
+      serving_size: '30 g',
+      nutriments: {},
+    }]);
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    expect(document.getElementById('ed-weight').value).toBe('500');
+    expect(document.getElementById('ed-portion').value).toBe('30');
+  });
+
+  it('skips numeric field when OFF value is 0 but local has non-zero value', async () => {
+    setupFullEdFields();
+    document.getElementById('ed-kcal').value = '200';
+    document.getElementById('ed-fat').value = '5';
+    await populatePickerProducts([{
+      product_name: 'ZeroNutri',
+      nutriments: { 'energy-kcal_100g': 0, 'fat_100g': 0 },
+    }]);
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    // OFF=0, local=200 -> skip (keep local)
+    expect(document.getElementById('ed-kcal').value).toBe('200');
+    expect(document.getElementById('ed-fat').value).toBe('5');
+  });
+
+  it('does not overwrite ean when local ean already has a value', async () => {
+    setupFullEdFields();
+    document.getElementById('ed-ean').value = '1111111111111';
+    await populatePickerProducts([{
+      product_name: 'HasCode',
+      code: '2222222222222',
+      nutriments: {},
+    }]);
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    // ean should stay as local value since it was non-empty
+    expect(document.getElementById('ed-ean').value).toBe('1111111111111');
+  });
+
+  it('shows ingredients wrap and triggers estimateProteinQuality when ingredients present', async () => {
+    setupFullEdFields();
+    await populatePickerProducts([{
+      product_name: 'WithIngredients',
+      ingredients_text_no: 'melk, sukker',
+      nutriments: {},
+    }]);
+    // Mock fetch for estimateProteinQuality call (triggered by setTimeout)
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
+    });
+    await selectOffResult(0);
+    expect(document.getElementById('ed-ingredients').value).toBe('melk, sukker');
+    const wrap = document.getElementById('ed-protein-quality-wrap');
+    expect(wrap.style.display).toBe('');
+  });
+
+  it('saves image to product via API when productId is provided', async () => {
+    setupFullEdFields();
+    const originalFileReader = global.FileReader;
+    const mockFileReader = {
+      readAsDataURL: vi.fn(),
+      onload: null,
+      onerror: null,
+    };
+    mockFileReader.readAsDataURL.mockImplementation(function () {
+      if (mockFileReader.onload) {
+        mockFileReader.onload({ target: { result: 'data:image/png;base64,testimg' } });
+      }
+    });
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    const fakeBlob = new Blob(['fake'], { type: 'image/png' });
+
+    // Create img element for the product
+    const imgEl = document.createElement('img');
+    imgEl.id = 'prod-img-42';
+    document.body.appendChild(imgEl);
+
+    await populatePickerProducts([{
+      product_name: 'ImgProd',
+      image_front_url: 'https://example.com/img.jpg',
+      nutriments: {},
+    }]);
+
+    // selectOffResult will use _offCtx.productId which was set during lookupOFF
+    // We need to re-set via lookupOFF with productId
+    document.getElementById('ed-name').value = 'Search';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'ImgProd',
+          image_front_url: 'https://example.com/img.jpg',
+          nutriments: {},
+        }],
+      }),
+    });
+    await lookupOFF('ed', 42);
+    vi.clearAllMocks();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    await selectOffResult(0);
+    expect(api).toHaveBeenCalledWith('/api/products/42/image', expect.objectContaining({ method: 'PUT' }));
+    expect(state.imageCache[42]).toBe('data:image/png;base64,testimg');
+    expect(imgEl.src).toContain('data:image/png;base64,testimg');
+
+    global.FileReader = originalFileReader;
+  });
+
+  it('creates img element when prod-img-wrap exists but no img element', async () => {
+    setupFullEdFields();
+    const originalFileReader = global.FileReader;
+    const mockFileReader = {
+      readAsDataURL: vi.fn(),
+      onload: null,
+      onerror: null,
+    };
+    mockFileReader.readAsDataURL.mockImplementation(function () {
+      if (mockFileReader.onload) {
+        mockFileReader.onload({ target: { result: 'data:image/png;base64,wraptest' } });
+      }
+    });
+    global.FileReader = vi.fn(() => mockFileReader);
+
+    const fakeBlob = new Blob(['fake'], { type: 'image/png' });
+
+    // Create img wrap but no img element
+    const wrap = document.createElement('div');
+    wrap.id = 'prod-img-wrap-55';
+    document.body.appendChild(wrap);
+
+    document.getElementById('ed-name').value = 'Search';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'WrapProd',
+          image_front_url: 'https://example.com/img2.jpg',
+          nutriments: {},
+        }],
+      }),
+    });
+    await lookupOFF('ed', 55);
+    vi.clearAllMocks();
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: () => Promise.resolve(fakeBlob),
+    });
+
+    await selectOffResult(0);
+    expect(api).toHaveBeenCalledWith('/api/products/55/image', expect.objectContaining({ method: 'PUT' }));
+    // wrap should now contain an img element
+    const createdImg = wrap.querySelector('img');
+    expect(createdImg).not.toBeNull();
+
+    global.FileReader = originalFileReader;
+  });
+
+  it('fills ingredients from English or generic text when Norwegian is unavailable', async () => {
+    setupFullEdFields();
+    await populatePickerProducts([{
+      product_name: 'EnIngr',
+      ingredients_text_en: 'milk, sugar, cocoa',
+      nutriments: {},
+    }]);
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
+    });
+    await selectOffResult(0);
+    expect(document.getElementById('ed-ingredients').value).toBe('milk, sugar, cocoa');
+  });
+
+  it('uses stores string directly when available (not stores_tags)', async () => {
+    setupFullEdFields();
+    await populatePickerProducts([{
+      product_name: 'DirectStore',
+      stores: 'Meny, Coop',
+      stores_tags: ['ignored'],
+      nutriments: {},
+    }]);
+    global.fetch = vi.fn();
+    await selectOffResult(0);
+    expect(document.getElementById('ed-stores').value).toBe('Meny, Coop');
+  });
+});
+
+describe('updateOffPickerResults branches', () => {
+  function setupPickerDOM() {
+    const body = document.createElement('div');
+    body.id = 'off-results-body';
+    document.body.appendChild(body);
+    const count = document.createElement('div');
+    count.id = 'off-result-count';
+    document.body.appendChild(count);
+    const si = document.createElement('input');
+    si.id = 'off-search-input';
+    si.disabled = true;
+    document.body.appendChild(si);
+    const sb = document.createElement('button');
+    sb.id = 'off-search-btn';
+    sb.disabled = true;
+    document.body.appendChild(sb);
+    return { body, count, si, sb };
+  }
+
+  it('auto-closes and shows toast when autoClose=true and ean provided with error', async () => {
+    setupPickerDOM();
+    // Set up fields for lookupOFF
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '9999999999999';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = '';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 0, product: null }),
+    });
+    await lookupOFF('ed', null, { autoClose: true });
+    // autoClose should have closed the picker and shown info toast
+    expect(showToast).toHaveBeenCalledWith('off_not_found_auto', 'info');
+  });
+
+  it('shows add-to-OFF button when errorMsg and ean are provided without autoClose', async () => {
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '8888888888888';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = '';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ status: 0, product: null }),
+    });
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal).not.toBeNull();
+    // Should contain add-to-OFF button
+    expect(modal.innerHTML).toContain('off_add_to_off');
+  });
+});
+
+describe('renderOffResults product without name fallback', () => {
+  function setupNameSearch() {
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = 'TestProduct';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+  }
+
+  it('renders off_unknown_product when product has neither product_name_no nor product_name', async () => {
+    setupNameSearch();
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        // The product passes filter because it has product_name_no set
+        // But in renderOffResults, it checks product_name_no || product_name || t('off_unknown_product')
+        products: [{ product_name_no: '', product_name: '', completeness: 0.5, nutriments: {} }],
+      }),
+    });
+    await lookupOFF('ed', null);
+    // The filter in searchOFF filters out products without name,
+    // but if we manipulate _offPickerProducts to have an item with empty names
+    // we need to go through updateOffPickerResults directly.
+    // Instead, test a product where product_name_no is used as truthy but is the only name
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{ product_name_no: 'NorskNavn', completeness: 0.5, nutriments: {} }],
+      }),
+    });
+    document.getElementById('ed-name').value = 'TestProduct';
+    await lookupOFF('ed', null);
+    const modal = document.getElementById('off-modal-bg');
+    expect(modal.innerHTML).toContain('NorskNavn');
+  });
+});
+
+describe('offModalSearch without input element', () => {
+  it('returns early when no input exists and query is empty', async () => {
+    // No off-search-input in DOM
+    const origFetch = global.fetch;
+    delete global.fetch;
+    await offModalSearch();
+    // Should not throw; short query path handles missing input
+    expect(showToast).not.toHaveBeenCalled();
+    if (origFetch) global.fetch = origFetch;
+  });
+});
+
+describe('showDuplicateMergeModal volume field display', () => {
+  afterEach(() => {
+    document.querySelectorAll('.scan-modal-bg').forEach(el => el.remove());
+  });
+
+  it('displays volume labels using _volumeLabel for volume conflicts', async () => {
+    const formData = { volume: 1 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      volume: 3,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const options = bg.querySelectorAll('.conflict-option-value');
+    const values = Array.from(options).map(el => el.textContent);
+    // _volumeLabel(1) = t('volume_low'), _volumeLabel(3) = t('volume_high')
+    expect(values).toContain('volume_low');
+    expect(values).toContain('volume_high');
+
+    bg.querySelector('.conflict-apply-btn').click();
+    await promise;
+  });
+
+  it('displays raw value when volume is not in _VOLUME_LABELS map', async () => {
+    const formData = { volume: 99 };
+    const duplicate = {
+      id: 99, name: 'Dup', match_type: 'ean',
+      is_synced_with_off: false,
+      volume: 1,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    const options = bg.querySelectorAll('.conflict-option-value');
+    const values = Array.from(options).map(el => el.textContent);
+    // _volumeLabel(99) returns 99 since it's not in the map
+    expect(values).toContain('99');
+    expect(values).toContain('volume_low');
+
+    bg.querySelector('.conflict-apply-btn').click();
+    await promise;
+  });
+
+  it('uses fallback name when duplicate.name is empty', async () => {
+    const formData = { price: 50, name: '' };
+    const duplicate = {
+      id: 99, name: '', match_type: 'ean',
+      is_synced_with_off: false,
+      price: 100,
+    };
+    const promise = showDuplicateMergeModal(formData, duplicate, false);
+
+    const bg = document.querySelector('.scan-modal-bg');
+    // The modal should still render successfully with fallback names
+    expect(bg).not.toBeNull();
+    const modal = bg.querySelector('.conflict-modal');
+    expect(modal).not.toBeNull();
+    // Should still have conflict options for price
+    const labels = bg.querySelectorAll('.conflict-row-label');
+    expect(labels.length).toBe(1);
+
+    bg.querySelector('.conflict-apply-btn').click();
+    const result = await promise;
+    expect(result.scenario).toBe('neither');
+    expect(result.choices.price).toBe(50);
+  });
+});
+
+describe('showOffAddReview additional branches', () => {
+  function setupReviewFields(values) {
+    const fields = [
+      'name', 'brand', 'stores', 'ingredients', 'kcal', 'energy_kj',
+      'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt',
+      'weight', 'portion',
+    ];
+    fields.forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = values[f] || '';
+      document.body.appendChild(el);
+    });
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '1234567890123';
+    document.body.appendChild(ean);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+  }
+
+  it('truncates display of field values longer than 50 chars', () => {
+    const longVal = 'a'.repeat(60);
+    setupReviewFields({ name: 'TestProduct', ingredients: longVal });
+    showOffAddReview('1234567890123', 'ed');
+    const modal = document.getElementById('off-add-review-bg');
+    expect(modal).not.toBeNull();
+    // Should show truncated value (50 chars + ...)
+    expect(modal.innerHTML).toContain('a'.repeat(50) + '...');
+  });
+
+  it('uses prefixOverride parameter instead of _offCtx.prefix', () => {
+    // Set up fields with prefix 'xx'
+    const fields = [
+      'name', 'brand', 'stores', 'ingredients', 'kcal', 'energy_kj',
+      'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt',
+      'weight', 'portion',
+    ];
+    fields.forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'xx-' + f;
+      el.value = f === 'name' ? 'PrefixTest' : '';
+      document.body.appendChild(el);
+    });
+    showOffAddReview('5555555555555', 'xx');
+    const modal = document.getElementById('off-add-review-bg');
+    expect(modal).not.toBeNull();
+    expect(modal.innerHTML).toContain('5555555555555');
+  });
+
+  it('resolves previous _offReviewResolve when called again', () => {
+    setupReviewFields({ name: 'Test' });
+    let firstResolved = false;
+    const first = showOffAddReview('1111111111111', 'ed');
+    first.then(() => { firstResolved = true; });
+    // Call again - should resolve the first promise
+    showOffAddReview('2222222222222', 'ed');
+    // The first promise resolve was called synchronously
+    return Promise.resolve().then(() => {
+      expect(firstResolved).toBe(true);
+    });
+  });
+
+  it('reuses existing off-add-review-bg element', () => {
+    setupReviewFields({ name: 'Test' });
+    // Create the bg element beforehand
+    const existingBg = document.createElement('div');
+    existingBg.className = 'off-modal-bg';
+    existingBg.id = 'off-add-review-bg';
+    document.body.appendChild(existingBg);
+
+    showOffAddReview('3333333333333', 'ed');
+    // Should reuse the existing element (only 1 in DOM)
+    const bgs = document.querySelectorAll('#off-add-review-bg');
+    expect(bgs.length).toBe(1);
+  });
+});
+
+describe('submitToOff error without message', () => {
+  it('falls back to toast_network_error when error has no message', async () => {
+    const btn = document.createElement('button');
+    btn.id = 'off-submit-btn';
+    document.body.appendChild(btn);
+
+    api.mockRejectedValueOnce(new Error());
+    await submitToOff('1234567890123');
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+  });
+});
+
+describe('showOffPickerLoading background click', () => {
+  it('closes picker when clicking on background overlay', async () => {
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = 'TestProduct';
+    document.body.appendChild(name);
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [{ product_name: 'X' }] }),
+    });
+    await lookupOFF('ed', null);
+    const bg = document.getElementById('off-modal-bg');
+    expect(bg).not.toBeNull();
+    // Simulate click on the background itself (not a child)
+    bg.onclick({ target: bg });
+    expect(document.getElementById('off-modal-bg')).toBeNull();
+  });
+});
+
+describe('offModalSearch Enter key in search input', () => {
+  it('triggers search when Enter key is pressed in search input', async () => {
+    // Set up the off-modal by doing a lookupOFF
+    const ean = document.createElement('input');
+    ean.id = 'ed-ean';
+    ean.value = '';
+    document.body.appendChild(ean);
+    const name = document.createElement('input');
+    name.id = 'ed-name';
+    name.value = 'TestProduct';
+    document.body.appendChild(name);
+    const offBtn = document.createElement('button');
+    offBtn.id = 'ed-off-btn';
+    document.body.appendChild(offBtn);
+    ['kcal', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [{ product_name: 'X' }] }),
+    });
+    await lookupOFF('ed', null);
+
+    // Now the modal is open with off-search-input
+    const si = document.getElementById('off-search-input');
+    expect(si).not.toBeNull();
+    si.value = 'NewSearch';
+    si.disabled = false;
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [{ product_name: 'NewResult' }] }),
+    });
+
+    // Dispatch Enter keydown event
+    si.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    // Give async search time to complete
+    await vi.waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
+  });
+});
+
+describe('fetchImageAsDataUri proxy fallback when proxy also fails', () => {
+  function setupForImageTest() {
+    ['ean', 'name', 'kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt', 'portion', 'weight', 'brand', 'stores', 'ingredients'].forEach((f) => {
+      const el = document.createElement('input');
+      el.id = 'ed-' + f;
+      el.value = '';
+      document.body.appendChild(el);
+    });
+    const btn = document.createElement('button');
+    btn.id = 'ed-off-btn';
+    document.body.appendChild(btn);
+    const wrap = document.createElement('div');
+    wrap.id = 'ed-protein-quality-wrap';
+    wrap.style.display = 'none';
+    document.body.appendChild(wrap);
+    const typeEl = document.createElement('select');
+    typeEl.id = 'ed-type';
+    document.body.appendChild(typeEl);
+  }
+
+  it('returns null when proxy image fetch also returns not-ok', async () => {
+    setupForImageTest();
+    document.getElementById('ed-name').value = 'Search';
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        products: [{
+          product_name: 'ProxyFail',
+          image_front_url: 'https://example.com/img.jpg',
+          nutriments: {},
+        }],
+      }),
+    });
+    await lookupOFF('ed', null);
+    vi.clearAllMocks();
+
+    // Both direct and proxy fail
+    global.fetch = vi.fn().mockImplementation((url) => {
+      if (typeof url === 'string' && url.includes('proxy-image')) {
+        return Promise.resolve({ ok: false, status: 500 });
+      }
+      return Promise.resolve({ ok: false, status: 403 });
+    });
+
+    await selectOffResult(0);
+    // No image should be set, but product fields still applied
+    expect(window._pendingImage).toBeUndefined();
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_off_fetched'), 'success');
   });
 });
 

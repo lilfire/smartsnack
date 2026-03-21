@@ -994,6 +994,371 @@ describe('scanOffFetch sets eanEl value', () => {
   });
 });
 
+describe('onSearchScanDetected error handling', () => {
+  it('logs error and shows toast when fetchProducts throws', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    state.currentView = 'search';
+    // Make fetchProducts reject to trigger the catch branch
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    fetchProducts.mockRejectedValue(new Error('network failure'));
+
+    openSearchScanner();
+    await vi.waitFor(() => {
+      expect(capturedOnSuccess).toBeDefined();
+    });
+
+    capturedOnSuccess('1234567890123');
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    });
+    expect(consoleSpy).toHaveBeenCalled();
+
+    consoleSpy.mockRestore();
+    fetchProducts.mockResolvedValue([]);
+  });
+});
+
+// ── Targeted branch coverage tests for lines 88, 320, 354, 391, 138-140, 155, 165 ──
+
+describe('openScanner with truthy productId (line 88 branch)', () => {
+  it('stores truthy productId in scanner context', () => {
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: vi.fn().mockResolvedValue(),
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    // Call with a truthy productId (42) to cover the productId || null truthy branch
+    openScanner('ed', 42);
+    expect(document.getElementById('scanner-bg')).not.toBeNull();
+    closeScanner();
+  });
+
+  it('stores null when productId is 0 (falsy)', () => {
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: vi.fn().mockResolvedValue(),
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    // Call with falsy productId (0) to cover the productId || null falsy branch
+    openScanner('ed', 0);
+    expect(document.getElementById('scanner-bg')).not.toBeNull();
+    closeScanner();
+  });
+
+  it('stores null when productId is undefined', () => {
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: vi.fn().mockResolvedValue(),
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    openScanner('ed', undefined);
+    expect(document.getElementById('scanner-bg')).not.toBeNull();
+    closeScanner();
+  });
+});
+
+describe('scanPickerSearch Enter key handler (line 320 branch)', () => {
+  beforeEach(() => {
+    const bg = document.createElement('div');
+    bg.id = 'scan-picker-bg';
+    const body = document.createElement('div');
+    body.id = 'scan-picker-body';
+    body.className = 'off-modal-body';
+    bg.appendChild(body);
+    const cnt = document.createElement('div');
+    cnt.id = 'scan-picker-count';
+    bg.appendChild(cnt);
+    const inp = document.createElement('input');
+    inp.id = 'scan-picker-input';
+    bg.appendChild(inp);
+    document.body.appendChild(bg);
+  });
+
+  it('triggers search when Enter is pressed in scan picker input', async () => {
+    // Use showScanProductPicker to build the DOM with event listeners attached
+    // We need to rebuild it via the real function
+    document.body.innerHTML = '';
+    const modalBg = document.createElement('div');
+    modalBg.id = 'scan-modal-bg';
+    document.body.appendChild(modalBg);
+    scanUpdateExisting('1234567890123');
+
+    const inp = document.getElementById('scan-picker-input');
+    inp.value = 'TestEnter';
+    fetchProducts.mockResolvedValueOnce([
+      { id: 1, name: 'TestEnter', type: 'dairy', has_image: 0 },
+    ]);
+
+    // Dispatch Enter keydown event
+    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    inp.dispatchEvent(enterEvent);
+
+    await vi.waitFor(() => {
+      expect(fetchProducts).toHaveBeenCalledWith('TestEnter', []);
+    });
+  });
+
+  it('does not trigger search when non-Enter key is pressed', async () => {
+    document.body.innerHTML = '';
+    const modalBg = document.createElement('div');
+    modalBg.id = 'scan-modal-bg';
+    document.body.appendChild(modalBg);
+    scanUpdateExisting('1234567890123');
+
+    const inp = document.getElementById('scan-picker-input');
+    inp.value = 'NoSearch';
+
+    // Dispatch a non-Enter keydown event
+    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    inp.dispatchEvent(tabEvent);
+
+    // fetchProducts should NOT have been called for 'NoSearch'
+    expect(fetchProducts).not.toHaveBeenCalledWith('NoSearch', []);
+  });
+});
+
+describe('scanPickerSearch when input element is missing (line 354 branch)', () => {
+  it('shows error toast when scan-picker-input does not exist', async () => {
+    // Set up DOM with body and count but NO input element
+    const bg = document.createElement('div');
+    bg.id = 'scan-picker-bg';
+    const body = document.createElement('div');
+    body.id = 'scan-picker-body';
+    bg.appendChild(body);
+    const cnt = document.createElement('div');
+    cnt.id = 'scan-picker-count';
+    bg.appendChild(cnt);
+    // Deliberately NO scan-picker-input
+    document.body.appendChild(bg);
+
+    await scanPickerSearch();
+    // query will be '' since inp is null, so it should show the empty query toast
+    expect(showToast).toHaveBeenCalledWith('toast_enter_product_name', 'error');
+  });
+});
+
+describe('scanPickerSearch loadProductImage returns falsy (line 391 branch)', () => {
+  beforeEach(() => {
+    const bg = document.createElement('div');
+    bg.id = 'scan-picker-bg';
+    const body = document.createElement('div');
+    body.id = 'scan-picker-body';
+    body.className = 'off-modal-body';
+    bg.appendChild(body);
+    const cnt = document.createElement('div');
+    cnt.id = 'scan-picker-count';
+    bg.appendChild(cnt);
+    const inp = document.createElement('input');
+    inp.id = 'scan-picker-input';
+    bg.appendChild(inp);
+    document.body.appendChild(bg);
+  });
+
+  it('does not render image when loadProductImage returns null for a product with has_image', async () => {
+    // loadProductImage returns null (falsy) - covers the `if (!dataUri) return` branch
+    loadProductImage.mockResolvedValueOnce(null);
+
+    document.getElementById('scan-picker-input').value = 'NullImg';
+    fetchProducts.mockResolvedValueOnce([
+      { id: 60, name: 'NullImg', type: 'dairy', has_image: 1 },
+    ]);
+    await scanPickerSearch();
+
+    // Wait for loadProductImage promise to resolve
+    await vi.waitFor(() => {
+      expect(loadProductImage).toHaveBeenCalledWith(60);
+    });
+
+    // The image element should exist but should NOT contain an <img> tag
+    const imgEl = document.getElementById('scan-pick-img-60');
+    expect(imgEl).not.toBeNull();
+    expect(imgEl.innerHTML).not.toContain('<img');
+  });
+});
+
+describe('closeSearchScanner via close button (lines 138-140, 155)', () => {
+  it('resets search scan mode and closes scanner when close button is clicked', async () => {
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: vi.fn().mockResolvedValue(),
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+
+    openSearchScanner();
+    expect(document.getElementById('scanner-bg')).not.toBeNull();
+
+    // Click the close button which triggers the closeSearchScanner callback
+    const closeBtn = document.querySelector('.scanner-close');
+    expect(closeBtn).not.toBeNull();
+    closeBtn.click();
+
+    expect(document.getElementById('scanner-bg')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
+});
+
+describe('closeSearchScanner via error cancel button (line 165)', () => {
+  it('calls closeSearchScanner when error cancel button is clicked in search scanner', async () => {
+    const mockStart = vi.fn().mockRejectedValue(new Error('Camera denied'));
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+
+    openSearchScanner();
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('toast_scanner_load_error', 'error');
+    });
+
+    // The error UI should have a cancel button that calls closeSearchScanner
+    const cancelBtn = document.querySelector('.btn-sm.btn-outline');
+    expect(cancelBtn).not.toBeNull();
+    cancelBtn.click();
+
+    expect(document.getElementById('scanner-bg')).toBeNull();
+    expect(document.body.style.overflow).toBe('');
+  });
+});
+
+describe('showScanNotFoundModal update button triggers scanUpdateExisting', () => {
+  it('update button closes modal and opens picker', () => {
+    showScanNotFoundModal('1234567890123');
+    const updBtn = document.querySelector('.scan-modal-btn-update');
+    expect(updBtn).not.toBeNull();
+    updBtn.click();
+    // scanUpdateExisting closes scan modal and opens scan picker
+    expect(document.getElementById('scan-modal-bg')).toBeNull();
+    expect(document.getElementById('scan-picker-bg')).not.toBeNull();
+  });
+});
+
+describe('showScanOffConfirm fetch and skip button interactions', () => {
+  it('fetch button triggers scanOffFetch', async () => {
+    loadData.mockResolvedValueOnce();
+    showScanOffConfirm('1234567890123', 1);
+    const fetchBtn = document.querySelector('.scan-modal-btn-register');
+    expect(fetchBtn).not.toBeNull();
+    fetchBtn.click();
+    // Should close the confirm modal
+    expect(document.getElementById('scan-off-confirm-bg')).toBeNull();
+  });
+
+  it('skip button closes modal and calls loadData', async () => {
+    showScanOffConfirm('1234567890123', 1);
+    const skipBtn = document.querySelector('.scan-modal-btn-cancel');
+    expect(skipBtn).not.toBeNull();
+    skipBtn.click();
+    expect(document.getElementById('scan-off-confirm-bg')).toBeNull();
+    expect(loadData).toHaveBeenCalled();
+  });
+});
+
+describe('showScanProductPicker close button and search button click (line 311, 324)', () => {
+  it('close button closes the picker', () => {
+    const modalBg = document.createElement('div');
+    modalBg.id = 'scan-modal-bg';
+    document.body.appendChild(modalBg);
+    scanUpdateExisting('1234567890123');
+
+    const closeBtn = document.querySelector('.off-modal-close');
+    expect(closeBtn).not.toBeNull();
+    closeBtn.click();
+    expect(document.getElementById('scan-picker-bg')).toBeNull();
+  });
+
+  it('search button triggers scanPickerSearch', async () => {
+    const modalBg = document.createElement('div');
+    modalBg.id = 'scan-modal-bg';
+    document.body.appendChild(modalBg);
+    scanUpdateExisting('1234567890123');
+
+    const inp = document.getElementById('scan-picker-input');
+    inp.value = 'BtnSearch';
+    fetchProducts.mockResolvedValueOnce([
+      { id: 1, name: 'BtnSearch', type: 'dairy', has_image: 0 },
+    ]);
+
+    // Click the search button (second button in the search div)
+    const searchBtn = document.querySelector('.off-modal-search button');
+    expect(searchBtn).not.toBeNull();
+    searchBtn.click();
+
+    await vi.waitFor(() => {
+      expect(fetchProducts).toHaveBeenCalledWith('BtnSearch', []);
+    });
+  });
+});
+
+describe('openSearchScanner search scan success callback (line 159-163)', () => {
+  it('triggers onSearchScanDetected and sets _searchScanMode to false', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([]);
+
+    openSearchScanner();
+    await vi.waitFor(() => {
+      expect(capturedOnSuccess).toBeDefined();
+    });
+
+    // First call should trigger onSearchScanDetected
+    capturedOnSuccess('1111111111111');
+
+    // Second call should be ignored because _searchScanMode was set to false
+    capturedOnSuccess('2222222222222');
+
+    await vi.waitFor(() => {
+      // Only the not-found modal for the first scan should appear
+      expect(document.getElementById('scan-modal-bg')).not.toBeNull();
+    });
+
+    fetchProducts.mockResolvedValue([]);
+  });
+});
+
 describe('scanPickerSearch brand vs no brand products', () => {
   beforeEach(() => {
     const bg = document.createElement('div');
