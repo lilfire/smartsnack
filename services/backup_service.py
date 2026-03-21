@@ -99,8 +99,8 @@ def _opt_float(v):
 
 
 def _is_empty(val):
-    """Return True if a value is considered empty (None, empty string, or zero)."""
-    return val is None or val == "" or val == 0
+    """Return True if a value is considered empty (None or empty string)."""
+    return val is None or val == ""
 
 
 def _overwrite_product(cur, existing_id, p, valid_flags=None):

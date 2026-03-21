@@ -138,8 +138,10 @@ def test_advanced_filters_initial_condition_row(page):
     first_row = rows.first
     # Field select is wrapped by upgradeSelect — verify the trigger is present.
     expect(first_row.locator(".custom-select-trigger").first).to_be_visible()
-    # Value input is a plain <input>.
-    expect(first_row.locator(".adv-value-input")).to_be_visible()
+    # Value control — the default field is "category", which creates a category
+    # <select> wrapped by upgradeSelect (hiding the native element) plus a
+    # hidden text <input>.  Verify that the value control exists in the DOM.
+    expect(first_row.locator("input.adv-value-input")).to_be_attached()
 
 
 def test_add_condition(page):

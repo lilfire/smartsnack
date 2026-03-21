@@ -538,6 +538,8 @@
   "scan_find_product_title": "Find product",
   "scan_barcode_on_product_hint": "Scan the barcode on the product",
   "scan_no_ean": "No EAN",
+  "scan_result_count_one": "{count} result",
+  "scan_result_count_other": "{count} results",
   "scan_fetch_off_title": "Fetch data from OpenFoodFacts?",
   "scan_fetch_off_description": "We can fetch nutrition info and image from OpenFoodFacts for this barcode.",
   "adv_filter_toggle": "Advanced filter",

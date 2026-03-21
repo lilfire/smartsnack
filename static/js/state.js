@@ -68,7 +68,7 @@ export async function api(path, opts) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
   try {
-    const defaultHeaders = { 'Content-Type': 'application/json' };
+    const defaultHeaders = opts.body ? { 'Content-Type': 'application/json' } : {};
     const headers = Object.assign(defaultHeaders, opts.headers || {});
     const res = await fetch(path, Object.assign({}, opts, { headers, signal: controller.signal }));
     const text = await res.text();
@@ -156,7 +156,14 @@ export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel
 // Supports re-calling to refresh options when the native <select> is repopulated.
 let _docClickRegistered = false;
 export function upgradeSelect(sel, onSelect) {
-  if (!sel || window.innerWidth < 640) return;
+  if (!sel) return;
+  if (window.innerWidth < 640) {
+    // On mobile, skip custom UI but still register the callback on native select
+    if (onSelect) {
+      sel.addEventListener('change', () => onSelect(sel.value));
+    }
+    return;
+  }
 
   let wrap, trigger, optionsDiv;
   const isNew = !(sel.parentNode && sel.parentNode.classList.contains('custom-select-wrap'));

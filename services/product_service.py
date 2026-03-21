@@ -846,7 +846,7 @@ def merge_products(target_id: int, source_id: int, choices: dict | None = None) 
         else:
             target_val = target[f]
             source_val = source[f]
-            if (target_val is None or target_val == "" or target_val == 0) and source_val not in (None, "", 0):
+            if (target_val is None or target_val == "") and source_val not in (None, ""):
                 updates.append(f"{f} = ?")
                 vals.append(source_val)
     if target["image"] in (None, "") and source["image"] not in (None, ""):

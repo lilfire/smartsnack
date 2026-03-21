@@ -263,7 +263,7 @@ describe('scanPickerSearch', () => {
     ]);
     await scanPickerSearch();
     const cnt = document.getElementById('scan-picker-count');
-    expect(cnt.textContent).toContain('2');
+    expect(cnt.textContent).toBe('scan_result_count_other');
   });
 
   it('shows error on network failure', async () => {
@@ -689,16 +689,14 @@ describe('scanPickerSearch singular result count', () => {
     document.body.appendChild(bg);
   });
 
-  it('shows singular "resultat" label when exactly 1 result', async () => {
+  it('shows singular translation key when exactly 1 result', async () => {
     document.getElementById('scan-picker-input').value = 'Cheese';
     fetchProducts.mockResolvedValueOnce([
       { id: 1, name: 'Cheese', type: 'dairy', has_image: 0 },
     ]);
     await scanPickerSearch();
     const cnt = document.getElementById('scan-picker-count');
-    expect(cnt.textContent).toBe('1 resultat');
-    // Confirm it does NOT end with "er"
-    expect(cnt.textContent).not.toContain('resultater');
+    expect(cnt.textContent).toBe('scan_result_count_one');
   });
 });
 

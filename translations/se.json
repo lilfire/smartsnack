@@ -538,6 +538,8 @@
   "scan_find_product_title": "Hitta produkt",
   "scan_barcode_on_product_hint": "Skanna streckkoden på produkten",
   "scan_no_ean": "Ingen EAN",
+  "scan_result_count_one": "{count} resultat",
+  "scan_result_count_other": "{count} resultat",
   "scan_fetch_off_title": "Hämta data från OpenFoodFacts?",
   "scan_fetch_off_description": "Vi kan hämta näringsinformation och bild från OpenFoodFacts för denna streckkod.",
   "adv_filter_toggle": "Avancerat filter",
