@@ -4,6 +4,47 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.9.0] - 2026-03-21
+
+### Added
+
+- Support for uncategorized products (products without a category)
+- SQLite database files to .gitignore
+
+### Changed
+
+- Advanced filter number inputs replaced with text inputs using numeric inputMode for better mobile UX
+- Improved advanced filter row styling consistency and overflow handling
+
+### Fixed
+
+- Category name validation rejecting valid names with special characters
+- Advanced filters test to expect placeholder option from CATEGORY_OPS
+
+## [0.8.0] - 2026-03-21
+
+### Added
+
+- Advanced filters with category filter and is_set/is_not_set operators
+- Prompt user to add new products to Open Food Facts after saving
+- 7 missing translation keys across all languages
+- Translation coverage tests and deduplication of translation keys
+- E2e tests and supporting translation keys
+- Expanded test coverage for filters, i18n, OFF, render, scanner, settings, app, backup, and categories modules
+- Demo image to README
+
+### Changed
+
+- Improved OFF API refresh reliability and fix edge cases
+- Auto-close OFF picker on scanner miss and fix bulk image error handling
+
+### Fixed
+
+- Taste slider losing value/focus on touch release
+- Taste score label showing raw {val} placeholder instead of actual value
+- Empty-value checks, Content-Type headers, mobile select, and i18n result counts
+- Test pollution by isolating translation files during tests
+
 ## [0.7.0] - 2026-03-13
 
 ### Added
