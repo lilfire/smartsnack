@@ -1148,10 +1148,57 @@ describe('_updateOps and _syncValInput branch coverage via upgradeSelect callbac
     expect(opSel.options[6].value).toBe('is_not_set');
     expect(opSel.options[7].value).toBe('is_set');
 
-    // Value input should be visible and type number
+    // Value input should be visible with decimal inputMode (numeric field)
     const valInput = row.querySelector('.adv-value-input');
     expect(valInput.style.display).toBe('');
-    expect(valInput.type).toBe('number');
+    expect(valInput.type).toBe('text');
+    expect(valInput.inputMode).toBe('decimal');
+    expect(valInput.dataset.numeric).toBe('1');
+
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+
+  it('marks numeric input invalid when non-numeric text is entered', async () => {
+    const { upgradeSelect } = await import('../state.js');
+
+    let fieldCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList.contains('adv-field-select') && cb) {
+        fieldCallback = cb;
+      }
+    });
+
+    const { panel } = openPanel();
+    fieldCallback('kcal');
+    vi.runAllTimers();
+
+    const row = panel.querySelector('.adv-row');
+    const valInput = row.querySelector('.adv-value-input');
+
+    // Valid numeric input should not show invalid class
+    valInput.value = '42';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(false);
+
+    // Non-numeric text should show invalid class
+    valInput.value = 'abc';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(true);
+
+    // Decimal number should be valid
+    valInput.value = '3.14';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(false);
+
+    // Negative number should be valid
+    valInput.value = '-5';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(false);
+
+    // Empty value should be valid (not yet entered)
+    valInput.value = '';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(false);
 
     upgradeSelect.mockImplementation(vi.fn());
   });
@@ -1280,7 +1327,7 @@ describe('_updateOps fallback when previous op is not in new ops list', () => {
     const newRow = panel.querySelector('.adv-row');
     const newOpSel = newRow.querySelector('.adv-op-select');
     // Default field is 'type' (category), so ops should be category ops
-    // First option should be '=' (is)
-    expect(newOpSel.options[0].value).toBe('=');
+    // First option should be '' (placeholder from CATEGORY_OPS)
+    expect(newOpSel.options[0].value).toBe('');
   });
 });

@@ -72,11 +72,11 @@ def _validate_keywords(keywords) -> tuple[list | None, str | None]:
     return keywords, None
 
 
-_CATEGORY_NAME_RE = re.compile(r"^[\w\s\-]+$", re.UNICODE)
+_CATEGORY_NAME_RE = re.compile(r"^[^\x00-\x1f\x7f]+\Z")
 
 
 def _validate_category_name(name: str) -> str | None:
-    if not name or len(name) > _MAX_CATEGORY_NAME_LEN:
+    if not name or not name.strip() or len(name) > _MAX_CATEGORY_NAME_LEN:
         return "Invalid category name"
     if not _CATEGORY_NAME_RE.match(name):
         return "Invalid category name"

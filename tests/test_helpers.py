@@ -167,10 +167,24 @@ class TestValidateCategoryName:
             == "Invalid category name"
         )
 
-    def test_special_characters(self):
+    def test_special_characters_allowed(self):
         from helpers import _validate_category_name
 
-        assert _validate_category_name("Snacks!@#") == "Invalid category name"
+        assert _validate_category_name("Snacks!@#") is None
+        assert _validate_category_name("Frukt & Grønt") is None
+        assert _validate_category_name("Brød/Kaker") is None
+        assert _validate_category_name("O'Brien's") is None
+
+    def test_control_characters_rejected(self):
+        from helpers import _validate_category_name
+
+        assert _validate_category_name("Snacks\x00") == "Invalid category name"
+        assert _validate_category_name("Snacks\n") == "Invalid category name"
+
+    def test_whitespace_only_rejected(self):
+        from helpers import _validate_category_name
+
+        assert _validate_category_name("   ") == "Invalid category name"
 
 
 class TestRequireJson:

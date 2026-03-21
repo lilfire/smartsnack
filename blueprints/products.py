@@ -11,7 +11,7 @@ bp = Blueprint("products", __name__)
 @bp.route("/api/products")
 def get_products():
     search = request.args.get("search", "").strip()
-    type_filter = request.args.get("type", "").strip()
+    type_filter = request.args.get("type")
     advanced_filters = request.args.get("filters", "").strip() or None
     try:
         results = product_service.list_products(search, type_filter, advanced_filters)

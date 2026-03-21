@@ -10,6 +10,7 @@
   "search_placeholder": "Sök efter produkt eller EAN...",
   "search_scan_title": "Skanna streckkod för att hitta produkt",
   "filter_all": "Alla kategorier",
+  "uncategorized": "Okategoriserad",
   "filter_count": "{count} kategorier",
   "result_count": "{count} resultat",
   "result_count_plural": "{count} resultat",

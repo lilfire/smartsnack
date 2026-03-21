@@ -18,12 +18,18 @@ export const state = {
 // All nutrition field IDs used in register/edit forms
 export const NUTRI_IDS = ['kcal','energy_kj','fat','saturated_fat','carbs','sugar','protein','fiber','salt','weight','portion'];
 
+// Translation function reference, set by i18n.js to avoid circular imports
+let _tFunc = null;
+export function setTranslationFunc(fn) { _tFunc = fn; }
+
 export function catEmoji(typeName) {
+  if (!typeName) return '\u{1F4E6}';
   const c = state.categories.find((x) => x.name === typeName);
   return c ? c.emoji : '\u{1F4E6}';
 }
 
 export function catLabel(typeName) {
+  if (!typeName) return _tFunc ? _tFunc('uncategorized') : 'Uncategorized';
   const c = state.categories.find((x) => x.name === typeName);
   return c ? c.label : typeName;
 }

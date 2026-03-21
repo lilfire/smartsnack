@@ -33,6 +33,7 @@ vi.mock('../state.js', () => {
     }),
     showConfirmModal: vi.fn(),
     upgradeSelect: vi.fn(),
+    setTranslationFunc: vi.fn(),
   };
 });
 

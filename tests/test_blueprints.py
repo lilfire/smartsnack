@@ -43,7 +43,7 @@ class TestProductsBlueprint:
         assert "id" in data
 
     def test_add_product_invalid(self, client):
-        resp = client.post("/api/products", json={"name": "Missing type"})
+        resp = client.post("/api/products", json={"type": "Snacks"})
         assert resp.status_code == 400
 
     def test_update_product(self, client):
