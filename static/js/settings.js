@@ -303,14 +303,18 @@ export async function saveWeights() {
   _weightSaving = true;
   try {
     const payload = weightData.map((w) => {
+      const fMin = w.formula_min != null ? w.formula_min : 0;
+      const fMax = w.formula_max != null ? w.formula_max : 0;
       if (!w.enabled) {
         // For disabled weights, preserve existing values from weightData
-        return { field: w.field, enabled: w.enabled, weight: w.weight, direction: w.direction, formula: w.formula, formula_min: w.formula_min || 0, formula_max: w.formula_max || 0 };
+        return { field: w.field, enabled: w.enabled, weight: w.weight, direction: w.direction, formula: w.formula, formula_min: fMin, formula_max: fMax };
       }
       const minEl = document.getElementById('wn-' + w.field);
       const maxEl = document.getElementById('wm-' + w.field);
       const sliderEl = document.getElementById('w-' + w.field);
-      return { field: w.field, enabled: w.enabled, weight: parseFloat(sliderEl ? sliderEl.value : w.weight), direction: w.direction, formula: w.formula, formula_min: parseFloat(minEl ? minEl.value : 0) || 0, formula_max: parseFloat(maxEl ? maxEl.value : 0) || 0 };
+      const minVal = (minEl && minEl.value !== '') ? parseFloat(minEl.value) : NaN;
+      const maxVal = (maxEl && maxEl.value !== '') ? parseFloat(maxEl.value) : NaN;
+      return { field: w.field, enabled: w.enabled, weight: parseFloat(sliderEl ? sliderEl.value : w.weight), direction: w.direction, formula: w.formula, formula_min: isFinite(minVal) ? minVal : fMin, formula_max: isFinite(maxVal) ? maxVal : fMax };
     });
     await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
     showToast(t('toast_weights_saved'), 'success');

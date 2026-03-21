@@ -70,8 +70,13 @@ def update_weights(data: list) -> None:
         formula = item.get("formula", SCORE_CONFIG_MAP[f]["formula"])
         if formula not in _VALID_FORMULAS:
             raise ValueError(f"Invalid formula: {formula}")
-        formula_min = _safe_float(item.get("formula_min", 0), "formula_min")
-        formula_max = _safe_float(item.get("formula_max", 0), "formula_max")
+        sc_defaults = SCORE_CONFIG_MAP[f]
+        formula_min = _safe_float(
+            item.get("formula_min", sc_defaults["formula_min"]), "formula_min"
+        )
+        formula_max = _safe_float(
+            item.get("formula_max", sc_defaults["formula_max"]), "formula_max"
+        )
         weight = _safe_float(item.get("weight", 0), "weight")
         if not (0 <= weight <= 1000):
             raise ValueError("Weight must be between 0 and 1000")
