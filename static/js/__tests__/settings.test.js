@@ -2211,8 +2211,8 @@ describe('saveWeights with disabled weights and missing slider elements', () => 
     await saveWeights();
     const payload = JSON.parse(api.mock.calls[0][1].body);
     expect(payload[0].weight).toBe(30); // Falls back to w.weight
-    expect(payload[0].formula_min).toBe(0); // Falls back to 0
-    expect(payload[0].formula_max).toBe(0);
+    expect(payload[0].formula_min).toBe(0); // Falls back to w.formula_min
+    expect(payload[0].formula_max).toBe(50); // Falls back to w.formula_max (preserves stored value)
   });
 });
 

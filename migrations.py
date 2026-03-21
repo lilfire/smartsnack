@@ -42,6 +42,18 @@ MIGRATIONS = [
             "ALTER TABLE products ADD COLUMN taste_note TEXT NOT NULL DEFAULT ''",
         ],
     ),
+    (
+        "005_fix_direct_formula_ranges",
+        [
+            "UPDATE score_weights SET formula_max = 6.0 WHERE field = 'taste_score' AND formula = 'direct' AND formula_max = 0",
+            "UPDATE score_weights SET formula_max = 1.0 WHERE field = 'est_pdcaas' AND formula = 'direct' AND formula_max = 0",
+            "UPDATE score_weights SET formula_max = 1.2 WHERE field = 'est_diaas' AND formula = 'direct' AND formula_max = 0",
+            "UPDATE score_weights SET formula_max = 100.0 WHERE field = 'pct_protein_cal' AND formula = 'direct' AND formula_max = 0",
+            "UPDATE score_weights SET formula_max = 100.0 WHERE field = 'pct_fat_cal' AND formula = 'direct' AND formula_max = 0",
+            "UPDATE score_weights SET formula_max = 100.0 WHERE field = 'pct_carb_cal' AND formula = 'direct' AND formula_max = 0",
+            "UPDATE score_weights SET formula_min = 1.0, formula_max = 3.0 WHERE field = 'volume' AND formula = 'direct' AND formula_max = 0",
+        ],
+    ),
 ]
 
 

@@ -69,6 +69,28 @@ def _init_schema(cur, conn):
                     sc["formula_max"],
                 ),
             )
+    else:
+        # Seed any SCORE_CONFIG fields missing from existing databases
+        existing = {
+            r[0]
+            for r in cur.execute("SELECT field FROM score_weights").fetchall()
+        }
+        for sc in SCORE_CONFIG:
+            f = sc["field"]
+            if f not in existing:
+                d = DEFAULT_WEIGHTS.get(f, {"enabled": 0, "weight": 0})
+                cur.execute(
+                    "INSERT INTO score_weights (field, enabled, weight, direction, formula, formula_min, formula_max) VALUES (?,?,?,?,?,?,?)",
+                    (
+                        f,
+                        d["enabled"],
+                        d["weight"],
+                        sc["direction"],
+                        sc["formula"],
+                        sc["formula_min"],
+                        sc["formula_max"],
+                    ),
+                )
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS categories (
