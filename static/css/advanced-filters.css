@@ -52,6 +52,14 @@
   margin-bottom: 8px;
 }
 
+/* Normalize height for all interactive elements in a filter row */
+.adv-row select,
+.adv-row input,
+.adv-row .custom-select-trigger {
+  height: 36px;
+  line-height: 1.2;
+}
+
 .adv-field-select,
 .adv-op-select {
   padding: 8px 10px;
@@ -67,13 +75,11 @@
 .adv-field-select {
   flex: 0 0 auto;
   min-width: 120px;
-  max-width: 160px;
 }
 
 .adv-op-select {
   flex: 0 0 auto;
   min-width: 80px;
-  max-width: 130px;
 }
 
 .adv-field-select option,
@@ -129,17 +135,21 @@
 }
 .adv-row .adv-field-select + .custom-select-trigger {
   min-width: 120px;
-  max-width: 160px;
   padding: 8px 28px 8px 10px;
   font-size: 13px;
   border-radius: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .adv-row .adv-op-select + .custom-select-trigger {
   min-width: 80px;
-  max-width: 130px;
   padding: 8px 28px 8px 10px;
   font-size: 13px;
   border-radius: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .adv-row .custom-select-options {
   min-width: 140px;
