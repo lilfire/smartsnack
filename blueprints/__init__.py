@@ -14,6 +14,7 @@ from blueprints.translations import bp as translations_bp
 from blueprints.off import bp as off_bp
 from blueprints.flags import bp as flags_bp
 from blueprints.bulk import bp as bulk_bp
+from blueprints.ocr import bp as ocr_bp
 
 
 def register_blueprints(app):
@@ -31,3 +32,4 @@ def register_blueprints(app):
     app.register_blueprint(off_bp)
     app.register_blueprint(flags_bp)
     app.register_blueprint(bulk_bp)
+    app.register_blueprint(ocr_bp)

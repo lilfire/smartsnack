@@ -78,10 +78,12 @@ export function buildTypeSelect() {
   uncatOpt.value = '';
   uncatOpt.textContent = '\u{1F4E6} ' + t('uncategorized');
   sel.appendChild(uncatOpt);
-  if (prev !== undefined) {
+  if (prev) {
     for (let i = 0; i < sel.options.length; i++) {
       if (sel.options[i].value === prev) { sel.value = prev; break; }
     }
+  } else {
+    sel.value = '';
   }
   upgradeSelect(sel);
 }

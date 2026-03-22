@@ -4,6 +4,27 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.11.0] - 2026-03-22
+
+### Added
+
+- OCR ingredient scanning with image-to-text extraction
+- Duplicate skip option when adding products
+- EAN unlock feature for synced products
+- Flag field filtering in product list
+- OpenFoodFacts link displayed for synced products
+
+### Fixed
+
+- Advanced filter bug: load flags before post-filtering
+- Filter select reset not clearing value when no previous selection exists
+- Android keyboard scroll jump on range inputs
+- Filter rerender scope causing unnecessary updates
+
+### Changed
+
+- Brand field included in product search query
+
 ## [0.10.0] - 2026-03-22
 
 ### Added

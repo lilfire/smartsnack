@@ -44,7 +44,12 @@
       </div>
 
       <div>
-        <label class="field-label" for="f-ingredients" data-i18n="label_ingredients">Ingredients</label>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <label class="field-label" for="f-ingredients" data-i18n="label_ingredients">Ingredients</label>
+          <button type="button" class="btn-ocr" id="f-ocr-btn" onclick="scanIngredients('f')" data-i18n-title="btn_ocr_title" title="Scan ingredients">
+            <span class="ocr-spin"></span><span class="ocr-label">&#128247;</span>
+          </button>
+        </div>
         <textarea class="field-input" id="f-ingredients" data-i18n-placeholder="ph_ingredients" placeholder="e.g. Lentils, sunflower oil, paprika..." rows="2" style="resize:vertical;min-height:60px" oninput="updateEstimateBtn('f')"></textarea>
       </div>
 

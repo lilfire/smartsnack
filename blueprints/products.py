@@ -46,6 +46,16 @@ def update_product(pid):
     return jsonify({"ok": True, "message": "Product updated"})
 
 
+@bp.route("/api/products/<int:pid>/unsync", methods=["POST"])
+def unsync_product(pid):
+    """Remove the is_synced_with_off flag from a product."""
+    try:
+        product_service.set_system_flag(pid, "is_synced_with_off", False)
+    except (LookupError, ValueError) as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True})
+
+
 @bp.route("/api/products/<int:pid>/check-duplicate", methods=["POST"])
 def check_duplicate(pid):
     try:

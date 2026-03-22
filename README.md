@@ -8,9 +8,12 @@ A mobile-first web app for tracking and scoring food products. Search by name or
 ## Features
 
 - **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera. Detected codes auto-lookup product data from OpenFoodFacts.
-- **OpenFoodFacts Integration** — Fetch nutrition info, product names, and images by barcode or text search.
+- **OCR Ingredient Scanning** — Use the device camera to scan ingredient lists via OCR (powered by EasyOCR), with duplicate detection to skip already-registered products.
+- **OpenFoodFacts Integration** — Fetch nutrition info, product names, brand, and images by barcode or text search.
 - **Configurable Scoring** — 17 weight fields (kcal, sugar, protein, fiber, fat, price, taste, macro %kcal, etc.) each with toggleable enable, weight slider (0–100), direction (lower/higher is better), and formula (MinMax normalization or Direct mapping). Total score is a weighted average from 1–100.
-- **Categories** — Create custom categories with emoji picker. Change emoji on existing categories. Auto-create categories when importing products with unknown types. Multi-select filtering on the product list.
+- **Categories** — Create custom categories with built-in emoji picker. Change emoji on existing categories. Auto-create categories when importing products with unknown types. Multi-select filtering on the product list.
+- **Advanced Filters** — Filter products by flags, category, and other fields with a dedicated advanced filter panel.
+- **EAN Unlock** — Unlock EAN codes for synced products, with direct links to OpenFoodFacts product pages.
 - **Backup & Restore** — Full JSON export/import of the database (products, weights, categories).
 - **Responsive UI** — Dark theme with custom styled modals and toast notifications, three-tab layout (Search, Register, Settings). Single-column on mobile, multi-column on tablet/desktop.
 - **Multi-language** — Norwegian, English, and Swedish UI translations.
@@ -29,6 +32,8 @@ That's it. Everything else (Python 3.12, Flask, Gunicorn, OpenSSL) is handled in
   - `flask==3.1.0`
   - `gunicorn==23.0.0`
   - `pyopenssl==24.3.0`
+  - `cryptography>=43.0.0`
+  - `easyocr>=1.7.0` (OCR ingredient scanning)
 
 ## Installation
 
@@ -65,19 +70,20 @@ The SQLite database is created automatically at startup. Set the `DB_PATH` envir
 ├── config.py               # All constants: nutrition fields, score config, text limits
 ├── db.py                   # SQLite connection, schema init with seed data
 ├── migrations.py           # Structured database migrations
+├── exceptions.py           # Custom exception classes
 ├── helpers.py              # Request parsing and validation
 ├── translations.py         # i18n system, reads/writes JSON translation files
 ├── blueprints/             # Route handlers, one file per domain
 ├── services/               # Business logic, one file per domain
 ├── templates/              # Jinja2 templates with partials
 ├── static/
-│   ├── js/                 # Modular vanilla JS frontend (12 ES modules)
-│   └── css/                # Modular CSS files (14 files)
+│   ├── js/                 # Modular vanilla JS frontend (14 ES modules)
+│   └── css/                # Modular CSS files (15 files)
 ├── translations/
 │   ├── no.json             # Norwegian translations
 │   ├── en.json             # English translations
 │   └── se.json             # Swedish translations
-├── Dockerfile              # Python 3.12-slim + OpenSSL
+├── Dockerfile              # Python 3.12-slim + EasyOCR + OpenSSL
 ├── docker-compose.yml      # Service config, persistent volume
 ├── entrypoint.sh           # SSL cert generation + Gunicorn startup
 └── requirements.txt        # Python dependencies

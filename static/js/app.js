@@ -7,7 +7,7 @@ import { toggleFilters, setSort, rerender } from './filters.js';
 import { triggerImageUpload, removeProductImage } from './images.js';
 import { renderResults, loadFlagConfig } from './render.js';
 import {
-  showToast, startEdit, saveProduct, deleteProduct,
+  showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   loadData, switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct
 } from './products.js';
@@ -36,6 +36,7 @@ import {
   showOffAddReview, closeOffAddReview, submitToOff
 } from './openfoodfacts.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
+import { scanIngredients } from './ocr.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
 Object.assign(window, {
@@ -46,7 +47,7 @@ Object.assign(window, {
   // images
   triggerImageUpload, removeProductImage,
   // products
-  showToast, startEdit, saveProduct, deleteProduct,
+  showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct,
   rerender,
@@ -72,6 +73,8 @@ Object.assign(window, {
   closeScanModal, scanRegisterNew, scanUpdateExisting,
   closeScanPicker, scanPickerSearch, scanPickerSelect,
   scanOffFetch, closeScanOffConfirm,
+  // ocr
+  scanIngredients,
   // openfoodfacts
   validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
   selectOffResult, estimateProteinQuality, updateEstimateBtn,
@@ -86,6 +89,26 @@ Object.defineProperty(window, 'editingId', {
   set(v) { state.editingId = v; },
   configurable: true,
 });
+
+// ── Fix Android keyboard-dismiss scroll jump on range inputs ─────
+// When a number/text input has focus and the user taps a range slider,
+// the virtual keyboard closes and the viewport resizes, causing the
+// browser to scroll back to a previous position. We prevent this by
+// saving scroll position on touchstart, blurring the active input,
+// and restoring scroll position after the keyboard has fully dismissed.
+document.addEventListener('touchstart', function(e) {
+  if (e.target.type !== 'range') return;
+  var active = document.activeElement;
+  if (!active || (active.type !== 'number' && active.type !== 'text' && active.tagName !== 'TEXTAREA')) return;
+  var scrollY = window.scrollY;
+  active.blur();
+  // Restore scroll after keyboard dismiss (may take up to ~300ms on Android)
+  var restore = function() { window.scrollTo(0, scrollY); };
+  requestAnimationFrame(restore);
+  setTimeout(restore, 50);
+  setTimeout(restore, 150);
+  setTimeout(restore, 300);
+}, { passive: true });
 
 // ── Init ─────────────────────────────────────────────
 (async function() {

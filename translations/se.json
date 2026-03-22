@@ -573,6 +573,9 @@
   "adv_op_has_value": "har värde",
   "flag_is_discontinued": "Utgången",
   "flag_is_synced_with_off": "Synkad med OFF",
+  "btn_view_on_off": "Visa på OFF",
+  "btn_unlock_ean_title": "Lås upp EAN och ta bort synk med OFF",
+  "toast_ean_unlocked": "EAN upplåst, synk med OFF borttagen",
   "settings_flags_title": "Produktflaggor",
   "settings_flags_desc": "Hantera flaggor för märkning av produkter",
   "label_flag_name": "Flaggnamn",
@@ -632,6 +635,7 @@
   "duplicate_merge_source_editing": "{name} (redigerar)",
   "duplicate_merge_source_other": "{name}",
   "duplicate_merge_confirm": "Bekräfta sammanslagning",
+  "duplicate_not_same": "Inte samma produkt",
   "import_dup_title": "Importinställningar",
   "import_dup_desc": "Konfigurera hur dubbletter hanteras vid import",
   "import_dup_match_label": "Matchningskriterier",
@@ -657,5 +661,9 @@
   "category_snacks": "Updated Snacks",
   "btn_close": "Stäng",
   "off_no_results_for": "Inga resultat för \"{query}\"",
-  "search_heading": "Sök produkter"
+  "search_heading": "Sök produkter",
+  "btn_ocr_title": "Skanna ingredienslista",
+  "toast_ocr_success": "Ingredienser extraherade från bild",
+  "toast_ocr_error": "Kunde inte läsa ingredienser från bild",
+  "toast_ocr_no_text": "Ingen text hittad i bilden"
 }

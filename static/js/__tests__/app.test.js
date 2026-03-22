@@ -64,6 +64,7 @@ vi.mock('../products.js', () => ({
   startEdit: vi.fn(),
   saveProduct: vi.fn(),
   deleteProduct: vi.fn(),
+  unlockEan: vi.fn(),
   loadData: vi.fn(),
   switchView: vi.fn(),
   setFilter: vi.fn(),

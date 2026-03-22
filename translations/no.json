@@ -573,6 +573,9 @@
   "adv_op_has_value": "har verdi",
   "flag_is_discontinued": "Utgått",
   "flag_is_synced_with_off": "Synkronisert med OFF",
+  "btn_view_on_off": "Vis på OFF",
+  "btn_unlock_ean_title": "Lås opp EAN og fjern synkronisering med OFF",
+  "toast_ean_unlocked": "EAN låst opp, synkronisering med OFF fjernet",
   "settings_flags_title": "Produktflagg",
   "settings_flags_desc": "Administrer flagg for merking av produkter",
   "label_flag_name": "Flaggnavn",
@@ -634,6 +637,7 @@
   "duplicate_merge_source_editing": "{name} (redigerer)",
   "duplicate_merge_source_other": "{name}",
   "duplicate_merge_confirm": "Bekreft sammenslåing",
+  "duplicate_not_same": "Ikke samme produkt",
   "import_dup_title": "Importinnstillinger",
   "import_dup_desc": "Konfigurer hvordan duplikater håndteres ved import",
   "import_dup_match_label": "Treffkriterier",
@@ -657,5 +661,9 @@
   "label_name": "Navn",
   "btn_close": "Lukk",
   "off_no_results_for": "Ingen resultater for \"{query}\"",
-  "search_heading": "Søk etter produkter"
+  "search_heading": "Søk etter produkter",
+  "btn_ocr_title": "Skann ingrediensliste",
+  "toast_ocr_success": "Ingredienser hentet fra bilde",
+  "toast_ocr_error": "Kunne ikke lese ingredienser fra bilde",
+  "toast_ocr_no_text": "Ingen tekst funnet i bildet"
 }

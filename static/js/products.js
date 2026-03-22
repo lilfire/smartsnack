@@ -64,7 +64,9 @@ export async function saveProduct(id) {
         if (result === null) return; // User cancelled
         const { scenario, choices } = result;
 
-        if (scenario === 'b_synced') {
+        if (scenario === 'skip') {
+          // User confirmed this is not the same product — skip merge, continue saving
+        } else if (scenario === 'b_synced') {
           // B (duplicate) is synced with OFF — A will be deleted, merge into B
           // If user fetched fresh OFF data, include OFF-provided fields so B gets updated
           if (offAppliedFields) {
@@ -124,6 +126,20 @@ export async function saveProduct(id) {
       state.editingId = null;
       loadData();
     }
+  }
+}
+
+export async function unlockEan(id) {
+  try {
+    await api('/api/products/' + id + '/unsync', { method: 'POST' });
+    // Update cached product to remove the flag
+    const p = state.cachedResults.find(x => x.id === id);
+    if (p) p.flags = (p.flags || []).filter(f => f !== 'is_synced_with_off');
+    rerender();
+    showToast(t('toast_ean_unlocked'), 'success');
+  } catch (e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
   }
 }
 

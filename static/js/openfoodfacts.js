@@ -889,6 +889,13 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
     });
     actions.appendChild(applyBtn);
 
+    const skipBtn = document.createElement('button');
+    skipBtn.className = 'scan-modal-btn-register';
+    skipBtn.textContent = t('duplicate_not_same');
+    skipBtn.type = 'button';
+    skipBtn.addEventListener('click', () => { bg.remove(); resolve({ scenario: 'skip', choices: {} }); });
+    actions.appendChild(skipBtn);
+
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'scan-modal-btn-cancel confirm-no';
     cancelBtn.textContent = t('btn_cancel');

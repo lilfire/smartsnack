@@ -98,7 +98,7 @@ let _resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(() => {
-    if (state.editingId === null) {
+    if (state.editingId === null && state.currentView === 'search') {
       import('./filters.js').then((mod) => { mod.rerender(); });
     }
   }, 200);
@@ -227,11 +227,16 @@ export function renderResults(results, search) {
         const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
-          + '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"></div><button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>'
+          + (() => {
+              const isSynced = (p.flags || []).includes('is_synced_with_off');
+              return '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"' + (isSynced ? ' disabled' : '') + '></div>'
+                + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
+                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
+            })()
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
-          + '<div class="edit-grid-2"><label>' + t('label_ingredients') + '</label><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
+          + '<div class="edit-grid-2"><div style="display:flex;align-items:center;justify-content:space-between"><label>' + t('label_ingredients') + '</label><button type="button" class="btn-ocr" id="ed-ocr-btn" onclick="scanIngredients(\'ed\')" title="' + esc(t('btn_ocr_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
         h += '<div><label>' + t('label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
           + '<div><label>' + t('label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
@@ -268,9 +273,12 @@ export function renderResults(results, search) {
             }).join('')
           + ((() => {
               const sysFlags = (p.flags || []).filter(f => _flagConfig[f] && _flagConfig[f].type === 'system');
-              return sysFlags.length
-                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(_flagConfig[f].label || t(_flagConfig[f].labelKey)) + '</span>').join(' ') + '</span>'
-                : '';
+              if (!sysFlags.length) return '';
+              let badges = '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(_flagConfig[f].label || t(_flagConfig[f].labelKey)) + '</span>').join(' ');
+              if (sysFlags.includes('is_synced_with_off') && p.ean)
+                badges += ' <a href="https://world.openfoodfacts.org/product/' + encodeURIComponent(p.ean) + '" target="_blank" rel="noopener" class="btn-sm btn-outline" style="font-size:10px;padding:2px 8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;vertical-align:middle">' + t('btn_view_on_off') + ' &#8599;</a>';
+              badges += '</span>';
+              return badges;
             })())
           + '</div>'
           + '<div style="display:flex;gap:8px">'
@@ -336,6 +344,10 @@ export function renderResults(results, search) {
       case 'delete':
         e.stopPropagation();
         window.deleteProduct(id);
+        break;
+      case 'unlock-ean':
+        e.stopPropagation();
+        window.unlockEan(id);
         break;
       case 'open-scanner':
         e.stopPropagation();
