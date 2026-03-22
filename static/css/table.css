@@ -70,6 +70,11 @@
   white-space: nowrap;
 }
 
+.prod-brand {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
 .prod-meta {
   font-size: 9px;
   color: rgba(255, 255, 255, 0.25);
