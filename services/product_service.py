@@ -598,8 +598,8 @@ def list_products(
     conditions, params = [], []
     if search:
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        conditions.append("(name LIKE ? ESCAPE '\\' OR ean LIKE ? ESCAPE '\\')")
-        params.extend([f"%{escaped}%", f"%{escaped}%"])
+        conditions.append("(name LIKE ? ESCAPE '\\' OR ean LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\')")
+        params.extend([f"%{escaped}%", f"%{escaped}%", f"%{escaped}%"])
     if type_filter is not None:
         types = [t.strip() for t in type_filter.split(",")]
         # Support filtering by empty type (uncategorized products)
