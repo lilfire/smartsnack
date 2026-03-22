@@ -4,8 +4,6 @@ import base64
 import io
 import re
 
-import numpy as np
-
 _reader = None
 
 # EasyOCR readtext parameters tuned for food label text
@@ -48,6 +46,7 @@ def _prepare_images(image_bytes):
 
     upscaled = ImageEnhance.Contrast(upscaled).enhance(1.4)
     upscaled = ImageEnhance.Sharpness(upscaled).enhance(1.5)
+    import numpy as np
     gray = np.array(upscaled.convert("L"))
     variants.append(gray)
 
