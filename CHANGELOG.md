@@ -4,6 +4,24 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.10.0] - 2026-03-22
+
+### Added
+
+- Filter for uncategorized products in category select
+- Brand prefix displayed before product name when not already included
+
+### Changed
+
+- Category select in edit modal upgraded with improved styling
+- Product list layout: category label moved below its icon, fixed-width columns for category and thumbnail
+- Sub-label (EAN/completeness) aligned with product name
+- Brand styled consistently within product name
+
+### Fixed
+
+- Score weights losing `formula_max` for direct-formula fields
+
 ## [0.9.0] - 2026-03-21
 
 ### Added
