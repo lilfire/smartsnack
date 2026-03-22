@@ -352,6 +352,7 @@ export async function registerProduct() {
     document.getElementById('f-volume').value = '';
     upgradeSelect(document.getElementById('f-volume'));
     document.getElementById('f-price').value = '';
+    document.getElementById('f-type').value = '';
     document.getElementById('f-smak').value = '3';
     document.getElementById('smak-val').textContent = '3';
     const tasteLabel = document.getElementById('smak-label-text');
