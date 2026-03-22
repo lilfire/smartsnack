@@ -7,7 +7,7 @@ import { toggleFilters, setSort, rerender } from './filters.js';
 import { triggerImageUpload, removeProductImage } from './images.js';
 import { renderResults, loadFlagConfig } from './render.js';
 import {
-  showToast, startEdit, saveProduct, deleteProduct,
+  showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   loadData, switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct
 } from './products.js';
@@ -46,7 +46,7 @@ Object.assign(window, {
   // images
   triggerImageUpload, removeProductImage,
   // products
-  showToast, startEdit, saveProduct, deleteProduct,
+  showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct,
   rerender,

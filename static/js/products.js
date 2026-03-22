@@ -127,6 +127,20 @@ export async function saveProduct(id) {
   }
 }
 
+export async function unlockEan(id) {
+  try {
+    await api('/api/products/' + id + '/unsync', { method: 'POST' });
+    // Update cached product to remove the flag
+    const p = state.cachedResults.find(x => x.id === id);
+    if (p) p.flags = (p.flags || []).filter(f => f !== 'is_synced_with_off');
+    rerender();
+    showToast(t('toast_ean_unlocked'), 'success');
+  } catch (e) {
+    console.error(e);
+    showToast(t('toast_network_error'), 'error');
+  }
+}
+
 export async function deleteProduct(id, name) {
   if (!name) {
     const product = state.cachedResults && state.cachedResults.find((p) => p.id === id);

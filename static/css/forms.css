@@ -397,6 +397,29 @@ label.field-label {
   flex: 1;
 }
 
+.ean-row input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-ean-unlock {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.btn-ean-unlock:hover {
+  background: rgba(255, 120, 80, 0.12);
+  border-color: rgba(255, 120, 80, 0.3);
+  color: #ff7850;
+}
+
 .btn-off {
   padding: 8px 12px;
   border-radius: 10px;

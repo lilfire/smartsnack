@@ -574,6 +574,8 @@
   "flag_is_discontinued": "Discontinued",
   "flag_is_synced_with_off": "Synced with OFF",
   "btn_view_on_off": "View on OFF",
+  "btn_unlock_ean_title": "Unlock EAN and remove sync with OFF",
+  "toast_ean_unlocked": "EAN unlocked, sync with OFF removed",
   "settings_flags_title": "Product Flags",
   "settings_flags_desc": "Manage flags for tagging products",
   "label_flag_name": "Flag name",

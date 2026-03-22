@@ -574,6 +574,8 @@
   "flag_is_discontinued": "Utgången",
   "flag_is_synced_with_off": "Synkad med OFF",
   "btn_view_on_off": "Visa på OFF",
+  "btn_unlock_ean_title": "Lås upp EAN och ta bort synk med OFF",
+  "toast_ean_unlocked": "EAN upplåst, synk med OFF borttagen",
   "settings_flags_title": "Produktflaggor",
   "settings_flags_desc": "Hantera flaggor för märkning av produkter",
   "label_flag_name": "Flaggnamn",
