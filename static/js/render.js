@@ -268,9 +268,12 @@ export function renderResults(results, search) {
             }).join('')
           + ((() => {
               const sysFlags = (p.flags || []).filter(f => _flagConfig[f] && _flagConfig[f].type === 'system');
-              return sysFlags.length
-                ? '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(_flagConfig[f].label || t(_flagConfig[f].labelKey)) + '</span>').join(' ') + '</span>'
-                : '';
+              if (!sysFlags.length) return '';
+              let badges = '<span style="margin-left:8px">' + sysFlags.map(f => '<span class="flag-badge flag-system">' + esc(_flagConfig[f].label || t(_flagConfig[f].labelKey)) + '</span>').join(' ');
+              if (sysFlags.includes('is_synced_with_off') && p.ean)
+                badges += ' <a href="https://world.openfoodfacts.org/product/' + encodeURIComponent(p.ean) + '" target="_blank" rel="noopener" class="btn-sm btn-outline" style="font-size:10px;padding:2px 8px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;vertical-align:middle">' + t('btn_view_on_off') + ' &#8599;</a>';
+              badges += '</span>';
+              return badges;
             })())
           + '</div>'
           + '<div style="display:flex;gap:8px">'

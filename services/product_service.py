@@ -355,7 +355,10 @@ def _condition_to_post(field: str, op: str, value: str) -> tuple:
     """Convert a validated condition to a post-filter tuple.
 
     Returns (field, op, num_val).
+    For flag fields, returns (field, op, "true"/"false") where value is a string.
     """
+    if field.startswith(_FLAG_FIELD_PREFIX):
+        return field, op, value
     if op in ("is_not_set", "is_set"):
         return field, op, None
     if op == "contains":
@@ -548,7 +551,12 @@ _OP_FNS = {
 def _evaluate_post_node(node: dict, product: dict) -> bool:
     """Recursively evaluate a post-filter node against a product."""
     if "field" in node:
-        pval = product.get(node["field"])
+        field = node["field"]
+        if field.startswith(_FLAG_FIELD_PREFIX):
+            flag_name = field[len(_FLAG_FIELD_PREFIX):]
+            has_flag = flag_name in (product.get("flags") or [])
+            return has_flag if node["val"] == "true" else not has_flag
+        pval = product.get(field)
         if node["op"] == "is_not_set":
             return pval is None or pval == ""
         if node["op"] == "is_set":
