@@ -29,8 +29,9 @@ DB_PATH=./smartsnack.sqlite python app.py
 - `services/` — Business logic, one file per domain. Blueprints call service functions; services call `get_db()`
 - `static/js/` — Vanilla JS frontend modules (no framework, no build step)
 - `static/css/` — Modular CSS files
-- `templates/` — Jinja2 templates (`base.html` is the main SPA shell)
+- `templates/` — Jinja2 templates (`base.html` is the main SPA shell, `index.html` is the entry page)
 - `translations/` — JSON files per language (no.json, en.json, se.json)
+- `tests/` — pytest unit tests and `e2e/` integration tests
 
 ## Conventions
 
