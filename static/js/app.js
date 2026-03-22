@@ -87,6 +87,26 @@ Object.defineProperty(window, 'editingId', {
   configurable: true,
 });
 
+// ── Fix Android keyboard-dismiss scroll jump on range inputs ─────
+// When a number/text input has focus and the user taps a range slider,
+// the virtual keyboard closes and the viewport resizes, causing the
+// browser to scroll back to a previous position. We prevent this by
+// saving scroll position on touchstart, blurring the active input,
+// and restoring scroll position after the keyboard has fully dismissed.
+document.addEventListener('touchstart', function(e) {
+  if (e.target.type !== 'range') return;
+  var active = document.activeElement;
+  if (!active || (active.type !== 'number' && active.type !== 'text' && active.tagName !== 'TEXTAREA')) return;
+  var scrollY = window.scrollY;
+  active.blur();
+  // Restore scroll after keyboard dismiss (may take up to ~300ms on Android)
+  var restore = function() { window.scrollTo(0, scrollY); };
+  requestAnimationFrame(restore);
+  setTimeout(restore, 50);
+  setTimeout(restore, 150);
+  setTimeout(restore, 300);
+}, { passive: true });
+
 // ── Init ─────────────────────────────────────────────
 (async function() {
   await initLanguage();

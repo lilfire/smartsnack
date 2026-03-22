@@ -98,7 +98,7 @@ let _resizeTimer = null;
 window.addEventListener('resize', () => {
   clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(() => {
-    if (state.editingId === null) {
+    if (state.editingId === null && state.currentView === 'search') {
       import('./filters.js').then((mod) => { mod.rerender(); });
     }
   }, 200);
