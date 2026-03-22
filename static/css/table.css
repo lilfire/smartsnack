@@ -94,7 +94,7 @@
   font-size: 9px;
   color: rgba(255, 255, 255, 0.25);
   font-family: 'Space Mono', monospace;
-  margin-left: 22px;
+  margin-left: 0;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
