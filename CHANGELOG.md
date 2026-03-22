@@ -4,6 +4,22 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.12.0] - 2026-03-22
+
+### Improved
+
+- EasyOCR accuracy with image preprocessing and position-based text ordering
+- Replaced aggressive thresholding with gentle dual-pass OCR strategy
+- Lazy-load numpy in OCR service for faster startup
+
+### Fixed
+
+- Skip name-based duplicate check when EAN is provided
+
+### Added
+
+- Frontend tests for OCR and related modules
+
 ## [0.11.0] - 2026-03-22
 
 ### Added
