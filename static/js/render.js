@@ -141,10 +141,17 @@ export function renderResults(results, search) {
     const hasImg = p.has_image;
     const thumbHtml = hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '';
     const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
-    const brandPrefix = (p.brand && !p.name.toLowerCase().startsWith(p.brand.toLowerCase())) ? '<span class="prod-brand">' + esc(p.brand) + '</span> ' : '';
+    let nameHtml;
+    if (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase())) {
+      nameHtml = '<span class="prod-brand">' + esc(p.name.substring(0, p.brand.length)) + '</span>' + esc(p.name.substring(p.brand.length));
+    } else if (p.brand) {
+      nameHtml = '<span class="prod-brand">' + esc(p.brand) + '</span> ' + esc(p.name);
+    } else {
+      nameHtml = esc(p.name);
+    }
     const brandMeta = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
     h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
-      + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span>' + thumbHtml + '<span class="prod-name">' + brandPrefix + esc(p.name) + '</span></div>'
+      + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span>' + thumbHtml + '<span class="prod-name">' + nameHtml + '</span></div>'
       + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandMeta + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
       + '</div></div>';
