@@ -139,7 +139,7 @@ export function renderResults(results, search) {
   h += '</div>';
   sorted.forEach((p) => {
     const hasImg = p.has_image;
-    const thumbHtml = hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '';
+    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '') + '</div>';
     const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
     let nameHtml;
     if (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase())) {
