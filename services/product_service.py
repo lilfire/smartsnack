@@ -646,13 +646,14 @@ def list_products(
         p["completeness"] = _compute_completeness(p)
         results.append(p)
 
-    results = _apply_post_filters(results, post_filter_spec)
-
-    # Attach flags
+    # Attach flags BEFORE post-filtering — flag conditions may be evaluated
+    # in post-filter when OR groups mix SQL and computed fields.
     pids = [p["id"] for p in results]
     flags_map = _get_product_flags(cur, pids)
     for p in results:
         p["flags"] = flags_map.get(p["id"], [])
+
+    results = _apply_post_filters(results, post_filter_spec)
 
     results.sort(key=lambda x: x["total_score"], reverse=True)
     return results
