@@ -36,6 +36,7 @@ import {
   showOffAddReview, closeOffAddReview, submitToOff
 } from './openfoodfacts.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
+import { scanIngredients } from './ocr.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
 Object.assign(window, {
@@ -72,6 +73,8 @@ Object.assign(window, {
   closeScanModal, scanRegisterNew, scanUpdateExisting,
   closeScanPicker, scanPickerSearch, scanPickerSelect,
   scanOffFetch, closeScanOffConfirm,
+  // ocr
+  scanIngredients,
   // openfoodfacts
   validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
   selectOffResult, estimateProteinQuality, updateEstimateBtn,

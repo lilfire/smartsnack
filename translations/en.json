@@ -635,6 +635,7 @@
   "duplicate_merge_source_editing": "{name} (editing)",
   "duplicate_merge_source_other": "{name}",
   "duplicate_merge_confirm": "Confirm merge",
+  "duplicate_not_same": "Not the same product",
   "import_dup_title": "Import Settings",
   "import_dup_desc": "Configure how duplicates are handled during import",
   "import_dup_match_label": "Match criteria",
@@ -660,5 +661,9 @@
   "category_snacks": "Updated Snacks",
   "btn_close": "Close",
   "off_no_results_for": "No results for \"{query}\"",
-  "search_heading": "Search products"
+  "search_heading": "Search products",
+  "btn_ocr_title": "Scan ingredient list",
+  "toast_ocr_success": "Ingredients extracted from image",
+  "toast_ocr_error": "Could not read ingredients from image",
+  "toast_ocr_no_text": "No text found in image"
 }

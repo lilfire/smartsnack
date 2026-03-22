@@ -637,6 +637,7 @@
   "duplicate_merge_source_editing": "{name} (redigerer)",
   "duplicate_merge_source_other": "{name}",
   "duplicate_merge_confirm": "Bekreft sammenslåing",
+  "duplicate_not_same": "Ikke samme produkt",
   "import_dup_title": "Importinnstillinger",
   "import_dup_desc": "Konfigurer hvordan duplikater håndteres ved import",
   "import_dup_match_label": "Treffkriterier",
@@ -660,5 +661,9 @@
   "label_name": "Navn",
   "btn_close": "Lukk",
   "off_no_results_for": "Ingen resultater for \"{query}\"",
-  "search_heading": "Søk etter produkter"
+  "search_heading": "Søk etter produkter",
+  "btn_ocr_title": "Skann ingrediensliste",
+  "toast_ocr_success": "Ingredienser hentet fra bilde",
+  "toast_ocr_error": "Kunne ikke lese ingredienser fra bilde",
+  "toast_ocr_no_text": "Ingen tekst funnet i bildet"
 }
