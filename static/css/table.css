@@ -61,6 +61,23 @@
   background: rgba(232, 184, 75, 0.06);
 }
 
+.prod-cat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 48px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.prod-cat-label {
+  font-size: 7px;
+  color: rgba(255, 255, 255, 0.25);
+  font-family: 'Space Mono', monospace;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
 .prod-name {
   font-size: 13px;
   font-weight: 600;
@@ -70,11 +87,16 @@
   white-space: nowrap;
 }
 
+.prod-brand {
+  color: rgba(255, 255, 255, 0.35);
+  font-weight: 400;
+}
+
 .prod-meta {
   font-size: 9px;
   color: rgba(255, 255, 255, 0.25);
   font-family: 'Space Mono', monospace;
-  margin-left: 22px;
+  margin-left: 0;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -111,11 +133,16 @@
   opacity: 0.15;
 }
 
+.prod-thumb-wrap {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
 .prod-thumb {
   width: 24px;
   height: 24px;
   border-radius: 5px;
   object-fit: cover;
   background: rgba(255, 255, 255, 0.05);
-  flex-shrink: 0;
 }

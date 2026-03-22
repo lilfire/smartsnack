@@ -524,7 +524,8 @@ function _serializeGroup(groupEl) {
         children.push({ field, op: opRaw, value: '' });
       } else {
         const value = valInput.value.trim();
-        if (field && opRaw && value !== '' && value !== '__none__') {
+        // Allow empty value for category field (uncategorized products)
+        if (field && opRaw && value !== '__none__' && (value !== '' || field === _CATEGORY_FIELD_NAME)) {
           // Skip invalid numeric values
           if (valInput.dataset.numeric && !/^-?\d*\.?\d+$/.test(value)) continue;
           children.push({ field, op: opRaw, value });
