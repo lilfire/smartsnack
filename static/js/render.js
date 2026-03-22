@@ -149,10 +149,9 @@ export function renderResults(results, search) {
     } else {
       nameHtml = esc(p.name);
     }
-    const brandMeta = p.brand ? '<span style="color:rgba(255,255,255,0.3)">' + esc(p.brand) + '</span>' : '';
     h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
       + '<div><div style="display:flex;align-items:center;gap:8px"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span>' + thumbHtml + '<span class="prod-name">' + nameHtml + '</span></div>'
-      + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + brandMeta + eanHtml
+      + '<div class="prod-meta"><span>' + esc(catLabel(p.type)) + '</span>' + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
       + '</div></div>';
     for (let ci = 1; ci < cols.length; ci++) {
