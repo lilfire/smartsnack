@@ -125,6 +125,10 @@ vi.mock('../advanced-filters.js', () => ({
   toggleAdvancedFilters: vi.fn(),
 }));
 
+vi.mock('../ocr.js', () => ({
+  scanIngredients: vi.fn(),
+}));
+
 vi.mock('../openfoodfacts.js', () => ({
   validateOffBtn: vi.fn(),
   lookupOFF: vi.fn(),
@@ -259,5 +263,94 @@ describe('app.js initialization', () => {
 
     expect(SCORE_CFG_MAP.fat).toEqual({ label: 'Fat', desc: 'Fat desc', direction: 'lower' });
     expect(SCORE_CFG_MAP.sugar).toEqual({ label: 'Sugar', desc: 'Sugar desc', direction: 'lower' });
+  });
+});
+
+describe('touchstart range input handler', () => {
+  let scrollSpy;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.resetModules();
+    document.body.innerHTML = '';
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    document.body.appendChild(searchInput);
+    scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    await import('../app.js');
+    await vi.advanceTimersByTimeAsync(0);
+  });
+
+  afterEach(() => {
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    scrollSpy.mockRestore();
+  });
+
+  it('blurs active number input when range is touched', async () => {
+    const numberInput = document.createElement('input');
+    numberInput.type = 'number';
+    document.body.appendChild(numberInput);
+    numberInput.focus();
+
+    const range = document.createElement('input');
+    range.type = 'range';
+    document.body.appendChild(range);
+
+    const blurSpy = vi.spyOn(numberInput, 'blur');
+
+    range.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }));
+
+    expect(blurSpy).toHaveBeenCalled();
+
+    // Advance past all scheduled restores (50, 150, 300ms)
+    await vi.advanceTimersByTimeAsync(300);
+    expect(scrollSpy).toHaveBeenCalled();
+  });
+
+  it('blurs active text input when range is touched', async () => {
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    document.body.appendChild(textInput);
+    textInput.focus();
+
+    const range = document.createElement('input');
+    range.type = 'range';
+    document.body.appendChild(range);
+
+    const blurSpy = vi.spyOn(textInput, 'blur');
+
+    range.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }));
+
+    expect(blurSpy).toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(300);
+  });
+
+  it('does nothing when non-range element is touched', () => {
+    const numberInput = document.createElement('input');
+    numberInput.type = 'number';
+    document.body.appendChild(numberInput);
+    numberInput.focus();
+
+    const button = document.createElement('button');
+    document.body.appendChild(button);
+
+    const blurSpy = vi.spyOn(numberInput, 'blur');
+
+    button.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }));
+
+    expect(blurSpy).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when no relevant input is focused', () => {
+    const range = document.createElement('input');
+    range.type = 'range';
+    document.body.appendChild(range);
+
+    scrollSpy.mockClear();
+    range.dispatchEvent(new TouchEvent('touchstart', { bubbles: true }));
+
+    // scrollTo should not be called since no relevant input was active
+    expect(scrollSpy).not.toHaveBeenCalled();
   });
 });

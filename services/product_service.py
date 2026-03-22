@@ -64,8 +64,8 @@ def _find_duplicate(ean, name, exclude_id=None):
             result["is_synced_with_off"] = bool(row["is_synced_with_off"])
             return result
 
-    # Then check name match (case-insensitive)
-    if name and name.strip():
+    # Then check name match (case-insensitive), but only for products without EAN
+    if name and name.strip() and not (ean and ean.strip()):
         exclude_clause = "AND p.id != ?" if exclude_id else ""
         params = [name.strip()]
         if exclude_id:
