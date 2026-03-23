@@ -665,5 +665,10 @@
   "btn_ocr_title": "Scan ingredient list",
   "toast_ocr_success": "Ingredients extracted from image",
   "toast_ocr_error": "Could not read ingredients from image",
-  "toast_ocr_no_text": "No text found in image"
+  "toast_ocr_no_text": "No text found in image",
+  "btn_fetch_disabled_title": "Enter a valid EAN barcode or product name first",
+  "hint_ean": "8-13 digits",
+  "toast_uploading": "Uploading...",
+  "aria_select_emoji": "Select emoji",
+  "saved": "Saved"
 }

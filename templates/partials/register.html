@@ -16,10 +16,11 @@
           <label class="field-label" for="f-ean" data-i18n="label_ean">EAN (barcode)</label>
           <div class="ean-row">
             <div>
-              <input class="field-input" id="f-ean" data-i18n-placeholder="ph_ean" placeholder="e.g. 7038010069307" oninput="validateOffBtn('f')">
+              <input class="field-input" id="f-ean" data-i18n-placeholder="ph_ean" placeholder="e.g. 7038010069307" inputmode="numeric" pattern="\d{8,13}" oninput="validateOffBtn('f')">
+              <span class="field-hint" data-i18n="hint_ean">8-13 digits</span>
             </div>
             <button type="button" class="btn-scan" onclick="openScanner('f')" data-i18n-title="btn_scan_title" title="Scan barcode" aria-label="Scan barcode">&#128247;</button>
-            <button type="button" class="btn-off" id="f-off-btn" disabled onclick="lookupOFF('f')">
+            <button type="button" class="btn-off" id="f-off-btn" disabled onclick="lookupOFF('f')" data-i18n-title="btn_fetch_disabled_title" title="Enter a valid EAN barcode or product name first">
               <span class="off-spin"></span>
               <span class="off-label" data-i18n="btn_fetch">&#127758; Fetch</span>
             </button>
@@ -29,7 +30,7 @@
 
       <div>
         <label class="field-label" for="f-name" data-i18n="label_product_name">Product name *</label>
-        <input class="field-input" id="f-name" data-i18n-placeholder="ph_product_name" placeholder="e.g. Monster ProteinChips paprika" oninput="validateOffBtn('f')">
+        <input class="field-input" id="f-name" required data-i18n-placeholder="ph_product_name" placeholder="e.g. Monster ProteinChips paprika" oninput="validateOffBtn('f')">
       </div>
 
       <div class="grid-2">
@@ -133,7 +134,7 @@
           <span id="smak-label-text" data-i18n="label_taste" data-i18n-param-val="3">Smakskarakter (3/6)</span>
         </label>
         <div class="range-row">
-          <input type="range" min="0" max="6" step="0.5" value="3" id="f-smak" oninput="document.getElementById('smak-val').textContent=this.value;var v=this.value;requestAnimationFrame(function(){var lbl=document.getElementById('smak-label-text');lbl.setAttribute('data-i18n-param-val',v);if(window.__t)lbl.textContent=window.__t('label_taste',{val:v})})">
+          <input type="range" min="0" max="6" step="0.5" value="3" id="f-smak" aria-label="Taste score" aria-valuemin="0" aria-valuemax="6" aria-valuenow="3" oninput="this.setAttribute('aria-valuenow',this.value);document.getElementById('smak-val').textContent=this.value;var v=this.value;requestAnimationFrame(function(){var lbl=document.getElementById('smak-label-text');lbl.setAttribute('data-i18n-param-val',v);if(window.__t)lbl.textContent=window.__t('label_taste',{val:v})})">
           <span class="range-val" id="smak-val">3</span>
         </div>
       </div>

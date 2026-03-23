@@ -10,6 +10,7 @@
         <div>
           <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
             <span data-i18n="settings_weights_title">Score-weighting</span>
+            <span id="weights-saved-indicator" class="saved-indicator" data-i18n="saved">Saved</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>
           <div class="settings-section-body" style="display:none">
@@ -36,7 +37,7 @@
               <div>
                 <label class="field-label" for="cat-emoji-trigger" data-i18n="label_emoji">Emoji</label>
                 <input type="hidden" id="cat-emoji" value="">
-                <button type="button" class="emoji-picker-trigger" id="cat-emoji-trigger">&#128230;</button>
+                <button type="button" class="emoji-picker-trigger" id="cat-emoji-trigger" aria-label="Select emoji" data-i18n-aria-label="aria_select_emoji">&#128230;</button>
               </div>
               <div>
                 <label class="field-label" for="cat-label" data-i18n="label_display_name">Display name</label>

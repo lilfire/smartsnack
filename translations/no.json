@@ -665,5 +665,10 @@
   "btn_ocr_title": "Skann ingrediensliste",
   "toast_ocr_success": "Ingredienser hentet fra bilde",
   "toast_ocr_error": "Kunne ikke lese ingredienser fra bilde",
-  "toast_ocr_no_text": "Ingen tekst funnet i bildet"
+  "toast_ocr_no_text": "Ingen tekst funnet i bildet",
+  "btn_fetch_disabled_title": "Skriv inn en gyldig EAN-strekkode eller produktnavn først",
+  "hint_ean": "8-13 siffer",
+  "toast_uploading": "Laster opp...",
+  "aria_select_emoji": "Velg emoji",
+  "saved": "Lagret"
 }

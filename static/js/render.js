@@ -141,16 +141,16 @@ export function renderResults(results, search) {
     const hasImg = p.has_image;
     const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '') + '</div>';
     const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
-    let nameHtml;
+    const brandHtml = p.brand ? '<span class="prod-brand">' + esc(p.brand) + '</span>' : '';
+    let prodName;
     if (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase())) {
-      nameHtml = '<span class="prod-brand">' + esc(p.name.substring(0, p.brand.length)) + '</span>' + esc(p.name.substring(p.brand.length));
-    } else if (p.brand) {
-      nameHtml = '<span class="prod-brand">' + esc(p.brand) + '</span> ' + esc(p.name);
+      prodName = p.name.substring(p.brand.length).replace(/^\s+/, '');
     } else {
-      nameHtml = esc(p.name);
+      prodName = p.name;
     }
+    const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
     h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
-      + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info"><span class="prod-name">' + nameHtml + '</span>'
+      + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
       + '<div class="prod-meta">' + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
       + '</div></div></div></div>';
@@ -231,7 +231,7 @@ export function renderResults(results, search) {
               const isSynced = (p.flags || []).includes('is_synced_with_off');
               return '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"' + (isSynced ? ' disabled' : '') + '></div>'
                 + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
-                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
+                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '"' + (isSynced ? ' disabled' : '') + '>&#128247;</button><button class="btn-off" id="ed-off-btn" ' + (isSynced || !(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
             })()
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'

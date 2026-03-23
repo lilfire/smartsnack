@@ -65,31 +65,49 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 48px;
+  width: 56px;
   flex-shrink: 0;
-  overflow: hidden;
 }
 
 .prod-cat-label {
   font-size: 7px;
   color: rgba(255, 255, 255, 0.25);
   font-family: 'Space Mono', monospace;
-  white-space: nowrap;
   text-transform: uppercase;
+  text-align: center;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.prod-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .prod-name {
   font-size: 13px;
   font-weight: 600;
   line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  word-break: break-word;
 }
 
 .prod-brand {
   color: rgba(255, 255, 255, 0.35);
   font-weight: 400;
+  font-size: 11px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .prod-meta {

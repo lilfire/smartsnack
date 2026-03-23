@@ -242,6 +242,7 @@ export function toggleWeightConfig(field) {
 }
 
 let _weightSaveTimer = null;
+let _weightSavedTimer = null;
 function debouncedSaveWeights() { clearTimeout(_weightSaveTimer); _weightSaveTimer = setTimeout(saveWeights, 400); }
 
 export function removeWeight(field) {
@@ -317,7 +318,8 @@ export async function saveWeights() {
       return { field: w.field, enabled: w.enabled, weight: parseFloat(sliderEl ? sliderEl.value : w.weight), direction: w.direction, formula: w.formula, formula_min: isFinite(minVal) ? minVal : fMin, formula_max: isFinite(maxVal) ? maxVal : fMax };
     });
     await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
-    showToast(t('toast_weights_saved'), 'success');
+    const indicator = document.getElementById('weights-saved-indicator');
+    if (indicator) { indicator.style.opacity = '1'; clearTimeout(_weightSavedTimer); _weightSavedTimer = setTimeout(() => { indicator.style.opacity = '0'; }, 1500); }
     loadData();
   } catch(e) { showToast(t('toast_save_error'), 'error'); }
   finally { _weightSaving = false; }

@@ -36,7 +36,10 @@ export function validateOffBtn(prefix) {
   const ean = document.getElementById(prefix + '-ean').value.trim();
   const name = document.getElementById(prefix + '-name').value.trim();
   const btn = document.getElementById(prefix + '-off-btn');
-  if (btn) btn.disabled = !(isValidEan(ean) || name.length >= 2);
+  if (btn) {
+    btn.disabled = !(isValidEan(ean) || name.length >= 2);
+    btn.title = btn.disabled ? t('btn_fetch_disabled_title') : '';
+  }
 }
 
 let _offCtx = { prefix: null, productId: null };
@@ -1036,6 +1039,7 @@ export function showOffAddReview(ean, prefixOverride) {
   const headClose = document.createElement('button');
   headClose.className = 'off-modal-close';
   headClose.textContent = '\u00D7';
+  headClose.setAttribute('aria-label', t('btn_close'));
   headClose.addEventListener('click', closeOffAddReview);
   headDiv.appendChild(headClose);
   modalDiv.appendChild(headDiv);
