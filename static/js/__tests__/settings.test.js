@@ -496,11 +496,15 @@ describe('saveWeights', () => {
     const statsLine = document.createElement('div');
     statsLine.id = 'stats-line';
     document.body.appendChild(statsLine);
+    // Create saved indicator element
+    const indicator = document.createElement('span');
+    indicator.id = 'weights-saved-indicator';
+    document.body.appendChild(indicator);
 
     api.mockResolvedValueOnce({}); // PUT weights
     await saveWeights();
     expect(api).toHaveBeenCalledWith('/api/weights', expect.objectContaining({ method: 'PUT' }));
-    expect(showToast).toHaveBeenCalledWith('toast_weights_saved', 'success');
+    expect(indicator.style.opacity).toBe('1');
   });
 });
 

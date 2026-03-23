@@ -93,6 +93,7 @@ export function toggleAdvancedFilters() {
   const filterToggle = document.getElementById('filter-toggle');
   const filterRow = document.getElementById('filter-row');
 
+  if (toggle) toggle.setAttribute('aria-expanded', String(!visible));
   if (visible) {
     // ── Close advanced mode ──
     panel.classList.remove('open');

@@ -59,11 +59,25 @@ export function fmtNum(v) {
   return n.toFixed(n % 1 ? 1 : 0);
 }
 
+export function announceStatus(msg) {
+  const el = document.getElementById('sr-status');
+  if (el) { el.textContent = ''; requestAnimationFrame(() => { el.textContent = msg; }); }
+}
+
 let _toastTimer = null;
 export function showToast(msg, type) {
   const toast = document.getElementById('toast');
   if (!toast) return;
-  toast.textContent = msg;
+  toast.innerHTML = '';
+  const textSpan = document.createElement('span');
+  textSpan.textContent = msg;
+  toast.appendChild(textSpan);
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'toast-close';
+  closeBtn.textContent = '\u00D7';
+  closeBtn.setAttribute('aria-label', _tFunc ? _tFunc('btn_close') : 'Close');
+  closeBtn.addEventListener('click', () => { toast.classList.remove('show'); if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; } });
+  toast.appendChild(closeBtn);
   toast.className = 'toast ' + type + ' show';
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => { toast.classList.remove('show'); _toastTimer = null; }, 3000);
@@ -108,7 +122,7 @@ export async function fetchStats() {
 
 // ── Custom select dropdown (desktop only) ────────
 // Shows a styled confirmation modal. Returns a Promise that resolves true/false.
-export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel) {
+export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel, isDestructive) {
   return new Promise((resolve) => {
     const bg = document.createElement('div');
     bg.className = 'scan-modal-bg';
@@ -129,7 +143,7 @@ export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel
     const actions = document.createElement('div');
     actions.className = 'scan-modal-actions';
     const yesBtn = document.createElement('button');
-    yesBtn.className = 'scan-modal-btn-register confirm-yes';
+    yesBtn.className = 'scan-modal-btn-register confirm-yes' + (isDestructive ? ' confirm-destructive' : '');
     yesBtn.textContent = confirmLabel;
     actions.appendChild(yesBtn);
     const noBtn = document.createElement('button');

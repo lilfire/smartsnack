@@ -308,6 +308,7 @@ export function showScanProductPicker(ean) {
   const headClose = document.createElement('button');
   headClose.className = 'off-modal-close';
   headClose.textContent = '\u00D7';
+  headClose.setAttribute('aria-label', t('btn_close'));
   headClose.addEventListener('click', () => { closeScanPicker(); });
   head.appendChild(headClose);
   modal.appendChild(head);

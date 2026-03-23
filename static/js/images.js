@@ -30,6 +30,7 @@ export function triggerImageUpload(id) {
     reader.onerror = () => { showToast(t('toast_image_upload_error'), 'error'); };
     reader.onload = async (e) => {
       try {
+        showToast(t('toast_uploading'), 'info');
         const resized = await resizeImage(e.target.result, 400);
         await api('/api/products/' + id + '/image', { method: 'PUT', body: JSON.stringify({ image: resized }) });
         state.imageCache[id] = resized;

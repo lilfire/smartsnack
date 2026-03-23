@@ -81,6 +81,17 @@
   box-shadow: 0 4px 16px rgba(232, 184, 75, 0.25);
 }
 
+.confirm-destructive {
+  background: rgba(255, 68, 68, 0.15) !important;
+  border: 1px solid rgba(255, 68, 68, 0.4) !important;
+  color: #ff6666 !important;
+}
+
+.confirm-destructive:hover {
+  background: rgba(255, 68, 68, 0.25) !important;
+  box-shadow: 0 4px 16px rgba(255, 68, 68, 0.2) !important;
+}
+
 .scan-modal-btn-update {
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.06);

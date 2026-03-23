@@ -26,6 +26,7 @@ vi.mock('../state.js', () => {
     showConfirmModal: vi.fn().mockResolvedValue(true),
     showToast: vi.fn(),
     upgradeSelect: vi.fn(),
+    announceStatus: vi.fn(),
   };
 });
 
@@ -194,7 +195,7 @@ describe('deleteProduct', () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
     await deleteProduct(1);
-    expect(showConfirmModal).toHaveBeenCalledWith(expect.any(String), 'Milk', expect.any(String), expect.any(String), expect.any(String));
+    expect(showConfirmModal).toHaveBeenCalledWith(expect.any(String), 'Milk', expect.any(String), expect.any(String), expect.any(String), true);
   });
 
   it('cleans up state after deletion', async () => {

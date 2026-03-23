@@ -11,8 +11,8 @@
   </div>
   <div class="filter-wrap" id="filter-wrap">
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <button type="button" class="filter-toggle" id="adv-filter-toggle" onclick="toggleAdvancedFilters()" data-i18n="adv_filter_toggle">Advanced filter</button>
-      <button type="button" class="filter-toggle" id="filter-toggle" onclick="toggleFilters()">
+      <button type="button" class="filter-toggle" id="adv-filter-toggle" onclick="toggleAdvancedFilters()" aria-expanded="false" aria-controls="advanced-filters" data-i18n="adv_filter_toggle">Advanced filter</button>
+      <button type="button" class="filter-toggle" id="filter-toggle" onclick="toggleFilters()" aria-expanded="false" aria-controls="filter-row">
         <span id="filter-toggle-label" data-i18n="filter_all">All categories</span> <span class="ft-arrow">&#9660;</span>
       </button>
     </div>
@@ -20,7 +20,7 @@
   </div>
   <div id="advanced-filters" class="adv-filters"></div>
   <div class="result-count" id="result-count"></div>
-  <div id="results-container">
+  <div id="results-container" role="region" aria-label="Search results">
     <div class="loading">
       <span class="spinner"></span>
       <span data-i18n="loading_products">Loading products...</span>

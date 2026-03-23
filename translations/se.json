@@ -665,5 +665,10 @@
   "btn_ocr_title": "Skanna ingredienslista",
   "toast_ocr_success": "Ingredienser extraherade från bild",
   "toast_ocr_error": "Kunde inte läsa ingredienser från bild",
-  "toast_ocr_no_text": "Ingen text hittad i bilden"
+  "toast_ocr_no_text": "Ingen text hittad i bilden",
+  "btn_fetch_disabled_title": "Ange en giltig EAN-streckkod eller produktnamn först",
+  "hint_ean": "8-13 siffror",
+  "toast_uploading": "Laddar upp...",
+  "aria_select_emoji": "Välj emoji",
+  "saved": "Sparat"
 }

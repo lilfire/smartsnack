@@ -59,7 +59,10 @@ export function toggleFilters() {
   const row = document.getElementById('filter-row');
   const tog = document.getElementById('filter-toggle');
   if (row) row.classList.toggle('open');
-  if (tog) tog.classList.toggle('open');
+  if (tog) {
+    tog.classList.toggle('open');
+    tog.setAttribute('aria-expanded', String(row && row.classList.contains('open')));
+  }
 }
 
 export function buildTypeSelect() {

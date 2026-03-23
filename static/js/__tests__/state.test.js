@@ -169,7 +169,7 @@ describe('showToast', () => {
 
   it('sets toast text and className', () => {
     showToast('Hello', 'success');
-    expect(toastEl.textContent).toBe('Hello');
+    expect(toastEl.firstChild.textContent).toBe('Hello');
     expect(toastEl.className).toBe('toast success show');
   });
 
@@ -184,7 +184,7 @@ describe('showToast', () => {
     showToast('First', 'info');
     vi.advanceTimersByTime(2000);
     showToast('Second', 'success');
-    expect(toastEl.textContent).toBe('Second');
+    expect(toastEl.firstChild.textContent).toBe('Second');
     vi.advanceTimersByTime(2000);
     expect(toastEl.classList.contains('show')).toBe(true);
     vi.advanceTimersByTime(1000);
@@ -696,7 +696,7 @@ describe('showToast - additional branches', () => {
     showToast('Second', 'success');
     // clearTimeout should have been called for the first timer
     expect(clearSpy).toHaveBeenCalled();
-    expect(toastEl.textContent).toBe('Second');
+    expect(toastEl.firstChild.textContent).toBe('Second');
     // Only the second timer should fire
     vi.advanceTimersByTime(3000);
     expect(toastEl.classList.contains('show')).toBe(false);

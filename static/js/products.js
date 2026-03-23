@@ -1,5 +1,5 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
@@ -51,6 +51,8 @@ export async function saveProduct(id) {
   const offAppliedFields = window._offAppliedFields; window._offAppliedFields = null;
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
+  const saveBtn = document.querySelector('[data-action="save-product"][data-id="' + id + '"]');
+  if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = t('toast_saving'); }
   // Check for duplicate EAN/name before saving
   let mergedOrDeleted = false;
   if (data.ean || data.name) {
@@ -126,6 +128,8 @@ export async function saveProduct(id) {
       state.editingId = null;
       loadData();
     }
+  } finally {
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('btn_save'); }
   }
 }
 
@@ -148,7 +152,7 @@ export async function deleteProduct(id, name) {
     const product = state.cachedResults && state.cachedResults.find((p) => p.id === id);
     name = product ? product.name : '';
   }
-  if (!await showConfirmModal('\u{1F5D1}', name, t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'))) return;
+  if (!await showConfirmModal('\u{1F5D1}', name, t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'), true)) return;
   try {
     await api('/api/products/' + id, { method: 'DELETE' });
     delete state.imageCache[id];
@@ -174,6 +178,7 @@ export async function loadData() {
     const search = state.currentView === 'search' && searchInputEl ? searchInputEl.value.trim() : '';
     const results = await fetchProducts(search, state.currentFilter);
     renderResults(results, search);
+    announceStatus(t('stats_line', { total: results.length, types: state.cachedStats.types }));
   } catch (e) {
     console.error(e);
     showToast(t('toast_load_error'), 'error');
@@ -359,6 +364,7 @@ export async function registerProduct() {
     if (tasteLabel) { tasteLabel.setAttribute('data-i18n-param-val', '3'); tasteLabel.textContent = t('label_taste', { val: '3' }); }
     const toastKey = result.merged ? 'toast_product_merged' : 'toast_product_added';
     showToast(t(toastKey, { name: name }), 'success');
+    announceStatus(t(toastKey, { name: name }));
 
     // Switch to search view filtered by the registered category
     state.currentFilter = [registeredType];
