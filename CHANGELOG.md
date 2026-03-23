@@ -4,6 +4,23 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.13.0] - 2026-03-23
+
+### Changed
+
+- Product list layout changed to 3-line format: brand, name, EAN
+- Disable scan and OFF fetch buttons for synced products
+
+### Fixed
+
+- Long product names being truncated in search results
+- Long category names being cut off in product table
+- Product form reset not clearing the type field
+
+### Improved
+
+- Accessibility improvements and UX polish
+
 ## [0.12.0] - 2026-03-22
 
 ### Improved
