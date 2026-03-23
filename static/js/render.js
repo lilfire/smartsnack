@@ -231,7 +231,7 @@ export function renderResults(results, search) {
               const isSynced = (p.flags || []).includes('is_synced_with_off');
               return '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"' + (isSynced ? ' disabled' : '') + '></div>'
                 + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
-                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button><button class="btn-off" id="ed-off-btn" ' + ((isValidEan(p.ean) || p.name.trim()) ? '' : 'disabled') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
+                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '"' + (isSynced ? ' disabled' : '') + '>&#128247;</button><button class="btn-off" id="ed-off-btn" ' + (isSynced || !(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
             })()
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
