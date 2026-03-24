@@ -8,6 +8,7 @@ from werkzeug.exceptions import HTTPException
 
 from db import init_db, close_db
 from blueprints import register_blueprints
+from extensions import limiter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ def create_app() -> Flask:
 
     app.teardown_appcontext(close_db)
 
+    # S5: Rate limiting on all endpoints (stricter limits applied per-blueprint)
+    limiter.init_app(app)
+
     register_blueprints(app)
 
     @app.before_request
@@ -36,7 +40,21 @@ def create_app() -> Flask:
             return jsonify({"error": "CSRF validation failed"}), 403
 
     @app.after_request
-    def set_js_cache_headers(response):
+    def set_security_headers(response):
+        # S4: Security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: https://*.openfoodfacts.org https://*.openfoodfacts.net; "
+            "connect-src 'self'; "
+            "font-src 'self'; "
+            "frame-ancestors 'self'"
+        )
+        # JS cache-busting
         if response.content_type and "javascript" in response.content_type:
             response.headers["Cache-Control"] = "no-cache, must-revalidate"
         return response

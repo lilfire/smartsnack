@@ -4,6 +4,7 @@ import logging
 
 from flask import Blueprint, request, jsonify, Response
 
+from extensions import limiter
 from services import proxy_service
 
 logger = logging.getLogger(__name__)
@@ -12,6 +13,7 @@ bp = Blueprint("proxy", __name__)
 
 
 @bp.route("/api/proxy-image")
+@limiter.limit("30 per minute")
 def proxy_image():
     url = request.args.get("url", "")
     try:
@@ -27,7 +29,6 @@ def proxy_image():
         mimetype=content_type,
         headers={
             "Cache-Control": "public, max-age=86400",
-            "Access-Control-Allow-Origin": "*",
         },
     )
 

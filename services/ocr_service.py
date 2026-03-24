@@ -136,8 +136,8 @@ def extract_text(image_base64):
     except Exception:
         raise ValueError("Invalid base64 data")
 
-    if len(image_bytes) > 10 * 1024 * 1024:
-        raise ValueError("Image too large (max 10 MB)")
+    if len(image_bytes) > 5 * 1024 * 1024:
+        raise ValueError("Image too large (max 5 MB)")
 
     reader = _get_reader()
     variants = _prepare_images(image_bytes)

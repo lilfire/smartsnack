@@ -12,6 +12,15 @@ from translations import _category_label
 
 logger = logging.getLogger(__name__)
 
+# Magic bytes for allowed image formats
+_IMAGE_MAGIC_BYTES = (
+    b"\xff\xd8\xff",          # JPEG
+    b"\x89PNG\r\n\x1a\n",    # PNG
+    b"GIF87a",                # GIF87a
+    b"GIF89a",                # GIF89a
+    b"RIFF",                  # WebP (RIFF container)
+)
+
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -46,6 +55,9 @@ def proxy_image(url: str) -> tuple[bytes, str]:
             data = resp.read(max_size + 1)
             if len(data) > max_size:
                 raise ValueError("Image too large")
+            # S8: Validate magic bytes to ensure actual image content
+            if not any(data.startswith(magic) for magic in _IMAGE_MAGIC_BYTES):
+                raise ValueError("Response is not a valid image (bad magic bytes)")
             return data, ct
     except (ValueError, PermissionError):
         raise

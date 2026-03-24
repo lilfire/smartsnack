@@ -2,6 +2,7 @@
 
 from flask import Blueprint, jsonify
 
+from extensions import limiter
 from helpers import _require_json
 from services import ocr_service
 
@@ -9,6 +10,7 @@ bp = Blueprint("ocr", __name__)
 
 
 @bp.route("/api/ocr/ingredients", methods=["POST"])
+@limiter.limit("10 per minute")
 def ocr_ingredients():
     try:
         data = _require_json()

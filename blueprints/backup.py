@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request, Response
 
+from extensions import limiter
 from helpers import _require_json, _check_api_key
 from services import backup_service
 
@@ -15,6 +16,7 @@ bp = Blueprint("backup", __name__)
 
 
 @bp.route("/api/backup")
+@limiter.limit("5 per minute")
 def backup_db():
     denied = _check_api_key()
     if denied:
@@ -33,6 +35,7 @@ def backup_db():
 
 
 @bp.route("/api/restore", methods=["POST"])
+@limiter.limit("5 per minute")
 def restore_db():
     denied = _check_api_key()
     if denied:
@@ -49,6 +52,7 @@ def restore_db():
 
 
 @bp.route("/api/import", methods=["POST"])
+@limiter.limit("5 per minute")
 def import_products():
     denied = _check_api_key()
     if denied:
