@@ -290,10 +290,33 @@ async function _submitProduct(body, on_duplicate) {
 }
 
 export async function registerProduct() {
-  const name = document.getElementById('f-name').value.trim();
-  if (!name) { showToast(t('toast_product_name_required'), 'error'); return; }
-  const ean = document.getElementById('f-ean').value.trim();
-  if (ean && !isValidEan(ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
+  const nameInput = document.getElementById('f-name');
+  const nameError = document.getElementById('f-name-error');
+  const eanInput = document.getElementById('f-ean');
+  const eanError = document.getElementById('f-ean-error');
+  const name = nameInput.value.trim();
+
+  // Clear previous validation state
+  nameInput.setAttribute('aria-invalid', 'false');
+  if (nameError) nameError.style.display = 'none';
+  eanInput.setAttribute('aria-invalid', 'false');
+  if (eanError) eanError.style.display = 'none';
+
+  if (!name) {
+    nameInput.setAttribute('aria-invalid', 'true');
+    if (nameError) nameError.style.display = '';
+    nameInput.focus();
+    showToast(t('toast_product_name_required'), 'error');
+    return;
+  }
+  const ean = eanInput.value.trim();
+  if (ean && !isValidEan(ean)) {
+    eanInput.setAttribute('aria-invalid', 'true');
+    if (eanError) eanError.style.display = '';
+    eanInput.focus();
+    showToast(t('toast_invalid_ean'), 'error');
+    return;
+  }
   const btn = document.getElementById('btn-submit');
   btn.disabled = true;
   btn.textContent = t('toast_saving');

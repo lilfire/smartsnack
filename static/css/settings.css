@@ -33,6 +33,11 @@
   border-color: rgba(255, 255, 255, 0.12);
 }
 
+.settings-toggle:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+}
+
 .settings-toggle.open {
   border-color: rgba(232, 184, 75, 0.2);
   margin-bottom: 10px;

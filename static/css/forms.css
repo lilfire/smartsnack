@@ -20,8 +20,10 @@
 }
 
 .btn-ocr:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: wait;
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .ocr-spin {
@@ -417,9 +419,13 @@ label.field-label {
 }
 
 .btn-register:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* ── EAN / OFF Button ───────────────────────────── */
@@ -479,8 +485,10 @@ label.field-label {
 }
 
 .btn-off:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .field-hint {
@@ -488,6 +496,23 @@ label.field-label {
   color: rgba(255, 255, 255, 0.3);
   margin-top: 2px;
   display: block;
+}
+
+.field-error {
+  font-size: 11px;
+  color: #ff6666;
+  margin-top: 4px;
+  display: block;
+}
+
+.field-input[aria-invalid="true"],
+.field-select[aria-invalid="true"] {
+  border-color: rgba(255, 68, 68, 0.5);
+}
+
+.field-input[aria-invalid="true"]:focus,
+.field-select[aria-invalid="true"]:focus {
+  border-color: rgba(255, 68, 68, 0.7);
 }
 
 .btn-off.loading {

@@ -99,6 +99,8 @@
   "toast_product_deleted": "\"{name}\" deleted",
   "toast_product_name_required": "Product name is required",
   "toast_invalid_ean": "EAN must be 8-13 digits",
+  "error_product_name_required": "Product name is required",
+  "error_invalid_ean": "Enter a valid EAN (8-13 digits)",
   "toast_saving": "Saving...",
   "toast_product_added": "\"{name}\" added!",
   "toast_save_error": "Error saving",
