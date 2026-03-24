@@ -11,6 +11,7 @@ import threading
 import time
 
 import subprocess
+import urllib.request
 
 import pytest
 
@@ -18,6 +19,21 @@ import pytest
 sys.path.insert(
     0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _inject_csrf_header():
+    """Auto-inject X-Requested-With header into all urllib requests for CSRF."""
+    _orig_init = urllib.request.Request.__init__
+
+    def _patched_init(self, *args, **kwargs):
+        _orig_init(self, *args, **kwargs)
+        if not self.has_header("X-requested-with"):
+            self.add_header("X-Requested-With", "SmartSnack")
+
+    urllib.request.Request.__init__ = _patched_init
+    yield
+    urllib.request.Request.__init__ = _orig_init
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -175,7 +191,10 @@ def api_create_product(live_url):
         req = urllib.request.Request(
             f"{live_url}/api/products",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "X-Requested-With": "SmartSnack",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=5) as resp:

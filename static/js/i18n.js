@@ -54,7 +54,7 @@ export function applyStaticTranslations() {
     el.textContent = t(key, hasParams ? params : undefined);
   });
   document.querySelectorAll('[data-i18n-html]').forEach((el) => {
-    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+    el.textContent = t(el.getAttribute('data-i18n-html'));
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));

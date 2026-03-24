@@ -209,9 +209,9 @@ describe('api', () => {
     vi.useRealTimers();
     const data = await api('/test');
     expect(data).toEqual({ result: 'ok' });
-    // GET requests (no body) should not send Content-Type
+    // GET requests (no body) should not send Content-Type, but include CSRF header
     expect(global.fetch).toHaveBeenCalledWith('/test', expect.objectContaining({
-      headers: {},
+      headers: { 'X-Requested-With': 'SmartSnack' },
     }));
   });
 
@@ -724,9 +724,9 @@ describe('api - additional branches', () => {
       text: () => Promise.resolve('{}'),
     });
     await api('/test', { headers: { 'X-Custom': 'yes' } });
-    // GET requests (no body) should not send Content-Type, only custom headers
+    // GET requests (no body) should not send Content-Type, but include CSRF + custom headers
     expect(global.fetch).toHaveBeenCalledWith('/test', expect.objectContaining({
-      headers: { 'X-Custom': 'yes' },
+      headers: { 'X-Requested-With': 'SmartSnack', 'X-Custom': 'yes' },
     }));
   });
 });

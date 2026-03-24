@@ -4,6 +4,7 @@ import base64
 import hashlib
 import logging
 import os
+import secrets
 
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -12,17 +13,42 @@ from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_secret_key() -> str:
+    """Return the encryption secret, generating a persistent random key if not set."""
+    secret = os.environ.get("SMARTSNACK_SECRET_KEY", "")
+    if secret:
+        return secret
+    # Generate a persistent key in the data directory so it survives restarts
+    data_dir = os.path.dirname(os.environ.get("DB_PATH", "/data/smartsnack.sqlite"))
+    key_file = os.path.join(data_dir, ".smartsnack_secret_key")
+    try:
+        if os.path.exists(key_file):
+            secret = open(key_file).read().strip()
+            if secret:
+                return secret
+        secret = secrets.token_hex(32)
+        os.makedirs(data_dir, exist_ok=True)
+        with open(key_file, "w") as f:
+            f.write(secret)
+        logger.warning(
+            "SMARTSNACK_SECRET_KEY not set. Generated random key at %s. "
+            "Set the environment variable for production use.",
+            key_file,
+        )
+        return secret
+    except OSError:
+        raise RuntimeError(
+            "SMARTSNACK_SECRET_KEY environment variable is required "
+            "for credential encryption. Set it before starting the app."
+        )
+
 _FERNET_PREFIX = "fernet:"
 
 
 def _get_fernet() -> Fernet:
     """Return a Fernet instance using a key derived from the environment secret."""
-    secret = os.environ.get("SMARTSNACK_SECRET_KEY", "")
-    if not secret:
-        raise RuntimeError(
-            "SMARTSNACK_SECRET_KEY environment variable is required "
-            "for credential encryption. Set it before starting the app."
-        )
+    secret = _resolve_secret_key()
     key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
     return Fernet(key)
 

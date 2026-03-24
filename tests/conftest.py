@@ -50,10 +50,47 @@ def app(tmp_path, monkeypatch):
     yield application
 
 
+class _CsrfTestClient:
+    """Wraps Flask test client to automatically include CSRF header."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def _inject(self, kwargs):
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers.setdefault("X-Requested-With", "SmartSnack")
+        kwargs["headers"] = headers
+        return kwargs
+
+    def get(self, *a, **kw):
+        return self._inner.get(*a, **kw)
+
+    def head(self, *a, **kw):
+        return self._inner.head(*a, **kw)
+
+    def options(self, *a, **kw):
+        return self._inner.options(*a, **kw)
+
+    def post(self, *a, **kw):
+        return self._inner.post(*a, **self._inject(kw))
+
+    def put(self, *a, **kw):
+        return self._inner.put(*a, **self._inject(kw))
+
+    def patch(self, *a, **kw):
+        return self._inner.patch(*a, **self._inject(kw))
+
+    def delete(self, *a, **kw):
+        return self._inner.delete(*a, **self._inject(kw))
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
 @pytest.fixture()
 def client(app):
-    """Flask test client."""
-    return app.test_client()
+    """Flask test client with automatic CSRF header."""
+    return _CsrfTestClient(app.test_client())
 
 
 @pytest.fixture()

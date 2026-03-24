@@ -66,12 +66,13 @@ class TestDecryptInvalidToken:
 
 
 class TestGetFernet:
-    def test_missing_secret_key(self, app_ctx, monkeypatch):
+    def test_missing_secret_key_generates_random(self, app_ctx, monkeypatch):
         monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "")
         from services.settings_service import _get_fernet
 
-        with pytest.raises(RuntimeError, match="SMARTSNACK_SECRET_KEY"):
-            _get_fernet()
+        # Should not raise — generates a random key when env var is empty
+        fernet = _get_fernet()
+        assert fernet is not None
 
     def test_valid_secret_key(self, app_ctx):
         from services.settings_service import _get_fernet

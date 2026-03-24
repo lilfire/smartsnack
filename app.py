@@ -3,7 +3,7 @@
 import logging
 import sys
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 
 from db import init_db, close_db
@@ -27,6 +27,13 @@ def create_app() -> Flask:
     app.teardown_appcontext(close_db)
 
     register_blueprints(app)
+
+    @app.before_request
+    def csrf_protect():
+        if request.method in ("GET", "HEAD", "OPTIONS"):
+            return None
+        if request.headers.get("X-Requested-With") != "SmartSnack":
+            return jsonify({"error": "CSRF validation failed"}), 403
 
     @app.after_request
     def set_js_cache_headers(response):

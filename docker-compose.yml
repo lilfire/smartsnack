@@ -7,7 +7,7 @@ services:
     volumes:
       - smartsnack-data:/data
     environment:
-      - SMARTSNACK_SECRET_KEY=changeme
+      - SMARTSNACK_SECRET_KEY=${SMARTSNACK_SECRET_KEY:?Set SMARTSNACK_SECRET_KEY in .env or environment}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]

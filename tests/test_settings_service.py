@@ -47,12 +47,13 @@ class TestEncryptDecrypt:
         # Fernet uses random IV so they should differ
         assert enc1 != enc2
 
-    def test_no_secret_key_raises(self, app_ctx, monkeypatch):
+    def test_no_secret_key_generates_random(self, app_ctx, monkeypatch):
         monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "")
         from services.settings_service import _encrypt
 
-        with pytest.raises(RuntimeError, match="SMARTSNACK_SECRET_KEY"):
-            _encrypt("test")
+        # Should not raise — generates a random key when env var is empty
+        result = _encrypt("test")
+        assert result.startswith("fernet:")
 
 
 class TestOffCredentials:

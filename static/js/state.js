@@ -88,7 +88,9 @@ export async function api(path, opts) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
   try {
-    const defaultHeaders = opts.body ? { 'Content-Type': 'application/json' } : {};
+    const defaultHeaders = opts.body
+      ? { 'Content-Type': 'application/json', 'X-Requested-With': 'SmartSnack' }
+      : { 'X-Requested-With': 'SmartSnack' };
     const headers = Object.assign(defaultHeaders, opts.headers || {});
     const res = await fetch(path, Object.assign({}, opts, { headers, signal: controller.signal }));
     const text = await res.text();

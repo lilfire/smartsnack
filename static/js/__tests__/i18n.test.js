@@ -133,7 +133,7 @@ describe('applyStaticTranslations', () => {
     expect(el.textContent).toBe('Hello');
   });
 
-  it('sets innerHTML for data-i18n-html elements', async () => {
+  it('sets textContent for data-i18n-html elements', async () => {
     api.mockResolvedValueOnce({ language: 'en' })
        .mockResolvedValueOnce({ bold: '<b>Bold</b>' });
     await initLanguage();
@@ -141,7 +141,7 @@ describe('applyStaticTranslations', () => {
     el.setAttribute('data-i18n-html', 'bold');
     document.body.appendChild(el);
     applyStaticTranslations();
-    expect(el.innerHTML).toBe('<b>Bold</b>');
+    expect(el.textContent).toBe('<b>Bold</b>');
   });
 
   it('sets placeholder for data-i18n-placeholder elements', async () => {
