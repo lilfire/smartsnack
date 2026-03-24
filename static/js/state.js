@@ -1,5 +1,25 @@
 // ── Shared state & utilities ─────────────────────────
 
+// Focus trap: keeps Tab/Shift+Tab cycling within a container.
+// Returns a cleanup function that removes the event listener.
+export function trapFocus(container) {
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function handler(e) {
+    if (e.key !== 'Tab') return;
+    const focusable = Array.from(container.querySelectorAll(FOCUSABLE));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  container.addEventListener('keydown', handler);
+  return () => container.removeEventListener('keydown', handler);
+}
+
 export const state = {
   currentView: 'search',
   currentFilter: [],
@@ -156,8 +176,10 @@ export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel
     bg.appendChild(modal);
     document.body.appendChild(bg);
 
+    const removeTrap = trapFocus(bg);
     function close(val) {
       document.removeEventListener('keydown', onKeyDown);
+      removeTrap();
       bg.remove();
       resolve(val);
     }

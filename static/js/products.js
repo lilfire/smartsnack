@@ -1,5 +1,5 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus, trapFocus } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
@@ -280,6 +280,7 @@ function _showDuplicateModal(duplicate) {
     modal.appendChild(actions);
     bg.appendChild(modal);
     document.body.appendChild(bg);
+    trapFocus(bg);
   });
 }
 
