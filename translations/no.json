@@ -97,6 +97,8 @@
   "toast_name_required": "Navn er påkrevd",
   "toast_product_updated": "Produkt oppdatert",
   "toast_product_deleted": "\"{name}\" slettet",
+  "btn_undo": "Angre",
+  "toast_delete_undone": "Sletting angret",
   "toast_product_name_required": "Produktnavn er påkrevd",
   "toast_invalid_ean": "EAN må være 8-13 siffer",
   "error_product_name_required": "Produktnavn er påkrevd",

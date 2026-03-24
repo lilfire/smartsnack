@@ -97,6 +97,8 @@
   "toast_name_required": "Namn krävs",
   "toast_product_updated": "Produkt uppdaterad",
   "toast_product_deleted": "\"{name}\" raderad",
+  "btn_undo": "Ångra",
+  "toast_delete_undone": "Radering ångrad",
   "toast_product_name_required": "Produktnamn krävs",
   "toast_invalid_ean": "EAN måste vara 8-13 siffror",
   "error_product_name_required": "Produktnamn krävs",

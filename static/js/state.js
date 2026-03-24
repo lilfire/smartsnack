@@ -85,13 +85,24 @@ export function announceStatus(msg) {
 }
 
 let _toastTimer = null;
-export function showToast(msg, type) {
+export function showToast(msg, type, opts) {
   const toast = document.getElementById('toast');
   if (!toast) return;
   toast.innerHTML = '';
   const textSpan = document.createElement('span');
   textSpan.textContent = msg;
   toast.appendChild(textSpan);
+  if (opts && opts.onUndo) {
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'toast-undo';
+    undoBtn.textContent = _tFunc ? _tFunc('btn_undo') : 'Undo';
+    undoBtn.addEventListener('click', () => {
+      toast.classList.remove('show');
+      if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+      opts.onUndo();
+    });
+    toast.appendChild(undoBtn);
+  }
   const closeBtn = document.createElement('button');
   closeBtn.className = 'toast-close';
   closeBtn.textContent = '\u00D7';
@@ -100,7 +111,8 @@ export function showToast(msg, type) {
   toast.appendChild(closeBtn);
   toast.className = 'toast ' + type + ' show';
   if (_toastTimer) clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => { toast.classList.remove('show'); _toastTimer = null; }, 3000);
+  var duration = (opts && opts.duration) || 3000;
+  _toastTimer = setTimeout(() => { toast.classList.remove('show'); _toastTimer = null; }, duration);
 }
 
 export async function api(path, opts) {

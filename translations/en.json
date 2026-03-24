@@ -97,6 +97,8 @@
   "toast_name_required": "Name is required",
   "toast_product_updated": "Product updated",
   "toast_product_deleted": "\"{name}\" deleted",
+  "btn_undo": "Undo",
+  "toast_delete_undone": "Delete undone",
   "toast_product_name_required": "Product name is required",
   "toast_invalid_ean": "EAN must be 8-13 digits",
   "error_product_name_required": "Product name is required",
