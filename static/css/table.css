@@ -13,7 +13,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.6);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-family: 'Space Mono', monospace;
 }
@@ -71,7 +71,7 @@
 
 .prod-cat-label {
   font-size: 7px;
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.6);
   font-family: 'Space Mono', monospace;
   text-transform: uppercase;
   text-align: center;
@@ -112,7 +112,7 @@
 
 .prod-meta {
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.6);
   font-family: 'Space Mono', monospace;
   margin-left: 0;
   display: flex;
@@ -121,7 +121,7 @@
 }
 
 .prod-ean {
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .cell-right {

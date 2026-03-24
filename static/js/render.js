@@ -139,7 +139,7 @@ export function renderResults(results, search) {
   h += '</div>';
   sorted.forEach((p) => {
     const hasImg = p.has_image;
-    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '') + '</div>';
+    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="' + esc(p.name) + '">' : '') + '</div>';
     const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
     const brandHtml = p.brand ? '<span class="prod-brand">' + esc(p.brand) + '</span>' : '';
     let prodName;
@@ -167,7 +167,7 @@ export function renderResults(results, search) {
     if (state.expandedId === p.id) {
       h += '<div class="expanded"><div class="expanded-top">'
         + '<div class="expanded-img-area" data-action="trigger-image" data-id="' + p.id + '">'
-        + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
+        + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" alt="' + esc(p.name) + '" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
         + '<div class="expanded-img-overlay">' + (hasImg ? t('expanded_change_image') : t('expanded_upload_image')) + '</div></div>'
         + '<div class="expanded-right">';
       h += '<p class="expanded-title">' + t('expanded_score_breakdown') + '</p><div class="score-grid">';
