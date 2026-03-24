@@ -27,6 +27,7 @@ vi.mock('../state.js', () => {
     showToast: vi.fn(),
     upgradeSelect: vi.fn(),
     announceStatus: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
   };
 });
 

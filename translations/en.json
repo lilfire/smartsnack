@@ -23,7 +23,7 @@
   "register_sub": "Add a new product to the database",
   "label_category": "Category",
   "label_ean": "EAN (barcode)",
-  "label_product_name": "Product name *",
+  "label_product_name": "Product name",
   "label_brand": "Brand",
   "label_stores": "Stores",
   "label_ingredients": "Ingredients",

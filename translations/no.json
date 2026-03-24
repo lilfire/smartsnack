@@ -23,7 +23,7 @@
   "register_sub": "Legg til et nytt produkt i databasen",
   "label_category": "Kategori",
   "label_ean": "EAN (strekkode)",
-  "label_product_name": "Produktnavn *",
+  "label_product_name": "Produktnavn",
   "label_brand": "Merke",
   "label_stores": "Butikker",
   "label_ingredients": "Ingredienser",

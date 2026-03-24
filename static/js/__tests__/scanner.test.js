@@ -29,6 +29,7 @@ vi.mock('../state.js', () => {
     fetchStats: vi.fn().mockResolvedValue({}),
     showConfirmModal: vi.fn().mockResolvedValue(true),
     upgradeSelect: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
   };
 });
 
