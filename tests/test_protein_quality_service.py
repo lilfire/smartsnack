@@ -191,6 +191,19 @@ class TestEstimate:
         assert result["est_pdcaas"] is not None
         assert len(result["sources"]) >= 2
 
+    def test_uppercase_keyword_matches(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+        from translations import _set_translation_key
+
+        # Simulate user adding "Hjortekjøtt" (capitalized) as a keyword
+        _set_translation_key("pq_meat_keywords", {"no": "kjøtt, Hjortekjøtt"})
+        result = estimate(
+            "Hjortekjøtt (90,3 %), havsalt, hvitvinseddik"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_position_weighting(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
         from translations import _set_translation_key
