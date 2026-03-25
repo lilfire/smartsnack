@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 # ---------- builder ----------
 FROM python:3.12-slim AS builder
 
@@ -5,9 +6,10 @@ WORKDIR /build
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --prefix=/install \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --prefix=/install \
         torch torchvision --index-url https://download.pytorch.org/whl/cpu \
-    && pip install --no-cache-dir --prefix=/install -r requirements.txt \
+    && pip install --prefix=/install -r requirements.txt \
     && find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'tests' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'test' -exec rm -rf {} + 2>/dev/null; \
@@ -23,9 +25,10 @@ RUN pip install --no-cache-dir --prefix=/install \
 # ---------- runtime ----------
 FROM python:3.12-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    openssl libgl1 libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    openssl libgl1 libglib2.0-0
 
 ENV EASYOCR_MODULE_PATH=/data/.easyocr
 
