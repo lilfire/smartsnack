@@ -1,5 +1,5 @@
 // ── OpenFoodFacts Lookup & Protein Quality Estimation ─
-import { state, api, esc, safeDataUri, showToast } from './state.js';
+import { state, api, esc, safeDataUri, showToast, trapFocus } from './state.js';
 import { t } from './i18n.js';
 import { resizeImage } from './images.js';
 
@@ -144,6 +144,7 @@ function showOffPickerLoading(msg) {
 
   bg.appendChild(modal);
   document.body.appendChild(bg);
+  trapFocus(bg);
 }
 
 function updateOffPickerResults(products, errorMsg, ean) {
@@ -483,6 +484,7 @@ export function showEditDuplicateModal(duplicate) {
     modal.appendChild(actions);
     bg.appendChild(modal);
     document.body.appendChild(bg);
+    trapFocus(bg);
   });
 }
 
@@ -652,6 +654,7 @@ export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
 
     bg.appendChild(modal);
     document.body.appendChild(bg);
+    trapFocus(bg);
   });
 }
 
@@ -909,6 +912,7 @@ export function showDuplicateMergeModal(formData, duplicate, aIsSynced) {
 
     bg.appendChild(modal);
     document.body.appendChild(bg);
+    trapFocus(bg);
   });
 }
 
@@ -1068,7 +1072,10 @@ export function showOffAddReview(ean, prefixOverride) {
 
   modalDiv.appendChild(bodyDiv);
   bg.innerHTML = '';
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modalDiv);
+  trapFocus(bg);
   return reviewPromise;
 }
 

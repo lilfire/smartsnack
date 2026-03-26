@@ -9,7 +9,7 @@
     <div class="form-fields">
       <div class="grid-2">
         <div>
-          <label class="field-label" for="f-type" data-i18n="label_category">Category</label>
+          <label class="field-label field-required" for="f-type" data-i18n="label_category">Category</label>
           <select class="field-select" id="f-type"></select>
         </div>
         <div>
@@ -20,7 +20,7 @@
               <span class="field-hint" id="f-ean-hint" data-i18n="hint_ean">8-13 digits</span>
               <span id="f-ean-error" class="field-error" role="alert" style="display:none" data-i18n="error_invalid_ean">Enter a valid EAN (8-13 digits)</span>
             </div>
-            <button type="button" class="btn-scan" onclick="openScanner('f')" data-i18n-title="btn_scan_title" title="Scan barcode" aria-label="Scan barcode">&#128247;</button>
+            <button type="button" class="btn-scan" onclick="openScanner('f')" data-i18n-aria-label="btn_scan_title" aria-label="Scan barcode">&#128247;</button>
             <button type="button" class="btn-off" id="f-off-btn" disabled onclick="lookupOFF('f')" data-i18n-title="btn_fetch_disabled_title" title="Enter a valid EAN barcode or product name first">
               <span class="off-spin"></span>
               <span class="off-label" data-i18n="btn_fetch">&#127758; Fetch</span>
@@ -30,8 +30,8 @@
       </div>
 
       <div>
-        <label class="field-label" for="f-name" data-i18n="label_product_name">Product name *</label>
-        <input class="field-input" id="f-name" required aria-describedby="f-name-error" data-i18n-placeholder="ph_product_name" placeholder="e.g. Monster ProteinChips paprika" oninput="validateOffBtn('f');this.setAttribute('aria-invalid','false');var e=document.getElementById('f-name-error');if(e)e.style.display='none'">
+        <label class="field-label field-required" for="f-name" data-i18n="label_product_name">Product name</label>
+        <input class="field-input" id="f-name" required aria-required="true" aria-describedby="f-name-error" data-i18n-placeholder="ph_product_name" placeholder="e.g. Monster ProteinChips paprika" oninput="validateOffBtn('f');this.setAttribute('aria-invalid','false');var e=document.getElementById('f-name-error');if(e)e.style.display='none'">
         <span id="f-name-error" class="field-error" role="alert" style="display:none" data-i18n="error_product_name_required">Product name is required</span>
       </div>
 

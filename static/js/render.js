@@ -132,9 +132,9 @@ export function renderResults(results, search) {
   const sorted = applySorting(results);
   const cols = getActiveCols();
   const gridTpl = getGridTemplate(cols);
-  let h = '<div class="table-wrap"><div class="table-head" style="grid-template-columns:' + gridTpl + '">';
+  let h = '<div class="table-wrap" role="table"><div class="table-head" role="row" style="grid-template-columns:' + gridTpl + '">';
   cols.forEach((c, i) => {
-    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" data-action="sort" data-col="' + esc(c.key) + '"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
+    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" data-action="sort" data-col="' + esc(c.key) + '" tabindex="0" role="columnheader" aria-sort="' + (state.sortCol === c.key ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
   });
   h += '</div>';
   sorted.forEach((p) => {
@@ -149,7 +149,7 @@ export function renderResults(results, search) {
       prodName = p.name;
     }
     const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
-    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="row" aria-label="' + esc(p.name) + '">'
       + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
       + '<div class="prod-meta">' + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'

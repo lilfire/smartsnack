@@ -1,5 +1,5 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus, trapFocus } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
@@ -147,23 +147,61 @@ export async function unlockEan(id) {
   }
 }
 
+let _pendingDelete = null;
+
 export async function deleteProduct(id, name) {
   if (!name) {
     const product = state.cachedResults && state.cachedResults.find((p) => p.id === id);
     name = product ? product.name : '';
   }
   if (!await showConfirmModal('\u{1F5D1}', name, t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'), true)) return;
-  try {
-    await api('/api/products/' + id, { method: 'DELETE' });
-    delete state.imageCache[id];
-    state.expandedId = null;
-    state.editingId = null;
-    showToast(t('toast_product_deleted', { name: name }), 'success');
-    loadData();
-  } catch(e) {
-    console.error(e);
-    showToast(t('toast_network_error'), 'error');
-  }
+
+  // Cancel any previous pending delete
+  if (_pendingDelete) { clearTimeout(_pendingDelete.timer); _pendingDelete = null; }
+
+  // Cache the product data for undo
+  const cachedProduct = state.cachedResults && state.cachedResults.find((p) => p.id === id);
+  const cachedImage = state.imageCache[id];
+
+  // Remove from UI immediately
+  state.cachedResults = (state.cachedResults || []).filter((p) => p.id !== id);
+  delete state.imageCache[id];
+  state.expandedId = null;
+  state.editingId = null;
+  rerender();
+
+  // Schedule actual delete after 5 seconds
+  var pending = {
+    timer: setTimeout(async () => {
+      _pendingDelete = null;
+      try {
+        await api('/api/products/' + id, { method: 'DELETE' });
+      } catch(e) {
+        console.error(e);
+        showToast(t('toast_network_error'), 'error');
+        // Restore on failure
+        if (cachedProduct) { state.cachedResults.push(cachedProduct); }
+        if (cachedImage) { state.imageCache[id] = cachedImage; }
+        loadData();
+      }
+    }, 5000)
+  };
+  _pendingDelete = pending;
+
+  showToast(t('toast_product_deleted', { name: name }), 'success', {
+    duration: 5000,
+    onUndo: function() {
+      if (_pendingDelete === pending) {
+        clearTimeout(pending.timer);
+        _pendingDelete = null;
+      }
+      // Restore product to cached results
+      if (cachedProduct) { state.cachedResults.push(cachedProduct); }
+      if (cachedImage) { state.imageCache[id] = cachedImage; }
+      rerender();
+      showToast(t('toast_delete_undone'), 'info');
+    }
+  });
 }
 
 export async function loadData() {
@@ -280,6 +318,7 @@ function _showDuplicateModal(duplicate) {
     modal.appendChild(actions);
     bg.appendChild(modal);
     document.body.appendChild(bg);
+    trapFocus(bg);
   });
 }
 

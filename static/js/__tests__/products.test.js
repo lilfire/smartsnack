@@ -27,6 +27,7 @@ vi.mock('../state.js', () => {
     showToast: vi.fn(),
     upgradeSelect: vi.fn(),
     announceStatus: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
   };
 });
 
@@ -99,6 +100,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.clearAllTimers();
   vi.useRealTimers();
   document.body.innerHTML = '';
 });
@@ -176,25 +178,36 @@ describe('saveProduct', () => {
 });
 
 describe('deleteProduct', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
   it('deletes product after confirmation', async () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(showConfirmModal).toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_deleted'), 'success', expect.objectContaining({ onUndo: expect.any(Function) }));
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(api).toHaveBeenCalledWith('/api/products/1', { method: 'DELETE' });
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_deleted'), 'success');
   });
 
   it('does nothing when confirmation cancelled', async () => {
     showConfirmModal.mockResolvedValue(false);
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(api).not.toHaveBeenCalled();
   });
 
   it('looks up name from cachedResults when not provided', async () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1);
+    const promise = deleteProduct(1);
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(showConfirmModal).toHaveBeenCalledWith(expect.any(String), 'Milk', expect.any(String), expect.any(String), expect.any(String), true);
   });
 
@@ -202,10 +215,28 @@ describe('deleteProduct', () => {
     state.imageCache[1] = 'data:image/png;base64,abc';
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(state.imageCache[1]).toBeUndefined();
     expect(state.expandedId).toBeNull();
     expect(state.editingId).toBeNull();
+  });
+
+  it('shows network error on API failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    showConfirmModal.mockResolvedValue(true);
+    api.mockReset();
+    api.mockImplementation(() => Promise.reject(new Error('network fail')));
+    showToast.mockClear();
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+    await vi.runAllTimersAsync();
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    api.mockReset();
+    api.mockResolvedValue({});
+    console.error.mockRestore();
   });
 });
 
@@ -438,17 +469,6 @@ describe('loadData', () => {
     fetchStats.mockRejectedValueOnce(new Error('network fail'));
     await loadData();
     expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
-    console.error.mockRestore();
-  });
-});
-
-describe('deleteProduct error path', () => {
-  it('shows network error on API failure', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    showConfirmModal.mockResolvedValue(true);
-    api.mockRejectedValueOnce(new Error('network fail'));
-    await deleteProduct(1, 'Milk');
-    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
     console.error.mockRestore();
   });
 });

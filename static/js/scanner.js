@@ -1,5 +1,5 @@
 // ── Barcode Scanner (all scanner sections) ──────────
-import { state, api, esc, catEmoji, catLabel, safeDataUri, fetchProducts } from './state.js';
+import { state, api, esc, catEmoji, catLabel, safeDataUri, fetchProducts, trapFocus } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender } from './filters.js';
 import { loadProductImage } from './images.js';
@@ -259,9 +259,13 @@ export function showScanNotFoundModal(ean) {
   cancelBtn.addEventListener('click', () => { closeScanModal(); });
   actions.appendChild(cancelBtn);
 
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modal);
   document.body.appendChild(bg);
   document.body.style.overflow = 'hidden';
+  trapFocus(bg);
+  regBtn.focus();
 }
 
 export function closeScanModal() {
@@ -338,8 +342,11 @@ export function showScanProductPicker(ean) {
   bodyDiv.innerHTML = '<div class="off-modal-empty">\u{1F50D} ' + esc(t('search_placeholder')) + '</div>';
   modal.appendChild(bodyDiv);
 
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modal);
   document.body.appendChild(bg);
+  trapFocus(bg);
   setTimeout(() => { if (searchInput) searchInput.focus(); }, 100);
 }
 
@@ -460,8 +467,12 @@ export function showScanOffConfirm(ean, productId) {
   skipBtn.addEventListener('click', () => { closeScanOffConfirm(); loadData(); });
   actions.appendChild(skipBtn);
 
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modal);
   document.body.appendChild(bg);
+  trapFocus(bg);
+  fetchBtn.focus();
 }
 
 export function closeScanOffConfirm() {

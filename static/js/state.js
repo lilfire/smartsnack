@@ -1,5 +1,25 @@
 // ── Shared state & utilities ─────────────────────────
 
+// Focus trap: keeps Tab/Shift+Tab cycling within a container.
+// Returns a cleanup function that removes the event listener.
+export function trapFocus(container) {
+  const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  function handler(e) {
+    if (e.key !== 'Tab') return;
+    const focusable = Array.from(container.querySelectorAll(FOCUSABLE));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+    } else {
+      if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  }
+  container.addEventListener('keydown', handler);
+  return () => container.removeEventListener('keydown', handler);
+}
+
 export const state = {
   currentView: 'search',
   currentFilter: [],
@@ -65,13 +85,24 @@ export function announceStatus(msg) {
 }
 
 let _toastTimer = null;
-export function showToast(msg, type) {
+export function showToast(msg, type, opts) {
   const toast = document.getElementById('toast');
   if (!toast) return;
   toast.innerHTML = '';
   const textSpan = document.createElement('span');
   textSpan.textContent = msg;
   toast.appendChild(textSpan);
+  if (opts && opts.onUndo) {
+    const undoBtn = document.createElement('button');
+    undoBtn.className = 'toast-undo';
+    undoBtn.textContent = _tFunc ? _tFunc('btn_undo') : 'Undo';
+    undoBtn.addEventListener('click', () => {
+      toast.classList.remove('show');
+      if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+      opts.onUndo();
+    });
+    toast.appendChild(undoBtn);
+  }
   const closeBtn = document.createElement('button');
   closeBtn.className = 'toast-close';
   closeBtn.textContent = '\u00D7';
@@ -80,7 +111,8 @@ export function showToast(msg, type) {
   toast.appendChild(closeBtn);
   toast.className = 'toast ' + type + ' show';
   if (_toastTimer) clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => { toast.classList.remove('show'); _toastTimer = null; }, 3000);
+  var duration = (opts && opts.duration) || 3000;
+  _toastTimer = setTimeout(() => { toast.classList.remove('show'); _toastTimer = null; }, duration);
 }
 
 export async function api(path, opts) {
@@ -156,8 +188,10 @@ export function showConfirmModal(icon, title, message, confirmLabel, cancelLabel
     bg.appendChild(modal);
     document.body.appendChild(bg);
 
+    const removeTrap = trapFocus(bg);
     function close(val) {
       document.removeEventListener('keydown', onKeyDown);
+      removeTrap();
       bg.remove();
       resolve(val);
     }

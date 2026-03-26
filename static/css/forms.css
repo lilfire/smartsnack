@@ -217,6 +217,12 @@ label.field-label {
   font-family: 'Space Mono', monospace;
 }
 
+label.field-label.field-required::after {
+  content: ' *';
+  color: #E8B84B;
+  font-weight: 700;
+}
+
 .field-input,
 .field-select {
   width: 100%;
