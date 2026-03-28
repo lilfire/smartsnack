@@ -20,6 +20,7 @@ from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
 
 logger = logging.getLogger(__name__)
 
+
 _OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
 
 _INGREDIENT_PROMPT = (
