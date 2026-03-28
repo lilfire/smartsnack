@@ -18,11 +18,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
 
       - name: Install dependencies
         run: |
-          pip install --no-cache-dir \
+          pip install \
             flask==3.1.0 \
             flask-limiter==3.8.0 \
             gunicorn==23.0.0 \
