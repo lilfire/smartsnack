@@ -1,0 +1,21 @@
+name: Branch Name Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch name
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          echo "Checking branch name: $BRANCH"
+          if [[ "$BRANCH" =~ ^LSO-[0-9]+-. ]] || [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "development" ]]; then
+            echo "Branch name '$BRANCH' follows naming convention."
+          else
+            echo "::error::Branch name '$BRANCH' does not follow the naming convention."
+            echo "Branch names must match: LSO-{number}-*, main, or development"
+            exit 1
+          fi
