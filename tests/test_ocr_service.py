@@ -1,4 +1,4 @@
-"""Tests for OCR service — tesseract and LLM vision backends."""
+"""Tests for OCR service — multi-provider OCR backends."""
 
 import base64
 import io
@@ -198,69 +198,334 @@ class TestTesseractBackend:
 
 
 # ---------------------------------------------------------------------------
-# LLM vision backend
+# Claude Vision backend
 # ---------------------------------------------------------------------------
 
-class TestLLMBackend:
-    """Tests for the LLM vision-based OCR backend."""
+class TestClaudeVisionBackend:
+    """Tests for the Claude Vision OCR backend."""
 
-    def _setup_llm_env(self):
-        """Ensure ocr_service uses LLM backend."""
+    def _setup_env(self):
         import services.ocr_service as mod
-        mod._OCR_BACKEND = "llm"
+        mod._OCR_BACKEND = "claude_vision"
         return mod
 
-    @patch("services.ocr_service._call_llm_vision")
-    def test_extract_text_calls_llm(self, mock_llm):
-        """When OCR_BACKEND=llm, should use LLM vision API."""
-        mod = self._setup_llm_env()
+    def test_extract_text_calls_claude_vision(self):
+        """When OCR_BACKEND=claude_vision, should use Claude Vision."""
+        mod = self._setup_env()
 
-        mock_llm.return_value = "sukker, hvetemel, vann, salt"
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="sukker, hvetemel, vann, salt")]
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_msg
 
-        png_bytes = _make_tiny_png()
-        result = mod.extract_text(_b64(png_bytes))
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
+            with patch("anthropic.Anthropic", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
 
-        assert mock_llm.called
-        assert result == "sukker, hvetemel, vann, salt"
+                assert mock_client.messages.create.called
+                assert result == "sukker, hvetemel, vann, salt"
 
-    @patch("services.ocr_service._call_llm_vision")
-    def test_llm_with_data_uri(self, mock_llm):
-        """LLM backend should also accept data URI format."""
-        mod = self._setup_llm_env()
+    def test_claude_vision_with_data_uri(self):
+        mod = self._setup_env()
 
-        mock_llm.return_value = "ingredients list"
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="ingredients list")]
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_msg
 
-        png_bytes = _make_tiny_png()
-        result = mod.extract_text(_data_uri(png_bytes))
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
+            with patch("anthropic.Anthropic", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_data_uri(png_bytes))
 
-        assert result == "ingredients list"
+                assert result == "ingredients list"
 
-    def test_llm_missing_api_key_raises(self):
-        """Should raise ValueError when LLM_API_KEY is not set."""
-        mod = self._setup_llm_env()
+    def test_missing_api_key_raises(self):
+        """Should raise ValueError when no API key is available."""
+        mod = self._setup_env()
 
         with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
             os.environ.pop("LLM_API_KEY", None)
 
             png_bytes = _make_tiny_png()
-            with pytest.raises(ValueError, match="LLM_API_KEY"):
+            with pytest.raises(ValueError, match="API key"):
                 mod.extract_text(_b64(png_bytes))
 
-    @patch("services.ocr_service._call_llm_vision")
-    def test_llm_empty_response(self, mock_llm):
-        """LLM returning empty string should return empty."""
-        mod = self._setup_llm_env()
+    def test_falls_back_to_llm_api_key(self):
+        """Should use LLM_API_KEY when ANTHROPIC_API_KEY is not set."""
+        mod = self._setup_env()
 
-        mock_llm.return_value = ""
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="ingredients here")]
 
-        png_bytes = _make_tiny_png()
-        result = mod.extract_text(_b64(png_bytes))
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_msg
 
-        assert result == ""
+        with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            with patch("anthropic.Anthropic", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(api_key="fallback-key")
+                assert result == "ingredients here"
+
+    def test_empty_response(self):
+        mod = self._setup_env()
+
+        mock_msg = MagicMock()
+        mock_msg.content = []
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_msg
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
+            with patch("anthropic.Anthropic", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                assert result == ""
 
 
 # ---------------------------------------------------------------------------
-# OCR_BACKEND config
+# Gemini backend
+# ---------------------------------------------------------------------------
+
+class TestGeminiBackend:
+    """Tests for the Gemini Vision OCR backend."""
+
+    def _setup_env(self):
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "gemini"
+        return mod
+
+    def _patch_genai(self, mock_client):
+        """Create sys.modules patches for google.genai with mock_client."""
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+        return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
+
+    def test_extract_text_calls_gemini(self):
+        """Should call google.genai.Client with correct API shape."""
+        mod = self._setup_env()
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker, mel, vann"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, mock_genai = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-gemini-key"}, clear=False):
+            with patcher:
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                mock_genai.Client.assert_called_once_with(api_key="test-gemini-key")
+                mock_client.models.generate_content.assert_called_once()
+                call_kwargs = mock_client.models.generate_content.call_args
+                assert call_kwargs[1]["model"] == "gemini-2.0-flash"
+                assert result == "sukker, mel, vann"
+
+    def test_missing_api_key_raises(self):
+        mod = self._setup_env()
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            os.environ.pop("LLM_API_KEY", None)
+
+            png_bytes = _make_tiny_png()
+            with pytest.raises(ValueError, match="API key"):
+                mod.extract_text(_b64(png_bytes))
+
+    def test_falls_back_to_llm_api_key(self):
+        mod = self._setup_env()
+
+        mock_response = MagicMock()
+        mock_response.text = "ingredients"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, mock_genai = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
+            os.environ.pop("GEMINI_API_KEY", None)
+            with patcher:
+                png_bytes = _make_tiny_png()
+                mod.extract_text(_b64(png_bytes))
+
+                mock_genai.Client.assert_called_once_with(api_key="fallback-key")
+
+    def test_empty_response(self):
+        mod = self._setup_env()
+
+        mock_response = MagicMock()
+        mock_response.text = ""
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _ = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# OpenAI backend
+# ---------------------------------------------------------------------------
+
+class TestOpenAIBackend:
+    """Tests for the OpenAI Vision OCR backend."""
+
+    def _setup_env(self):
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "openai"
+        return mod
+
+    def test_extract_text_calls_openai(self):
+        """Should call openai.OpenAI with correct API shape."""
+        mod = self._setup_env()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "sukker, mel, vann"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-openai-key"}, clear=False):
+            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(api_key="test-openai-key")
+                mock_client.chat.completions.create.assert_called_once()
+                call_kwargs = mock_client.chat.completions.create.call_args
+                assert call_kwargs[1]["model"] == "gpt-4o"
+                assert result == "sukker, mel, vann"
+
+    def test_missing_api_key_raises(self):
+        mod = self._setup_env()
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("OPENAI_API_KEY", None)
+            os.environ.pop("LLM_API_KEY", None)
+
+            png_bytes = _make_tiny_png()
+            with pytest.raises(ValueError, match="API key"):
+                mod.extract_text(_b64(png_bytes))
+
+    def test_falls_back_to_llm_api_key(self):
+        mod = self._setup_env()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "ingredients"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
+            os.environ.pop("OPENAI_API_KEY", None)
+            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(api_key="fallback-key")
+
+    def test_empty_response(self):
+        mod = self._setup_env()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            with patch("openai.OpenAI", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                assert result == ""
+
+
+# ---------------------------------------------------------------------------
+# Backward compatibility
+# ---------------------------------------------------------------------------
+
+class TestBackwardCompatibility:
+    """Verify OCR_BACKEND=llm still routes to Claude Vision."""
+
+    def test_llm_routes_to_claude_vision(self):
+        """OCR_BACKEND=llm should use the Claude Vision provider (anthropic SDK)."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "llm"
+
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="sukker, mel")]
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_msg
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
+            with patch("anthropic.Anthropic", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = mod.extract_text(_b64(png_bytes))
+
+                assert mock_client.messages.create.called
+                assert result == "sukker, mel"
+
+    def test_llm_alias_in_providers_registry(self):
+        """The _PROVIDERS dict should map 'llm' to claude_vision handler."""
+        import services.ocr_service as mod
+
+        assert "llm" in mod._PROVIDERS
+        assert mod._PROVIDERS["llm"] == mod._PROVIDERS["claude_vision"]
+
+
+# ---------------------------------------------------------------------------
+# Unknown backend
+# ---------------------------------------------------------------------------
+
+class TestUnknownBackend:
+    """Verify clear error message for invalid OCR_BACKEND values."""
+
+    def test_unknown_backend_raises_value_error(self):
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "invalid_provider"
+
+        png_bytes = _make_tiny_png()
+        with pytest.raises(ValueError, match="Unknown OCR backend"):
+            mod.extract_text(_b64(png_bytes))
+
+    def test_error_message_includes_backend_name(self):
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "banana_vision"
+
+        png_bytes = _make_tiny_png()
+        with pytest.raises(ValueError, match="banana_vision"):
+            mod.extract_text(_b64(png_bytes))
+
+
+# ---------------------------------------------------------------------------
+# OCR_BACKEND config — all provider names
 # ---------------------------------------------------------------------------
 
 class TestOCRBackendConfig:
@@ -291,6 +556,36 @@ class TestOCRBackendConfig:
         importlib.reload(mod)
 
         assert mod._OCR_BACKEND == "tesseract"
+
+    @patch.dict(os.environ, {"OCR_BACKEND": "claude_vision"}, clear=False)
+    def test_claude_vision_backend_selected(self):
+        import importlib
+        import services.ocr_service as mod
+        importlib.reload(mod)
+
+        assert mod._OCR_BACKEND == "claude_vision"
+
+    @patch.dict(os.environ, {"OCR_BACKEND": "gemini"}, clear=False)
+    def test_gemini_backend_selected(self):
+        import importlib
+        import services.ocr_service as mod
+        importlib.reload(mod)
+
+        assert mod._OCR_BACKEND == "gemini"
+
+    @patch.dict(os.environ, {"OCR_BACKEND": "openai"}, clear=False)
+    def test_openai_backend_selected(self):
+        import importlib
+        import services.ocr_service as mod
+        importlib.reload(mod)
+
+        assert mod._OCR_BACKEND == "openai"
+
+    def test_all_providers_in_registry(self):
+        """All valid backend names should be in the _PROVIDERS dict."""
+        import services.ocr_service as mod
+        expected = {"tesseract", "claude_vision", "gemini", "openai", "llm"}
+        assert expected == set(mod._PROVIDERS.keys())
 
 
 # ---------------------------------------------------------------------------
