@@ -168,19 +168,32 @@ class TestOcrSettingsApi:
 class TestOcrDispatchWiring:
     """Tests for OCR dispatch reading from user_settings with tesseract fallback."""
 
+    @staticmethod
+    def _make_test_image_b64():
+        """Create a minimal valid base64-encoded PNG for dispatch tests."""
+        import base64
+        import io
+        from PIL import Image
+
+        img = Image.new("RGB", (10, 10), color="white")
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+
     def test_dispatch_uses_tesseract_by_default(self, app_ctx, monkeypatch):
-        """When no backend is set, dispatch should use tesseract (extract_text)."""
-        from services import ocr_service, settings_service
+        """When no backend is set, dispatch should call the tesseract provider."""
+        from services import ocr_service
 
         called_with = {}
 
-        def mock_extract_text(image_base64):
+        def mock_tesseract(image_bytes, image_b64):
             called_with["backend"] = "tesseract"
             return "mock text"
 
-        monkeypatch.setattr(ocr_service, "extract_text", mock_extract_text)
-        result = ocr_service.dispatch_ocr("fake_image_data")
+        monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
+        result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called_with.get("backend") == "tesseract"
+        assert result == "mock text"
 
     def test_dispatch_falls_back_to_tesseract_when_stored_unavailable(
         self, app_ctx, monkeypatch
@@ -195,23 +208,42 @@ class TestOcrDispatchWiring:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         called_with = {}
-        original_extract = ocr_service.extract_text
 
-        def mock_extract_text(image_base64):
-            called_with["called"] = True
+        def mock_tesseract(image_bytes, image_b64):
+            called_with["backend"] = "tesseract"
             return "fallback text"
 
-        monkeypatch.setattr(ocr_service, "extract_text", mock_extract_text)
+        monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
 
-        result = ocr_service.dispatch_ocr("fake_image_data")
-        assert called_with.get("called") is True
+        result = ocr_service.dispatch_ocr(self._make_test_image_b64())
+        assert called_with.get("backend") == "tesseract"
+        assert result == "fallback text"
+
+    def test_dispatch_uses_selected_backend(self, app_ctx, monkeypatch):
+        """When a valid available backend is selected, dispatch uses it."""
+        from services import settings_service, ocr_service
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        settings_service.set_ocr_backend("claude_vision")
+
+        called_with = {}
+
+        def mock_claude(image_bytes, image_b64):
+            called_with["backend"] = "claude_vision"
+            return "claude text"
+
+        monkeypatch.setitem(ocr_service._PROVIDERS, "claude_vision", mock_claude)
+
+        result = ocr_service.dispatch_ocr(self._make_test_image_b64())
+        assert called_with.get("backend") == "claude_vision"
+        assert result == "claude text"
 
     def test_dispatch_ocr_returns_text(self, app_ctx, monkeypatch):
         from services import ocr_service
 
-        def mock_extract_text(image_base64):
+        def mock_tesseract(image_bytes, image_b64):
             return "ingredient text"
 
-        monkeypatch.setattr(ocr_service, "extract_text", mock_extract_text)
-        result = ocr_service.dispatch_ocr("fake_image_data")
+        monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
+        result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert result == "ingredient text"

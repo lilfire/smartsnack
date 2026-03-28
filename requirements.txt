@@ -3,6 +3,8 @@ flask-limiter==3.8.0
 gunicorn==23.0.0
 pyopenssl==24.3.0
 cryptography==43.0.3
-easyocr==1.7.2
-opencv-python-headless==4.10.0.84
-Pillow==11.1.0
+pytesseract>=0.3.10
+anthropic>=0.39.0
+google-genai>=1.0.0
+openai>=1.0.0
+Pillow>=10.0.0
