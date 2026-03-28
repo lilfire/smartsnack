@@ -1359,7 +1359,7 @@ export async function loadOcrSettings() {
   try {
     const data = await api('/api/ocr/settings');
     sel.value = data.provider || 'tesseract';
-    if (cb) cb.checked = !!data.fallback;
+    if (cb) cb.checked = !!data.fallback_to_tesseract;
     _updateOcrFallbackVisibility();
   } catch(e) { /* settings may not exist yet — use defaults */ }
 }
@@ -1368,7 +1368,7 @@ export async function saveOcrSettings() {
   const sel = document.getElementById('ocr-provider-select');
   const cb = document.getElementById('ocr-fallback-checkbox');
   if (!sel || !sel.value) return;
-  const body = { provider: sel.value, fallback: !!(cb && cb.checked) };
+  const body = { provider: sel.value, fallback_to_tesseract: !!(cb && cb.checked) };
   try {
     await api('/api/ocr/settings', { method: 'POST', body: JSON.stringify(body) });
     showToast(t('toast_ocr_settings_saved'), 'success');
