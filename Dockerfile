@@ -7,13 +7,20 @@ WORKDIR /build
 COPY requirements.txt .
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefix=/install -r requirements.txt \
+    pip install --prefix=/install \
+        torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --prefix=/install -r requirements.txt \
     && ( \
        find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'tests' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'test' -exec rm -rf {} + 2>/dev/null; \
        find /install -name '*.pyc' -delete 2>/dev/null; \
        find /install -name '*.pyi' -delete 2>/dev/null; \
+       rm -rf /install/lib/python3.12/site-packages/torch/test \
+              /install/lib/python3.12/site-packages/torch/include \
+              /install/lib/python3.12/site-packages/torch/share \
+              /install/lib/python3.12/site-packages/torchvision/datasets \
+              /install/lib/python3.12/site-packages/caffe2 \
     ) || true
 
 # ---------- runtime ----------
