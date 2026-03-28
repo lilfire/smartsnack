@@ -1,0 +1,55 @@
+name: Tests
+
+on:
+  push:
+    branches: [development, main]
+  pull_request:
+    branches: [development, main]
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install --no-cache-dir \
+            flask==3.1.0 \
+            flask-limiter==3.8.0 \
+            gunicorn==23.0.0 \
+            pyopenssl==24.3.0 \
+            cryptography==43.0.3 \
+            Pillow==11.1.0 \
+            pytest==8.3.4 \
+            pytest-cov==5.0.0
+
+      - name: Run pytest
+        run: python -m pytest --tb=short -q
+
+  frontend:
+    name: Frontend (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vitest
+        run: npx vitest run
