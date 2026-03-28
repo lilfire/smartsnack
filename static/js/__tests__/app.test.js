@@ -104,6 +104,8 @@ vi.mock('../settings.js', () => ({
   saveOffCredentials: vi.fn(),
   refreshAllFromOff: vi.fn(),
   estimateAllPq: vi.fn(),
+  loadOcrSettings: vi.fn(),
+  saveOcrSettings: vi.fn(),
 }));
 
 vi.mock('../scanner.js', () => ({

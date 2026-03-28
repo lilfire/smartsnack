@@ -1240,12 +1240,10 @@ export async function loadOcrSettings() {
     container.innerHTML = '';
     (data.backends || []).forEach((b) => {
       const id = 'ocr-backend-' + b.id;
+      const unavailId = 'ocr-unavailable-' + b.id;
       const label = document.createElement('label');
-      label.className = 'settings-radio-label';
-      label.style.display = 'flex';
-      label.style.alignItems = 'center';
-      label.style.gap = '8px';
-      label.style.padding = '6px 0';
+      label.className = 'settings-radio-label' + (!b.available ? ' disabled' : '');
+      label.setAttribute('for', id);
       const radio = document.createElement('input');
       radio.type = 'radio';
       radio.name = 'ocr-backend';
@@ -1254,7 +1252,7 @@ export async function loadOcrSettings() {
       radio.checked = b.id === data.active;
       if (!b.available) {
         radio.disabled = true;
-        label.style.opacity = '0.5';
+        radio.setAttribute('aria-describedby', unavailId);
       }
       label.appendChild(radio);
       const nameSpan = document.createElement('span');
@@ -1263,7 +1261,7 @@ export async function loadOcrSettings() {
       if (!b.available) {
         const unavail = document.createElement('span');
         unavail.className = 'form-sub';
-        unavail.style.marginLeft = '4px';
+        unavail.id = unavailId;
         unavail.setAttribute('data-i18n', 'settings_ocr_unavailable');
         unavail.textContent = t('settings_ocr_unavailable');
         label.appendChild(unavail);
