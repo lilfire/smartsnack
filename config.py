@@ -5,6 +5,10 @@ import os
 APP_VERSION = "0.13"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
+
+# OCR backend: "tesseract" (default) or "llm" (Claude Vision)
+OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 TRANSLATIONS_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "translations"
 )
