@@ -1,5 +1,6 @@
 """Tests for OCR settings: config, service, API endpoints, and dispatch wiring."""
 
+import logging
 import os
 
 import pytest
@@ -85,6 +86,15 @@ class TestGetAvailableBackends:
         ids = {b["id"] for b in backends}
         assert ids == set(OCR_BACKENDS.keys())
 
+    def test_all_keys_set_all_available(self, app_ctx, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        monkeypatch.setenv("GEMINI_API_KEY", "gm-test")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
+        from services import ocr_service
+        backends = ocr_service.get_available_backends()
+        for b in backends:
+            assert b["available"] is True, f"{b['id']} should be available"
+
 
 class TestOcrSettingsService:
     """Tests for get_ocr_backend() and set_ocr_backend() in settings_service."""
@@ -164,6 +174,27 @@ class TestOcrSettingsApi:
         data = resp.get_json()
         assert data["current_backend"] == "tesseract"
 
+    def test_put_ocr_backend_non_json_body(self, client):
+        resp = client.put(
+            "/api/settings/ocr", data="not json", content_type="text/plain"
+        )
+        assert resp.status_code == 400
+
+    def test_put_available_non_tesseract_backend(self, client, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        resp = client.put("/api/settings/ocr", json={"backend": "claude_vision"})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data.get("ok") is True
+        assert data.get("backend") == "claude_vision"
+
+    def test_get_reflects_changed_backend(self, client, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        client.put("/api/settings/ocr", json={"backend": "claude_vision"})
+        resp = client.get("/api/settings/ocr")
+        data = resp.get_json()
+        assert data["current_backend"] == "claude_vision"
+
 
 class TestOcrDispatchWiring:
     """Tests for OCR dispatch reading from user_settings with tesseract fallback."""
@@ -215,3 +246,31 @@ class TestOcrDispatchWiring:
         monkeypatch.setattr(ocr_service, "extract_text", mock_extract_text)
         result = ocr_service.dispatch_ocr("fake_image_data")
         assert result == "ingredient text"
+
+    def test_dispatch_fallback_logs_warning(self, app_ctx, monkeypatch, caplog):
+        """Verify that falling back to tesseract logs a warning."""
+        from services import settings_service, ocr_service
+
+        settings_service.set_ocr_backend("claude_vision")
+        monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+        monkeypatch.setattr(ocr_service, "extract_text", lambda img: "text")
+
+        with caplog.at_level(logging.WARNING, logger="services.ocr_service"):
+            ocr_service.dispatch_ocr("fake_image_data")
+
+        assert any("unavailable" in r.message.lower() for r in caplog.records)
+
+    def test_dispatch_with_selected_backend(self, app_ctx, monkeypatch):
+        """When a valid available backend is selected, dispatch still calls extract_text."""
+        from services import settings_service, ocr_service
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
+        settings_service.set_ocr_backend("claude_vision")
+
+        called = {}
+        monkeypatch.setattr(
+            ocr_service, "extract_text", lambda img: called.update(called=True) or "text"
+        )
+        result = ocr_service.dispatch_ocr("fake_image_data")
+        assert called.get("called") is True
+        assert result == "text"
