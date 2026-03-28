@@ -53,18 +53,27 @@ import { loadOcrSettings, saveOcrSettings } from '../settings.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
 
-const MOCK_OCR_RESPONSE = {
-  active: 'easyocr',
-  backends: [
-    { id: 'easyocr', name: 'EasyOCR', available: true },
-    { id: 'google_vision', name: 'Google Vision', available: false },
-    { id: 'tesseract', name: 'Tesseract', available: true },
-  ],
+const MOCK_SETTINGS_RESPONSE = {
+  provider: 'google_vision',
+  fallback_to_tesseract: true,
 };
+
+function setupDropdownDOM() {
+  document.body.innerHTML = `
+    <select id="ocr-provider-select">
+      <option value="tesseract">Tesseract OCR</option>
+      <option value="google_vision">Google Vision</option>
+      <option value="easyocr">EasyOCR</option>
+    </select>
+    <div id="ocr-fallback-wrapper">
+      <input type="checkbox" id="ocr-fallback-checkbox">
+    </div>
+  `;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  document.body.innerHTML = '<div id="ocr-backends"></div>';
+  setupDropdownDOM();
 });
 
 afterEach(() => {
@@ -72,126 +81,99 @@ afterEach(() => {
 });
 
 describe('loadOcrSettings', () => {
-  it('fetches backends and renders radio buttons', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
+  it('fetches settings and sets dropdown value', async () => {
+    api.mockResolvedValueOnce(MOCK_SETTINGS_RESPONSE);
     await loadOcrSettings();
 
-    expect(api).toHaveBeenCalledWith('/api/settings/ocr');
-    const radios = document.querySelectorAll('input[name="ocr-backend"]');
-    expect(radios).toHaveLength(3);
-    expect(radios[0].value).toBe('easyocr');
-    expect(radios[1].value).toBe('google_vision');
-    expect(radios[2].value).toBe('tesseract');
+    expect(api).toHaveBeenCalledWith('/api/ocr/settings');
+    const sel = document.getElementById('ocr-provider-select');
+    expect(sel.value).toBe('google_vision');
   });
 
-  it('selects the active backend', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
+  it('sets fallback checkbox when enabled', async () => {
+    api.mockResolvedValueOnce(MOCK_SETTINGS_RESPONSE);
     await loadOcrSettings();
 
-    const radios = document.querySelectorAll('input[name="ocr-backend"]');
-    expect(radios[0].checked).toBe(true);
-    expect(radios[1].checked).toBe(false);
-    expect(radios[2].checked).toBe(false);
+    const cb = document.getElementById('ocr-fallback-checkbox');
+    expect(cb.checked).toBe(true);
   });
 
-  it('disables unavailable backends', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
+  it('unchecks fallback when disabled', async () => {
+    api.mockResolvedValueOnce({ provider: 'easyocr', fallback_to_tesseract: false });
     await loadOcrSettings();
 
-    const radios = document.querySelectorAll('input[name="ocr-backend"]');
-    expect(radios[0].disabled).toBe(false);
-    expect(radios[1].disabled).toBe(true);
-    expect(radios[2].disabled).toBe(false);
+    const cb = document.getElementById('ocr-fallback-checkbox');
+    expect(cb.checked).toBe(false);
   });
 
-  it('shows unavailable label for disabled backends', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
+  it('defaults to tesseract when provider not set', async () => {
+    api.mockResolvedValueOnce({});
     await loadOcrSettings();
 
-    const unavailLabels = document.querySelectorAll('[data-i18n="settings_ocr_unavailable"]');
-    expect(unavailLabels).toHaveLength(1);
-    expect(t).toHaveBeenCalledWith('settings_ocr_unavailable');
+    const sel = document.getElementById('ocr-provider-select');
+    expect(sel.value).toBe('tesseract');
   });
 
-  it('displays backend names', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
-    await loadOcrSettings();
-
-    const labels = document.querySelectorAll('#ocr-backends label');
-    expect(labels[0].textContent).toContain('EasyOCR');
-    expect(labels[1].textContent).toContain('Google Vision');
-    expect(labels[2].textContent).toContain('Tesseract');
-  });
-
-  it('shows error toast on API failure', async () => {
-    api.mockRejectedValueOnce(new Error('network'));
-    await loadOcrSettings();
-
-    expect(showToast).toHaveBeenCalledWith('settings_ocr_error', 'error');
-  });
-
-  it('does nothing when container is missing', async () => {
+  it('does nothing when select element is missing', async () => {
     document.body.innerHTML = '';
     await loadOcrSettings();
 
     expect(api).not.toHaveBeenCalled();
   });
 
-  it('handles empty backends array', async () => {
-    api.mockResolvedValueOnce({ active: '', backends: [] });
+  it('silently handles API failure', async () => {
+    api.mockRejectedValueOnce(new Error('network'));
     await loadOcrSettings();
 
-    const radios = document.querySelectorAll('input[name="ocr-backend"]');
-    expect(radios).toHaveLength(0);
+    // loadOcrSettings swallows errors (defaults are fine)
+    expect(showToast).not.toHaveBeenCalled();
   });
 });
 
 describe('saveOcrSettings', () => {
-  it('sends selected backend to API and shows success toast', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
-    await loadOcrSettings();
+  it('sends selected provider and fallback to API', async () => {
+    const sel = document.getElementById('ocr-provider-select');
+    sel.value = 'google_vision';
+    const cb = document.getElementById('ocr-fallback-checkbox');
+    cb.checked = true;
 
     api.mockResolvedValueOnce({});
     await saveOcrSettings();
 
-    expect(api).toHaveBeenCalledWith('/api/settings/ocr', {
-      method: 'PUT',
-      body: JSON.stringify({ active: 'easyocr' }),
+    expect(api).toHaveBeenCalledWith('/api/ocr/settings', {
+      method: 'POST',
+      body: JSON.stringify({ provider: 'google_vision', fallback_to_tesseract: true }),
     });
-    expect(showToast).toHaveBeenCalledWith('settings_ocr_saved', 'success');
+    expect(showToast).toHaveBeenCalledWith('toast_ocr_settings_saved', 'success');
   });
 
-  it('sends newly selected backend', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
-    await loadOcrSettings();
-
-    // Select tesseract
-    const radios = document.querySelectorAll('input[name="ocr-backend"]');
-    radios[0].checked = false;
-    radios[2].checked = true;
+  it('sends fallback_to_tesseract as false when unchecked', async () => {
+    const sel = document.getElementById('ocr-provider-select');
+    sel.value = 'easyocr';
+    const cb = document.getElementById('ocr-fallback-checkbox');
+    cb.checked = false;
 
     api.mockResolvedValueOnce({});
     await saveOcrSettings();
 
-    expect(api).toHaveBeenCalledWith('/api/settings/ocr', {
-      method: 'PUT',
-      body: JSON.stringify({ active: 'tesseract' }),
+    expect(api).toHaveBeenCalledWith('/api/ocr/settings', {
+      method: 'POST',
+      body: JSON.stringify({ provider: 'easyocr', fallback_to_tesseract: false }),
     });
   });
 
   it('shows error toast on save failure', async () => {
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
-    await loadOcrSettings();
+    const sel = document.getElementById('ocr-provider-select');
+    sel.value = 'google_vision';
 
     api.mockRejectedValueOnce(new Error('save failed'));
     await saveOcrSettings();
 
-    expect(showToast).toHaveBeenCalledWith('settings_ocr_error', 'error');
+    expect(showToast).toHaveBeenCalledWith('toast_ocr_settings_error', 'error');
   });
 
-  it('does nothing when no radio is selected', async () => {
-    document.body.innerHTML = '<div id="ocr-backends"></div>';
-    // No radios rendered
+  it('does nothing when select is missing', async () => {
+    document.body.innerHTML = '';
     await saveOcrSettings();
 
     expect(api).not.toHaveBeenCalled();
@@ -200,31 +182,26 @@ describe('saveOcrSettings', () => {
 });
 
 describe('OCR settings E2E flow', () => {
-  it('load → select different backend → save → reload persists selection', async () => {
-    // Initial load
-    api.mockResolvedValueOnce(MOCK_OCR_RESPONSE);
+  it('load → change provider → save → reload persists selection', async () => {
+    // Initial load with google_vision
+    api.mockResolvedValueOnce(MOCK_SETTINGS_RESPONSE);
     await loadOcrSettings();
 
-    // User selects tesseract
-    const radios = document.querySelectorAll('input[name="ocr-backend"]');
-    radios[0].checked = false;
-    radios[2].checked = true;
+    const sel = document.getElementById('ocr-provider-select');
+    expect(sel.value).toBe('google_vision');
+
+    // User changes to easyocr
+    sel.value = 'easyocr';
 
     // Save
     api.mockResolvedValueOnce({});
     await saveOcrSettings();
-    expect(showToast).toHaveBeenCalledWith('settings_ocr_saved', 'success');
+    expect(showToast).toHaveBeenCalledWith('toast_ocr_settings_saved', 'success');
 
-    // Reload with new active
-    const updatedResponse = {
-      ...MOCK_OCR_RESPONSE,
-      active: 'tesseract',
-    };
-    api.mockResolvedValueOnce(updatedResponse);
+    // Reload with new provider
+    api.mockResolvedValueOnce({ provider: 'easyocr', fallback_to_tesseract: false });
     await loadOcrSettings();
 
-    const reloadedRadios = document.querySelectorAll('input[name="ocr-backend"]');
-    expect(reloadedRadios[0].checked).toBe(false);
-    expect(reloadedRadios[2].checked).toBe(true);
+    expect(sel.value).toBe('easyocr');
   });
 });
