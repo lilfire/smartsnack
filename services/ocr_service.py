@@ -1,42 +1,34 @@
-"""OCR service for extracting text from ingredient images using EasyOCR."""
+"""OCR service for extracting text from ingredient images.
+
+Supports two backends controlled by OCR_BACKEND env var:
+- "tesseract" (default): uses pytesseract
+- "llm": uses Claude Vision API via anthropic SDK
+"""
 
 import base64
 import io
+import os
 import re
 
-_reader = None
+from PIL import Image, ImageEnhance
 
-# EasyOCR readtext parameters tuned for food label text
-_OCR_PARAMS = dict(
-    detail=1,
-    paragraph=False,
-    width_ths=0.7,
-    text_threshold=0.6,
-    low_text=0.4,
-    link_threshold=0.4,
-)
+_OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
 
 
-def _get_reader():
-    global _reader
-    if _reader is None:
-        import easyocr
-        _reader = easyocr.Reader(["no", "en"], gpu=False)
-    return _reader
-
+# ---------------------------------------------------------------------------
+# Image preprocessing (shared by tesseract backend)
+# ---------------------------------------------------------------------------
 
 def _prepare_images(image_bytes):
-    """Return a list of image variants to try OCR on.
+    """Return a list of PIL Image variants to try OCR on.
 
-    Returns [upscaled_grayscale, original_bytes] so we can pick the best.
+    Returns [upscaled_enhanced, original] so we can pick the best.
     """
-    from PIL import Image, ImageEnhance
-
     variants = []
 
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    # Variant 1: gentle preprocessing — upscale + mild contrast on grayscale
+    # Variant 1: gentle preprocessing — upscale + mild contrast
     w, h = image.size
     if max(w, h) < 1500:
         scale = 1500 / max(w, h)
@@ -46,53 +38,44 @@ def _prepare_images(image_bytes):
 
     upscaled = ImageEnhance.Contrast(upscaled).enhance(1.4)
     upscaled = ImageEnhance.Sharpness(upscaled).enhance(1.5)
-    import numpy as np
-    gray = np.array(upscaled.convert("L"))
-    variants.append(gray)
+    variants.append(upscaled.convert("L"))
 
-    # Variant 2: original image bytes (let EasyOCR handle it)
-    variants.append(image_bytes)
+    # Variant 2: original image as-is
+    variants.append(image)
 
     return variants
 
 
-def _avg_confidence(results):
-    """Average confidence score for a set of OCR results."""
-    if not results:
-        return 0.0
-    return sum(conf for _, _, conf in results) / len(results)
+# ---------------------------------------------------------------------------
+# Spatial sorting (tesseract output format)
+# ---------------------------------------------------------------------------
 
+def _sort_and_join(items):
+    """Sort OCR result dicts by position (top-to-bottom, left-to-right) and join.
 
-def _sort_and_join(results):
-    """Sort OCR results by position (top-to-bottom, left-to-right) and join.
-
-    Groups text boxes into lines based on vertical overlap, then orders
-    left-to-right within each line.
+    Each item: {"left": int, "top": int, "width": int, "height": int, "text": str}
     """
-    if not results:
-        return ""
-
-    # results: [([[x1,y1],[x2,y2],[x3,y3],[x4,y4]], text, confidence), ...]
-    items = []
-    for bbox, text, _conf in results:
-        top_y = min(pt[1] for pt in bbox)
-        bottom_y = max(pt[1] for pt in bbox)
-        left_x = min(pt[0] for pt in bbox)
-        height = bottom_y - top_y
-        items.append((top_y, bottom_y, left_x, height, text.strip()))
-
     if not items:
         return ""
 
-    # Sort by top_y to process top-to-bottom
-    items.sort(key=lambda x: x[0])
+    enriched = []
+    for item in items:
+        top = item["top"]
+        bottom = top + item["height"]
+        left = item["left"]
+        height = item["height"]
+        text = item["text"].strip()
+        if text:
+            enriched.append((top, bottom, left, height, text))
 
-    # Group into lines: items whose vertical midpoints are close enough
-    # belong on the same line
+    if not enriched:
+        return ""
+
+    enriched.sort(key=lambda x: x[0])
+
     lines = []
-    current_line = [items[0]]
-    for item in items[1:]:
-        # Compare current item's midpoint against the line's average midpoint
+    current_line = [enriched[0]]
+    for item in enriched[1:]:
         line_mid = sum((it[0] + it[1]) / 2 for it in current_line) / len(current_line)
         curr_mid = (item[0] + item[1]) / 2
         avg_height = sum(it[3] for it in current_line) / len(current_line)
@@ -103,7 +86,6 @@ def _sort_and_join(results):
             current_line = [item]
     lines.append(current_line)
 
-    # Sort each line left-to-right, then join
     text_parts = []
     for line in lines:
         line.sort(key=lambda x: x[2])
@@ -113,6 +95,108 @@ def _sort_and_join(results):
 
     return " ".join(text_parts)
 
+
+# ---------------------------------------------------------------------------
+# Tesseract backend
+# ---------------------------------------------------------------------------
+
+_MIN_CONFIDENCE = 30
+
+
+def _avg_confidence_tesseract(data):
+    """Average confidence from pytesseract output dict, ignoring low-conf words."""
+    confs = [c for c, t in zip(data["conf"], data["text"])
+             if isinstance(c, (int, float)) and c >= _MIN_CONFIDENCE and t.strip()]
+    return sum(confs) / len(confs) if confs else 0.0
+
+
+def _extract_tesseract(image_bytes):
+    """Run pytesseract on image variants, return best text."""
+    import pytesseract
+
+    variants = _prepare_images(image_bytes)
+
+    best_text = ""
+    best_confidence = -1.0
+
+    for variant in variants:
+        data = pytesseract.image_to_data(
+            variant,
+            lang="nor+eng",
+            config="--psm 6",
+            output_type=pytesseract.Output.DICT,
+        )
+
+        # Filter low-confidence words and build items for spatial sorting
+        items = []
+        for i in range(len(data["text"])):
+            text = data["text"][i].strip()
+            conf = data["conf"][i]
+            if text and isinstance(conf, (int, float)) and conf >= _MIN_CONFIDENCE:
+                items.append({
+                    "left": data["left"][i],
+                    "top": data["top"][i],
+                    "width": data["width"][i],
+                    "height": data["height"][i],
+                    "text": text,
+                })
+
+        confidence = _avg_confidence_tesseract(data)
+        if confidence > best_confidence:
+            best_confidence = confidence
+            best_text = _sort_and_join(items)
+
+    return best_text
+
+
+# ---------------------------------------------------------------------------
+# LLM vision backend
+# ---------------------------------------------------------------------------
+
+def _call_llm_vision(image_b64, media_type="image/png"):
+    """Call Claude Vision API to extract ingredient text from an image."""
+    api_key = os.environ.get("LLM_API_KEY", "")
+    if not api_key:
+        raise ValueError("LLM_API_KEY environment variable is required for LLM backend")
+
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=api_key)
+    message = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": media_type,
+                            "data": image_b64,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": "Extract the ingredient text from this food label image. "
+                                "Return only the ingredient text, nothing else.",
+                    },
+                ],
+            }
+        ],
+    )
+    return message.content[0].text.strip() if message.content else ""
+
+
+def _extract_llm(image_bytes, raw_b64):
+    """Use LLM vision to extract text — no preprocessing needed."""
+    return _call_llm_vision(raw_b64)
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 def extract_text(image_base64):
     """Extract text from a base64-encoded image.
@@ -139,18 +223,7 @@ def extract_text(image_base64):
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
 
-    reader = _get_reader()
-    variants = _prepare_images(image_bytes)
-
-    # Run OCR on each variant, pick the one with highest average confidence
-    best_results = []
-    best_confidence = -1.0
-
-    for variant in variants:
-        results = reader.readtext(variant, **_OCR_PARAMS)
-        confidence = _avg_confidence(results)
-        if confidence > best_confidence:
-            best_confidence = confidence
-            best_results = results
-
-    return _sort_and_join(best_results)
+    if _OCR_BACKEND == "llm":
+        return _extract_llm(image_bytes, raw)
+    else:
+        return _extract_tesseract(image_bytes)
