@@ -41,7 +41,7 @@ class TestProxyImage:
 
         mock_resp = MagicMock()
         mock_resp.headers = {"Content-Type": "image/png"}
-        mock_resp.read.return_value = b"\x89PNG" * 100
+        mock_resp.read.return_value = b"\x89PNG\r\n\x1a\n" + b"\x00" * 400
         mock_resp.__enter__ = lambda s: s
         mock_resp.__exit__ = MagicMock(return_value=False)
         with patch.object(
