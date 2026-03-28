@@ -674,5 +674,11 @@
   "hint_ean": "8-13 siffer",
   "toast_uploading": "Laster opp...",
   "aria_select_emoji": "Velg emoji",
-  "saved": "Lagret"
+  "saved": "Lagret",
+  "settings_ocr_title": "OCR",
+  "settings_ocr_subtitle": "Velg hvordan ingredienstekst hentes fra bilder",
+  "settings_ocr_saved": "OCR-innstillinger lagret",
+  "settings_ocr_error": "Kunne ikke lagre OCR-innstillinger",
+  "settings_ocr_unavailable": "(API-nøkkel ikke konfigurert)",
+  "btn_save_ocr": "Lagre OCR-innstillinger"
 }

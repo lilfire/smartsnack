@@ -146,6 +146,18 @@
             </div>
           </div>
         </div>
+        <!-- OCR -->
+        <div>
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
+            <span data-i18n="settings_ocr_title">OCR</span>
+            <span class="settings-chevron">&#9660;</span>
+          </h3>
+          <div class="settings-section-body" style="display:none">
+            <p class="form-sub" data-i18n="settings_ocr_subtitle">Choose how ingredient text is extracted from images</p>
+            <div id="ocr-backends" class="settings-item-list" role="radiogroup" aria-label="OCR backend selection"></div>
+            <button type="button" class="btn-register" style="margin-top:12px" onclick="saveOcrSettings()" data-i18n="btn_save_ocr">Save OCR settings</button>
+          </div>
+        </div>
         <!-- Database -->
         <div>
           <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">

@@ -674,5 +674,11 @@
   "hint_ean": "8-13 digits",
   "toast_uploading": "Uploading...",
   "aria_select_emoji": "Select emoji",
-  "saved": "Saved"
+  "saved": "Saved",
+  "settings_ocr_title": "OCR",
+  "settings_ocr_subtitle": "Choose how ingredient text is extracted from images",
+  "settings_ocr_saved": "OCR settings saved",
+  "settings_ocr_error": "Failed to save OCR settings",
+  "settings_ocr_unavailable": "(API key not configured)",
+  "btn_save_ocr": "Save OCR settings"
 }
