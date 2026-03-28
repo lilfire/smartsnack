@@ -13,6 +13,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
+
 # ── OCR backend configuration (user-settings-driven) ──
 OCR_BACKENDS = {
     "tesseract": {"name": "Tesseract (Local)", "env_key": None},
@@ -21,6 +22,7 @@ OCR_BACKENDS = {
     "openai": {"name": "GPT-4 Vision", "env_key": "OPENAI_API_KEY"},
 }
 DEFAULT_OCR_BACKEND = "tesseract"
+
 
 TRANSLATIONS_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "translations"
