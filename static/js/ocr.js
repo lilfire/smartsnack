@@ -47,12 +47,41 @@ export function scanIngredients(prefix) {
           const existing = textarea.value.trim();
           textarea.value = existing ? existing + '\n' + res.text : res.text;
           textarea.dispatchEvent(new Event('input'));
-          showToast(t('toast_ocr_success'), 'success');
+          if (res.fallback) {
+            // Success via fallback provider
+            const reason = res.error_detail || 'primary provider unavailable';
+            showToast(
+              t('toast_ocr_fallback', { fallback_provider: res.provider || 'unknown', reason: reason }),
+              'warning',
+              { title: t('toast_ocr_title_fallback'), duration: 5000 }
+            );
+          } else {
+            // Success via primary provider
+            showToast(
+              t('toast_ocr_success_provider', { provider: res.provider || 'OCR' }),
+              'success',
+              { title: t('toast_ocr_title_success'), duration: 3000 }
+            );
+          }
         } else {
           showToast(t('toast_ocr_no_text'), 'error');
         }
       } catch (err) {
-        showToast(t('toast_ocr_error'), 'error');
+        const errorData = err.data || {};
+        if (errorData.error_type === 'token_limit') {
+          showToast(
+            t('toast_ocr_token_limit'),
+            'error',
+            { title: t('toast_ocr_title_failed'), duration: 5000 }
+          );
+        } else {
+          const detail = errorData.error_detail || 'an unexpected error occurred';
+          showToast(
+            t('toast_ocr_generic_error', { error_detail: detail }),
+            'error',
+            { title: t('toast_ocr_title_failed'), duration: 5000 }
+          );
+        }
       } finally {
         if (btn) {
           btn.disabled = false;
