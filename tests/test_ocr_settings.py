@@ -53,6 +53,12 @@ class TestGetAvailableBackends:
         tesseract = next(b for b in backends if b["id"] == "tesseract")
         assert tesseract["available"] is True
 
+    def test_tesseract_is_first(self, app_ctx):
+        """Tesseract must always be the first backend in the list."""
+        from services import ocr_service
+        backends = ocr_service.get_available_backends()
+        assert backends[0]["id"] == "tesseract"
+
     def test_returns_list_of_dicts(self, app_ctx):
         from services import ocr_service
         backends = ocr_service.get_available_backends()
@@ -94,6 +100,22 @@ class TestGetAvailableBackends:
         backends = ocr_service.get_available_backends()
         for b in backends:
             assert b["available"] is True, f"{b['id']} should be available"
+
+    def test_backends_never_expose_api_key_values(self, app_ctx, monkeypatch):
+        """Security: backend list must never contain actual API key values."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-secret-123")
+        monkeypatch.setenv("GEMINI_API_KEY", "AIzaSy-gemini-secret")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-secret-456")
+        from services import ocr_service
+        import json
+        backends = ocr_service.get_available_backends()
+        serialized = json.dumps(backends)
+        assert "sk-ant-secret-123" not in serialized
+        assert "AIzaSy-gemini-secret" not in serialized
+        assert "sk-openai-secret-456" not in serialized
+        # Also verify no env_key field is leaked to the client
+        for b in backends:
+            assert "env_key" not in b, f"Backend {b['id']} should not expose env_key"
 
 
 class TestOcrSettingsService:
@@ -194,6 +216,29 @@ class TestOcrSettingsApi:
         resp = client.get("/api/settings/ocr")
         data = resp.get_json()
         assert data["current_backend"] == "claude_vision"
+
+    def test_api_response_never_contains_api_keys(self, client, monkeypatch):
+        """Security: GET /api/settings/ocr must never expose API key values."""
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-api-secret")
+        monkeypatch.setenv("GEMINI_API_KEY", "AIzaSy-gemini-key")
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-key-789")
+        resp = client.get("/api/settings/ocr")
+        assert resp.status_code == 200
+        raw = resp.get_data(as_text=True)
+        assert "sk-ant-api-secret" not in raw
+        assert "AIzaSy-gemini-key" not in raw
+        assert "sk-openai-key-789" not in raw
+        data = resp.get_json()
+        for b in data["available_backends"]:
+            assert set(b.keys()) <= {"id", "name", "available"}, (
+                f"Backend {b['id']} has unexpected fields: {set(b.keys())}"
+            )
+
+    def test_tesseract_is_first_in_api_response(self, client):
+        """Tesseract must always be the first option in the API response."""
+        resp = client.get("/api/settings/ocr")
+        data = resp.get_json()
+        assert data["available_backends"][0]["id"] == "tesseract"
 
 
 class TestOcrDispatchWiring:
