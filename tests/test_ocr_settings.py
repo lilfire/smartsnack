@@ -285,24 +285,29 @@ class TestOcrDispatchWiring:
 
         settings_service.set_ocr_backend("claude_vision")
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-        monkeypatch.setattr(ocr_service, "extract_text", lambda img: "text")
+        monkeypatch.setitem(
+            ocr_service._PROVIDERS, "tesseract", lambda image_bytes, image_b64: "text"
+        )
 
         with caplog.at_level(logging.WARNING, logger="services.ocr_service"):
-            ocr_service.dispatch_ocr("fake_image_data")
+            ocr_service.dispatch_ocr(self._make_test_image_b64())
 
         assert any("unavailable" in r.message.lower() for r in caplog.records)
 
     def test_dispatch_with_selected_backend(self, app_ctx, monkeypatch):
-        """When a valid available backend is selected, dispatch still calls extract_text."""
+        """When a valid available backend is selected, dispatch uses the provider."""
         from services import settings_service, ocr_service
 
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
         settings_service.set_ocr_backend("claude_vision")
 
         called = {}
-        monkeypatch.setattr(
-            ocr_service, "extract_text", lambda img: called.update(called=True) or "text"
-        )
-        result = ocr_service.dispatch_ocr("fake_image_data")
+
+        def mock_claude(image_bytes, image_b64):
+            called["called"] = True
+            return "text"
+
+        monkeypatch.setitem(ocr_service._PROVIDERS, "claude_vision", mock_claude)
+        result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called.get("called") is True
         assert result == "text"
