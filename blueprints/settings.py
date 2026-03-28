@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify
 
 from helpers import _require_json, _check_api_key
 from config import _MAX_PASSWORD_LEN
-from services import settings_service
+from services import settings_service, ocr_service
 
 bp = Blueprint("settings", __name__)
 
@@ -62,3 +62,30 @@ def set_off_credentials():
     except RuntimeError:
         return jsonify({"error": "encryption_not_configured"}), 500
     return jsonify({"ok": True})
+
+
+@bp.route("/api/settings/ocr")
+def get_ocr_settings():
+    current = settings_service.get_ocr_backend()
+    backends = ocr_service.get_available_backends()
+    return jsonify({"current_backend": current, "available_backends": backends})
+
+
+@bp.route("/api/settings/ocr", methods=["PUT"])
+def set_ocr_settings():
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    backend_id = data.get("backend", "")
+    if not backend_id:
+        return jsonify({"error": "backend is required"}), 400
+    from config import OCR_BACKENDS
+    if backend_id not in OCR_BACKENDS:
+        return jsonify({"error": f"Unrecognized OCR backend '{backend_id}'"}), 400
+    # Check availability before storing
+    backends = {b["id"]: b for b in ocr_service.get_available_backends()}
+    if not backends[backend_id]["available"]:
+        return jsonify({"error": f"Backend '{backend_id}' is not available (missing API key)"}), 400
+    settings_service.set_ocr_backend(backend_id)
+    return jsonify({"ok": True, "backend": backend_id})

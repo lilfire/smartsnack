@@ -10,7 +10,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefix=/install \
         torch torchvision --index-url https://download.pytorch.org/whl/cpu \
     && pip install --prefix=/install -r requirements.txt \
-    && find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
+    && ( \
+       find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'tests' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'test' -exec rm -rf {} + 2>/dev/null; \
        find /install -name '*.pyc' -delete 2>/dev/null; \
@@ -20,7 +21,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
               /install/lib/python3.12/site-packages/torch/share \
               /install/lib/python3.12/site-packages/torchvision/datasets \
               /install/lib/python3.12/site-packages/caffe2 \
-    || true
+    ) || true
 
 # ---------- runtime ----------
 FROM python:3.12-slim
@@ -28,9 +29,7 @@ FROM python:3.12-slim
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    openssl libgl1 libglib2.0-0
-
-ENV EASYOCR_MODULE_PATH=/data/.easyocr
+    openssl tesseract-ocr tesseract-ocr-nor tesseract-ocr-eng
 
 WORKDIR /app
 
@@ -39,6 +38,7 @@ COPY --from=builder /install /usr/local
 COPY app.py .
 COPY config.py .
 COPY exceptions.py .
+COPY extensions.py .
 COPY db.py .
 COPY helpers.py .
 COPY translations.py .
