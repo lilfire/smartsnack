@@ -15,6 +15,7 @@ from blueprints.off import bp as off_bp
 from blueprints.flags import bp as flags_bp
 from blueprints.bulk import bp as bulk_bp
 from blueprints.ocr import bp as ocr_bp
+from blueprints.ocr_settings import bp as ocr_settings_bp
 
 
 def register_blueprints(app):
@@ -33,3 +34,4 @@ def register_blueprints(app):
     app.register_blueprint(flags_bp)
     app.register_blueprint(bulk_bp)
     app.register_blueprint(ocr_bp)
+    app.register_blueprint(ocr_settings_bp)
