@@ -89,9 +89,25 @@ export function showToast(msg, type, opts) {
   const toast = document.getElementById('toast');
   if (!toast) return;
   toast.innerHTML = '';
-  const textSpan = document.createElement('span');
-  textSpan.textContent = msg;
-  toast.appendChild(textSpan);
+  // Set aria-live based on severity: assertive for errors/warnings, polite for others
+  toast.setAttribute('aria-live', (type === 'error' || type === 'warning') ? 'assertive' : 'polite');
+  if (opts && opts.title) {
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'toast-content';
+    const titleSpan = document.createElement('span');
+    titleSpan.className = 'toast-title';
+    titleSpan.textContent = opts.title;
+    contentDiv.appendChild(titleSpan);
+    const msgSpan = document.createElement('span');
+    msgSpan.className = 'toast-message';
+    msgSpan.textContent = msg;
+    contentDiv.appendChild(msgSpan);
+    toast.appendChild(contentDiv);
+  } else {
+    const textSpan = document.createElement('span');
+    textSpan.textContent = msg;
+    toast.appendChild(textSpan);
+  }
   if (opts && opts.onUndo) {
     const undoBtn = document.createElement('button');
     undoBtn.className = 'toast-undo';

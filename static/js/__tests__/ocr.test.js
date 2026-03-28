@@ -124,7 +124,7 @@ describe('scanIngredients', () => {
 
     await vi.waitFor(() => {
       expect(textarea.value).toBe('sukker, mel, vann');
-      expect(showToast).toHaveBeenCalledWith('toast_ocr_success', 'success');
+      expect(showToast).toHaveBeenCalledWith('toast_ocr_success_provider', 'success', { title: 'toast_ocr_title_success', duration: 3000 });
     }, { timeout: 2000 });
   });
 
@@ -164,7 +164,49 @@ describe('scanIngredients', () => {
     fileInput.onchange();
 
     await vi.waitFor(() => {
-      expect(showToast).toHaveBeenCalledWith('toast_ocr_error', 'error');
+      expect(showToast).toHaveBeenCalledWith('toast_ocr_generic_error', 'error', { title: 'toast_ocr_title_failed', duration: 5000 });
+    }, { timeout: 2000 });
+  });
+
+  it('shows error toast for token limit exceeded', async () => {
+    createDOM(prefix);
+    const tokenErr = new Error('token limit');
+    tokenErr.data = { error_type: 'token_limit' };
+    api.mockRejectedValueOnce(tokenErr);
+
+    let fileInput;
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
+      fileInput = this;
+    });
+
+    scanIngredients(prefix);
+    clickSpy.mockRestore();
+
+    Object.defineProperty(fileInput, 'files', { value: [createFile()], writable: false });
+    fileInput.onchange();
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('toast_ocr_token_limit', 'error', { title: 'toast_ocr_title_failed', duration: 5000 });
+    }, { timeout: 2000 });
+  });
+
+  it('shows warning toast for fallback provider', async () => {
+    createDOM(prefix);
+    api.mockResolvedValueOnce({ text: 'sukker, mel', fallback: true, provider: 'Tesseract', error_detail: 'invalid API key' });
+
+    let fileInput;
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
+      fileInput = this;
+    });
+
+    scanIngredients(prefix);
+    clickSpy.mockRestore();
+
+    Object.defineProperty(fileInput, 'files', { value: [createFile()], writable: false });
+    fileInput.onchange();
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('toast_ocr_fallback', 'warning', { title: 'toast_ocr_title_fallback', duration: 5000 });
     }, { timeout: 2000 });
   });
 
