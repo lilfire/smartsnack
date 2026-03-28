@@ -31,6 +31,7 @@ COPY --from=builder /install /usr/local
 COPY app.py .
 COPY config.py .
 COPY exceptions.py .
+COPY extensions.py .
 COPY db.py .
 COPY helpers.py .
 COPY translations.py .
