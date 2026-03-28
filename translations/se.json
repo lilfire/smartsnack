@@ -682,5 +682,7 @@
   "settings_ocr_unavailable": "(API-nyckel inte konfigurerad)",
   "btn_save_ocr_settings": "Spara OCR-inställningar",
   "toast_ocr_settings_saved": "OCR-inställningar sparade",
-  "toast_ocr_settings_error": "Kunde inte spara OCR-inställningar"
+  "toast_ocr_settings_error": "Kunde inte spara OCR-inställningar",
+  "settings_ocr_saved": "OCR-inställningar sparade",
+  "settings_ocr_error": "Kunde inte spara OCR-inställningar"
 }

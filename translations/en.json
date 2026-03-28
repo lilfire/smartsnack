@@ -682,5 +682,7 @@
   "settings_ocr_unavailable": "(API key not configured)",
   "btn_save_ocr_settings": "Save OCR settings",
   "toast_ocr_settings_saved": "OCR settings saved",
-  "toast_ocr_settings_error": "Could not save OCR settings"
+  "toast_ocr_settings_error": "Could not save OCR settings",
+  "settings_ocr_saved": "OCR settings saved",
+  "settings_ocr_error": "Could not save OCR settings"
 }

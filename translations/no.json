@@ -682,5 +682,7 @@
   "settings_ocr_unavailable": "(API-nøkkel ikke konfigurert)",
   "btn_save_ocr_settings": "Lagre OCR-innstillinger",
   "toast_ocr_settings_saved": "OCR-innstillinger lagret",
-  "toast_ocr_settings_error": "Kunne ikke lagre OCR-innstillinger"
+  "toast_ocr_settings_error": "Kunne ikke lagre OCR-innstillinger",
+  "settings_ocr_saved": "OCR-innstillinger lagret",
+  "settings_ocr_error": "Kunne ikke lagre OCR-innstillinger"
 }

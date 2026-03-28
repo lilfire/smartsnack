@@ -71,8 +71,6 @@ Object.assign(window, {
   saveOcrSettings,
   // settings — bulk operations
   refreshAllFromOff, estimateAllPq,
-  // settings — OCR
-  saveOcrSettings,
   // scanner
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
