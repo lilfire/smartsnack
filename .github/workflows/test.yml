@@ -32,8 +32,8 @@ jobs:
             pytest==8.3.4 \
             pytest-cov==5.0.0
 
-      - name: Run pytest
-        run: python -m pytest --tb=short -q
+      - name: Run pytest (unit tests only, e2e requires playwright + server)
+        run: python -m pytest --ignore=tests/e2e --tb=short -q
 
   frontend:
     name: Frontend (vitest)
