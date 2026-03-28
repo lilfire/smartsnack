@@ -72,6 +72,8 @@ export async function loadSettings() {
     loadOcrSettings();
     loadOffCredentials();
     checkRefreshStatus();
+    loadOcrProviders();
+    loadOcrSettings();
   } finally {
     _settingsLoading = false;
   }
@@ -1313,4 +1315,57 @@ export async function saveOffCredentials() {
       : t('toast_save_error');
     showToast(msg, 'error');
   }
+}
+
+// ── OCR Settings ─────────────────────────────────────
+function _updateOcrFallbackVisibility() {
+  const sel = document.getElementById('ocr-provider-select');
+  const wrapper = document.getElementById('ocr-fallback-wrapper');
+  const cb = document.getElementById('ocr-fallback-checkbox');
+  if (!sel || !wrapper) return;
+  if (sel.value === 'tesseract') {
+    wrapper.style.display = 'none';
+    if (cb) cb.checked = false;
+  } else {
+    wrapper.style.display = '';
+  }
+}
+
+export async function loadOcrProviders() {
+  const sel = document.getElementById('ocr-provider-select');
+  if (!sel) return;
+  try {
+    const data = await api('/api/ocr/providers');
+    sel.innerHTML = '';
+    (data.providers || []).forEach((p) => {
+      const opt = document.createElement('option');
+      opt.value = p.key;
+      opt.textContent = p.label;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', _updateOcrFallbackVisibility);
+  } catch(e) { showToast(t('toast_ocr_settings_error'), 'error'); }
+}
+
+export async function loadOcrSettings() {
+  const sel = document.getElementById('ocr-provider-select');
+  const cb = document.getElementById('ocr-fallback-checkbox');
+  if (!sel) return;
+  try {
+    const data = await api('/api/ocr/settings');
+    sel.value = data.provider || 'tesseract';
+    if (cb) cb.checked = !!data.fallback;
+    _updateOcrFallbackVisibility();
+  } catch(e) { /* settings may not exist yet — use defaults */ }
+}
+
+export async function saveOcrSettings() {
+  const sel = document.getElementById('ocr-provider-select');
+  const cb = document.getElementById('ocr-fallback-checkbox');
+  if (!sel || !sel.value) return;
+  const body = { provider: sel.value, fallback: !!(cb && cb.checked) };
+  try {
+    await api('/api/ocr/settings', { method: 'POST', body: JSON.stringify(body) });
+    showToast(t('toast_ocr_settings_saved'), 'success');
+  } catch(e) { showToast(t('toast_ocr_settings_error'), 'error'); }
 }

@@ -102,6 +102,7 @@ vi.mock('../settings.js', () => ({
   handleImport: vi.fn(),
   initRestoreDragDrop: vi.fn(),
   saveOffCredentials: vi.fn(),
+  saveOcrSettings: vi.fn(),
   refreshAllFromOff: vi.fn(),
   estimateAllPq: vi.fn(),
   loadOcrSettings: vi.fn(),
@@ -186,6 +187,8 @@ describe('app.js', () => {
       'downloadBackup', 'handleRestore', 'handleImport',
       // settings — OFF credentials
       'saveOffCredentials',
+      // settings — OCR
+      'saveOcrSettings',
       // settings — bulk operations
       'refreshAllFromOff', 'estimateAllPq',
       // scanner

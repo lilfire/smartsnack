@@ -676,9 +676,11 @@
   "aria_select_emoji": "Välj emoji",
   "saved": "Sparat",
   "settings_ocr_title": "OCR",
-  "settings_ocr_subtitle": "Välj hur ingredienstext extraheras från bilder",
-  "settings_ocr_saved": "OCR-inställningar sparade",
-  "settings_ocr_error": "Kunde inte spara OCR-inställningar",
+  "settings_ocr_desc": "Välj OCR-leverantör för bildigenkänning",
+  "settings_ocr_provider_label": "OCR-leverantör",
+  "settings_ocr_fallback_label": "Reserv till Tesseract OCR",
   "settings_ocr_unavailable": "(API-nyckel inte konfigurerad)",
-  "btn_save_ocr": "Spara OCR-inställningar"
+  "btn_save_ocr_settings": "Spara OCR-inställningar",
+  "toast_ocr_settings_saved": "OCR-inställningar sparade",
+  "toast_ocr_settings_error": "Kunde inte spara OCR-inställningar"
 }
