@@ -361,21 +361,27 @@ def dispatch_ocr(image_base64):
 
     Reads the selected backend from user_settings. If the stored backend
     is unavailable, falls back to tesseract and logs a warning.
+
+    Returns a dict: {"text": str, "provider": str, "fallback": bool}.
     """
     from services import settings_service
 
-    backend_id = settings_service.get_ocr_backend()
+    requested_id = settings_service.get_ocr_backend()
+    fallback = False
 
     # Check if the selected backend is available
     backends = {b["id"]: b for b in get_available_backends()}
-    backend = backends.get(backend_id)
+    backend = backends.get(requested_id)
 
     if not backend or not backend["available"]:
         logger.warning(
             "Stored OCR backend '%s' is unavailable, falling back to tesseract",
-            backend_id,
+            requested_id,
         )
-        backend_id = DEFAULT_OCR_BACKEND
+        fallback = requested_id != DEFAULT_OCR_BACKEND
+        requested_id = DEFAULT_OCR_BACKEND
+
+    backend_id = requested_id
 
     # Validate and decode the image (shared logic from extract_text)
     if not image_base64 or not isinstance(image_base64, str):
@@ -396,11 +402,15 @@ def dispatch_ocr(image_base64):
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
 
-    provider = _PROVIDERS.get(backend_id)
-    if provider is None:
+    provider_fn = _PROVIDERS.get(backend_id)
+    if provider_fn is None:
         raise ValueError(
             f"Unknown OCR backend: '{backend_id}'. "
             f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
         )
 
-    return provider(image_bytes, raw)
+    # Resolve display name from config
+    provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
+    text = provider_fn(image_bytes, raw)
+
+    return {"text": text, "provider": provider_name, "fallback": fallback}
