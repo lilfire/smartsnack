@@ -1,8 +1,11 @@
 """OCR service for extracting text from ingredient images.
 
-Supports two backends controlled by OCR_BACKEND env var:
+Supports multiple backends controlled by OCR_BACKEND env var:
 - "tesseract" (default): uses pytesseract
-- "llm": uses Claude Vision API via anthropic SDK
+- "claude_vision": uses Claude Vision API via anthropic SDK
+- "gemini": uses Google Gemini API via google-genai SDK
+- "openai": uses OpenAI Vision API via openai SDK
+- "llm": alias for claude_vision (backward compatibility)
 """
 
 import base64
@@ -13,6 +16,27 @@ import re
 from PIL import Image, ImageEnhance
 
 _OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
+
+_INGREDIENT_PROMPT = (
+    "Extract the ingredient text from this food label image. "
+    "Return only the ingredient text, nothing else."
+)
+
+
+# ---------------------------------------------------------------------------
+# API key helper
+# ---------------------------------------------------------------------------
+
+def _get_api_key(env_var):
+    """Get provider-specific API key, falling back to LLM_API_KEY."""
+    key = os.environ.get(env_var, "")
+    if not key:
+        key = os.environ.get("LLM_API_KEY", "")
+    if not key:
+        raise ValueError(
+            f"API key required: set {env_var} or LLM_API_KEY environment variable"
+        )
+    return key
 
 
 # ---------------------------------------------------------------------------
@@ -110,7 +134,7 @@ def _avg_confidence_tesseract(data):
     return sum(confs) / len(confs) if confs else 0.0
 
 
-def _extract_tesseract(image_bytes):
+def _extract_tesseract(image_bytes, image_b64):
     """Run pytesseract on image variants, return best text."""
     import pytesseract
 
@@ -150,14 +174,12 @@ def _extract_tesseract(image_bytes):
 
 
 # ---------------------------------------------------------------------------
-# LLM vision backend
+# Claude Vision backend
 # ---------------------------------------------------------------------------
 
-def _call_llm_vision(image_b64, media_type="image/png"):
-    """Call Claude Vision API to extract ingredient text from an image."""
-    api_key = os.environ.get("LLM_API_KEY", "")
-    if not api_key:
-        raise ValueError("LLM_API_KEY environment variable is required for LLM backend")
+def _extract_claude_vision(image_bytes, image_b64):
+    """Use Claude Vision API to extract ingredient text from an image."""
+    api_key = _get_api_key("ANTHROPIC_API_KEY")
 
     import anthropic
 
@@ -173,14 +195,13 @@ def _call_llm_vision(image_b64, media_type="image/png"):
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": media_type,
+                            "media_type": "image/png",
                             "data": image_b64,
                         },
                     },
                     {
                         "type": "text",
-                        "text": "Extract the ingredient text from this food label image. "
-                                "Return only the ingredient text, nothing else.",
+                        "text": _INGREDIENT_PROMPT,
                     },
                 ],
             }
@@ -189,9 +210,83 @@ def _call_llm_vision(image_b64, media_type="image/png"):
     return message.content[0].text.strip() if message.content else ""
 
 
-def _extract_llm(image_bytes, raw_b64):
-    """Use LLM vision to extract text — no preprocessing needed."""
-    return _call_llm_vision(raw_b64)
+# ---------------------------------------------------------------------------
+# Gemini backend
+# ---------------------------------------------------------------------------
+
+def _extract_gemini(image_bytes, image_b64):
+    """Use Google Gemini API to extract ingredient text from an image."""
+    api_key = _get_api_key("GEMINI_API_KEY")
+
+    from google import genai
+
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[
+            {
+                "parts": [
+                    {
+                        "inline_data": {
+                            "mime_type": "image/png",
+                            "data": image_b64,
+                        }
+                    },
+                    {"text": _INGREDIENT_PROMPT},
+                ]
+            }
+        ],
+    )
+    return response.text.strip() if response.text else ""
+
+
+# ---------------------------------------------------------------------------
+# OpenAI backend
+# ---------------------------------------------------------------------------
+
+def _extract_openai(image_bytes, image_b64):
+    """Use OpenAI Vision API to extract ingredient text from an image."""
+    api_key = _get_api_key("OPENAI_API_KEY")
+
+    import openai
+
+    client = openai.OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{image_b64}",
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": _INGREDIENT_PROMPT,
+                    },
+                ],
+            }
+        ],
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    return content.strip() if content else ""
+
+
+# ---------------------------------------------------------------------------
+# Provider registry
+# ---------------------------------------------------------------------------
+
+_PROVIDERS = {
+    "tesseract": _extract_tesseract,
+    "claude_vision": _extract_claude_vision,
+    "gemini": _extract_gemini,
+    "openai": _extract_openai,
+    "llm": _extract_claude_vision,  # backward compatibility alias
+}
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +318,11 @@ def extract_text(image_base64):
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
 
-    if _OCR_BACKEND == "llm":
-        return _extract_llm(image_bytes, raw)
-    else:
-        return _extract_tesseract(image_bytes)
+    provider = _PROVIDERS.get(_OCR_BACKEND)
+    if provider is None:
+        raise ValueError(
+            f"Unknown OCR backend: '{_OCR_BACKEND}'. "
+            f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
+        )
+
+    return provider(image_bytes, raw)
