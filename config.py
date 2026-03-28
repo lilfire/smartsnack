@@ -353,6 +353,15 @@ DEFAULT_WEIGHTS = {
     "taste_score": {"enabled": 1, "weight": 100.0},
 }
 
+# ── OCR backend configuration ────────────────────────
+OCR_BACKENDS = {
+    "tesseract": {"name": "Tesseract (Local)", "env_key": None},
+    "claude_vision": {"name": "Claude Vision", "env_key": "ANTHROPIC_API_KEY"},
+    "gemini": {"name": "Gemini Vision", "env_key": "GEMINI_API_KEY"},
+    "openai": {"name": "GPT-4 Vision", "env_key": "OPENAI_API_KEY"},
+}
+DEFAULT_OCR_BACKEND = "tesseract"
+
 # ── SQL helpers ───────────────────────────────────────
 PRODUCT_COLS_NO_IMAGE = (
     "id, type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "

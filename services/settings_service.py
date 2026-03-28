@@ -9,7 +9,7 @@ import secrets
 from cryptography.fernet import Fernet, InvalidToken
 
 from db import get_db
-from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
+from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, OCR_BACKENDS, DEFAULT_OCR_BACKEND
 
 logger = logging.getLogger(__name__)
 
@@ -150,3 +150,29 @@ def set_off_credentials(user_id: str, password: str) -> None:
         (encrypted_password,),
     )
     conn.commit()
+
+
+def get_ocr_backend() -> str:
+    """Return the currently selected OCR backend ID, defaulting to tesseract."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT value FROM user_settings WHERE key='ocr_backend'"
+    ).fetchone()
+    return row["value"] if row else DEFAULT_OCR_BACKEND
+
+
+def set_ocr_backend(backend_id: str) -> str:
+    """Store the selected OCR backend. Raises ValueError if unrecognized."""
+    backend_id = backend_id.strip()
+    if backend_id not in OCR_BACKENDS:
+        raise ValueError(
+            f"Unrecognized OCR backend '{backend_id}'. "
+            f"Valid: {', '.join(OCR_BACKENDS.keys())}"
+        )
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_backend', ?)",
+        (backend_id,),
+    )
+    conn.commit()
+    return backend_id

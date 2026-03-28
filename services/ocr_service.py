@@ -2,7 +2,13 @@
 
 import base64
 import io
+import logging
+import os
 import re
+
+from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
+
+logger = logging.getLogger(__name__)
 
 _reader = None
 
@@ -154,3 +160,47 @@ def extract_text(image_base64):
             best_results = results
 
     return _sort_and_join(best_results)
+
+
+def get_available_backends():
+    """Return list of OCR backends with availability based on env vars.
+
+    Returns list of dicts: {"id": "...", "name": "...", "available": bool}.
+    tesseract is always available (no key needed).
+    """
+    result = []
+    for backend_id, info in OCR_BACKENDS.items():
+        env_key = info.get("env_key")
+        available = env_key is None or bool(os.environ.get(env_key))
+        result.append({
+            "id": backend_id,
+            "name": info["name"],
+            "available": available,
+        })
+    return result
+
+
+def dispatch_ocr(image_base64):
+    """Dispatch OCR to the configured backend, falling back to tesseract.
+
+    Reads the selected backend from user_settings. If the stored backend
+    is unavailable, falls back to tesseract and logs a warning.
+    """
+    from services import settings_service
+
+    backend_id = settings_service.get_ocr_backend()
+
+    # Check if the selected backend is available
+    backends = {b["id"]: b for b in get_available_backends()}
+    backend = backends.get(backend_id)
+
+    if not backend or not backend["available"]:
+        logger.warning(
+            "Stored OCR backend '%s' is unavailable, falling back to tesseract",
+            backend_id,
+        )
+        backend_id = DEFAULT_OCR_BACKEND
+
+    # Currently only tesseract (extract_text) is implemented;
+    # other backends would be dispatched here when implemented.
+    return extract_text(image_base64)
