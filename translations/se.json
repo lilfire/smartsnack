@@ -678,7 +678,7 @@
   "settings_ocr_title": "OCR",
   "settings_ocr_desc": "Välj OCR-leverantör för bildigenkänning",
   "settings_ocr_provider_label": "OCR-leverantör",
-  "settings_ocr_fallback_label": "Reserv till Tesseract OCR",
+  "settings_ocr_fallback_label": "Använd Tesseract OCR som reserv",
   "settings_ocr_unavailable": "(API-nyckel inte konfigurerad)",
   "btn_save_ocr_settings": "Spara OCR-inställningar",
   "toast_ocr_settings_saved": "OCR-inställningar sparade",

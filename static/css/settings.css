@@ -648,3 +648,15 @@
   margin: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
+
+/* ── OCR fallback transition ────────────────────── */
+#ocr-fallback-wrapper {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+#ocr-fallback-wrapper.visible {
+  max-height: 60px;
+  opacity: 1;
+}
