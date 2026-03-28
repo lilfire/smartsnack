@@ -67,6 +67,8 @@ Object.assign(window, {
   downloadBackup, handleRestore, handleImport,
   // settings — OFF credentials
   saveOffCredentials,
+  // settings — OCR
+  saveOcrSettings,
   // settings — bulk operations
   refreshAllFromOff, estimateAllPq,
   // settings — OCR

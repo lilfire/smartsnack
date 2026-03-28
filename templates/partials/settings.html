@@ -153,9 +153,21 @@
             <span class="settings-chevron">&#9660;</span>
           </h3>
           <div class="settings-section-body" style="display:none">
-            <p class="form-sub" data-i18n="settings_ocr_subtitle">Choose how ingredient text is extracted from images</p>
-            <div id="ocr-backends" class="settings-item-list" role="radiogroup" aria-label="OCR backend selection"></div>
-            <button type="button" class="btn-register" style="margin-top:12px" onclick="saveOcrSettings()" data-i18n="btn_save_ocr">Save OCR settings</button>
+            <p class="form-sub" data-i18n="settings_ocr_desc">Velg OCR-leverandør for bildegjenkjenning</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div>
+                <label class="field-label" for="ocr-provider-select" data-i18n="settings_ocr_provider_label">OCR-leverandør</label>
+                <select class="field-select" id="ocr-provider-select">
+                </select>
+              </div>
+              <div id="ocr-fallback-wrapper" style="display:none">
+                <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="ocr-fallback-checkbox">
+                  <span data-i18n="settings_ocr_fallback_label">Fallback til Tesseract OCR</span>
+                </label>
+              </div>
+              <button type="button" class="btn-register" style="margin-top:4px" onclick="saveOcrSettings()" data-i18n="btn_save_ocr_settings">&#128190; Lagre OCR-innstillinger</button>
+            </div>
           </div>
         </div>
         <!-- Database -->
