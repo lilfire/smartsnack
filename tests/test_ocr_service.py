@@ -711,7 +711,11 @@ class TestOCRBlueprint:
 
     @patch("services.ocr_service.dispatch_ocr")
     def test_post_returns_text(self, mock_dispatch, client):
-        mock_dispatch.return_value = "sukker, mel"
+        mock_dispatch.return_value = {
+            "text": "sukker, mel",
+            "provider": "Tesseract (Local)",
+            "fallback": False,
+        }
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "dGVzdA=="},
@@ -727,7 +731,11 @@ class TestOCRBlueprint:
 
     @patch("services.ocr_service.dispatch_ocr")
     def test_post_empty_result(self, mock_dispatch, client):
-        mock_dispatch.return_value = ""
+        mock_dispatch.return_value = {
+            "text": "",
+            "provider": "Tesseract (Local)",
+            "fallback": False,
+        }
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "dGVzdA=="},

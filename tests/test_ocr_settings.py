@@ -269,7 +269,7 @@ class TestOcrDispatchWiring:
         monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called_with.get("backend") == "tesseract"
-        assert result == "mock text"
+        assert result["text"] == "mock text"
 
     def test_dispatch_falls_back_to_tesseract_when_stored_unavailable(
         self, app_ctx, monkeypatch
@@ -293,7 +293,8 @@ class TestOcrDispatchWiring:
 
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called_with.get("backend") == "tesseract"
-        assert result == "fallback text"
+        assert result["text"] == "fallback text"
+        assert result["fallback"] is True
 
     def test_dispatch_uses_selected_backend(self, app_ctx, monkeypatch):
         """When a valid available backend is selected, dispatch uses it."""
@@ -312,7 +313,9 @@ class TestOcrDispatchWiring:
 
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called_with.get("backend") == "claude_vision"
-        assert result == "claude text"
+        assert result["text"] == "claude text"
+        assert result["provider"] == "Claude Vision"
+        assert result["fallback"] is False
 
     def test_dispatch_ocr_returns_text(self, app_ctx, monkeypatch):
         from services import ocr_service
@@ -322,7 +325,7 @@ class TestOcrDispatchWiring:
 
         monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
-        assert result == "ingredient text"
+        assert result["text"] == "ingredient text"
 
     def test_dispatch_fallback_logs_warning(self, app_ctx, monkeypatch, caplog):
         """Verify that falling back to tesseract logs a warning."""
@@ -355,4 +358,4 @@ class TestOcrDispatchWiring:
         monkeypatch.setitem(ocr_service._PROVIDERS, "claude_vision", mock_claude)
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called.get("called") is True
-        assert result == "text"
+        assert result["text"] == "text"
