@@ -158,12 +158,13 @@
               <div>
                 <label class="field-label" for="ocr-provider-select" data-i18n="settings_ocr_provider_label">OCR-leverandør</label>
                 <select class="field-select" id="ocr-provider-select">
+                  <option value="tesseract">Tesseract OCR</option>
                 </select>
               </div>
-              <div id="ocr-fallback-wrapper" style="display:none">
+              <div id="ocr-fallback-wrapper" aria-live="polite">
                 <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
                   <input type="checkbox" id="ocr-fallback-checkbox">
-                  <span data-i18n="settings_ocr_fallback_label">Fallback til Tesseract OCR</span>
+                  <span data-i18n="settings_ocr_fallback_label">Bruk Tesseract OCR som reserve</span>
                 </label>
               </div>
               <button type="button" class="btn-register" style="margin-top:4px" onclick="saveOcrSettings()" data-i18n="btn_save_ocr_settings">&#128190; Lagre OCR-innstillinger</button>
