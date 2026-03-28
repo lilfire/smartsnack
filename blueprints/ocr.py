@@ -22,7 +22,7 @@ def ocr_ingredients():
         return jsonify({"error": "No image provided"}), 400
 
     try:
-        text = ocr_service.extract_text(image)
+        text = ocr_service.dispatch_ocr(image)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except Exception:
