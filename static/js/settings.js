@@ -69,6 +69,7 @@ export async function loadSettings() {
     initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
     loadFlags();
     loadPq();
+    loadOcrSettings();
     loadOffCredentials();
     checkRefreshStatus();
   } finally {
@@ -1227,6 +1228,64 @@ export async function estimateAllPq() {
     if (status) status.style.display = 'none';
   } finally {
     if (btn) btn.disabled = false;
+  }
+}
+
+// ── OCR Settings ────────────────────────────────────
+export async function loadOcrSettings() {
+  const container = document.getElementById('ocr-backends');
+  if (!container) return;
+  try {
+    const data = await api('/api/settings/ocr');
+    container.innerHTML = '';
+    (data.backends || []).forEach((b) => {
+      const id = 'ocr-backend-' + b.id;
+      const label = document.createElement('label');
+      label.className = 'settings-radio-label';
+      label.style.display = 'flex';
+      label.style.alignItems = 'center';
+      label.style.gap = '8px';
+      label.style.padding = '6px 0';
+      const radio = document.createElement('input');
+      radio.type = 'radio';
+      radio.name = 'ocr-backend';
+      radio.value = b.id;
+      radio.id = id;
+      radio.checked = b.id === data.active;
+      if (!b.available) {
+        radio.disabled = true;
+        label.style.opacity = '0.5';
+      }
+      label.appendChild(radio);
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = b.name;
+      label.appendChild(nameSpan);
+      if (!b.available) {
+        const unavail = document.createElement('span');
+        unavail.className = 'form-sub';
+        unavail.style.marginLeft = '4px';
+        unavail.setAttribute('data-i18n', 'settings_ocr_unavailable');
+        unavail.textContent = t('settings_ocr_unavailable');
+        label.appendChild(unavail);
+      }
+      container.appendChild(label);
+    });
+  } catch(e) {
+    showToast(t('settings_ocr_error'), 'error');
+  }
+}
+
+export async function saveOcrSettings() {
+  const selected = document.querySelector('input[name="ocr-backend"]:checked');
+  if (!selected) return;
+  try {
+    await api('/api/settings/ocr', {
+      method: 'PUT',
+      body: JSON.stringify({ active: selected.value }),
+    });
+    showToast(t('settings_ocr_saved'), 'success');
+  } catch(e) {
+    showToast(t('settings_ocr_error'), 'error');
   }
 }
 
