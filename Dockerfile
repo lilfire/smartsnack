@@ -8,12 +8,13 @@ COPY requirements.txt .
 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --prefix=/install -r requirements.txt \
-    && find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
+    && ( \
+       find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'tests' -exec rm -rf {} + 2>/dev/null; \
        find /install -type d -name 'test' -exec rm -rf {} + 2>/dev/null; \
        find /install -name '*.pyc' -delete 2>/dev/null; \
        find /install -name '*.pyi' -delete 2>/dev/null; \
-    || true
+    ) || true
 
 # ---------- runtime ----------
 FROM python:3.12-slim
@@ -30,6 +31,7 @@ COPY --from=builder /install /usr/local
 COPY app.py .
 COPY config.py .
 COPY exceptions.py .
+COPY extensions.py .
 COPY db.py .
 COPY helpers.py .
 COPY translations.py .
