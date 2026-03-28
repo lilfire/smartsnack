@@ -22,7 +22,8 @@ import {
   downloadBackup, handleRestore, handleImport,
   initRestoreDragDrop,
   saveOffCredentials,
-  refreshAllFromOff, estimateAllPq
+  refreshAllFromOff, estimateAllPq,
+  loadOcrSettings, saveOcrSettings
 } from './settings.js';
 import {
   openScanner, closeScanner, openSearchScanner,
@@ -68,6 +69,8 @@ Object.assign(window, {
   saveOffCredentials,
   // settings — bulk operations
   refreshAllFromOff, estimateAllPq,
+  // settings — OCR
+  saveOcrSettings,
   // scanner
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
