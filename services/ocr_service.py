@@ -10,10 +10,16 @@ Supports multiple backends controlled by OCR_BACKEND env var:
 
 import base64
 import io
+import logging
 import os
 import re
 
 from PIL import Image, ImageEnhance
+
+from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
+
+logger = logging.getLogger(__name__)
+
 
 _OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
 
@@ -322,6 +328,78 @@ def extract_text(image_base64):
     if provider is None:
         raise ValueError(
             f"Unknown OCR backend: '{_OCR_BACKEND}'. "
+            f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
+        )
+
+    return provider(image_bytes, raw)
+
+
+# ---------------------------------------------------------------------------
+# User-settings-driven backend detection and dispatch
+# ---------------------------------------------------------------------------
+
+def get_available_backends():
+    """Return list of OCR backends with availability based on env vars.
+
+    Returns list of dicts: {"id": "...", "name": "...", "available": bool}.
+    tesseract is always available (no key needed).
+    """
+    result = []
+    for backend_id, info in OCR_BACKENDS.items():
+        env_key = info.get("env_key")
+        available = env_key is None or bool(os.environ.get(env_key))
+        result.append({
+            "id": backend_id,
+            "name": info["name"],
+            "available": available,
+        })
+    return result
+
+
+def dispatch_ocr(image_base64):
+    """Dispatch OCR to the user-selected backend, falling back to tesseract.
+
+    Reads the selected backend from user_settings. If the stored backend
+    is unavailable, falls back to tesseract and logs a warning.
+    """
+    from services import settings_service
+
+    backend_id = settings_service.get_ocr_backend()
+
+    # Check if the selected backend is available
+    backends = {b["id"]: b for b in get_available_backends()}
+    backend = backends.get(backend_id)
+
+    if not backend or not backend["available"]:
+        logger.warning(
+            "Stored OCR backend '%s' is unavailable, falling back to tesseract",
+            backend_id,
+        )
+        backend_id = DEFAULT_OCR_BACKEND
+
+    # Validate and decode the image (shared logic from extract_text)
+    if not image_base64 or not isinstance(image_base64, str):
+        raise ValueError("No image provided")
+
+    raw = image_base64
+    if raw.startswith("data:"):
+        match = re.match(r"data:image/[^;]+;base64,(.+)", raw, re.DOTALL)
+        if not match:
+            raise ValueError("Invalid data URI format")
+        raw = match.group(1)
+
+    try:
+        image_bytes = base64.b64decode(raw)
+    except Exception:
+        raise ValueError("Invalid base64 data")
+
+    if len(image_bytes) > 5 * 1024 * 1024:
+        raise ValueError("Image too large (max 5 MB)")
+
+    provider = _PROVIDERS.get(backend_id)
+    if provider is None:
+        raise ValueError(
+            f"Unknown OCR backend: '{backend_id}'. "
             f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
         )
 

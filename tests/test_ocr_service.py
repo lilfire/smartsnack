@@ -709,9 +709,9 @@ class TestAvgConfidenceTesseract:
 class TestOCRBlueprint:
     """Test the /api/ocr/ingredients endpoint contract is preserved."""
 
-    @patch("services.ocr_service.extract_text")
-    def test_post_returns_text(self, mock_extract, client):
-        mock_extract.return_value = "sukker, mel"
+    @patch("services.ocr_service.dispatch_ocr")
+    def test_post_returns_text(self, mock_dispatch, client):
+        mock_dispatch.return_value = "sukker, mel"
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "dGVzdA=="},
@@ -725,9 +725,9 @@ class TestOCRBlueprint:
         assert resp.status_code == 400
         assert "error" in resp.get_json()
 
-    @patch("services.ocr_service.extract_text")
-    def test_post_empty_result(self, mock_extract, client):
-        mock_extract.return_value = ""
+    @patch("services.ocr_service.dispatch_ocr")
+    def test_post_empty_result(self, mock_dispatch, client):
+        mock_dispatch.return_value = ""
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "dGVzdA=="},
@@ -737,16 +737,16 @@ class TestOCRBlueprint:
         assert data["text"] == ""
         assert "error" in data  # "No text found in image"
 
-    @patch("services.ocr_service.extract_text", side_effect=ValueError("bad input"))
-    def test_post_value_error_returns_400(self, mock_extract, client):
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("bad input"))
+    def test_post_value_error_returns_400(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "bad"},
         )
         assert resp.status_code == 400
 
-    @patch("services.ocr_service.extract_text", side_effect=RuntimeError("boom"))
-    def test_post_runtime_error_returns_500(self, mock_extract, client):
+    @patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("boom"))
+    def test_post_runtime_error_returns_500(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "dGVzdA=="},
