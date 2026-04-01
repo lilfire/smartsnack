@@ -1,6 +1,7 @@
 """Blueprint for OCR ingredient extraction endpoint."""
 
 from flask import Blueprint, jsonify
+from PIL import UnidentifiedImageError
 
 from extensions import limiter
 from helpers import _require_json
@@ -17,15 +18,16 @@ def _is_token_limit_error(message):
     return any(kw in lower for kw in _TOKEN_LIMIT_KEYWORDS)
 
 
-def _error_response(message, status_code):
+def _error_response(message, status_code, error_type=None, error_detail=None):
     """Build a structured error response with error_type and error_detail."""
-    error_type = (
-        "token_limit_exceeded" if _is_token_limit_error(message) else "generic"
-    )
+    if error_type is None:
+        error_type = (
+            "token_limit_exceeded" if _is_token_limit_error(message) else "generic"
+        )
     return jsonify({
         "error": message,
         "error_type": error_type,
-        "error_detail": message,
+        "error_detail": error_detail or message,
     }), status_code
 
 
@@ -45,8 +47,25 @@ def ocr_ingredients():
         result = ocr_service.dispatch_ocr(image)
     except ValueError as e:
         return _error_response(str(e), 400)
-    except Exception:
-        return _error_response("OCR processing failed", 500)
+    except (TimeoutError, ConnectionError):
+        return _error_response(
+            "Could not read image — the service is not responding. Try again shortly.",
+            503,
+            error_type="provider_timeout",
+        )
+    except (UnidentifiedImageError, OSError):
+        return _error_response(
+            "Could not read image — invalid image format. Try a different image.",
+            400,
+            error_type="invalid_image",
+        )
+    except Exception as exc:
+        return _error_response(
+            "OCR processing failed",
+            500,
+            error_type="generic",
+            error_detail=f"{type(exc).__name__}: {exc}",
+        )
 
     text = result["text"]
     provider = result["provider"]
@@ -56,6 +75,7 @@ def ocr_ingredients():
         return jsonify({
             "text": "",
             "error": "No text found in image",
+            "error_type": "no_text",
             "provider": provider,
             "fallback": fallback,
         }), 200
