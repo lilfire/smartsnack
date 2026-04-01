@@ -44,6 +44,7 @@ class TestOcrSuccessResponse:
         data = resp.get_json()
         assert resp.status_code == 200
         assert "provider" in data, "Success response must include 'provider' field"
+        assert isinstance(data["provider"], str) and data["provider"], "provider must be a non-empty string"
 
     def test_no_text_still_has_text_field(self, client):
         """When OCR finds no text, response still has 'text' field (empty string)."""
