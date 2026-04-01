@@ -215,12 +215,82 @@ def _extract_claude_vision(image_bytes, image_b64):
 
 
 # ---------------------------------------------------------------------------
+# Gemini image format conversion
+# ---------------------------------------------------------------------------
+
+_GEMINI_SUPPORTED_MIME_TYPES = frozenset({
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+})
+
+_PIL_FORMAT_TO_MIME = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+    "BMP": "image/bmp",
+    "TIFF": "image/tiff",
+    "GIF": "image/gif",
+}
+
+
+def _svg_to_png(svg_bytes):
+    """Convert SVG bytes to PNG bytes using cairosvg."""
+    try:
+        import cairosvg
+    except ImportError:
+        raise ValueError(
+            "SVG conversion requires cairosvg: pip install cairosvg"
+        )
+    return cairosvg.svg2png(bytestring=svg_bytes)
+
+
+def _convert_for_gemini(image_bytes):
+    """Return (image_bytes, mime_type) ready for the Gemini API.
+
+    If the image format is not supported by Gemini, convert to PNG.
+    Supported formats: image/jpeg, image/png, image/webp, image/heic, image/heif.
+    """
+    # Detect SVG before PIL (PIL cannot open SVG)
+    stripped = image_bytes.lstrip()
+    if stripped.startswith(b"<svg") or (
+        stripped.startswith(b"<?xml") and b"<svg" in stripped[:512]
+    ):
+        converted = _svg_to_png(image_bytes)
+        logger.info("OCR: converted svg \u2192 image/png for Gemini")
+        return converted, "image/png"
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        pil_format = img.format or "PNG"
+    except Exception:
+        return image_bytes, "image/png"
+
+    mime_type = _PIL_FORMAT_TO_MIME.get(pil_format, "image/png")
+
+    if mime_type in _GEMINI_SUPPORTED_MIME_TYPES:
+        return image_bytes, mime_type
+
+    # Convert unsupported format to PNG
+    buf = io.BytesIO()
+    img.convert("RGBA").save(buf, format="PNG")
+    converted_bytes = buf.getvalue()
+    logger.info("OCR: converted %s \u2192 image/png for Gemini", pil_format.lower())
+    return converted_bytes, "image/png"
+
+
+# ---------------------------------------------------------------------------
 # Gemini backend
 # ---------------------------------------------------------------------------
 
 def _extract_gemini(image_bytes, image_b64):
     """Use Google Gemini API to extract ingredient text from an image."""
     api_key = _get_api_key("GEMINI_API_KEY")
+
+    image_bytes, mime_type = _convert_for_gemini(image_bytes)
+    image_b64 = base64.b64encode(image_bytes).decode()
 
     from google import genai
 
@@ -232,7 +302,7 @@ def _extract_gemini(image_bytes, image_b64):
                 "parts": [
                     {
                         "inline_data": {
-                            "mime_type": "image/png",
+                            "mime_type": mime_type,
                             "data": image_b64,
                         }
                     },

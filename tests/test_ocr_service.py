@@ -25,6 +25,51 @@ def _make_tiny_png():
     return buf.getvalue()
 
 
+def _make_tiny_jpeg():
+    """Create a minimal valid JPEG image and return raw bytes."""
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 50), color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+def _make_tiny_bmp():
+    """Create a minimal valid BMP image and return raw bytes."""
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 50), color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="BMP")
+    return buf.getvalue()
+
+
+def _make_tiny_tiff():
+    """Create a minimal valid TIFF image and return raw bytes."""
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 50), color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="TIFF")
+    return buf.getvalue()
+
+
+def _make_tiny_gif():
+    """Create a minimal valid GIF image and return raw bytes."""
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 50), color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="GIF")
+    return buf.getvalue()
+
+
+def _make_minimal_svg():
+    """Return a minimal SVG file as bytes."""
+    return b'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="50"><rect width="100" height="50" fill="white"/></svg>'
+
+
 def _b64(raw_bytes):
     return base64.b64encode(raw_bytes).decode()
 
@@ -363,6 +408,318 @@ class TestGeminiBackend:
                 result = extract_text(_b64(png_bytes))
 
                 assert result == ""
+
+    def test_bmp_converted_before_gemini_call(self, _mock_backend):
+        """BMP image should be converted to PNG before calling Gemini API."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker, mel"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, mock_genai = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                bmp_bytes = _make_tiny_bmp()
+                result = extract_text(_b64(bmp_bytes))
+
+                assert result == "sukker, mel"
+                call_kwargs = mock_client.models.generate_content.call_args
+                parts = call_kwargs[1]["contents"][0]["parts"]
+                mime_type = parts[0]["inline_data"]["mime_type"]
+                assert mime_type == "image/png"
+
+    def test_tiff_converted_before_gemini_call(self, _mock_backend):
+        """TIFF image should be converted to PNG before calling Gemini API."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "ingredients"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _ = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                tiff_bytes = _make_tiny_tiff()
+                result = extract_text(_b64(tiff_bytes))
+
+                assert result == "ingredients"
+                call_kwargs = mock_client.models.generate_content.call_args
+                parts = call_kwargs[1]["contents"][0]["parts"]
+                mime_type = parts[0]["inline_data"]["mime_type"]
+                assert mime_type == "image/png"
+
+    def test_gif_converted_before_gemini_call(self, _mock_backend):
+        """GIF image should be converted to PNG before calling Gemini API."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "ingredients"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _ = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                gif_bytes = _make_tiny_gif()
+                result = extract_text(_b64(gif_bytes))
+
+                assert result == "ingredients"
+                call_kwargs = mock_client.models.generate_content.call_args
+                parts = call_kwargs[1]["contents"][0]["parts"]
+                mime_type = parts[0]["inline_data"]["mime_type"]
+                assert mime_type == "image/png"
+
+    def test_jpeg_passthrough_with_correct_mime_type(self, _mock_backend):
+        """JPEG should pass through with image/jpeg mime type."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _ = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                jpeg_bytes = _make_tiny_jpeg()
+                result = extract_text(_b64(jpeg_bytes))
+
+                assert result == "sukker"
+                call_kwargs = mock_client.models.generate_content.call_args
+                parts = call_kwargs[1]["contents"][0]["parts"]
+                mime_type = parts[0]["inline_data"]["mime_type"]
+                assert mime_type == "image/jpeg"
+
+    def test_png_passthrough_with_correct_mime_type(self, _mock_backend):
+        """PNG should pass through with image/png mime type."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "mel"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _ = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                png_bytes = _make_tiny_png()
+                result = extract_text(_b64(png_bytes))
+
+                assert result == "mel"
+                call_kwargs = mock_client.models.generate_content.call_args
+                parts = call_kwargs[1]["contents"][0]["parts"]
+                mime_type = parts[0]["inline_data"]["mime_type"]
+                assert mime_type == "image/png"
+
+    def test_svg_converted_before_gemini_call(self, _mock_backend):
+        """SVG image should be converted to PNG before calling Gemini API."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "ingredients"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _ = self._patch_genai(mock_client)
+
+        fake_png = _make_tiny_png()
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+                    svg_bytes = _make_minimal_svg()
+                    result = extract_text(_b64(svg_bytes))
+
+                    assert result == "ingredients"
+                    mock_svg.assert_called_once_with(svg_bytes)
+                    call_kwargs = mock_client.models.generate_content.call_args
+                    parts = call_kwargs[1]["contents"][0]["parts"]
+                    mime_type = parts[0]["inline_data"]["mime_type"]
+                    assert mime_type == "image/png"
+
+
+# ---------------------------------------------------------------------------
+# _convert_for_gemini unit tests
+# ---------------------------------------------------------------------------
+
+class TestConvertForGemini:
+    """Unit tests for the _convert_for_gemini helper."""
+
+    def test_png_returns_unchanged_bytes_and_mime(self):
+        from services.ocr_service import _convert_for_gemini
+
+        png_bytes = _make_tiny_png()
+        out_bytes, mime = _convert_for_gemini(png_bytes)
+
+        assert mime == "image/png"
+        assert out_bytes == png_bytes
+
+    def test_jpeg_returns_unchanged_bytes_and_mime(self):
+        from services.ocr_service import _convert_for_gemini
+
+        jpeg_bytes = _make_tiny_jpeg()
+        out_bytes, mime = _convert_for_gemini(jpeg_bytes)
+
+        assert mime == "image/jpeg"
+        assert out_bytes == jpeg_bytes
+
+    def test_bmp_converts_to_png(self):
+        from PIL import Image
+        from services.ocr_service import _convert_for_gemini
+
+        bmp_bytes = _make_tiny_bmp()
+        out_bytes, mime = _convert_for_gemini(bmp_bytes)
+
+        assert mime == "image/png"
+        img = Image.open(io.BytesIO(out_bytes))
+        assert img.format == "PNG"
+
+    def test_tiff_converts_to_png(self):
+        from PIL import Image
+        from services.ocr_service import _convert_for_gemini
+
+        tiff_bytes = _make_tiny_tiff()
+        out_bytes, mime = _convert_for_gemini(tiff_bytes)
+
+        assert mime == "image/png"
+        img = Image.open(io.BytesIO(out_bytes))
+        assert img.format == "PNG"
+
+    def test_gif_converts_to_png(self):
+        from PIL import Image
+        from services.ocr_service import _convert_for_gemini
+
+        gif_bytes = _make_tiny_gif()
+        out_bytes, mime = _convert_for_gemini(gif_bytes)
+
+        assert mime == "image/png"
+        img = Image.open(io.BytesIO(out_bytes))
+        assert img.format == "PNG"
+
+    def test_bmp_conversion_logs_message(self, caplog):
+        import logging
+        from services.ocr_service import _convert_for_gemini
+
+        bmp_bytes = _make_tiny_bmp()
+        with caplog.at_level(logging.INFO, logger="services.ocr_service"):
+            _convert_for_gemini(bmp_bytes)
+
+        assert any("OCR: converted bmp → image/png for Gemini" in r.message for r in caplog.records)
+
+    def test_tiff_conversion_logs_message(self, caplog):
+        import logging
+        from services.ocr_service import _convert_for_gemini
+
+        tiff_bytes = _make_tiny_tiff()
+        with caplog.at_level(logging.INFO, logger="services.ocr_service"):
+            _convert_for_gemini(tiff_bytes)
+
+        assert any("OCR: converted tiff → image/png for Gemini" in r.message for r in caplog.records)
+
+    def test_gif_conversion_logs_message(self, caplog):
+        import logging
+        from services.ocr_service import _convert_for_gemini
+
+        gif_bytes = _make_tiny_gif()
+        with caplog.at_level(logging.INFO, logger="services.ocr_service"):
+            _convert_for_gemini(gif_bytes)
+
+        assert any("OCR: converted gif → image/png for Gemini" in r.message for r in caplog.records)
+
+    def test_png_no_conversion_log(self, caplog):
+        import logging
+        from services.ocr_service import _convert_for_gemini
+
+        png_bytes = _make_tiny_png()
+        with caplog.at_level(logging.INFO, logger="services.ocr_service"):
+            _convert_for_gemini(png_bytes)
+
+        assert not any("OCR: converted" in r.message for r in caplog.records)
+
+    def test_svg_calls_svg_to_png(self):
+        from services.ocr_service import _convert_for_gemini
+
+        svg_bytes = _make_minimal_svg()
+        fake_png = _make_tiny_png()
+
+        with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+            out_bytes, mime = _convert_for_gemini(svg_bytes)
+
+        mock_svg.assert_called_once_with(svg_bytes)
+        assert mime == "image/png"
+        assert out_bytes == fake_png
+
+    def test_svg_conversion_logs_message(self, caplog):
+        import logging
+        from services.ocr_service import _convert_for_gemini
+
+        svg_bytes = _make_minimal_svg()
+        fake_png = _make_tiny_png()
+
+        with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+            with caplog.at_level(logging.INFO, logger="services.ocr_service"):
+                _convert_for_gemini(svg_bytes)
+
+        assert any("OCR: converted svg → image/png for Gemini" in r.message for r in caplog.records)
+
+    def test_svg_with_xml_declaration(self):
+        """SVG with XML declaration should also be detected and converted."""
+        from services.ocr_service import _convert_for_gemini
+
+        svg_bytes = b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
+        fake_png = _make_tiny_png()
+
+        with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+            out_bytes, mime = _convert_for_gemini(svg_bytes)
+
+        mock_svg.assert_called_once()
+        assert mime == "image/png"
+
+
+# ---------------------------------------------------------------------------
+# _svg_to_png unit tests
+# ---------------------------------------------------------------------------
+
+class TestSvgToPng:
+    """Unit tests for the _svg_to_png helper."""
+
+    def test_uses_cairosvg_when_available(self):
+        from services.ocr_service import _svg_to_png
+
+        svg_bytes = _make_minimal_svg()
+        fake_png = _make_tiny_png()
+
+        mock_cairosvg = MagicMock()
+        mock_cairosvg.svg2png.return_value = fake_png
+
+        with patch.dict("sys.modules", {"cairosvg": mock_cairosvg}):
+            result = _svg_to_png(svg_bytes)
+
+        mock_cairosvg.svg2png.assert_called_once_with(bytestring=svg_bytes)
+        assert result == fake_png
+
+    def test_raises_value_error_when_cairosvg_missing(self):
+        from services.ocr_service import _svg_to_png
+
+        svg_bytes = _make_minimal_svg()
+
+        with patch.dict("sys.modules", {"cairosvg": None}):
+            with pytest.raises((ValueError, ImportError)):
+                _svg_to_png(svg_bytes)
 
 
 # ---------------------------------------------------------------------------
