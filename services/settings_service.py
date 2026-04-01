@@ -156,7 +156,7 @@ def get_ocr_backend() -> str:
     """Return the currently selected OCR backend ID, defaulting to tesseract."""
     conn = get_db()
     row = conn.execute(
-        "SELECT value FROM user_settings WHERE key='ocr_backend'"
+        "SELECT value FROM user_settings WHERE key='ocr_provider'"
     ).fetchone()
     return row["value"] if row else DEFAULT_OCR_BACKEND
 
@@ -171,7 +171,7 @@ def set_ocr_backend(backend_id: str) -> str:
         )
     conn = get_db()
     conn.execute(
-        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_backend', ?)",
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_provider', ?)",
         (backend_id,),
     )
     conn.commit()

@@ -95,22 +95,15 @@ class TestExtractTextValidation:
 # Tesseract backend
 # ---------------------------------------------------------------------------
 
+@patch("services.settings_service.get_ocr_backend", return_value="tesseract")
 class TestTesseractBackend:
     """Tests for the pytesseract-based OCR backend."""
 
-    def _setup_tesseract_env(self):
-        """Ensure ocr_service uses tesseract backend."""
-        import importlib
-        import services.ocr_service as mod
-        # Force tesseract backend
-        mod._OCR_BACKEND = "tesseract"
-        return mod
-
     @patch("pytesseract.image_to_data")
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
-    def test_extract_text_calls_pytesseract(self, mock_output, mock_itd):
+    def test_extract_text_calls_pytesseract(self, mock_output, mock_itd, _mock_backend):
         """extract_text should call pytesseract.image_to_data with correct params."""
-        mod = self._setup_tesseract_env()
+        from services.ocr_service import extract_text
 
         mock_itd.return_value = _make_tesseract_data(
             texts=["Sukker", "mel"],
@@ -120,7 +113,7 @@ class TestTesseractBackend:
         )
 
         png_bytes = _make_tiny_png()
-        result = mod.extract_text(_b64(png_bytes))
+        result = extract_text(_b64(png_bytes))
 
         assert mock_itd.called
         assert "Sukker" in result
@@ -128,9 +121,9 @@ class TestTesseractBackend:
 
     @patch("pytesseract.image_to_data")
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
-    def test_extract_text_with_data_uri(self, mock_output, mock_itd):
+    def test_extract_text_with_data_uri(self, mock_output, mock_itd, _mock_backend):
         """Should handle data URI format input."""
-        mod = self._setup_tesseract_env()
+        from services.ocr_service import extract_text
 
         mock_itd.return_value = _make_tesseract_data(
             texts=["ingredienser"],
@@ -138,15 +131,15 @@ class TestTesseractBackend:
         )
 
         png_bytes = _make_tiny_png()
-        result = mod.extract_text(_data_uri(png_bytes))
+        result = extract_text(_data_uri(png_bytes))
 
         assert result == "ingredienser"
 
     @patch("pytesseract.image_to_data")
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
-    def test_filters_low_confidence(self, mock_output, mock_itd):
+    def test_filters_low_confidence(self, mock_output, mock_itd, _mock_backend):
         """Words with confidence < 30 should be dropped."""
-        mod = self._setup_tesseract_env()
+        from services.ocr_service import extract_text
 
         mock_itd.return_value = _make_tesseract_data(
             texts=["good", "noise"],
@@ -155,29 +148,29 @@ class TestTesseractBackend:
         )
 
         png_bytes = _make_tiny_png()
-        result = mod.extract_text(_b64(png_bytes))
+        result = extract_text(_b64(png_bytes))
 
         assert "good" in result
         assert "noise" not in result
 
     @patch("pytesseract.image_to_data")
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
-    def test_empty_ocr_returns_empty_string(self, mock_output, mock_itd):
+    def test_empty_ocr_returns_empty_string(self, mock_output, mock_itd, _mock_backend):
         """When OCR produces no text, return empty string."""
-        mod = self._setup_tesseract_env()
+        from services.ocr_service import extract_text
 
         mock_itd.return_value = _make_tesseract_data(texts=[], confs=[])
 
         png_bytes = _make_tiny_png()
-        result = mod.extract_text(_b64(png_bytes))
+        result = extract_text(_b64(png_bytes))
 
         assert result == ""
 
     @patch("pytesseract.image_to_data")
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
-    def test_multi_variant_picks_best(self, mock_output, mock_itd):
+    def test_multi_variant_picks_best(self, mock_output, mock_itd, _mock_backend):
         """Should try multiple image variants and pick highest confidence."""
-        mod = self._setup_tesseract_env()
+        from services.ocr_service import extract_text
 
         call_count = [0]
 
@@ -191,7 +184,7 @@ class TestTesseractBackend:
         mock_itd.side_effect = side_effect
 
         png_bytes = _make_tiny_png()
-        result = mod.extract_text(_b64(png_bytes))
+        result = extract_text(_b64(png_bytes))
 
         assert "sharp" in result
         assert mock_itd.call_count == 2
@@ -201,17 +194,13 @@ class TestTesseractBackend:
 # Claude Vision backend
 # ---------------------------------------------------------------------------
 
+@patch("services.settings_service.get_ocr_backend", return_value="claude_vision")
 class TestClaudeVisionBackend:
     """Tests for the Claude Vision OCR backend."""
 
-    def _setup_env(self):
-        import services.ocr_service as mod
-        mod._OCR_BACKEND = "claude_vision"
-        return mod
-
-    def test_extract_text_calls_claude_vision(self):
-        """When OCR_BACKEND=claude_vision, should use Claude Vision."""
-        mod = self._setup_env()
+    def test_extract_text_calls_claude_vision(self, _mock_backend):
+        """When backend=claude_vision, should use Claude Vision."""
+        from services.ocr_service import extract_text
 
         mock_msg = MagicMock()
         mock_msg.content = [MagicMock(text="sukker, hvetemel, vann, salt")]
@@ -221,13 +210,13 @@ class TestClaudeVisionBackend:
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
             with patch("anthropic.Anthropic", return_value=mock_client):
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 assert mock_client.messages.create.called
                 assert result == "sukker, hvetemel, vann, salt"
 
-    def test_claude_vision_with_data_uri(self):
-        mod = self._setup_env()
+    def test_claude_vision_with_data_uri(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         mock_msg = MagicMock()
         mock_msg.content = [MagicMock(text="ingredients list")]
@@ -237,13 +226,13 @@ class TestClaudeVisionBackend:
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
             with patch("anthropic.Anthropic", return_value=mock_client):
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_data_uri(png_bytes))
+                result = extract_text(_data_uri(png_bytes))
 
                 assert result == "ingredients list"
 
-    def test_missing_api_key_raises(self):
+    def test_missing_api_key_raises(self, _mock_backend):
         """Should raise ValueError when no API key is available."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("ANTHROPIC_API_KEY", None)
@@ -251,11 +240,11 @@ class TestClaudeVisionBackend:
 
             png_bytes = _make_tiny_png()
             with pytest.raises(ValueError, match="API key"):
-                mod.extract_text(_b64(png_bytes))
+                extract_text(_b64(png_bytes))
 
-    def test_falls_back_to_llm_api_key(self):
+    def test_falls_back_to_llm_api_key(self, _mock_backend):
         """Should use LLM_API_KEY when ANTHROPIC_API_KEY is not set."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_msg = MagicMock()
         mock_msg.content = [MagicMock(text="ingredients here")]
@@ -267,13 +256,13 @@ class TestClaudeVisionBackend:
             os.environ.pop("ANTHROPIC_API_KEY", None)
             with patch("anthropic.Anthropic", return_value=mock_client) as mock_cls:
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 mock_cls.assert_called_once_with(api_key="fallback-key")
                 assert result == "ingredients here"
 
-    def test_empty_response(self):
-        mod = self._setup_env()
+    def test_empty_response(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         mock_msg = MagicMock()
         mock_msg.content = []
@@ -283,7 +272,7 @@ class TestClaudeVisionBackend:
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
             with patch("anthropic.Anthropic", return_value=mock_client):
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 assert result == ""
 
@@ -292,13 +281,9 @@ class TestClaudeVisionBackend:
 # Gemini backend
 # ---------------------------------------------------------------------------
 
+@patch("services.settings_service.get_ocr_backend", return_value="gemini")
 class TestGeminiBackend:
     """Tests for the Gemini Vision OCR backend."""
-
-    def _setup_env(self):
-        import services.ocr_service as mod
-        mod._OCR_BACKEND = "gemini"
-        return mod
 
     def _patch_genai(self, mock_client):
         """Create sys.modules patches for google.genai with mock_client."""
@@ -308,9 +293,9 @@ class TestGeminiBackend:
         mock_google.genai = mock_genai
         return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
 
-    def test_extract_text_calls_gemini(self):
+    def test_extract_text_calls_gemini(self, _mock_backend):
         """Should call google.genai.Client with correct API shape."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "sukker, mel, vann"
@@ -323,7 +308,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-gemini-key"}, clear=False):
             with patcher:
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 mock_genai.Client.assert_called_once_with(api_key="test-gemini-key")
                 mock_client.models.generate_content.assert_called_once()
@@ -331,8 +316,8 @@ class TestGeminiBackend:
                 assert call_kwargs[1]["model"] == "gemini-2.0-flash"
                 assert result == "sukker, mel, vann"
 
-    def test_missing_api_key_raises(self):
-        mod = self._setup_env()
+    def test_missing_api_key_raises(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("GEMINI_API_KEY", None)
@@ -340,10 +325,10 @@ class TestGeminiBackend:
 
             png_bytes = _make_tiny_png()
             with pytest.raises(ValueError, match="API key"):
-                mod.extract_text(_b64(png_bytes))
+                extract_text(_b64(png_bytes))
 
-    def test_falls_back_to_llm_api_key(self):
-        mod = self._setup_env()
+    def test_falls_back_to_llm_api_key(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "ingredients"
@@ -357,12 +342,12 @@ class TestGeminiBackend:
             os.environ.pop("GEMINI_API_KEY", None)
             with patcher:
                 png_bytes = _make_tiny_png()
-                mod.extract_text(_b64(png_bytes))
+                extract_text(_b64(png_bytes))
 
                 mock_genai.Client.assert_called_once_with(api_key="fallback-key")
 
-    def test_empty_response(self):
-        mod = self._setup_env()
+    def test_empty_response(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = ""
@@ -375,7 +360,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 assert result == ""
 
@@ -384,17 +369,13 @@ class TestGeminiBackend:
 # OpenAI backend
 # ---------------------------------------------------------------------------
 
+@patch("services.settings_service.get_ocr_backend", return_value="openai")
 class TestOpenAIBackend:
     """Tests for the OpenAI Vision OCR backend."""
 
-    def _setup_env(self):
-        import services.ocr_service as mod
-        mod._OCR_BACKEND = "openai"
-        return mod
-
-    def test_extract_text_calls_openai(self):
+    def test_extract_text_calls_openai(self, _mock_backend):
         """Should call openai.OpenAI with correct API shape."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_choice = MagicMock()
         mock_choice.message.content = "sukker, mel, vann"
@@ -408,7 +389,7 @@ class TestOpenAIBackend:
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-openai-key"}, clear=False):
             with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 mock_cls.assert_called_once_with(api_key="test-openai-key")
                 mock_client.chat.completions.create.assert_called_once()
@@ -416,8 +397,8 @@ class TestOpenAIBackend:
                 assert call_kwargs[1]["model"] == "gpt-4o"
                 assert result == "sukker, mel, vann"
 
-    def test_missing_api_key_raises(self):
-        mod = self._setup_env()
+    def test_missing_api_key_raises(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("OPENAI_API_KEY", None)
@@ -425,10 +406,10 @@ class TestOpenAIBackend:
 
             png_bytes = _make_tiny_png()
             with pytest.raises(ValueError, match="API key"):
-                mod.extract_text(_b64(png_bytes))
+                extract_text(_b64(png_bytes))
 
-    def test_falls_back_to_llm_api_key(self):
-        mod = self._setup_env()
+    def test_falls_back_to_llm_api_key(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         mock_choice = MagicMock()
         mock_choice.message.content = "ingredients"
@@ -443,12 +424,12 @@ class TestOpenAIBackend:
             os.environ.pop("OPENAI_API_KEY", None)
             with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                extract_text(_b64(png_bytes))
 
                 mock_cls.assert_called_once_with(api_key="fallback-key")
 
-    def test_empty_response(self):
-        mod = self._setup_env()
+    def test_empty_response(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         mock_choice = MagicMock()
         mock_choice.message.content = ""
@@ -462,7 +443,7 @@ class TestOpenAIBackend:
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
             with patch("openai.OpenAI", return_value=mock_client):
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 assert result == ""
 
@@ -471,13 +452,13 @@ class TestOpenAIBackend:
 # Backward compatibility
 # ---------------------------------------------------------------------------
 
+@patch("services.settings_service.get_ocr_backend", return_value="llm")
 class TestBackwardCompatibility:
-    """Verify OCR_BACKEND=llm still routes to Claude Vision."""
+    """Verify backend=llm still routes to Claude Vision."""
 
-    def test_llm_routes_to_claude_vision(self):
-        """OCR_BACKEND=llm should use the Claude Vision provider (anthropic SDK)."""
-        import services.ocr_service as mod
-        mod._OCR_BACKEND = "llm"
+    def test_llm_routes_to_claude_vision(self, _mock_backend):
+        """backend=llm should use the Claude Vision provider (anthropic SDK)."""
+        from services.ocr_service import extract_text
 
         mock_msg = MagicMock()
         mock_msg.content = [MagicMock(text="sukker, mel")]
@@ -487,12 +468,12 @@ class TestBackwardCompatibility:
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
             with patch("anthropic.Anthropic", return_value=mock_client):
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 assert mock_client.messages.create.called
                 assert result == "sukker, mel"
 
-    def test_llm_alias_in_providers_registry(self):
+    def test_llm_alias_in_providers_registry(self, _mock_backend):
         """The _PROVIDERS dict should map 'llm' to claude_vision handler."""
         import services.ocr_service as mod
 
@@ -505,81 +486,31 @@ class TestBackwardCompatibility:
 # ---------------------------------------------------------------------------
 
 class TestUnknownBackend:
-    """Verify clear error message for invalid OCR_BACKEND values."""
+    """Verify clear error message for invalid backend values."""
 
-    def test_unknown_backend_raises_value_error(self):
-        import services.ocr_service as mod
-        mod._OCR_BACKEND = "invalid_provider"
+    @patch("services.settings_service.get_ocr_backend", return_value="invalid_provider")
+    def test_unknown_backend_raises_value_error(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         png_bytes = _make_tiny_png()
         with pytest.raises(ValueError, match="Unknown OCR backend"):
-            mod.extract_text(_b64(png_bytes))
+            extract_text(_b64(png_bytes))
 
-    def test_error_message_includes_backend_name(self):
-        import services.ocr_service as mod
-        mod._OCR_BACKEND = "banana_vision"
+    @patch("services.settings_service.get_ocr_backend", return_value="banana_vision")
+    def test_error_message_includes_backend_name(self, _mock_backend):
+        from services.ocr_service import extract_text
 
         png_bytes = _make_tiny_png()
         with pytest.raises(ValueError, match="banana_vision"):
-            mod.extract_text(_b64(png_bytes))
+            extract_text(_b64(png_bytes))
 
 
 # ---------------------------------------------------------------------------
-# OCR_BACKEND config — all provider names
+# Provider registry
 # ---------------------------------------------------------------------------
 
-class TestOCRBackendConfig:
-    """Verify OCR_BACKEND env var controls which backend is used."""
-
-    @patch.dict(os.environ, {}, clear=False)
-    def test_default_backend_is_tesseract(self):
-        """Without OCR_BACKEND set, default to tesseract."""
-        os.environ.pop("OCR_BACKEND", None)
-        import importlib
-        import services.ocr_service as mod
-        importlib.reload(mod)
-
-        assert mod._OCR_BACKEND == "tesseract"
-
-    @patch.dict(os.environ, {"OCR_BACKEND": "llm"}, clear=False)
-    def test_llm_backend_selected(self):
-        import importlib
-        import services.ocr_service as mod
-        importlib.reload(mod)
-
-        assert mod._OCR_BACKEND == "llm"
-
-    @patch.dict(os.environ, {"OCR_BACKEND": "tesseract"}, clear=False)
-    def test_tesseract_backend_selected(self):
-        import importlib
-        import services.ocr_service as mod
-        importlib.reload(mod)
-
-        assert mod._OCR_BACKEND == "tesseract"
-
-    @patch.dict(os.environ, {"OCR_BACKEND": "claude_vision"}, clear=False)
-    def test_claude_vision_backend_selected(self):
-        import importlib
-        import services.ocr_service as mod
-        importlib.reload(mod)
-
-        assert mod._OCR_BACKEND == "claude_vision"
-
-    @patch.dict(os.environ, {"OCR_BACKEND": "gemini"}, clear=False)
-    def test_gemini_backend_selected(self):
-        import importlib
-        import services.ocr_service as mod
-        importlib.reload(mod)
-
-        assert mod._OCR_BACKEND == "gemini"
-
-    @patch.dict(os.environ, {"OCR_BACKEND": "openai"}, clear=False)
-    def test_openai_backend_selected(self):
-        import importlib
-        import services.ocr_service as mod
-        importlib.reload(mod)
-
-        assert mod._OCR_BACKEND == "openai"
+class TestProviderRegistry:
+    """Verify provider registry contains all expected backends."""
 
     def test_all_providers_in_registry(self):
         """All valid backend names should be in the _PROVIDERS dict."""
@@ -760,3 +691,88 @@ class TestOCRBlueprint:
             json={"image": "dGVzdA=="},
         )
         assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# Fix 2: dispatch_ocr() must honor ocr_fallback_to_tesseract setting
+# ---------------------------------------------------------------------------
+
+class TestDispatchOcrFallbackSetting:
+    """dispatch_ocr() should respect ocr_fallback_to_tesseract user preference."""
+
+    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
+    def test_fallback_allowed_when_setting_enabled(self, mock_output, mock_itd, app_ctx):
+        """When fallback is enabled and provider unavailable, fall back to tesseract."""
+        from services.ocr_settings_service import save_ocr_settings
+
+        # Select claude_vision but no API key → unavailable; enable fallback
+        save_ocr_settings("claude_vision", fallback_to_tesseract=True)
+
+        mock_itd.return_value = _make_tesseract_data(
+            texts=["sukker"], confs=[90]
+        )
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            os.environ.pop("LLM_API_KEY", None)
+
+            from services.ocr_service import dispatch_ocr
+
+            png_bytes = _make_tiny_png()
+            result = dispatch_ocr(_b64(png_bytes))
+
+            assert result["fallback"] is True
+            assert "sukker" in result["text"]
+
+    def test_fallback_blocked_when_setting_disabled(self, app_ctx):
+        """When fallback is disabled and provider unavailable, raise ValueError."""
+        from services.ocr_settings_service import save_ocr_settings
+
+        # Select claude_vision but no API key → unavailable; disable fallback
+        save_ocr_settings("claude_vision", fallback_to_tesseract=False)
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+            os.environ.pop("LLM_API_KEY", None)
+
+            from services.ocr_service import dispatch_ocr
+
+            png_bytes = _make_tiny_png()
+            with pytest.raises(ValueError, match="unavailable"):
+                dispatch_ocr(_b64(png_bytes))
+
+    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
+    def test_no_fallback_when_provider_available(self, mock_output, mock_itd, app_ctx):
+        """When selected provider is available (tesseract), no fallback occurs."""
+        from services.ocr_settings_service import save_ocr_settings
+
+        save_ocr_settings("tesseract", fallback_to_tesseract=False)
+
+        mock_itd.return_value = _make_tesseract_data(
+            texts=["mel"], confs=[85]
+        )
+
+        from services.ocr_service import dispatch_ocr
+
+        png_bytes = _make_tiny_png()
+        result = dispatch_ocr(_b64(png_bytes))
+
+        assert result["fallback"] is False
+
+
+# ---------------------------------------------------------------------------
+# Fix 3: _OCR_BACKEND module-level env var should be removed
+# ---------------------------------------------------------------------------
+
+class TestLegacyEnvVarRemoved:
+    """The unused _OCR_BACKEND module-level variable should no longer exist."""
+
+    def test_ocr_backend_module_var_removed(self):
+        """services.ocr_service should not have _OCR_BACKEND attribute."""
+        import services.ocr_service as mod
+
+        assert not hasattr(mod, "_OCR_BACKEND"), (
+            "_OCR_BACKEND module-level variable should be removed"
+        )
