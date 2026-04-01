@@ -19,7 +19,7 @@ class TestOcrSuccessResponse:
 
     def test_success_returns_text(self, client):
         """Baseline: successful OCR returns text field."""
-        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "sukker, mel", "provider": "EasyOCR", "fallback": False}):
+        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "sukker, mel", "provider": "Tesseract (Local)", "fallback": False}):
             resp = client.post(
                 "/api/ocr/ingredients",
                 data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
@@ -30,8 +30,8 @@ class TestOcrSuccessResponse:
         assert data["text"] == "sukker, mel"
 
     def test_success_includes_provider_field(self, client):
-        """Success response must include provider field (value: 'EasyOCR')."""
-        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "sukker, mel", "provider": "EasyOCR", "fallback": False}):
+        """Success response must include provider field (value: 'Tesseract (Local)')."""
+        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "sukker, mel", "provider": "Tesseract (Local)", "fallback": False}):
             resp = client.post(
                 "/api/ocr/ingredients",
                 data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
@@ -40,11 +40,11 @@ class TestOcrSuccessResponse:
         data = resp.get_json()
         assert resp.status_code == 200
         assert "provider" in data, "Success response must include 'provider' field"
-        assert data["provider"] == "EasyOCR"
+        assert data["provider"] == "Tesseract (Local)"
 
     def test_no_text_still_has_text_field(self, client):
         """When OCR finds no text, response still has 'text' field (empty string)."""
-        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "", "provider": "EasyOCR", "fallback": False}):
+        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "", "provider": "Tesseract (Local)", "fallback": False}):
             resp = client.post(
                 "/api/ocr/ingredients",
                 data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
@@ -114,7 +114,7 @@ class TestOcrBackwardsCompat:
 
     def test_success_has_text_field(self, client):
         """Success response always includes 'text' field."""
-        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "mel", "provider": "EasyOCR", "fallback": False}):
+        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "mel", "provider": "Tesseract (Local)", "fallback": False}):
             resp = client.post(
                 "/api/ocr/ingredients",
                 data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
@@ -125,7 +125,7 @@ class TestOcrBackwardsCompat:
 
     def test_no_text_has_error_field(self, client):
         """When no text found, response includes both 'text' and 'error' fields."""
-        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "", "provider": "EasyOCR", "fallback": False}):
+        with patch("services.ocr_service.dispatch_ocr", return_value={"text": "", "provider": "Tesseract (Local)", "fallback": False}):
             resp = client.post(
                 "/api/ocr/ingredients",
                 data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),

@@ -1,6 +1,6 @@
 """OCR service for extracting text from ingredient images.
 
-Supports multiple backends controlled by OCR_BACKEND env var:
+Supports multiple backends controlled by user settings (ocr_provider):
 - "tesseract" (default): uses pytesseract
 - "claude_vision": uses Claude Vision API via anthropic SDK
 - "gemini": uses Google Gemini API via google-genai SDK
@@ -20,8 +20,6 @@ from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
 
 logger = logging.getLogger(__name__)
 
-
-_OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
 
 _INGREDIENT_PROMPT = (
     "Extract the ingredient text from this food label image. "
@@ -324,10 +322,13 @@ def extract_text(image_base64):
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
 
-    provider = _PROVIDERS.get(_OCR_BACKEND)
+    from services import settings_service
+
+    backend_id = settings_service.get_ocr_backend()
+    provider = _PROVIDERS.get(backend_id)
     if provider is None:
         raise ValueError(
-            f"Unknown OCR backend: '{_OCR_BACKEND}'. "
+            f"Unknown OCR backend: '{backend_id}'. "
             f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
         )
 
@@ -365,6 +366,7 @@ def dispatch_ocr(image_base64):
     Returns a dict: {"text": str, "provider": str, "fallback": bool}.
     """
     from services import settings_service
+    from services import ocr_settings_service
 
     requested_id = settings_service.get_ocr_backend()
     fallback = False
@@ -374,6 +376,13 @@ def dispatch_ocr(image_base64):
     backend = backends.get(requested_id)
 
     if not backend or not backend["available"]:
+        # Check user preference before falling back
+        ocr_settings = ocr_settings_service.get_ocr_settings()
+        if not ocr_settings.get("fallback_to_tesseract", False):
+            raise ValueError(
+                f"Selected OCR provider '{requested_id}' is unavailable "
+                f"and fallback to tesseract is disabled"
+            )
         logger.warning(
             "Stored OCR backend '%s' is unavailable, falling back to tesseract",
             requested_id,
