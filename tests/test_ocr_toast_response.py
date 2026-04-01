@@ -114,6 +114,102 @@ class TestOcrErrorResponse:
         assert "error_type" in data, "Token limit error must include 'error_type'"
         assert data["error_type"] == "token_limit_exceeded"
 
+    def test_invalid_image_returns_400(self, client):
+        """Invalid/corrupt image must return HTTP 400 with error_type='invalid_image'."""
+        from PIL import UnidentifiedImageError
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=UnidentifiedImageError("cannot identify image file"),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert resp.status_code == 400
+        assert "error" in data
+        assert data["error_type"] == "invalid_image"
+        assert "error_detail" in data
+
+    def test_invalid_image_via_oserror(self, client):
+        """OSError (corrupt file) must also return error_type='invalid_image'."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=OSError("broken data stream"),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert resp.status_code == 400
+        assert data["error_type"] == "invalid_image"
+
+    def test_provider_timeout_returns_503(self, client):
+        """TimeoutError must return HTTP 503 with error_type='provider_timeout'."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=TimeoutError("read timed out"),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert resp.status_code == 503
+        assert "error" in data
+        assert data["error_type"] == "provider_timeout"
+        assert "error_detail" in data
+
+    def test_provider_timeout_via_connection_error(self, client):
+        """ConnectionError must also return error_type='provider_timeout'."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ConnectionError("connection refused"),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert resp.status_code == 503
+        assert data["error_type"] == "provider_timeout"
+
+    def test_no_text_returns_error_type_no_text(self, client):
+        """When OCR finds no text, response includes error_type='no_text'."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            return_value=_ocr_result(text=""),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert resp.status_code == 200
+        assert data["error_type"] == "no_text"
+
+    def test_generic_error_detail_includes_exception_class(self, client):
+        """Generic error_detail must include the exception class name."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=RuntimeError("something broke"),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert data["error_type"] == "generic"
+        assert "RuntimeError" in data["error_detail"]
+
 
 class TestOcrBackwardsCompat:
     """Backwards compatibility: existing text/error fields still present."""
