@@ -677,6 +677,8 @@
   "toast_ocr_fallback": "Used {fallback_provider} as a fallback — {reason}.",
   "toast_ocr_token_limit": "Failed to read image — no remaining tokens.",
   "toast_ocr_generic_error": "Failed to read image — {error_detail}.",
+  "toast_ocr_invalid_image": "Failed to read image — the image format is invalid or unsupported.",
+  "toast_ocr_provider_timeout": "Failed to read image — the OCR provider timed out. Please try again.",
   "btn_fetch_disabled_title": "Enter a valid EAN barcode or product name first",
   "hint_ean": "8-13 digits",
   "toast_uploading": "Uploading...",
