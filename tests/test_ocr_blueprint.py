@@ -155,6 +155,71 @@ class TestOcrErrorResponse:
         assert "Token limit" in data["error_detail"]
 
 
+class TestClientError4xxMapping:
+    """ClientError with 4xx status_code should map to invalid_image (LSO-277)."""
+
+    def test_client_error_400_returns_invalid_image(self, client):
+        """ClientError with status_code=400 → HTTP 400, error_type=invalid_image."""
+
+        class ClientError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ClientError("Bad Request", 400),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 400
+            data = resp.get_json()
+            assert data["error_type"] == "invalid_image"
+            assert data["error"] == "Invalid or corrupt image"
+
+    def test_client_error_422_returns_invalid_image(self, client):
+        """ClientError with status_code=422 → HTTP 400, error_type=invalid_image."""
+
+        class ClientError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ClientError("Unprocessable Entity", 422),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 400
+            data = resp.get_json()
+            assert data["error_type"] == "invalid_image"
+
+    def test_server_error_5xx_still_generic(self, client):
+        """Exception with status_code=500 should NOT map to invalid_image."""
+
+        class ServerError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ServerError("Internal Server Error", 500),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 500
+            data = resp.get_json()
+            assert data["error_type"] == "generic"
+
+
 class TestOcrBackwardsCompat:
     """Existing fields must not change shape or status codes."""
 
