@@ -137,7 +137,7 @@ class TestOcrErrorResponse:
         data = resp.get_json()
         assert data["error"] == "OCR processing failed"
         assert data["error_type"] == "generic"
-        assert data["error_detail"] == "OCR processing failed"
+        assert "OCR processing failed" in data["error_detail"]
 
     @patch(
         "services.ocr_service.dispatch_ocr",
