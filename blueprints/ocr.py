@@ -66,6 +66,12 @@ def ocr_ingredients():
             return _error_response(
                 "OCR provider is not responding", 503, error_type="provider_timeout",
             )
+        # Map 4xx provider errors to invalid_image
+        status_code = getattr(e, "status_code", None)
+        if status_code is not None and 400 <= status_code < 500:
+            return _error_response(
+                "Invalid or corrupt image", 400, error_type="invalid_image",
+            )
         exc_name = type(e).__name__
         return _error_response(
             "OCR processing failed", 500, error_type="generic",
