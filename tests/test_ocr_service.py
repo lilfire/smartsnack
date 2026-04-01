@@ -409,9 +409,9 @@ class TestGeminiBackend:
 
                 assert result == ""
 
-    def test_bmp_converted_before_gemini_call(self):
+    def test_bmp_converted_before_gemini_call(self, _mock_backend):
         """BMP image should be converted to PNG before calling Gemini API."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "sukker, mel"
@@ -424,7 +424,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
                 bmp_bytes = _make_tiny_bmp()
-                result = mod.extract_text(_b64(bmp_bytes))
+                result = extract_text(_b64(bmp_bytes))
 
                 assert result == "sukker, mel"
                 call_kwargs = mock_client.models.generate_content.call_args
@@ -432,9 +432,9 @@ class TestGeminiBackend:
                 mime_type = parts[0]["inline_data"]["mime_type"]
                 assert mime_type == "image/png"
 
-    def test_tiff_converted_before_gemini_call(self):
+    def test_tiff_converted_before_gemini_call(self, _mock_backend):
         """TIFF image should be converted to PNG before calling Gemini API."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "ingredients"
@@ -447,7 +447,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
                 tiff_bytes = _make_tiny_tiff()
-                result = mod.extract_text(_b64(tiff_bytes))
+                result = extract_text(_b64(tiff_bytes))
 
                 assert result == "ingredients"
                 call_kwargs = mock_client.models.generate_content.call_args
@@ -455,9 +455,9 @@ class TestGeminiBackend:
                 mime_type = parts[0]["inline_data"]["mime_type"]
                 assert mime_type == "image/png"
 
-    def test_gif_converted_before_gemini_call(self):
+    def test_gif_converted_before_gemini_call(self, _mock_backend):
         """GIF image should be converted to PNG before calling Gemini API."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "ingredients"
@@ -470,7 +470,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
                 gif_bytes = _make_tiny_gif()
-                result = mod.extract_text(_b64(gif_bytes))
+                result = extract_text(_b64(gif_bytes))
 
                 assert result == "ingredients"
                 call_kwargs = mock_client.models.generate_content.call_args
@@ -478,9 +478,9 @@ class TestGeminiBackend:
                 mime_type = parts[0]["inline_data"]["mime_type"]
                 assert mime_type == "image/png"
 
-    def test_jpeg_passthrough_with_correct_mime_type(self):
+    def test_jpeg_passthrough_with_correct_mime_type(self, _mock_backend):
         """JPEG should pass through with image/jpeg mime type."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "sukker"
@@ -493,7 +493,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
                 jpeg_bytes = _make_tiny_jpeg()
-                result = mod.extract_text(_b64(jpeg_bytes))
+                result = extract_text(_b64(jpeg_bytes))
 
                 assert result == "sukker"
                 call_kwargs = mock_client.models.generate_content.call_args
@@ -501,9 +501,9 @@ class TestGeminiBackend:
                 mime_type = parts[0]["inline_data"]["mime_type"]
                 assert mime_type == "image/jpeg"
 
-    def test_png_passthrough_with_correct_mime_type(self):
+    def test_png_passthrough_with_correct_mime_type(self, _mock_backend):
         """PNG should pass through with image/png mime type."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "mel"
@@ -516,7 +516,7 @@ class TestGeminiBackend:
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
                 png_bytes = _make_tiny_png()
-                result = mod.extract_text(_b64(png_bytes))
+                result = extract_text(_b64(png_bytes))
 
                 assert result == "mel"
                 call_kwargs = mock_client.models.generate_content.call_args
@@ -524,9 +524,9 @@ class TestGeminiBackend:
                 mime_type = parts[0]["inline_data"]["mime_type"]
                 assert mime_type == "image/png"
 
-    def test_svg_converted_before_gemini_call(self):
+    def test_svg_converted_before_gemini_call(self, _mock_backend):
         """SVG image should be converted to PNG before calling Gemini API."""
-        mod = self._setup_env()
+        from services.ocr_service import extract_text
 
         mock_response = MagicMock()
         mock_response.text = "ingredients"
@@ -542,7 +542,7 @@ class TestGeminiBackend:
             with patcher:
                 with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
                     svg_bytes = _make_minimal_svg()
-                    result = mod.extract_text(_b64(svg_bytes))
+                    result = extract_text(_b64(svg_bytes))
 
                     assert result == "ingredients"
                     mock_svg.assert_called_once_with(svg_bytes)
