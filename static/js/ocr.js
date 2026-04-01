@@ -74,6 +74,24 @@ export function scanIngredients(prefix) {
             'error',
             { title: t('toast_ocr_title_failed'), duration: 5000 }
           );
+        } else if (errorData.error_type === 'invalid_image') {
+          showToast(
+            t('toast_ocr_invalid_image'),
+            'error',
+            { title: t('toast_ocr_title_failed'), duration: 5000 }
+          );
+        } else if (errorData.error_type === 'provider_timeout') {
+          showToast(
+            t('toast_ocr_provider_timeout'),
+            'error',
+            { title: t('toast_ocr_title_failed'), duration: 5000 }
+          );
+        } else if (errorData.error_type === 'no_text') {
+          showToast(
+            t('toast_ocr_no_text'),
+            'error',
+            { title: t('toast_ocr_title_failed'), duration: 5000 }
+          );
         } else {
           const detail = errorData.error_detail || 'an unexpected error occurred';
           showToast(
