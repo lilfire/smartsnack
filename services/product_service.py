@@ -53,7 +53,7 @@ def _find_duplicate(ean, name, exclude_id=None):
                           WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
                    AS is_synced_with_off
             FROM products p
-            WHERE p.ean = ? {exclude_clause}
+            WHERE EXISTS (SELECT 1 FROM product_eans pe WHERE pe.product_id = p.id AND pe.ean = ?) {exclude_clause}
             LIMIT 1""",
             params,
         ).fetchone()
@@ -598,7 +598,11 @@ def list_products(
     conditions, params = [], []
     if search:
         escaped = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        conditions.append("(name LIKE ? ESCAPE '\\' OR ean LIKE ? ESCAPE '\\' OR brand LIKE ? ESCAPE '\\')")
+        conditions.append(
+            "(name LIKE ? ESCAPE '\\' OR EXISTS ("
+            "SELECT 1 FROM product_eans pe WHERE pe.product_id = products.id AND pe.ean LIKE ? ESCAPE '\\'"
+            ") OR brand LIKE ? ESCAPE '\\')"
+        )
         params.extend([f"%{escaped}%", f"%{escaped}%", f"%{escaped}%"])
     if type_filter is not None:
         types = [t.strip() for t in type_filter.split(",")]
@@ -758,12 +762,71 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         ),
     )
     new_id = cur.lastrowid
+    if ean:
+        conn.execute(
+            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+            (new_id, ean),
+        )
     if "flags" in data and isinstance(data["flags"], list):
         _set_user_flags(conn, new_id, data["flags"])
     if data.get("from_off"):
         set_system_flag(new_id, "is_synced_with_off", True)
     conn.commit()
     return {"id": new_id, "message": "Product added"}
+
+
+def _sync_primary_ean(conn, pid: int, new_ean: str) -> None:
+    """Sync product_eans primary row when products.ean changes."""
+    if new_ean:
+        existing_primary = conn.execute(
+            "SELECT id, ean FROM product_eans WHERE product_id = ? AND is_primary = 1",
+            (pid,),
+        ).fetchone()
+        if existing_primary:
+            if existing_primary["ean"] != new_ean:
+                # Check if the new ean already exists as a non-primary row
+                existing_row = conn.execute(
+                    "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+                    (pid, new_ean),
+                ).fetchone()
+                if existing_row:
+                    # Demote old primary, promote the existing row
+                    conn.execute(
+                        "UPDATE product_eans SET is_primary = 0 WHERE id = ?",
+                        (existing_primary["id"],),
+                    )
+                    conn.execute(
+                        "UPDATE product_eans SET is_primary = 1 WHERE id = ?",
+                        (existing_row["id"],),
+                    )
+                else:
+                    # Update primary row's ean value
+                    conn.execute(
+                        "UPDATE product_eans SET ean = ? WHERE id = ?",
+                        (new_ean, existing_primary["id"]),
+                    )
+        else:
+            # No primary row — insert or promote existing matching row
+            existing_row = conn.execute(
+                "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+                (pid, new_ean),
+            ).fetchone()
+            if existing_row:
+                conn.execute(
+                    "UPDATE product_eans SET is_primary = 1 WHERE id = ?",
+                    (existing_row["id"],),
+                )
+            else:
+                conn.execute(
+                    "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                    (pid, new_ean),
+                )
+    else:
+        # EAN cleared — demote primary designation
+        conn.execute(
+            "UPDATE product_eans SET is_primary = 0 WHERE product_id = ? AND is_primary = 1",
+            (pid,),
+        )
 
 
 def update_product(pid: int, data: dict) -> None:
@@ -816,6 +879,9 @@ def update_product(pid: int, data: dict) -> None:
         exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
         if not exists:
             raise LookupError("Product not found")
+    if "ean" in data:
+        new_ean = (data["ean"] or "").strip()
+        _sync_primary_ean(conn, pid, new_ean)
     if incoming_flags is not None and isinstance(incoming_flags, list):
         _set_user_flags(conn, pid, incoming_flags)
     conn.commit()
@@ -902,3 +968,101 @@ def delete_product(pid: int) -> bool:
     cur.execute("DELETE FROM products WHERE id = ?", (pid,))
     conn.commit()
     return cur.rowcount > 0
+
+
+# ── EAN CRUD ──────────────────────────────────────────────────────────────────
+
+
+def list_eans(pid: int) -> list:
+    """List all EANs for a product."""
+    conn = get_db()
+    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
+    if not exists:
+        raise LookupError("Product not found")
+    rows = conn.execute(
+        "SELECT id, ean, is_primary FROM product_eans WHERE product_id = ? ORDER BY is_primary DESC, id ASC",
+        (pid,),
+    ).fetchall()
+    return [{"id": r["id"], "ean": r["ean"], "is_primary": bool(r["is_primary"])} for r in rows]
+
+
+def add_ean(pid: int, ean: str) -> dict:
+    """Add a new EAN to a product."""
+    ean = ean.strip()
+    if not re.fullmatch(r"\d{8,13}", ean):
+        raise ValueError("EAN must be 8-13 digits")
+    conn = get_db()
+    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
+    if not exists:
+        raise LookupError("Product not found")
+    count = conn.execute(
+        "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
+    ).fetchone()[0]
+    is_primary = 1 if count == 0 else 0
+    try:
+        cur = conn.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, ?)",
+            (pid, ean, is_primary),
+        )
+    except sqlite3.IntegrityError:
+        raise ValueError("error_ean_already_exists")
+    new_id = cur.lastrowid
+    if is_primary:
+        conn.execute("UPDATE products SET ean = ? WHERE id = ?", (ean, pid))
+    conn.commit()
+    return {"id": new_id, "ean": ean, "is_primary": bool(is_primary)}
+
+
+def delete_ean(pid: int, ean_id: int) -> None:
+    """Delete an EAN from a product."""
+    conn = get_db()
+    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
+    if not exists:
+        raise LookupError("Product not found")
+    row = conn.execute(
+        "SELECT id, ean, is_primary FROM product_eans WHERE id = ? AND product_id = ?",
+        (ean_id, pid),
+    ).fetchone()
+    if not row:
+        raise LookupError("EAN not found")
+    count = conn.execute(
+        "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
+    ).fetchone()[0]
+    if count == 1:
+        raise ValueError("error_cannot_remove_only_ean")
+    conn.execute("DELETE FROM product_eans WHERE id = ?", (ean_id,))
+    if row["is_primary"]:
+        next_row = conn.execute(
+            "SELECT id, ean FROM product_eans WHERE product_id = ? ORDER BY id ASC LIMIT 1",
+            (pid,),
+        ).fetchone()
+        if next_row:
+            conn.execute(
+                "UPDATE product_eans SET is_primary = 1 WHERE id = ?", (next_row["id"],)
+            )
+            conn.execute(
+                "UPDATE products SET ean = ? WHERE id = ?", (next_row["ean"], pid)
+            )
+    conn.commit()
+
+
+def set_primary_ean(pid: int, ean_id: int) -> None:
+    """Set an EAN as primary for a product."""
+    conn = get_db()
+    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
+    if not exists:
+        raise LookupError("Product not found")
+    row = conn.execute(
+        "SELECT id, ean FROM product_eans WHERE id = ? AND product_id = ?",
+        (ean_id, pid),
+    ).fetchone()
+    if not row:
+        raise LookupError("EAN not found")
+    conn.execute(
+        "UPDATE product_eans SET is_primary = 0 WHERE product_id = ?", (pid,)
+    )
+    conn.execute(
+        "UPDATE product_eans SET is_primary = 1 WHERE id = ?", (ean_id,)
+    )
+    conn.execute("UPDATE products SET ean = ? WHERE id = ?", (row["ean"], pid))
+    conn.commit()

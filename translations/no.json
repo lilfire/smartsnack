@@ -693,5 +693,13 @@
   "toast_ocr_settings_saved": "OCR-innstillinger lagret",
   "toast_ocr_settings_error": "Kunne ikke lagre OCR-innstillinger",
   "settings_ocr_saved": "OCR-innstillinger lagret",
-  "settings_ocr_error": "Kunne ikke lagre OCR-innstillinger"
+  "settings_ocr_error": "Kunne ikke lagre OCR-innstillinger",
+  "label_eans": "EAN-koder",
+  "btn_add_ean": "Legg til EAN",
+  "btn_set_primary_ean": "Sett som primær",
+  "toast_ean_added": "EAN {ean} lagt til",
+  "toast_ean_removed": "EAN {ean} fjernet",
+  "toast_ean_set_primary": "EAN {ean} satt som primær",
+  "error_ean_already_exists": "Denne EAN finnes allerede på produktet",
+  "error_cannot_remove_only_ean": "Kan ikke fjerne den eneste EAN"
 }
