@@ -685,6 +685,7 @@
   "aria_select_emoji": "Välj emoji",
   "saved": "Sparat",
   "settings_ocr_title": "OCR",
+  "settings_ocr_subtitle": "Inställningar för bildigenkänning",
   "settings_ocr_desc": "Välj OCR-leverantör för bildigenkänning",
   "settings_ocr_provider_label": "OCR-leverantör",
   "settings_ocr_fallback_label": "Använd Tesseract OCR som reserv",

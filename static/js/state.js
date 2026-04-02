@@ -136,7 +136,7 @@ export async function api(path, opts) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => { controller.abort(); }, 15000);
   try {
-    const defaultHeaders = opts.body
+    const defaultHeaders = opts.body && !(opts.body instanceof FormData)
       ? { 'Content-Type': 'application/json', 'X-Requested-With': 'SmartSnack' }
       : { 'X-Requested-With': 'SmartSnack' };
     const headers = Object.assign(defaultHeaders, opts.headers || {});
