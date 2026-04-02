@@ -1158,6 +1158,34 @@ describe('_updateOps and _syncValInput branch coverage via upgradeSelect callbac
     upgradeSelect.mockImplementation(vi.fn());
   });
 
+  it('includes !contains in TEXT_OPS when a text field is selected', async () => {
+    const { upgradeSelect } = await import('../state.js');
+
+    let fieldCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList.contains('adv-field-select') && cb) {
+        fieldCallback = cb;
+      }
+    });
+
+    const { panel } = openPanel();
+    expect(fieldCallback).toBeDefined();
+
+    // Simulate user selecting a text field
+    fieldCallback('name');
+    vi.runAllTimers();
+
+    const row = panel.querySelector('.adv-row');
+    const opSel = row.querySelector('.adv-op-select');
+
+    // TEXT_OPS: contains, !contains, =, !=, is_not_set, is_set
+    const opValues = Array.from(opSel.options).map(o => o.value);
+    expect(opValues).toContain('contains');
+    expect(opValues).toContain('!contains');
+
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+
   it('marks numeric input invalid when non-numeric text is entered', async () => {
     const { upgradeSelect } = await import('../state.js');
 

@@ -293,6 +293,7 @@ ADVANCED_FILTER_OPS = {
     "<=": "<=",
     ">=": ">=",
     "contains": "LIKE",
+    "!contains": "NOT_LIKE",
     "is_not_set": "IS_NOT_SET",
     "is_set": "IS_SET",
 }
