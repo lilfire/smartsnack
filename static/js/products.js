@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
 import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal, showOffAddReview } from './openfoodfacts.js';
+import { initTagInput, getTagsForSave } from './tags.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -40,6 +41,7 @@ function collectFormFields(prefix) {
       if (cb && cb.checked) acc.push(f);
       return acc;
     }, []),
+    ...(prefix === 'ed' ? { tags: getTagsForSave() } : {}),
   };
 }
 
@@ -53,6 +55,8 @@ export function startEdit(id) {
       const firstInput = form.querySelector('#ed-name');
       if (firstInput) firstInput.focus();
     }
+    const product = state.cachedResults && state.cachedResults.find(p => p.id === id);
+    initTagInput(product ? (product.tags || []) : []);
   });
 }
 

@@ -220,6 +220,13 @@ export function renderResults(results, search) {
         });
         h += '</div>';
       }
+      if (p.tags && p.tags.length > 0) {
+        h += '<div class="product-tags">';
+        for (const tag of p.tags) {
+          h += '<span class="tag-badge">' + esc(tag) + '</span>';
+        }
+        h += '</div>';
+      }
       h += '</div></div>';
 
       if (state.editingId === p.id) {
@@ -289,6 +296,14 @@ export function renderResults(results, search) {
               badges += '</span>';
               return badges;
             })())
+          + '</div>'
+          + '<div class="form-group">'
+          + '<label data-i18n="tags">' + t('tags') + '</label>'
+          + '<div class="tag-input-container" id="tag-container-ed"></div>'
+          + '<div class="tag-autocomplete-wrapper">'
+          + '<input type="text" id="tag-input-ed" class="tag-input" placeholder="Add tag..." autocomplete="off" />'
+          + '<ul id="tag-suggestions-ed" class="tag-suggestions" hidden></ul>'
+          + '</div>'
           + '</div>'
           + '<div style="display:flex;gap:8px">'
           + '<button class="btn-sm btn-green" data-action="save-product" data-id="' + p.id + '">' + t('btn_save') + '</button>'
