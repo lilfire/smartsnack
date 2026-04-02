@@ -760,3 +760,239 @@ class TestOCRBlueprint:
             json={"image": "dGVzdA=="},
         )
         assert resp.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# MIME type extraction and propagation
+# ---------------------------------------------------------------------------
+
+def _make_tiny_jpeg():
+    """Create a minimal valid JPEG image and return raw bytes."""
+    from PIL import Image
+
+    img = Image.new("RGB", (100, 50), color="white")
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG")
+    return buf.getvalue()
+
+
+class TestMimeTypeExtraction:
+    """dispatch_ocr() should extract and propagate MIME type to providers."""
+
+    def test_jpeg_data_uri_passes_correct_mime_to_gemini(self):
+        """Gemini should receive image/jpeg when the data URI declares JPEG."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "gemini"
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+
+        jpeg_bytes = _make_tiny_jpeg()
+        jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                    mod.dispatch_ocr(jpeg_uri)
+
+        call_args = mock_client.models.generate_content.call_args
+        contents = call_args[1]["contents"]
+        inline_data = contents[0]["parts"][0]["inline_data"]
+        assert inline_data["mime_type"] == "image/jpeg"
+
+    def test_png_data_uri_passes_correct_mime_to_gemini(self):
+        """Gemini should receive image/png when the data URI declares PNG."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "gemini"
+
+        mock_response = MagicMock()
+        mock_response.text = "mel"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+
+        png_bytes = _make_tiny_png()
+        png_uri = f"data:image/png;base64,{_b64(png_bytes)}"
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                    mod.dispatch_ocr(png_uri)
+
+        call_args = mock_client.models.generate_content.call_args
+        contents = call_args[1]["contents"]
+        inline_data = contents[0]["parts"][0]["inline_data"]
+        assert inline_data["mime_type"] == "image/png"
+
+    def test_jpeg_data_uri_passes_correct_mime_to_openai(self):
+        """OpenAI data URI should contain image/jpeg when input is JPEG."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "openai"
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "ingredienser"
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        jpeg_bytes = _make_tiny_jpeg()
+        jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
+            with patch("openai.OpenAI", return_value=mock_client):
+                with patch("services.settings_service.get_ocr_backend", return_value="openai"):
+                    mod.dispatch_ocr(jpeg_uri)
+
+        call_args = mock_client.chat.completions.create.call_args
+        messages = call_args[1]["messages"]
+        image_url = messages[0]["content"][0]["image_url"]["url"]
+        assert image_url.startswith("data:image/jpeg;base64,")
+
+    def test_jpeg_data_uri_passes_correct_media_type_to_claude(self):
+        """Claude Vision should receive media_type=image/jpeg when input is JPEG."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "claude_vision"
+
+        mock_msg = MagicMock()
+        mock_msg.content = [MagicMock(text="sukker")]
+        mock_client = MagicMock()
+        mock_client.messages.create.return_value = mock_msg
+
+        jpeg_bytes = _make_tiny_jpeg()
+        jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
+
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
+            with patch("anthropic.Anthropic", return_value=mock_client):
+                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision"):
+                    mod.dispatch_ocr(jpeg_uri)
+
+        call_args = mock_client.messages.create.call_args
+        messages = call_args[1]["messages"]
+        source = messages[0]["content"][0]["source"]
+        assert source["media_type"] == "image/jpeg"
+
+
+class TestMagicByteFallback:
+    """dispatch_ocr() should detect format from magic bytes when no data URI."""
+
+    def test_raw_jpeg_base64_defaults_to_jpeg(self):
+        """Raw JPEG base64 (no data URI) should be detected as image/jpeg."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "gemini"
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+
+        jpeg_bytes = _make_tiny_jpeg()
+        raw_b64 = _b64(jpeg_bytes)  # no data URI prefix
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                    mod.dispatch_ocr(raw_b64)
+
+        call_args = mock_client.models.generate_content.call_args
+        contents = call_args[1]["contents"]
+        inline_data = contents[0]["parts"][0]["inline_data"]
+        assert inline_data["mime_type"] == "image/jpeg"
+
+    def test_raw_png_base64_detects_png(self):
+        """Raw PNG base64 (no data URI) should be detected as image/png."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "gemini"
+
+        mock_response = MagicMock()
+        mock_response.text = "mel"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+
+        png_bytes = _make_tiny_png()
+        raw_b64 = _b64(png_bytes)  # no data URI prefix
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                    mod.dispatch_ocr(raw_b64)
+
+        call_args = mock_client.models.generate_content.call_args
+        contents = call_args[1]["contents"]
+        inline_data = contents[0]["parts"][0]["inline_data"]
+        assert inline_data["mime_type"] == "image/png"
+
+    def test_unknown_magic_bytes_defaults_to_jpeg(self):
+        """When magic bytes are unrecognized, default to image/jpeg."""
+        import services.ocr_service as mod
+        mod._OCR_BACKEND = "gemini"
+
+        mock_response = MagicMock()
+        mock_response.text = "text"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+
+        # Bytes that look like an image (non-trivial size) but have unknown magic
+        unknown_bytes = b"\x00\x01\x02\x03" + b"\xff" * 200
+        raw_b64 = _b64(unknown_bytes)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                    mod.dispatch_ocr(raw_b64)
+
+        call_args = mock_client.models.generate_content.call_args
+        contents = call_args[1]["contents"]
+        inline_data = contents[0]["parts"][0]["inline_data"]
+        assert inline_data["mime_type"] == "image/jpeg"
+
+
+class TestBlueprintErrorMessages:
+    """OCR blueprint should include provider name in error responses."""
+
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("No image provided"))
+    def test_value_error_returns_error_type(self, mock_dispatch, client):
+        resp = client.post("/api/ocr/ingredients", json={"image": "bad"})
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert "error" in data
+        assert "error_type" in data
+
+    @patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("provider failed"))
+    def test_runtime_error_returns_500_with_error_detail(self, mock_dispatch, client):
+        resp = client.post("/api/ocr/ingredients", json={"image": "dGVzdA=="})
+        assert resp.status_code == 500
+        data = resp.get_json()
+        assert "error" in data
+        assert "error_type" in data
