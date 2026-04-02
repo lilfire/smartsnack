@@ -561,6 +561,7 @@
   "adv_op_lte": "maks",
   "adv_op_gte": "minst",
   "adv_op_contains": "inneholder",
+  "adv_op_not_contains": "inneholder ikke",
   "adv_op_is": "er",
   "adv_op_is_not": "er ikke",
   "adv_group_category": "Kategori",

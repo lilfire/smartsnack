@@ -333,14 +333,19 @@ def _condition_to_sql(field: str, op: str, value: str, sql_op: str) -> tuple:
                 value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
             )
             return f"LOWER({field}) LIKE ? ESCAPE '\\'", f"%{escaped.lower()}%"
+        elif op == "!contains":
+            escaped = (
+                value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            )
+            return f"LOWER({field}) NOT LIKE ? ESCAPE '\\'", f"%{escaped.lower()}%"
         elif op in ("=", "!="):
             return f"LOWER({field}) {sql_op} LOWER(?)", value
         else:
             raise ValueError(f"Operator '{op}' not valid for text field '{field}'")
     else:
-        if op == "contains":
+        if op in ("contains", "!contains"):
             raise ValueError(
-                f"Operator 'contains' not valid for numeric field '{field}'"
+                f"Operator '{op}' not valid for numeric field '{field}'"
             )
         try:
             num_val = float(value)
@@ -361,8 +366,8 @@ def _condition_to_post(field: str, op: str, value: str) -> tuple:
         return field, op, value
     if op in ("is_not_set", "is_set"):
         return field, op, None
-    if op == "contains":
-        raise ValueError(f"Operator 'contains' not valid for numeric field '{field}'")
+    if op in ("contains", "!contains"):
+        raise ValueError(f"Operator '{op}' not valid for numeric field '{field}'")
     try:
         num_val = float(value)
     except (ValueError, TypeError) as e:

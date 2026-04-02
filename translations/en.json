@@ -561,6 +561,7 @@
   "adv_op_lte": "at most",
   "adv_op_gte": "at least",
   "adv_op_contains": "contains",
+  "adv_op_not_contains": "does not contain",
   "adv_op_is": "is",
   "adv_op_is_not": "is not",
   "adv_group_category": "Category",
