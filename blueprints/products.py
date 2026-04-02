@@ -110,7 +110,10 @@ def add_ean(pid):
     except LookupError:
         return jsonify({"error": "Product not found"}), 404
     except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+        err = str(e)
+        if err == "ean_already_exists":
+            return jsonify({"error": err}), 409
+        return jsonify({"error": err}), 400
     return jsonify(result), 201
 
 

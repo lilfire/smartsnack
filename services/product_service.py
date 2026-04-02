@@ -1005,7 +1005,7 @@ def add_ean(pid: int, ean: str) -> dict:
             (pid, ean, is_primary),
         )
     except sqlite3.IntegrityError:
-        raise ValueError("error_ean_already_exists")
+        raise ValueError("ean_already_exists")
     new_id = cur.lastrowid
     if is_primary:
         conn.execute("UPDATE products SET ean = ? WHERE id = ?", (ean, pid))
@@ -1029,7 +1029,7 @@ def delete_ean(pid: int, ean_id: int) -> None:
         "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
     ).fetchone()[0]
     if count == 1:
-        raise ValueError("error_cannot_remove_only_ean")
+        raise ValueError("cannot_remove_only_ean")
     conn.execute("DELETE FROM product_eans WHERE id = ?", (ean_id,))
     if row["is_primary"]:
         next_row = conn.execute(
