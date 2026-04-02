@@ -262,7 +262,7 @@ class TestOcrDispatchWiring:
 
         called_with = {}
 
-        def mock_tesseract(image_bytes, image_b64):
+        def mock_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
             called_with["backend"] = "tesseract"
             return "mock text"
 
@@ -285,7 +285,7 @@ class TestOcrDispatchWiring:
 
         called_with = {}
 
-        def mock_tesseract(image_bytes, image_b64):
+        def mock_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
             called_with["backend"] = "tesseract"
             return "fallback text"
 
@@ -305,7 +305,7 @@ class TestOcrDispatchWiring:
 
         called_with = {}
 
-        def mock_claude(image_bytes, image_b64):
+        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg"):
             called_with["backend"] = "claude_vision"
             return "claude text"
 
@@ -320,7 +320,7 @@ class TestOcrDispatchWiring:
     def test_dispatch_ocr_returns_text(self, app_ctx, monkeypatch):
         from services import ocr_service
 
-        def mock_tesseract(image_bytes, image_b64):
+        def mock_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
             return "ingredient text"
 
         monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
@@ -334,7 +334,7 @@ class TestOcrDispatchWiring:
         ocr_settings_service.save_ocr_settings("claude_vision", fallback_to_tesseract=True)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.setitem(
-            ocr_service._PROVIDERS, "tesseract", lambda image_bytes, image_b64: "text"
+            ocr_service._PROVIDERS, "tesseract", lambda image_bytes, image_b64, mime_type="image/jpeg": "text"
         )
 
         with caplog.at_level(logging.WARNING, logger="services.ocr_service"):
@@ -351,7 +351,7 @@ class TestOcrDispatchWiring:
 
         called = {}
 
-        def mock_claude(image_bytes, image_b64):
+        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg"):
             called["called"] = True
             return "text"
 

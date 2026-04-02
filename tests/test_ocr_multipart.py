@@ -208,7 +208,6 @@ class TestDispatchOcrBytes:
 
     def _setup_tesseract(self):
         import services.ocr_service as mod
-        mod._OCR_BACKEND = "tesseract"
         return mod
 
     @patch("pytesseract.image_to_data")
