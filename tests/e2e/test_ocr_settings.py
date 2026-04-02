@@ -238,6 +238,8 @@ class TestFallbackBehavior:
         """dispatch_ocr should fall back to tesseract when stored backend is unavailable."""
         os.environ["ANTHROPIC_API_KEY"] = "test-key-anthropic"
         _put(f"{live_url}/api/settings/ocr", {"backend": "claude_vision"})
+        # Enable fallback so dispatch_ocr will fall back when the key is removed
+        _post(f"{live_url}/api/ocr/settings", {"provider": "claude_vision", "fallback_to_tesseract": True})
         del os.environ["ANTHROPIC_API_KEY"]
 
         import base64

@@ -685,6 +685,7 @@
   "aria_select_emoji": "Select emoji",
   "saved": "Saved",
   "settings_ocr_title": "OCR",
+  "settings_ocr_subtitle": "Image recognition settings",
   "settings_ocr_desc": "Choose OCR provider for image recognition",
   "settings_ocr_provider_label": "OCR provider",
   "settings_ocr_fallback_label": "Fallback to Tesseract OCR",

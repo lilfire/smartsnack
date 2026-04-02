@@ -26,9 +26,14 @@ vi.mock('../i18n.js', () => ({
   }),
 }));
 
+vi.mock('../images.js', () => ({
+  resizeImage: vi.fn((dataUri) => Promise.resolve(dataUri)),
+}));
+
 import { scanIngredients } from '../ocr.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
+import { resizeImage } from '../images.js';
 
 function createDOM(prefix) {
   const textarea = document.createElement('textarea');
@@ -52,9 +57,13 @@ function createFile(sizeBytes = 100) {
 
 /**
  * Helper to trigger scanIngredients with a file and wait for API call.
+ * Installs a MockFileReader so the async FileReader path completes.
  * Returns the fileInput for further assertions if needed.
  */
 async function triggerScan(prefix) {
+  const fakeDataUrl = 'data:image/jpeg;base64,dGVzdA==';
+  resizeImage.mockResolvedValueOnce(fakeDataUrl);
+
   let fileInput;
   const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
     fileInput = this;
@@ -63,14 +72,26 @@ async function triggerScan(prefix) {
   scanIngredients(prefix);
   clickSpy.mockRestore();
 
+  const originalFileReader = globalThis.FileReader;
+  class MockFileReader {
+    constructor() { this.onload = null; this.onerror = null; }
+    readAsDataURL() {
+      setTimeout(() => {
+        if (this.onload) this.onload({ target: { result: fakeDataUrl } });
+      }, 0);
+    }
+  }
+  globalThis.FileReader = MockFileReader;
+
   Object.defineProperty(fileInput, 'files', { value: [createFile()], writable: false });
   fileInput.onchange();
 
-  // Wait for FormData API call to complete (no FileReader in FormData upload flow)
+  // Wait for FileReader + resizeImage + API call to complete
   await vi.waitFor(() => {
     expect(api).toHaveBeenCalled();
   }, { timeout: 2000 });
 
+  globalThis.FileReader = originalFileReader;
   return fileInput;
 }
 
