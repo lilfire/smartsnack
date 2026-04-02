@@ -72,6 +72,10 @@ vi.mock('../products.js', () => ({
   onSearchInput: vi.fn(),
   clearSearch: vi.fn(),
   registerProduct: vi.fn(),
+  loadEanManager: vi.fn(),
+  addEan: vi.fn(),
+  deleteEan: vi.fn(),
+  setEanPrimary: vi.fn(),
 }));
 
 vi.mock('../settings.js', () => ({
@@ -171,6 +175,7 @@ describe('app.js', () => {
       'showToast', 'startEdit', 'saveProduct', 'deleteProduct',
       'switchView', 'setFilter', 'toggleExpand',
       'onSearchInput', 'clearSearch', 'registerProduct',
+      'loadEanManager', 'addEan', 'deleteEan', 'setEanPrimary',
       'rerender',
       // settings — sections
       'toggleSettingsSection',

@@ -545,10 +545,7 @@ describe('renderResults - event delegation', () => {
     const edName = document.getElementById('ed-name');
     edName.dispatchEvent(new Event('input'));
     expect(window.validateOffBtn).toHaveBeenCalledWith('ed');
-
-    const edEan = document.getElementById('ed-ean');
-    edEan.dispatchEvent(new Event('input'));
-    expect(window.validateOffBtn).toHaveBeenCalledTimes(2);
+    expect(window.validateOffBtn).toHaveBeenCalledTimes(1);
 
     const edIngredients = document.getElementById('ed-ingredients');
     edIngredients.dispatchEvent(new Event('input'));
