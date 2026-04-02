@@ -542,3 +542,141 @@ label.field-label.field-required::after {
 .btn-off.loading .off-label {
   display: none;
 }
+
+/* ── EAN Manager ──────────────────────────────────── */
+.ean-manager {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ean-manager-loading {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 4px 0;
+}
+
+.ean-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ean-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ean-item:last-child {
+  border-bottom: none;
+}
+
+.ean-value {
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  color: rgba(255, 255, 255, 0.75);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ean-badge-primary {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(78, 205, 196, 0.1);
+  color: #4ecdc4;
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  white-space: nowrap;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.btn-ean-action {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-ean-action:hover {
+  background: rgba(232, 184, 75, 0.1);
+  border-color: rgba(232, 184, 75, 0.25);
+  color: #E8B84B;
+}
+
+.btn-ean-delete {
+  padding: 3px 7px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.btn-ean-delete:hover {
+  background: rgba(255, 80, 80, 0.1);
+  border-color: rgba(255, 80, 80, 0.25);
+  color: #ff6666;
+}
+
+.ean-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ean-add-input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ean-add-input:focus {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.btn-ean-add {
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(232, 184, 75, 0.25);
+  background: rgba(232, 184, 75, 0.08);
+  color: #E8B84B;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-ean-add:hover {
+  background: rgba(232, 184, 75, 0.15);
+  border-color: rgba(232, 184, 75, 0.4);
+}
+
+.ean-count-suffix {
+  font-size: 9px;
+  color: rgba(78, 205, 196, 0.7);
+  font-family: 'Space Mono', monospace;
+}

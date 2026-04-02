@@ -699,5 +699,6 @@
   "toast_ean_removed": "EAN {ean} borttagen",
   "toast_ean_set_primary": "EAN {ean} angiven som primär",
   "error_ean_already_exists": "Denna EAN finns redan på produkten",
-  "error_cannot_remove_only_ean": "Kan inte ta bort den enda EAN"
+  "error_cannot_remove_only_ean": "Kan inte ta bort den enda EAN",
+  "label_ean_primary": "Primär"
 }

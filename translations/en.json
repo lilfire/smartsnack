@@ -699,5 +699,6 @@
   "toast_ean_removed": "EAN {ean} removed",
   "toast_ean_set_primary": "EAN {ean} set as primary",
   "error_ean_already_exists": "This EAN already exists on this product",
-  "error_cannot_remove_only_ean": "Cannot remove the only EAN"
+  "error_cannot_remove_only_ean": "Cannot remove the only EAN",
+  "label_ean_primary": "Primary"
 }

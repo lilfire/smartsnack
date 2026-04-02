@@ -787,10 +787,11 @@ describe('onSearchScanDetected when product is not found', () => {
     navigator.vibrate = vi.fn();
 
     state.currentView = 'search';
-    // Return products that do NOT match the scanned EAN
-    fetchProducts.mockResolvedValue([
+    // First call (all products): none match the scanned EAN by primary EAN
+    // Second call (secondary EAN search): no results either
+    fetchProducts.mockResolvedValueOnce([
       { id: 1, name: 'Other', type: 'dairy', ean: '0000000000000' },
-    ]);
+    ]).mockResolvedValueOnce([]);
 
     openSearchScanner();
     await vi.waitFor(() => {
