@@ -54,6 +54,20 @@ MIGRATIONS = [
             "UPDATE score_weights SET formula_min = 1.0, formula_max = 3.0 WHERE field = 'volume' AND formula = 'direct' AND formula_max = 0",
         ],
     ),
+    (
+        "006_product_eans_table",
+        [
+            """CREATE TABLE IF NOT EXISTS product_eans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                ean TEXT NOT NULL,
+                is_primary INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(product_id, ean)
+            )""",
+            """INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
+               SELECT id, ean, 1 FROM products WHERE ean != ''""",
+        ],
+    ),
 ]
 
 
