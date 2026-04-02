@@ -1237,6 +1237,68 @@ describe('getFlagConfig', () => {
   });
 });
 
+describe('renderResults - EAN display in product list', () => {
+  beforeEach(() => {
+    const count = document.createElement('div');
+    count.id = 'result-count';
+    document.body.appendChild(count);
+    const container = document.createElement('div');
+    container.id = 'results-container';
+    document.body.appendChild(container);
+  });
+
+  it('shows EAN with no suffix for a product with one EAN', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', ean_count: 1, has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010069307');
+    expect(container.innerHTML).not.toContain('(+');
+  });
+
+  it('shows EAN with (+2) suffix for a product with three EANs', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', ean_count: 3, has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010069307');
+    const suffix = container.querySelector('.ean-count-suffix');
+    expect(suffix).not.toBeNull();
+    expect(suffix.textContent).toContain('(+2)');
+  });
+
+  it('shows EAN with (+1) suffix for a product with two EANs', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', ean_count: 2, has_image: 0 },
+    ];
+    renderResults(products, '');
+    const suffix = document.querySelector('.ean-count-suffix');
+    expect(suffix).not.toBeNull();
+    expect(suffix.textContent).toContain('(+1)');
+  });
+
+  it('shows no suffix when ean_count is not provided (defaults to 1)', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010069307');
+    expect(container.querySelector('.ean-count-suffix')).toBeNull();
+  });
+
+  it('shows no EAN HTML when product has no EAN', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.querySelector('.prod-ean')).toBeNull();
+  });
+});
+
 describe('loadFlagConfig', () => {
   it('fetches from /api/flag-config and stores result', async () => {
     const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
