@@ -105,6 +105,47 @@ def _get_product_flags(cur, product_ids: list) -> dict:
     return result
 
 
+def _get_product_tags(cur, product_ids: list) -> dict:
+    """Batch-fetch tags for a list of product IDs. Returns {pid: [tag, ...]}."""
+    if not product_ids:
+        return {}
+    placeholders = ",".join("?" for _ in product_ids)
+    cur.execute(
+        f"SELECT product_id, tag FROM product_tags"
+        f" WHERE product_id IN ({placeholders})"
+        f" ORDER BY tag COLLATE NOCASE",
+        product_ids,
+    )
+    result: dict[int, list[str]] = {}
+    for pid, tag in cur.fetchall():
+        result.setdefault(pid, []).append(tag)
+    return result
+
+
+def _set_tags(conn, pid: int, tags: list) -> None:
+    """Replace all tags for product `pid` with the given list."""
+    cur = conn.cursor()
+    cur.execute("DELETE FROM product_tags WHERE product_id = ?", (pid,))
+    for tag in set(t.strip().lower() for t in tags if t.strip() and len(t.strip()) <= 50):
+        cur.execute(
+            "INSERT OR IGNORE INTO product_tags (product_id, tag) VALUES (?, ?)",
+            (pid, tag),
+        )
+
+
+def get_tag_suggestions(prefix: str) -> list:
+    """Return up to 10 existing tags that start with `prefix` (case-insensitive)."""
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT DISTINCT tag FROM product_tags"
+        " WHERE tag LIKE ? COLLATE NOCASE"
+        " ORDER BY tag COLLATE NOCASE LIMIT 10",
+        (prefix.strip() + "%",),
+    )
+    return [row[0] for row in cur.fetchall()]
+
+
 def _set_user_flags(conn, pid: int, flags: list) -> None:
     """Replace all user flags for a product. Ignores unknown or system flags."""
     user_flags = flag_service.get_user_flag_names()
@@ -654,8 +695,10 @@ def list_products(
     # in post-filter when OR groups mix SQL and computed fields.
     pids = [p["id"] for p in results]
     flags_map = _get_product_flags(cur, pids)
+    tags_map = _get_product_tags(cur, pids)
     for p in results:
         p["flags"] = flags_map.get(p["id"], [])
+        p["tags"] = tags_map.get(p["id"], [])
 
     results = _apply_post_filters(results, post_filter_spec)
 
@@ -831,8 +874,9 @@ def _sync_primary_ean(conn, pid: int, new_ean: str) -> None:
 
 def update_product(pid: int, data: dict) -> None:
     """Update a product's fields by ID."""
-    # Extract flags before field validation loop
+    # Extract flags and tags before field validation loop
     incoming_flags = data.pop("flags", None)
+    incoming_tags = data.pop("tags", None)
     from_off = data.pop("from_off", False)
 
     updates, vals = [], []
@@ -858,7 +902,7 @@ def update_product(pid: int, data: dict) -> None:
                     v = _safe_float(v, f)
             updates.append(f"{f} = ?")
             vals.append(v)
-    if not updates and incoming_flags is None:
+    if not updates and incoming_flags is None and incoming_tags is None:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data and data["type"]:
@@ -875,7 +919,7 @@ def update_product(pid: int, data: dict) -> None:
         if cur.rowcount == 0:
             raise LookupError("Product not found")
     else:
-        # Only flags are being updated — verify product exists
+        # Only flags/tags are being updated — verify product exists
         exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
         if not exists:
             raise LookupError("Product not found")
@@ -884,6 +928,8 @@ def update_product(pid: int, data: dict) -> None:
         _sync_primary_ean(conn, pid, new_ean)
     if incoming_flags is not None and isinstance(incoming_flags, list):
         _set_user_flags(conn, pid, incoming_flags)
+    if incoming_tags is not None and isinstance(incoming_tags, list):
+        _set_tags(conn, pid, incoming_tags)
     conn.commit()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
