@@ -1,6 +1,6 @@
 """Blueprint for OCR ingredient extraction endpoint."""
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from PIL import UnidentifiedImageError
 
 from extensions import limiter
@@ -40,43 +40,76 @@ def _is_timeout_or_connection_error(exc):
 @bp.route("/api/ocr/ingredients", methods=["POST"])
 @limiter.limit("10 per minute")
 def ocr_ingredients():
-    try:
-        data = _require_json()
-    except ValueError as e:
-        return _error_response(str(e), 400)
-
-    image = data.get("image", "")
-    if not image:
-        return _error_response("No image provided", 400)
-
-    try:
-        result = ocr_service.dispatch_ocr(image)
-    except ValueError as e:
-        return _error_response(str(e), 400)
-    except (TimeoutError, ConnectionError):
-        return _error_response(
-            "OCR provider is not responding", 503, error_type="provider_timeout",
-        )
-    except (UnidentifiedImageError, OSError):
-        return _error_response(
-            "Invalid or corrupt image", 400, error_type="invalid_image",
-        )
-    except Exception as e:
-        if _is_timeout_or_connection_error(e):
+    if "image" in request.files:
+        # Multipart/form-data upload path
+        image_bytes = request.files["image"].read()
+        if not image_bytes:
+            return _error_response("No image provided", 400)
+        try:
+            result = ocr_service.dispatch_ocr_bytes(image_bytes)
+        except ValueError as e:
+            return _error_response(str(e), 400)
+        except (TimeoutError, ConnectionError):
             return _error_response(
                 "OCR provider is not responding", 503, error_type="provider_timeout",
             )
-        # Map 4xx provider errors to invalid_image (check both status_code and code)
-        http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
-        if isinstance(http_status, int) and 400 <= http_status < 500:
+        except (UnidentifiedImageError, OSError):
             return _error_response(
                 "Invalid or corrupt image", 400, error_type="invalid_image",
             )
-        exc_name = type(e).__name__
-        return _error_response(
-            "OCR processing failed", 500, error_type="generic",
-            error_detail=f"OCR processing failed ({exc_name})",
-        )
+        except Exception as e:
+            if _is_timeout_or_connection_error(e):
+                return _error_response(
+                    "OCR provider is not responding", 503, error_type="provider_timeout",
+                )
+            http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
+            if isinstance(http_status, int) and 400 <= http_status < 500:
+                return _error_response(
+                    "Invalid or corrupt image", 400, error_type="invalid_image",
+                )
+            exc_name = type(e).__name__
+            return _error_response(
+                "OCR processing failed", 500, error_type="generic",
+                error_detail=f"OCR processing failed ({exc_name})",
+            )
+    else:
+        # JSON fallback (backward compatibility)
+        try:
+            data = _require_json()
+        except ValueError as e:
+            return _error_response(str(e), 400)
+
+        image = data.get("image", "")
+        if not image:
+            return _error_response("No image provided", 400)
+
+        try:
+            result = ocr_service.dispatch_ocr(image)
+        except ValueError as e:
+            return _error_response(str(e), 400)
+        except (TimeoutError, ConnectionError):
+            return _error_response(
+                "OCR provider is not responding", 503, error_type="provider_timeout",
+            )
+        except (UnidentifiedImageError, OSError):
+            return _error_response(
+                "Invalid or corrupt image", 400, error_type="invalid_image",
+            )
+        except Exception as e:
+            if _is_timeout_or_connection_error(e):
+                return _error_response(
+                    "OCR provider is not responding", 503, error_type="provider_timeout",
+                )
+            http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
+            if isinstance(http_status, int) and 400 <= http_status < 500:
+                return _error_response(
+                    "Invalid or corrupt image", 400, error_type="invalid_image",
+                )
+            exc_name = type(e).__name__
+            return _error_response(
+                "OCR processing failed", 500, error_type="generic",
+                error_detail=f"OCR processing failed ({exc_name})",
+            )
 
     text = result["text"]
     provider = result["provider"]
