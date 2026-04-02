@@ -140,7 +140,9 @@ export function renderResults(results, search) {
   sorted.forEach((p) => {
     const hasImg = p.has_image;
     const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="' + esc(p.name) + '">' : '') + '</div>';
-    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
+    const eanCount = p.ean_count || 1;
+    const eanSuffix = eanCount > 1 ? '<span class="ean-count-suffix"> (+' + (eanCount - 1) + ')</span>' : '';
+    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + eanSuffix + '</span>' : '';
     const brandHtml = p.brand ? '<span class="prod-brand">' + esc(p.brand) + '</span>' : '';
     let prodName;
     if (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase())) {
@@ -229,9 +231,16 @@ export function renderResults(results, search) {
           + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
           + (() => {
               const isSynced = (p.flags || []).includes('is_synced_with_off');
-              return '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"' + (isSynced ? ' disabled' : '') + '></div>'
+              return '<div class="edit-grid-2">'
+                + '<label>' + t('label_eans') + '</label>'
+                + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
+                + '<div id="ean-manager-' + p.id + '" class="ean-manager"><div class="ean-manager-loading">\u2026</div></div>'
+                + '<div class="ean-row" style="margin-top:6px">'
                 + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
-                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '"' + (isSynced ? ' disabled' : '') + '>&#128247;</button><button class="btn-off" id="ed-off-btn" ' + (isSynced || !(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
+                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
+                + '<button class="btn-off" id="ed-off-btn" ' + (!(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button>'
+                + '</div>'
+                + '</div>';
             })()
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
@@ -366,11 +375,14 @@ export function renderResults(results, search) {
 
   // Attach input handlers for validation
   const edName = document.getElementById('ed-name');
-  const edEan = document.getElementById('ed-ean');
   const edIngredients = document.getElementById('ed-ingredients');
   if (edName) edName.addEventListener('input', () => window.validateOffBtn('ed'));
-  if (edEan) edEan.addEventListener('input', () => window.validateOffBtn('ed'));
   if (edIngredients) edIngredients.addEventListener('input', () => window.updateEstimateBtn('ed'));
+
+  // Load EAN manager asynchronously after edit form renders
+  if (state.editingId && document.getElementById('ean-manager-' + state.editingId)) {
+    if (window.loadEanManager) window.loadEanManager(state.editingId);
+  }
 
   const edType = document.getElementById('ed-type');
   if (edType) upgradeSelect(edType);
