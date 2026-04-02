@@ -1,6 +1,6 @@
 """Blueprint for OCR ingredient extraction endpoint."""
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from extensions import limiter
 from helpers import _require_json
@@ -32,21 +32,29 @@ def _error_response(message, status_code):
 @bp.route("/api/ocr/ingredients", methods=["POST"])
 @limiter.limit("10 per minute")
 def ocr_ingredients():
-    try:
-        data = _require_json()
-    except ValueError as e:
-        return _error_response(str(e), 400)
-
-    image = data.get("image", "")
-    if not image:
-        return _error_response("No image provided", 400)
-
-    try:
-        result = ocr_service.dispatch_ocr(image)
-    except ValueError as e:
-        return _error_response(str(e), 400)
-    except Exception:
-        return _error_response("OCR processing failed", 500)
+    if "image" in request.files:
+        # Multipart/form-data upload path
+        image_bytes = request.files["image"].read()
+        if not image_bytes:
+            return _error_response("No image provided", 400)
+        try:
+            result = ocr_service.dispatch_ocr_bytes(image_bytes)
+        except ValueError as e:
+            return _error_response(str(e), 400)
+        except Exception:
+            return _error_response("OCR processing failed", 500)
+    else:
+        # JSON fallback (backward compatibility)
+        data = request.get_json(silent=True) or {}
+        image = data.get("image", "")
+        if not image:
+            return _error_response("No image provided", 400)
+        try:
+            result = ocr_service.dispatch_ocr(image)
+        except ValueError as e:
+            return _error_response(str(e), 400)
+        except Exception:
+            return _error_response("OCR processing failed", 500)
 
     text = result["text"]
     provider = result["provider"]
