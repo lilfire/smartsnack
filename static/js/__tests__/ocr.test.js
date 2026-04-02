@@ -9,14 +9,9 @@ vi.mock('../i18n.js', () => ({
   t: vi.fn((key) => key),
 }));
 
-vi.mock('../images.js', () => ({
-  resizeImage: vi.fn((data) => Promise.resolve(data)),
-}));
-
 import { scanIngredients } from '../ocr.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
-import { resizeImage } from '../images.js';
 
 function createDOM(prefix) {
   const textarea = document.createElement('textarea');
@@ -108,13 +103,8 @@ describe('scanIngredients', () => {
     const file = createFile();
     Object.defineProperty(fileInput, 'files', { value: [file], writable: false });
 
-    // Trigger onchange — this starts FileReader
+    // Trigger onchange — this starts FormData upload
     fileInput.onchange();
-
-    // Simulate FileReader completing
-    await vi.waitFor(() => {
-      expect(resizeImage).toHaveBeenCalled();
-    }, { timeout: 2000 });
 
     await vi.waitFor(() => {
       expect(api).toHaveBeenCalledWith('/api/ocr/ingredients', expect.objectContaining({
@@ -248,7 +238,7 @@ describe('scanIngredients', () => {
     fileInput.onchange();
 
     await vi.waitFor(() => {
-      expect(resizeImage).toHaveBeenCalled();
+      expect(api).toHaveBeenCalled();
     }, { timeout: 2000 });
 
     // Button should be disabled while API is pending
@@ -262,37 +252,6 @@ describe('scanIngredients', () => {
       expect(btn.disabled).toBe(false);
       expect(spin.style.display).toBe('none');
     }, { timeout: 2000 });
-  });
-
-  it('handles reader.onerror', async () => {
-    const { btn } = createDOM(prefix);
-
-    let fileInput;
-    const clickSpy = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function () {
-      fileInput = this;
-    });
-
-    scanIngredients(prefix);
-    clickSpy.mockRestore();
-
-    Object.defineProperty(fileInput, 'files', { value: [createFile()], writable: false });
-
-    // Monkey-patch FileReader to trigger onerror
-    const OrigFileReader = globalThis.FileReader;
-    globalThis.FileReader = class extends OrigFileReader {
-      readAsDataURL() {
-        setTimeout(() => this.onerror(new Error('read failed')), 0);
-      }
-    };
-
-    fileInput.onchange();
-
-    await vi.waitFor(() => {
-      expect(showToast).toHaveBeenCalledWith('toast_ocr_error', 'error');
-      expect(btn.disabled).toBe(false);
-    }, { timeout: 2000 });
-
-    globalThis.FileReader = OrigFileReader;
   });
 
   it('works without button element', async () => {

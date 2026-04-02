@@ -26,14 +26,9 @@ vi.mock('../i18n.js', () => ({
   }),
 }));
 
-vi.mock('../images.js', () => ({
-  resizeImage: vi.fn((data) => Promise.resolve(data)),
-}));
-
 import { scanIngredients } from '../ocr.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
-import { resizeImage } from '../images.js';
 
 function createDOM(prefix) {
   const textarea = document.createElement('textarea');
@@ -71,9 +66,9 @@ async function triggerScan(prefix) {
   Object.defineProperty(fileInput, 'files', { value: [createFile()], writable: false });
   fileInput.onchange();
 
-  // Wait for FileReader and API call to complete
+  // Wait for FormData API call to complete (no FileReader in FormData upload flow)
   await vi.waitFor(() => {
-    expect(resizeImage).toHaveBeenCalled();
+    expect(api).toHaveBeenCalled();
   }, { timeout: 2000 });
 
   return fileInput;
