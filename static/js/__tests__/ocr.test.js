@@ -296,7 +296,7 @@ describe('scanIngredients', () => {
     const fakeDataUrl = 'data:image/jpeg;base64,abc';
     resizeImage.mockResolvedValueOnce(fakeDataUrl);
     const tokenErr = new Error('token limit');
-    tokenErr.data = { error_type: 'token_limit' };
+    tokenErr.data = { error_type: 'token_limit_exceeded' };
     api.mockRejectedValueOnce(tokenErr);
 
     let fileInput;
