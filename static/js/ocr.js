@@ -68,7 +68,7 @@ export function scanIngredients(prefix) {
         }
       } catch (err) {
         const errorData = err.data || {};
-        if (errorData.error_type === 'token_limit') {
+        if (errorData.error_type === 'token_limit_exceeded') {
           showToast(
             t('toast_ocr_token_limit'),
             'error',
