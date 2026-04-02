@@ -141,7 +141,7 @@ class TestOcrSettingsService:
         from db import get_db
         settings_service.set_ocr_backend("gemini")
         row = get_db().execute(
-            "SELECT value FROM user_settings WHERE key='ocr_backend'"
+            "SELECT value FROM user_settings WHERE key='ocr_provider'"
         ).fetchone()
         assert row is not None
         assert row["value"] == "gemini"
@@ -262,7 +262,7 @@ class TestOcrDispatchWiring:
 
         called_with = {}
 
-        def mock_tesseract(image_bytes, image_b64):
+        def mock_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
             called_with["backend"] = "tesseract"
             return "mock text"
 
@@ -275,17 +275,17 @@ class TestOcrDispatchWiring:
         self, app_ctx, monkeypatch
     ):
         """If stored backend becomes unavailable, fall back to tesseract."""
-        from services import settings_service, ocr_service
+        from services import settings_service, ocr_service, ocr_settings_service
 
-        # Store claude_vision as the selected backend
-        settings_service.set_ocr_backend("claude_vision")
+        # Store claude_vision with fallback enabled
+        ocr_settings_service.save_ocr_settings("claude_vision", fallback_to_tesseract=True)
 
         # But remove the API key so it's unavailable
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
 
         called_with = {}
 
-        def mock_tesseract(image_bytes, image_b64):
+        def mock_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
             called_with["backend"] = "tesseract"
             return "fallback text"
 
@@ -305,7 +305,7 @@ class TestOcrDispatchWiring:
 
         called_with = {}
 
-        def mock_claude(image_bytes, image_b64):
+        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg"):
             called_with["backend"] = "claude_vision"
             return "claude text"
 
@@ -320,7 +320,7 @@ class TestOcrDispatchWiring:
     def test_dispatch_ocr_returns_text(self, app_ctx, monkeypatch):
         from services import ocr_service
 
-        def mock_tesseract(image_bytes, image_b64):
+        def mock_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
             return "ingredient text"
 
         monkeypatch.setitem(ocr_service._PROVIDERS, "tesseract", mock_tesseract)
@@ -329,12 +329,12 @@ class TestOcrDispatchWiring:
 
     def test_dispatch_fallback_logs_warning(self, app_ctx, monkeypatch, caplog):
         """Verify that falling back to tesseract logs a warning."""
-        from services import settings_service, ocr_service
+        from services import ocr_service, ocr_settings_service
 
-        settings_service.set_ocr_backend("claude_vision")
+        ocr_settings_service.save_ocr_settings("claude_vision", fallback_to_tesseract=True)
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         monkeypatch.setitem(
-            ocr_service._PROVIDERS, "tesseract", lambda image_bytes, image_b64: "text"
+            ocr_service._PROVIDERS, "tesseract", lambda image_bytes, image_b64, mime_type="image/jpeg": "text"
         )
 
         with caplog.at_level(logging.WARNING, logger="services.ocr_service"):
@@ -351,7 +351,7 @@ class TestOcrDispatchWiring:
 
         called = {}
 
-        def mock_claude(image_bytes, image_b64):
+        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg"):
             called["called"] = True
             return "text"
 

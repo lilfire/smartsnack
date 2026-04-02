@@ -677,6 +677,8 @@
   "toast_ocr_fallback": "Brukte {fallback_provider} som reserve — {reason}.",
   "toast_ocr_token_limit": "Kunne ikke lese bildet — ingen gjenværende tokener.",
   "toast_ocr_generic_error": "Kunne ikke lese bildet — {error_detail}.",
+  "toast_ocr_invalid_image": "Kunne ikke lese bildet — ugyldig bildeformat. Prøv et annet bilde.",
+  "toast_ocr_provider_timeout": "Kunne ikke lese bildet — tjenesten svarer ikke. Prøv igjen om litt.",
   "btn_fetch_disabled_title": "Skriv inn en gyldig EAN-strekkode eller produktnavn først",
   "hint_ean": "8-13 siffer",
   "toast_uploading": "Laster opp...",
@@ -691,5 +693,14 @@
   "toast_ocr_settings_saved": "OCR-innstillinger lagret",
   "toast_ocr_settings_error": "Kunne ikke lagre OCR-innstillinger",
   "settings_ocr_saved": "OCR-innstillinger lagret",
-  "settings_ocr_error": "Kunne ikke lagre OCR-innstillinger"
+  "settings_ocr_error": "Kunne ikke lagre OCR-innstillinger",
+  "label_eans": "EAN-koder",
+  "btn_add_ean": "Legg til EAN",
+  "btn_set_primary_ean": "Sett som primær",
+  "toast_ean_added": "EAN {ean} lagt til",
+  "toast_ean_removed": "EAN {ean} fjernet",
+  "toast_ean_set_primary": "EAN {ean} satt som primær",
+  "error_ean_already_exists": "Denne EAN finnes allerede på produktet",
+  "error_cannot_remove_only_ean": "Kan ikke fjerne den eneste EAN",
+  "label_ean_primary": "Primær"
 }

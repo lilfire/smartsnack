@@ -152,6 +152,16 @@ def _init_schema(cur, conn):
                 (name, pdcaas, diaas),
             )
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS product_eans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+            ean TEXT NOT NULL,
+            is_primary INTEGER NOT NULL DEFAULT 0,
+            UNIQUE(product_id, ean)
+        )
+    """)
+
     # ── User settings (key-value store) ──────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_settings (
@@ -217,3 +227,8 @@ def seed_products(cur):
         """,
         data,
     )
+    # Backfill product_eans for seeded products
+    cur.execute("""
+        INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
+        SELECT id, ean, 1 FROM products WHERE ean != ''
+    """)

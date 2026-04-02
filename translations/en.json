@@ -677,6 +677,8 @@
   "toast_ocr_fallback": "Used {fallback_provider} as a fallback — {reason}.",
   "toast_ocr_token_limit": "Failed to read image — no remaining tokens.",
   "toast_ocr_generic_error": "Failed to read image — {error_detail}.",
+  "toast_ocr_invalid_image": "Could not read image — invalid image format. Try a different image.",
+  "toast_ocr_provider_timeout": "Could not read image — the service is not responding. Try again shortly.",
   "btn_fetch_disabled_title": "Enter a valid EAN barcode or product name first",
   "hint_ean": "8-13 digits",
   "toast_uploading": "Uploading...",
@@ -691,5 +693,14 @@
   "toast_ocr_settings_saved": "OCR settings saved",
   "toast_ocr_settings_error": "Could not save OCR settings",
   "settings_ocr_saved": "OCR settings saved",
-  "settings_ocr_error": "Could not save OCR settings"
+  "settings_ocr_error": "Could not save OCR settings",
+  "label_eans": "EAN codes",
+  "btn_add_ean": "Add EAN",
+  "btn_set_primary_ean": "Set as primary",
+  "toast_ean_added": "EAN {ean} added",
+  "toast_ean_removed": "EAN {ean} removed",
+  "toast_ean_set_primary": "EAN {ean} set as primary",
+  "error_ean_already_exists": "This EAN already exists on this product",
+  "error_cannot_remove_only_ean": "Cannot remove the only EAN",
+  "label_ean_primary": "Primary"
 }

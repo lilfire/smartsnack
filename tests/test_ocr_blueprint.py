@@ -137,7 +137,7 @@ class TestOcrErrorResponse:
         data = resp.get_json()
         assert data["error"] == "OCR processing failed"
         assert data["error_type"] == "generic"
-        assert data["error_detail"] == "OCR processing failed"
+        assert "OCR processing failed" in data["error_detail"]
 
     @patch(
         "services.ocr_service.dispatch_ocr",
@@ -153,6 +153,101 @@ class TestOcrErrorResponse:
         data = resp.get_json()
         assert data["error_type"] == "token_limit_exceeded"
         assert "Token limit" in data["error_detail"]
+
+
+class TestClientError4xxMapping:
+    """ClientError with 4xx status_code should map to invalid_image (LSO-277)."""
+
+    def test_client_error_400_returns_invalid_image(self, client):
+        """ClientError with status_code=400 → HTTP 400, error_type=invalid_image."""
+
+        class ClientError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ClientError("Bad Request", 400),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 400
+            data = resp.get_json()
+            assert data["error_type"] == "invalid_image"
+            assert data["error"] == "Invalid or corrupt image"
+
+    def test_client_error_422_returns_invalid_image(self, client):
+        """ClientError with status_code=422 → HTTP 400, error_type=invalid_image."""
+
+        class ClientError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ClientError("Unprocessable Entity", 422),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 400
+            data = resp.get_json()
+            assert data["error_type"] == "invalid_image"
+
+    def test_server_error_5xx_still_generic(self, client):
+        """Exception with status_code=500 should NOT map to invalid_image."""
+
+        class ServerError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ServerError("Internal Server Error", 500),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 500
+            data = resp.get_json()
+            assert data["error_type"] == "generic"
+
+
+class TestOcrClientErrorClassification:
+    """4xx errors via code attribute (google.genai) must also map to invalid_image."""
+
+    @patch("services.ocr_service.dispatch_ocr")
+    def test_google_genai_code_400_returns_invalid_image(self, mock_dispatch, client):
+        """google.genai ClientError with code=400 → HTTP 400, error_type=invalid_image."""
+        err = Exception("Invalid image format")
+        err.code = 400
+        mock_dispatch.side_effect = err
+        resp = client.post(
+            "/api/ocr/ingredients",
+            json={"image": "data:image/png;base64,iVBORw0KGgo="},
+        )
+        assert resp.status_code == 400
+        data = resp.get_json()
+        assert data["error_type"] == "invalid_image"
+
+    @patch("services.ocr_service.dispatch_ocr")
+    def test_no_status_attribute_still_returns_500_generic(self, mock_dispatch, client):
+        """Exceptions without status_code or code still return 500 generic."""
+        mock_dispatch.side_effect = Exception("unknown error")
+        resp = client.post(
+            "/api/ocr/ingredients",
+            json={"image": "data:image/png;base64,iVBORw0KGgo="},
+        )
+        assert resp.status_code == 500
+        data = resp.get_json()
+        assert data["error_type"] == "generic"
 
 
 class TestOcrBackwardsCompat:

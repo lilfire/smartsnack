@@ -1,6 +1,6 @@
 """OCR service for extracting text from ingredient images.
 
-Supports multiple backends controlled by OCR_BACKEND env var:
+Supports multiple backends controlled by user settings (ocr_provider):
 - "tesseract" (default): uses pytesseract
 - "claude_vision": uses Claude Vision API via anthropic SDK
 - "gemini": uses Google Gemini API via google-genai SDK
@@ -20,8 +20,6 @@ from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
 
 logger = logging.getLogger(__name__)
 
-
-_OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
 
 _INGREDIENT_PROMPT = (
     "Extract the ingredient text from this food label image. "
@@ -140,7 +138,7 @@ def _avg_confidence_tesseract(data):
     return sum(confs) / len(confs) if confs else 0.0
 
 
-def _extract_tesseract(image_bytes, image_b64):
+def _extract_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
     """Run pytesseract on image variants, return best text."""
     import pytesseract
 
@@ -183,7 +181,16 @@ def _extract_tesseract(image_bytes, image_b64):
 # Claude Vision backend
 # ---------------------------------------------------------------------------
 
-def _extract_claude_vision(image_bytes, image_b64):
+def _detect_mime_type(image_bytes):
+    """Detect image MIME type from magic bytes. Defaults to image/jpeg."""
+    if image_bytes[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    return "image/jpeg"
+
+
+def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png"):
     """Use Claude Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("ANTHROPIC_API_KEY")
 
@@ -201,7 +208,7 @@ def _extract_claude_vision(image_bytes, image_b64):
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/png",
+                            "media_type": mime_type,
                             "data": image_b64,
                         },
                     },
@@ -217,12 +224,82 @@ def _extract_claude_vision(image_bytes, image_b64):
 
 
 # ---------------------------------------------------------------------------
+# Gemini image format conversion
+# ---------------------------------------------------------------------------
+
+_GEMINI_SUPPORTED_MIME_TYPES = frozenset({
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+})
+
+_PIL_FORMAT_TO_MIME = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+    "BMP": "image/bmp",
+    "TIFF": "image/tiff",
+    "GIF": "image/gif",
+}
+
+
+def _svg_to_png(svg_bytes):
+    """Convert SVG bytes to PNG bytes using cairosvg."""
+    try:
+        import cairosvg
+    except ImportError:
+        raise ValueError(
+            "SVG conversion requires cairosvg: pip install cairosvg"
+        )
+    return cairosvg.svg2png(bytestring=svg_bytes)
+
+
+def _convert_for_gemini(image_bytes):
+    """Return (image_bytes, mime_type) ready for the Gemini API.
+
+    If the image format is not supported by Gemini, convert to PNG.
+    Supported formats: image/jpeg, image/png, image/webp, image/heic, image/heif.
+    """
+    # Detect SVG before PIL (PIL cannot open SVG)
+    stripped = image_bytes.lstrip()
+    if stripped.startswith(b"<svg") or (
+        stripped.startswith(b"<?xml") and b"<svg" in stripped[:512]
+    ):
+        converted = _svg_to_png(image_bytes)
+        logger.info("OCR: converted svg \u2192 image/png for Gemini")
+        return converted, "image/png"
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        pil_format = img.format or "PNG"
+    except Exception:
+        return image_bytes, "image/png"
+
+    mime_type = _PIL_FORMAT_TO_MIME.get(pil_format, "image/png")
+
+    if mime_type in _GEMINI_SUPPORTED_MIME_TYPES:
+        return image_bytes, mime_type
+
+    # Convert unsupported format to PNG
+    buf = io.BytesIO()
+    img.convert("RGBA").save(buf, format="PNG")
+    converted_bytes = buf.getvalue()
+    logger.info("OCR: converted %s \u2192 image/png for Gemini", pil_format.lower())
+    return converted_bytes, "image/png"
+
+
+# ---------------------------------------------------------------------------
 # Gemini backend
 # ---------------------------------------------------------------------------
 
-def _extract_gemini(image_bytes, image_b64):
+def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
     """Use Google Gemini API to extract ingredient text from an image."""
     api_key = _get_api_key("GEMINI_API_KEY")
+
+    image_bytes, mime_type = _convert_for_gemini(image_bytes)
+    image_b64 = base64.b64encode(image_bytes).decode()
 
     from google import genai
 
@@ -234,7 +311,7 @@ def _extract_gemini(image_bytes, image_b64):
                 "parts": [
                     {
                         "inline_data": {
-                            "mime_type": "image/png",
+                            "mime_type": mime_type,
                             "data": image_b64,
                         }
                     },
@@ -250,7 +327,7 @@ def _extract_gemini(image_bytes, image_b64):
 # OpenAI backend
 # ---------------------------------------------------------------------------
 
-def _extract_openai(image_bytes, image_b64):
+def _extract_openai(image_bytes, image_b64, mime_type="image/png"):
     """Use OpenAI Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("OPENAI_API_KEY")
 
@@ -267,7 +344,7 @@ def _extract_openai(image_bytes, image_b64):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/png;base64,{image_b64}",
+                            "url": f"data:{mime_type};base64,{image_b64}",
                         },
                     },
                     {
@@ -310,28 +387,36 @@ def extract_text(image_base64):
         raise ValueError("No image provided")
 
     raw = image_base64
+    mime_type = None
     if raw.startswith("data:"):
-        match = re.match(r"data:image/[^;]+;base64,(.+)", raw, re.DOTALL)
+        match = re.match(r"data:(image/[^;]+);base64,(.+)", raw, re.DOTALL)
         if not match:
             raise ValueError("Invalid data URI format")
-        raw = match.group(1)
+        mime_type = match.group(1)
+        raw = match.group(2)
 
     try:
         image_bytes = base64.b64decode(raw)
     except Exception:
         raise ValueError("Invalid base64 data")
 
+    if mime_type is None:
+        mime_type = _detect_mime_type(image_bytes)
+
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
 
-    provider = _PROVIDERS.get(_OCR_BACKEND)
+    from services import settings_service
+
+    backend_id = settings_service.get_ocr_backend()
+    provider = _PROVIDERS.get(backend_id)
     if provider is None:
         raise ValueError(
-            f"Unknown OCR backend: '{_OCR_BACKEND}'. "
+            f"Unknown OCR backend: '{backend_id}'. "
             f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
         )
 
-    return provider(image_bytes, raw)
+    return provider(image_bytes, raw, mime_type)
 
 
 # ---------------------------------------------------------------------------
@@ -365,6 +450,7 @@ def dispatch_ocr(image_base64):
     Returns a dict: {"text": str, "provider": str, "fallback": bool}.
     """
     from services import settings_service
+    from services import ocr_settings_service
 
     requested_id = settings_service.get_ocr_backend()
     fallback = False
@@ -374,6 +460,13 @@ def dispatch_ocr(image_base64):
     backend = backends.get(requested_id)
 
     if not backend or not backend["available"]:
+        # Check user preference before falling back
+        ocr_settings = ocr_settings_service.get_ocr_settings()
+        if not ocr_settings.get("fallback_to_tesseract", False):
+            raise ValueError(
+                f"Selected OCR provider '{requested_id}' is unavailable "
+                f"and fallback to tesseract is disabled"
+            )
         logger.warning(
             "Stored OCR backend '%s' is unavailable, falling back to tesseract",
             requested_id,
@@ -388,16 +481,21 @@ def dispatch_ocr(image_base64):
         raise ValueError("No image provided")
 
     raw = image_base64
+    mime_type = None
     if raw.startswith("data:"):
-        match = re.match(r"data:image/[^;]+;base64,(.+)", raw, re.DOTALL)
+        match = re.match(r"data:(image/[^;]+);base64,(.+)", raw, re.DOTALL)
         if not match:
             raise ValueError("Invalid data URI format")
-        raw = match.group(1)
+        mime_type = match.group(1)
+        raw = match.group(2)
 
     try:
         image_bytes = base64.b64decode(raw)
     except Exception:
         raise ValueError("Invalid base64 data")
+
+    if mime_type is None:
+        mime_type = _detect_mime_type(image_bytes)
 
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
@@ -411,6 +509,49 @@ def dispatch_ocr(image_base64):
 
     # Resolve display name from config
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
-    text = provider_fn(image_bytes, raw)
+    text = provider_fn(image_bytes, raw, mime_type)
+
+    return {"text": text, "provider": provider_name, "fallback": fallback}
+
+
+def dispatch_ocr_bytes(image_bytes):
+    """Dispatch OCR to the user-selected backend from raw image bytes.
+
+    Accepts raw bytes (e.g. from a multipart/form-data upload).
+    Returns a dict: {"text": str, "provider": str, "fallback": bool}.
+    """
+    from services import settings_service
+
+    if not image_bytes:
+        raise ValueError("No image provided")
+
+    if len(image_bytes) > 5 * 1024 * 1024:
+        raise ValueError("Image too large (max 5 MB)")
+
+    requested_id = settings_service.get_ocr_backend()
+    fallback = False
+
+    backends = {b["id"]: b for b in get_available_backends()}
+    backend = backends.get(requested_id)
+
+    if not backend or not backend["available"]:
+        logger.warning(
+            "Stored OCR backend '%s' is unavailable, falling back to tesseract",
+            requested_id,
+        )
+        fallback = requested_id != DEFAULT_OCR_BACKEND
+        requested_id = DEFAULT_OCR_BACKEND
+
+    backend_id = requested_id
+    provider_fn = _PROVIDERS.get(backend_id)
+    if provider_fn is None:
+        raise ValueError(
+            f"Unknown OCR backend: '{backend_id}'. "
+            f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
+        )
+
+    raw_b64 = base64.b64encode(image_bytes).decode()
+    provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
+    text = provider_fn(image_bytes, raw_b64)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}

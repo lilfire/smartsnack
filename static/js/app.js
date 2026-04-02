@@ -9,7 +9,8 @@ import { renderResults, loadFlagConfig } from './render.js';
 import {
   showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   loadData, switchView, setFilter, toggleExpand,
-  onSearchInput, clearSearch, registerProduct
+  onSearchInput, clearSearch, registerProduct,
+  loadEanManager, addEan, deleteEan, setEanPrimary
 } from './products.js';
 import {
   SCORE_CFG_MAP, weightData,
@@ -51,6 +52,7 @@ Object.assign(window, {
   showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct,
+  loadEanManager, addEan, deleteEan, setEanPrimary,
   rerender,
   // settings — sections
   toggleSettingsSection,
