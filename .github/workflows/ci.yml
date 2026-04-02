@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [development]
+    branches: [development, main]
   pull_request:
-    branches: [development]
+    branches: [development, main]
 
 jobs:
   test:
@@ -24,6 +24,25 @@ jobs:
 
       - name: Run pytest (unit tests only)
         run: python -m pytest --ignore=tests/e2e --tb=short -q
+
+  frontend-test:
+    name: Frontend Tests (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run vitest
+        run: npx vitest run
 
   build:
     name: Docker Build

@@ -204,30 +204,30 @@ class TestNegativeOcrUpload:
         "services.ocr_service.dispatch_ocr",
         side_effect=OSError("cannot identify image file"),
     )
-    def test_corrupt_image_returns_500(self, mock_dispatch, client):
-        """Corrupt/unreadable image (OSError) is caught by generic handler → 500."""
+    def test_corrupt_image_returns_400(self, mock_dispatch, client):
+        """Corrupt/unreadable image (OSError) is caught by invalid_image handler → 400."""
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": "data:image/png;base64,AAAA"},
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 400
         data = resp.get_json()
-        assert data["error"] == "OCR processing failed"
+        assert data["error"] == "Invalid or corrupt image"
 
     @patch(
         "services.ocr_service.dispatch_ocr",
         side_effect=OSError("cannot identify image file"),
     )
-    def test_corrupt_jpeg_returns_500(self, mock_dispatch, client):
-        """Corrupt JPEG (OSError) is caught by generic handler → 500."""
+    def test_corrupt_jpeg_returns_400(self, mock_dispatch, client):
+        """Corrupt JPEG (OSError) is caught by invalid_image handler → 400."""
         encoded = base64.b64encode(b"\xff\xd8garbage").decode()
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": f"data:image/jpeg;base64,{encoded}"},
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 400
         data = resp.get_json()
-        assert data["error"] == "OCR processing failed"
+        assert data["error"] == "Invalid or corrupt image"
 
     def test_empty_body_returns_400(self, client):
         """POST with completely empty body should return 400."""
@@ -283,12 +283,12 @@ class TestNegativeOcrUpload:
         "services.ocr_service.dispatch_ocr",
         side_effect=UnidentifiedImageError("cannot identify image file"),
     )
-    def test_unidentified_image_returns_500(self, mock_dispatch, client):
-        """PIL UnidentifiedImageError is caught by generic handler → 500."""
+    def test_unidentified_image_returns_400(self, mock_dispatch, client):
+        """PIL UnidentifiedImageError is caught by invalid_image handler → 400."""
         resp = client.post(
             "/api/ocr/ingredients",
             json={"image": _png_data_uri()},
         )
-        assert resp.status_code == 500
+        assert resp.status_code == 400
         data = resp.get_json()
-        assert data["error"] == "OCR processing failed"
+        assert data["error"] == "Invalid or corrupt image"

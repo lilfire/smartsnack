@@ -106,7 +106,7 @@ class TestOcrMultipartUpload:
         )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert data["error"] == "No image provided"
+        assert data["error"] == "Invalid or missing JSON body"
 
     def test_missing_file_error_has_error_type(self, client):
         resp = client.post(
