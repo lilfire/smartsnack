@@ -138,7 +138,7 @@ def _avg_confidence_tesseract(data):
     return sum(confs) / len(confs) if confs else 0.0
 
 
-def _extract_tesseract(image_bytes, image_b64):
+def _extract_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
     """Run pytesseract on image variants, return best text."""
     import pytesseract
 
@@ -181,7 +181,16 @@ def _extract_tesseract(image_bytes, image_b64):
 # Claude Vision backend
 # ---------------------------------------------------------------------------
 
-def _extract_claude_vision(image_bytes, image_b64):
+def _detect_mime_type(image_bytes):
+    """Detect image MIME type from magic bytes. Defaults to image/jpeg."""
+    if image_bytes[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if image_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    return "image/jpeg"
+
+
+def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png"):
     """Use Claude Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("ANTHROPIC_API_KEY")
 
@@ -199,7 +208,7 @@ def _extract_claude_vision(image_bytes, image_b64):
                         "type": "image",
                         "source": {
                             "type": "base64",
-                            "media_type": "image/png",
+                            "media_type": mime_type,
                             "data": image_b64,
                         },
                     },
@@ -285,7 +294,7 @@ def _convert_for_gemini(image_bytes):
 # Gemini backend
 # ---------------------------------------------------------------------------
 
-def _extract_gemini(image_bytes, image_b64):
+def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
     """Use Google Gemini API to extract ingredient text from an image."""
     api_key = _get_api_key("GEMINI_API_KEY")
 
@@ -318,7 +327,7 @@ def _extract_gemini(image_bytes, image_b64):
 # OpenAI backend
 # ---------------------------------------------------------------------------
 
-def _extract_openai(image_bytes, image_b64):
+def _extract_openai(image_bytes, image_b64, mime_type="image/png"):
     """Use OpenAI Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("OPENAI_API_KEY")
 
@@ -335,7 +344,7 @@ def _extract_openai(image_bytes, image_b64):
                     {
                         "type": "image_url",
                         "image_url": {
-                            "url": f"data:image/png;base64,{image_b64}",
+                            "url": f"data:{mime_type};base64,{image_b64}",
                         },
                     },
                     {
@@ -378,16 +387,21 @@ def extract_text(image_base64):
         raise ValueError("No image provided")
 
     raw = image_base64
+    mime_type = None
     if raw.startswith("data:"):
-        match = re.match(r"data:image/[^;]+;base64,(.+)", raw, re.DOTALL)
+        match = re.match(r"data:(image/[^;]+);base64,(.+)", raw, re.DOTALL)
         if not match:
             raise ValueError("Invalid data URI format")
-        raw = match.group(1)
+        mime_type = match.group(1)
+        raw = match.group(2)
 
     try:
         image_bytes = base64.b64decode(raw)
     except Exception:
         raise ValueError("Invalid base64 data")
+
+    if mime_type is None:
+        mime_type = _detect_mime_type(image_bytes)
 
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
@@ -402,7 +416,7 @@ def extract_text(image_base64):
             f"Valid options: {', '.join(sorted(_PROVIDERS.keys()))}"
         )
 
-    return provider(image_bytes, raw)
+    return provider(image_bytes, raw, mime_type)
 
 
 # ---------------------------------------------------------------------------
@@ -467,16 +481,21 @@ def dispatch_ocr(image_base64):
         raise ValueError("No image provided")
 
     raw = image_base64
+    mime_type = None
     if raw.startswith("data:"):
-        match = re.match(r"data:image/[^;]+;base64,(.+)", raw, re.DOTALL)
+        match = re.match(r"data:(image/[^;]+);base64,(.+)", raw, re.DOTALL)
         if not match:
             raise ValueError("Invalid data URI format")
-        raw = match.group(1)
+        mime_type = match.group(1)
+        raw = match.group(2)
 
     try:
         image_bytes = base64.b64decode(raw)
     except Exception:
         raise ValueError("Invalid base64 data")
+
+    if mime_type is None:
+        mime_type = _detect_mime_type(image_bytes)
 
     if len(image_bytes) > 5 * 1024 * 1024:
         raise ValueError("Image too large (max 5 MB)")
@@ -490,7 +509,7 @@ def dispatch_ocr(image_base64):
 
     # Resolve display name from config
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
-    text = provider_fn(image_bytes, raw)
+    text = provider_fn(image_bytes, raw, mime_type)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}
 
