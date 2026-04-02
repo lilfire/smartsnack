@@ -43,7 +43,18 @@ function collectFormFields(prefix) {
   };
 }
 
-export function startEdit(id) { state.editingId = id; rerender(); }
+export function startEdit(id) {
+  state.editingId = id;
+  rerender();
+  requestAnimationFrame(() => {
+    const form = document.querySelector('.edit-form');
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const firstInput = form.querySelector('#ed-name');
+      if (firstInput) firstInput.focus();
+    }
+  });
+}
 
 export async function saveProduct(id) {
   const data = collectFormFields('ed');

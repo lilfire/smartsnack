@@ -111,6 +111,36 @@ describe('startEdit', () => {
     expect(state.editingId).toBe(42);
     expect(rerender).toHaveBeenCalled();
   });
+
+  it('scrolls edit form into view and focuses first input after rerender', () => {
+    const form = document.createElement('div');
+    form.className = 'edit-form';
+    const input = document.createElement('input');
+    input.id = 'ed-name';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    const scrollIntoViewMock = vi.fn();
+    form.scrollIntoView = scrollIntoViewMock;
+    const focusMock = vi.fn();
+    input.focus = focusMock;
+
+    startEdit(99);
+    vi.runAllTicks();
+    // flush requestAnimationFrame
+    vi.runAllTimers();
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(focusMock).toHaveBeenCalled();
+  });
+
+  it('does not throw if edit form is absent after rerender', () => {
+    // No .edit-form in DOM
+    expect(() => {
+      startEdit(7);
+      vi.runAllTimers();
+    }).not.toThrow();
+  });
 });
 
 describe('saveProduct', () => {
