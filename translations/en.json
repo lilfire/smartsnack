@@ -706,5 +706,6 @@
   "error_ean_already_exists": "This EAN already exists on this product",
   "error_cannot_remove_only_ean": "Cannot remove the only EAN",
   "label_ean_primary": "Primary",
-  "tags": "Tags"
+  "tags": "Tags",
+  "tag_input_placeholder": "Add tag…"
 }
