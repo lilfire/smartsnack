@@ -191,6 +191,12 @@
   background: rgba(232, 184, 75, 0.6);
 }
 
+/* Standard: Firefox + future browsers */
+.filter-row {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(232, 184, 75, 0.4) rgba(255, 255, 255, 0.05);
+}
+
 .pill {
   padding: 5px 12px;
   border-radius: 20px;
