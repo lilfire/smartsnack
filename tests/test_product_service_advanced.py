@@ -442,11 +442,31 @@ class TestConditionToSql:
         assert "NOT EXISTS" in sql
         assert param == "is_discontinued"
 
+    def test_text_field_not_contains(self):
+        from services.product_service import _condition_to_sql
+
+        sql, param = _condition_to_sql("name", "!contains", "popcorn", "NOT_LIKE")
+        assert "NOT LIKE" in sql
+        assert "%popcorn%" in param
+
+    def test_text_field_not_contains_escapes_percent(self):
+        from services.product_service import _condition_to_sql
+
+        sql, param = _condition_to_sql("name", "!contains", "100%corn", "NOT_LIKE")
+        assert "NOT LIKE" in sql
+        assert "\\%" in param
+
     def test_numeric_contains_raises(self):
         from services.product_service import _condition_to_sql
 
         with pytest.raises(ValueError, match="not valid for numeric"):
             _condition_to_sql("kcal", "contains", "foo", "LIKE")
+
+    def test_numeric_not_contains_raises(self):
+        from services.product_service import _condition_to_sql
+
+        with pytest.raises(ValueError, match="not valid for numeric"):
+            _condition_to_sql("kcal", "!contains", "foo", "NOT_LIKE")
 
     def test_non_numeric_value_raises(self):
         from services.product_service import _condition_to_sql

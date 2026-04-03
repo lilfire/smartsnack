@@ -49,7 +49,7 @@ vi.mock('../emoji-picker.js', () => ({
 
 vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn(), getFlagConfig: vi.fn(() => ({})) }));
 
-import { loadOcrSettings, saveOcrSettings } from '../settings.js';
+import { loadOcrSettings, saveOcrSettings } from '../settings-ocr.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
 

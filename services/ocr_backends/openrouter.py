@@ -1,0 +1,46 @@
+"""OpenRouter Vision OCR backend."""
+import os
+
+from . import _get_api_key, _INGREDIENT_PROMPT
+
+_OPENROUTER_SYSTEM_PROMPT = (
+    "You are a precise food label reader. Your only job is to extract the exact "
+    "ingredient list from a food label image. Output the raw ingredient text as it "
+    "appears on the label — no commentary, no formatting changes, no summaries. "
+    "If no ingredient list is visible, output an empty string."
+)
+
+
+def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg"):
+    """Use OpenRouter Vision API to extract ingredient text from an image."""
+    api_key = _get_api_key("OPENROUTER_API_KEY")
+    model = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+
+    import openai
+
+    client = openai.OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        default_headers={"HTTP-Referer": "https://smartsnack.app"},
+    )
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=1024,
+        messages=[
+            {"role": "system", "content": _OPENROUTER_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{image_b64}",
+                        },
+                    },
+                    {"type": "text", "text": _INGREDIENT_PROMPT},
+                ],
+            },
+        ],
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    return content.strip() if content else ""

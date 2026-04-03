@@ -111,13 +111,13 @@ function onBarcodeDetected(code) {
   const productId = _scannerCtx.productId;
   const eanEl = document.getElementById(prefix + '-ean');
   if (eanEl) eanEl.value = code;
-  import('./openfoodfacts.js').then((mod) => { mod.validateOffBtn(prefix); });
+  import('./off-utils.js').then((mod) => { mod.validateOffBtn(prefix); });
 
   closeScanner();
 
   showToast(t('toast_barcode_scanned', { code: code }), 'success');
   setTimeout(() => {
-    import('./openfoodfacts.js').then((mod) => { mod.lookupOFF(prefix, productId); });
+    import('./off-api.js').then((mod) => { mod.lookupOFF(prefix, productId); });
   }, 300);
 }
 
@@ -291,9 +291,9 @@ export function scanRegisterNew(ean) {
   switchView('register');
   const eanEl = document.getElementById('f-ean');
   if (eanEl) eanEl.value = ean;
-  import('./openfoodfacts.js').then((mod) => {
-    mod.validateOffBtn('f');
-    setTimeout(() => { mod.lookupOFF('f', null, { autoClose: true }); }, 300);
+  Promise.all([import('./off-utils.js'), import('./off-api.js')]).then(([utilsMod, apiMod]) => {
+    utilsMod.validateOffBtn('f');
+    setTimeout(() => { apiMod.lookupOFF('f', null, { autoClose: true }); }, 300);
   });
 }
 
@@ -505,9 +505,9 @@ export async function scanOffFetch(ean, productId) {
   setTimeout(() => {
     const eanEl = document.getElementById('ed-ean');
     if (eanEl) eanEl.value = ean;
-    import('./openfoodfacts.js').then((mod) => {
-      mod.validateOffBtn('ed');
-      setTimeout(() => { mod.lookupOFF('ed', productId); }, 200);
+    Promise.all([import('./off-utils.js'), import('./off-api.js')]).then(([utilsMod, apiMod]) => {
+      utilsMod.validateOffBtn('ed');
+      setTimeout(() => { apiMod.lookupOFF('ed', productId); }, 200);
     });
   }, 300);
 }

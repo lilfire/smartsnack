@@ -176,6 +176,18 @@ def _init_schema(cur, conn):
             (DEFAULT_LANGUAGE,),
         )
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS product_tags (
+            product_id INTEGER NOT NULL,
+            tag        TEXT    NOT NULL COLLATE NOCASE,
+            PRIMARY KEY (product_id, tag),
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        )
+    """)
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag ON product_tags(tag COLLATE NOCASE)"
+    )
+
     run_migrations(cur)
 
     cur.execute("SELECT COUNT(*) FROM products")
