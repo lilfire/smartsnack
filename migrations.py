@@ -68,6 +68,15 @@ MIGRATIONS = [
                SELECT id, ean, 1 FROM products WHERE ean != ''""",
         ],
     ),
+    (
+        "007_add_performance_indexes",
+        [
+            "CREATE INDEX IF NOT EXISTS idx_product_flags_product_id ON product_flags(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_product_eans_product_id ON product_eans(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_products_type ON products(type)",
+        ],
+    ),
 ]
 
 
