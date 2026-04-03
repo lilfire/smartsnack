@@ -1,7 +1,7 @@
 // ── SmartSnack Entry Point ───────────────────────────
 // ES Module entry point — imports all modules and exposes functions to window
 
-import { state, api, initAllFieldSelects } from './state.js';
+import { state, api, upgradeSelect, initAllFieldSelects } from './state.js';
 import { initLanguage, changeLanguage, t } from './i18n.js';
 import { toggleFilters, setSort, rerender } from './filters.js';
 import { triggerImageUpload, removeProductImage } from './images.js';
@@ -119,6 +119,8 @@ document.addEventListener('touchstart', function(e) {
 (async function() {
   await initLanguage();
   initAllFieldSelects();
+  const langSel = document.getElementById('language-select');
+  if (langSel) upgradeSelect(langSel, (val) => changeLanguage(val));
   try {
     const wc = await api('/api/weights');
     weightData.length = 0;

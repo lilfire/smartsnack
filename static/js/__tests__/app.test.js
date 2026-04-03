@@ -294,6 +294,42 @@ describe('app.js initialization', () => {
   });
 });
 
+describe('language-select callback', () => {
+  it('calls upgradeSelect for #language-select with a changeLanguage callback', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    const langSelect = document.createElement('select');
+    langSelect.id = 'language-select';
+    langSelect.className = 'field-select';
+    langSelect.innerHTML = '<option value="no">Norsk</option><option value="en">English</option>';
+    document.body.appendChild(langSelect);
+
+    await import('../app.js');
+    await flushPromises();
+
+    const { upgradeSelect } = await import('../state.js');
+    const { changeLanguage } = await import('../i18n.js');
+
+    const langCall = upgradeSelect.mock.calls.find((c) => c[0] === langSelect);
+    expect(langCall).toBeDefined();
+    expect(typeof langCall[1]).toBe('function');
+
+    // Invoking the callback must call changeLanguage with the chosen value
+    langCall[1]('en');
+    expect(changeLanguage).toHaveBeenCalledWith('en');
+  });
+
+  it('does not throw when #language-select is absent', async () => {
+    vi.resetModules();
+    document.body.innerHTML = '';
+
+    // No language-select in DOM — should not throw
+    await expect(import('../app.js')).resolves.toBeDefined();
+    await flushPromises();
+  });
+});
+
 describe('touchstart range input handler', () => {
   let scrollSpy;
 
