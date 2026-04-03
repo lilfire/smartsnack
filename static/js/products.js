@@ -372,6 +372,7 @@ export async function loadData() {
 }
 
 export function switchView(v) {
+  state.cachedResults = [];
   state.currentView = v;
   state.expandedId = null;
   state.editingId = null;
@@ -395,6 +396,7 @@ export function setFilter(f) {
     if (i >= 0) state.currentFilter.splice(i, 1);
     else state.currentFilter.push(f);
   }
+  state.cachedResults = [];
   buildFilters();
   loadData();
 }
@@ -412,6 +414,7 @@ export function onSearchInput() {
   document.getElementById('search-clear').classList.toggle('visible', v.length > 0);
   state.expandedId = null;
   state.editingId = null;
+  state.cachedResults = [];
   clearTimeout(state.searchTimeout);
   state.searchTimeout = setTimeout(loadData, 250);
 }
