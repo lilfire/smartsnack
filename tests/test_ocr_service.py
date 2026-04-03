@@ -540,7 +540,7 @@ class TestGeminiBackend:
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
-                with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+                with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
                     svg_bytes = _make_minimal_svg()
                     result = extract_text(_b64(svg_bytes))
 
@@ -656,7 +656,7 @@ class TestConvertForGemini:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
             out_bytes, mime = _convert_for_gemini(svg_bytes)
 
         mock_svg.assert_called_once_with(svg_bytes)
@@ -670,7 +670,7 @@ class TestConvertForGemini:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
             with caplog.at_level(logging.INFO, logger="services.ocr_service"):
                 _convert_for_gemini(svg_bytes)
 
@@ -683,7 +683,7 @@ class TestConvertForGemini:
         svg_bytes = b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
             out_bytes, mime = _convert_for_gemini(svg_bytes)
 
         mock_svg.assert_called_once()
