@@ -708,6 +708,7 @@
   "error_cannot_remove_only_ean": "Kan inte ta bort den enda EAN",
   "label_ean_primary": "Primär",
   "tags": "Taggar",
+  "tag_input_placeholder": "Lägg till tagg…",
   "torch_toggle_off": "Sätt på ficklampa",
   "torch_toggle_on": "Stäng av ficklampa"
 }

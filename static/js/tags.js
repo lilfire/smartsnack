@@ -7,6 +7,12 @@ export function initTagInput(existingTags) {
 }
 
 export function getTagsForSave() {
+  // Flush any uncommitted text from the inline input before returning
+  const input = document.getElementById('tag-input-ed');
+  if (input && input.value.trim()) {
+    _addTag(input.value);
+    input.value = '';
+  }
   return Array.from(_tags);
 }
 
@@ -18,27 +24,42 @@ function _addTag(value) {
 }
 
 function _renderPills() {
-  const container = document.getElementById('tag-container-ed');
-  if (!container) return;
-  container.innerHTML = '';
+  const field = document.getElementById('tag-field-ed');
+  if (!field) return;
+  // Remove existing pill elements only (preserve input and suggestions list)
+  field.querySelectorAll('.tag-pill').forEach(el => el.remove());
+  const input = field.querySelector('#tag-input-ed');
   for (const tag of [..._tags].sort()) {
-    container.insertAdjacentHTML(
-      'beforeend',
-      `<span class="tag-pill">${_escapeHtml(tag)}<button type="button" class="tag-remove" data-tag="${_escapeHtml(tag)}">&times;</button></span>`
-    );
-  }
-  container.querySelectorAll('.tag-remove').forEach(btn => {
+    const span = document.createElement('span');
+    span.className = 'tag-pill';
+    const textNode = document.createTextNode(tag);
+    span.appendChild(textNode);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'tag-remove';
+    btn.setAttribute('data-tag', tag);
+    btn.textContent = '\u00D7';
     btn.addEventListener('click', () => {
-      _tags.delete(btn.dataset.tag);
+      _tags.delete(tag);
       _renderPills();
     });
-  });
+    span.appendChild(btn);
+    field.insertBefore(span, input);
+  }
 }
 
 function _bindInput() {
+  const field = document.getElementById('tag-field-ed');
   const input = document.getElementById('tag-input-ed');
   const list = document.getElementById('tag-suggestions-ed');
   if (!input || !list) return;
+
+  // Click anywhere on the field container focuses the input
+  if (field) {
+    field.addEventListener('click', (e) => {
+      if (e.target === field) input.focus();
+    });
+  }
 
   let _debounce = null;
 
@@ -76,6 +97,22 @@ function _bindInput() {
       _addTag(input.value);
       input.value = '';
       list.hidden = true;
+    } else if (e.key === 'Tab' && !list.hidden) {
+      // Tab completes the first visible suggestion
+      const first = list.querySelector('li');
+      if (first) {
+        e.preventDefault();
+        _addTag(first.textContent);
+        input.value = '';
+        list.hidden = true;
+      }
+    } else if (e.key === 'Backspace' && input.value === '') {
+      // Backspace with empty input removes the last tag
+      const sorted = [..._tags].sort();
+      if (sorted.length > 0) {
+        _tags.delete(sorted[sorted.length - 1]);
+        _renderPills();
+      }
     }
   });
 
@@ -84,6 +121,3 @@ function _bindInput() {
   });
 }
 
-function _escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
