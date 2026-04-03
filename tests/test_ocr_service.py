@@ -927,6 +927,89 @@ class TestOpenRouterBackend:
 
 
 # ---------------------------------------------------------------------------
+# Groq backend
+# ---------------------------------------------------------------------------
+
+@patch("services.settings_service.get_ocr_backend", return_value="groq")
+class TestGroqBackend:
+    """Tests for the Groq Vision OCR backend."""
+
+    def test_extract_text_calls_groq(self, _mock_backend):
+        """Should call groq.Groq with correct API shape."""
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "sukker, mel, vann"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"GROQ_API_KEY": "test-groq-key"}, clear=False):
+            with patch("groq.Groq", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                result = extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(api_key="test-groq-key")
+                mock_client.chat.completions.create.assert_called_once()
+                call_kwargs = mock_client.chat.completions.create.call_args
+                assert call_kwargs[1]["model"] == "meta-llama/llama-4-scout-17b-16e-instruct"
+                assert result == "sukker, mel, vann"
+
+    def test_missing_api_key_raises(self, _mock_backend):
+        from services.ocr_service import extract_text
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GROQ_API_KEY", None)
+            os.environ.pop("LLM_API_KEY", None)
+
+            png_bytes = _make_tiny_png()
+            with pytest.raises(ValueError, match="API key"):
+                extract_text(_b64(png_bytes))
+
+    def test_falls_back_to_llm_api_key(self, _mock_backend):
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "ingredients"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
+            os.environ.pop("GROQ_API_KEY", None)
+            with patch("groq.Groq", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(api_key="fallback-key")
+
+    def test_empty_response(self, _mock_backend):
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}, clear=False):
+            with patch("groq.Groq", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = extract_text(_b64(png_bytes))
+
+                assert result == ""
+
+
+# ---------------------------------------------------------------------------
 # Backward compatibility
 # ---------------------------------------------------------------------------
 
@@ -993,7 +1076,7 @@ class TestProviderRegistry:
     def test_all_providers_in_registry(self):
         """All valid backend names should be in the _PROVIDERS dict."""
         import services.ocr_service as mod
-        expected = {"tesseract", "claude_vision", "gemini", "openai", "openrouter", "llm"}
+        expected = {"tesseract", "claude_vision", "gemini", "openai", "openrouter", "groq", "llm"}
         assert expected == set(mod._PROVIDERS.keys())
 
 

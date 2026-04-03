@@ -10,6 +10,7 @@ from services.ocr_backends.claude import _extract_claude_vision
 from services.ocr_backends.gemini import _extract_gemini
 from services.ocr_backends.openai import _extract_openai
 from services.ocr_backends.openrouter import _extract_openrouter
+from services.ocr_backends.groq import _extract_groq
 
 logger = logging.getLogger("services.ocr_service")
 
@@ -37,6 +38,7 @@ _PROVIDERS = {
     "gemini": _extract_gemini,
     "openai": _extract_openai,
     "openrouter": _extract_openrouter,
+    "groq": _extract_groq,
     "llm": _extract_claude_vision,  # backward compatibility alias
 }
 
