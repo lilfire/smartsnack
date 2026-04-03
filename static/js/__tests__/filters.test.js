@@ -298,6 +298,23 @@ describe('buildFilters', () => {
     expect(pills[0].className).not.toContain('active'); // All not active
     expect(pills[1].className).toContain('active'); // Dairy active
   });
+
+  it('does not accumulate click listeners across multiple rebuilds', () => {
+    window.setFilter = vi.fn();
+    state.cachedStats = { total: 5, type_counts: { dairy: 3 } };
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    state.currentFilter = [];
+
+    buildFilters();
+    buildFilters();
+    buildFilters();
+
+    const allBtn = document.getElementById('filter-row').querySelector('button');
+    allBtn.click();
+
+    expect(window.setFilter).toHaveBeenCalledTimes(1);
+    delete window.setFilter;
+  });
 });
 
 describe('updateFilterToggle', () => {
