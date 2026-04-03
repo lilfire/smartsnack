@@ -5,6 +5,7 @@ Supports multiple backends controlled by user settings (ocr_provider):
 - "claude_vision": uses Claude Vision API via anthropic SDK
 - "gemini": uses Google Gemini API via google-genai SDK
 - "openai": uses OpenAI Vision API via openai SDK
+- "openrouter": uses OpenRouter Vision API via openai SDK (base_url override)
 - "llm": alias for claude_vision (backward compatibility)
 """
 
@@ -360,6 +361,53 @@ def _extract_openai(image_bytes, image_b64, mime_type="image/png"):
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter backend
+# ---------------------------------------------------------------------------
+
+_OPENROUTER_SYSTEM_PROMPT = (
+    "You are a precise food label reader. Your only job is to extract the exact "
+    "ingredient list from a food label image. Output the raw ingredient text as it "
+    "appears on the label — no commentary, no formatting changes, no summaries. "
+    "If no ingredient list is visible, output an empty string."
+)
+
+
+def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg"):
+    """Use OpenRouter Vision API to extract ingredient text from an image."""
+    api_key = _get_api_key("OPENROUTER_API_KEY")
+    model = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+
+    import openai
+
+    client = openai.OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
+        default_headers={"HTTP-Referer": "https://smartsnack.app"},
+    )
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=1024,
+        messages=[
+            {"role": "system", "content": _OPENROUTER_SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{image_b64}",
+                        },
+                    },
+                    {"type": "text", "text": _INGREDIENT_PROMPT},
+                ],
+            },
+        ],
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    return content.strip() if content else ""
+
+
+# ---------------------------------------------------------------------------
 # Provider registry
 # ---------------------------------------------------------------------------
 
@@ -368,6 +416,7 @@ _PROVIDERS = {
     "claude_vision": _extract_claude_vision,
     "gemini": _extract_gemini,
     "openai": _extract_openai,
+    "openrouter": _extract_openrouter,
     "llm": _extract_claude_vision,  # backward compatibility alias
 }
 

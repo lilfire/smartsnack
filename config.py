@@ -20,6 +20,7 @@ OCR_BACKENDS = {
     "claude_vision": {"name": "Claude Vision", "env_key": "ANTHROPIC_API_KEY"},
     "gemini": {"name": "Gemini Vision", "env_key": "GEMINI_API_KEY"},
     "openai": {"name": "GPT-4 Vision", "env_key": "OPENAI_API_KEY"},
+    "openrouter": {"name": "OpenRouter Vision", "env_key": "OPENROUTER_API_KEY"},
 }
 DEFAULT_OCR_BACKEND = "tesseract"
 

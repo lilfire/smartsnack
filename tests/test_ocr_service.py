@@ -872,7 +872,7 @@ class TestProviderRegistry:
     def test_all_providers_in_registry(self):
         """All valid backend names should be in the _PROVIDERS dict."""
         import services.ocr_service as mod
-        expected = {"tesseract", "claude_vision", "gemini", "openai", "llm"}
+        expected = {"tesseract", "claude_vision", "gemini", "openai", "openrouter", "llm"}
         assert expected == set(mod._PROVIDERS.keys())
 
 
