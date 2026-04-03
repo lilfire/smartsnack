@@ -1,5 +1,5 @@
 // ── Settings: OCR Provider and Settings ──────────────
-import { api, showToast } from './state.js';
+import { api, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
 function _updateOcrFallbackVisibility() {
@@ -18,7 +18,6 @@ function _updateOcrFallbackVisibility() {
 export async function loadOcrProviders() {
   const sel = document.getElementById('ocr-provider-select');
   if (!sel) return;
-  sel.onchange = _updateOcrFallbackVisibility;
   try {
     const data = await api('/api/ocr/providers');
     sel.innerHTML = '';
@@ -34,6 +33,7 @@ export async function loadOcrProviders() {
     }
     showToast(t('toast_ocr_settings_error'), 'error');
   }
+  upgradeSelect(sel, _updateOcrFallbackVisibility);
 }
 
 export async function loadOcrSettings() {
