@@ -56,10 +56,12 @@ vi.mock('../products.js', () => ({
   loadData: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   validateOffBtn: vi.fn(),
-  lookupOFF: vi.fn(),
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
+}));
+vi.mock('../off-api.js', () => ({
+  lookupOFF: vi.fn(),
 }));
 
 vi.mock('../render.js', () => ({

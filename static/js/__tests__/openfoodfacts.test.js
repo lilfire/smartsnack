@@ -41,7 +41,12 @@ vi.mock('../images.js', () => ({
   resizeImage: vi.fn((dataUri) => Promise.resolve(dataUri)),
 }));
 
-import { isValidEan, validateOffBtn, searchOFF, closeOffPicker, closeOffAddReview, estimateProteinQuality, updateEstimateBtn, submitToOff, lookupOFF, selectOffResult, offModalSearch, showOffAddReview, showDuplicateMergeModal, showEditDuplicateModal, showMergeConflictModal } from '../openfoodfacts.js';
+import { isValidEan, validateOffBtn, estimateProteinQuality, updateEstimateBtn } from '../off-utils.js';
+import { lookupOFF, searchOFF } from '../off-api.js';
+import { closeOffPicker, selectOffResult, offModalSearch } from '../off-picker.js';
+import { showOffAddReview, closeOffAddReview, submitToOff } from '../off-review.js';
+import { showEditDuplicateModal, showMergeConflictModal } from '../off-conflicts.js';
+import { showDuplicateMergeModal } from '../off-duplicates.js';
 import { state, api, showToast } from '../state.js';
 
 beforeEach(() => {

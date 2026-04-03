@@ -52,19 +52,27 @@ vi.mock('../settings-weights.js', () => ({
   loadSettings: vi.fn(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
   validateOffBtn: vi.fn(),
-  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-conflicts.js', () => ({
   showMergeConflictModal: vi.fn(),
   showEditDuplicateModal: vi.fn(),
+}));
+vi.mock('../off-duplicates.js', () => ({
+  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
   showOffAddReview: vi.fn(),
+  closeOffAddReview: vi.fn(),
+  submitToOff: vi.fn(),
 }));
 
 import { loadEanManager, addEan, deleteEan, setEanPrimary } from '../products.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
-import { isValidEan } from '../openfoodfacts.js';
+import { isValidEan } from '../off-utils.js';
 
 const PRODUCT_ID = 42;
 const MOCK_EANS_TWO = [

@@ -54,19 +54,28 @@ vi.mock('../settings-weights.js', () => ({
   loadSettings: vi.fn(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
   validateOffBtn: vi.fn(),
-  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-conflicts.js', () => ({
   showMergeConflictModal: vi.fn(),
   showEditDuplicateModal: vi.fn(),
+}));
+vi.mock('../off-duplicates.js', () => ({
+  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
+  showOffAddReview: vi.fn(),
+  closeOffAddReview: vi.fn(),
+  submitToOff: vi.fn(),
 }));
 
 import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
 import { rerender } from '../filters.js';
 import { renderResults, getFlagConfig } from '../render.js';
-import { showDuplicateMergeModal } from '../openfoodfacts.js';
+import { showDuplicateMergeModal } from '../off-duplicates.js';
 
 beforeEach(() => {
   vi.clearAllMocks();

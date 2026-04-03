@@ -147,14 +147,20 @@ vi.mock('../ocr.js', () => ({
   scanIngredients: vi.fn(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   validateOffBtn: vi.fn(),
+  estimateProteinQuality: vi.fn(),
+  updateEstimateBtn: vi.fn(),
+}));
+vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn(),
+}));
+vi.mock('../off-picker.js', () => ({
   closeOffPicker: vi.fn(),
   offModalSearch: vi.fn(),
   selectOffResult: vi.fn(),
-  estimateProteinQuality: vi.fn(),
-  updateEstimateBtn: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
   showOffAddReview: vi.fn(),
   closeOffAddReview: vi.fn(),
   submitToOff: vi.fn(),

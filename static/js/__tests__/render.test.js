@@ -56,7 +56,7 @@ vi.mock('../settings-weights.js', () => ({
   weightData: [],
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
 }));
 
