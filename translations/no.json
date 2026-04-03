@@ -690,6 +690,7 @@
   "settings_ocr_subtitle": "Innstillinger for bildegjenkjenning",
   "settings_ocr_desc": "Velg OCR-leverandør for bildegjenkjenning",
   "settings_ocr_provider_label": "OCR-leverandør",
+  "ocr_model_label": "Modell",
   "settings_ocr_fallback_label": "Bruk Tesseract OCR som reserve",
   "settings_ocr_unavailable": "(API-nøkkel ikke konfigurert)",
   "btn_save_ocr_settings": "Lagre OCR-innstillinger",
