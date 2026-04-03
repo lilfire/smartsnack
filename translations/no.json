@@ -680,6 +680,7 @@
   "toast_ocr_generic_error": "Kunne ikke lese bildet — {error_detail}.",
   "toast_ocr_invalid_image": "Kunne ikke lese bildet — ugyldig bildeformat. Prøv et annet bilde.",
   "toast_ocr_provider_timeout": "Kunne ikke lese bildet — tjenesten svarer ikke. Prøv igjen om litt.",
+  "toast_ocr_provider_quota": "OCR-leverandøren har nådd kvotegrensen. Prøv igjen senere.",
   "btn_fetch_disabled_title": "Skriv inn en gyldig EAN-strekkode eller produktnavn først",
   "hint_ean": "8-13 siffer",
   "toast_uploading": "Laster opp...",

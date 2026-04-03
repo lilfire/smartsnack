@@ -269,3 +269,67 @@ class TestTranslationKeys:
 
     def test_swedish_has_provider_timeout_key(self, translations_data):
         assert "toast_ocr_provider_timeout" in translations_data["se"]
+
+    def test_norwegian_has_provider_quota_key(self, translations_data):
+        assert "toast_ocr_provider_quota" in translations_data["no"]
+
+    def test_english_has_provider_quota_key(self, translations_data):
+        assert "toast_ocr_provider_quota" in translations_data["en"]
+
+    def test_swedish_has_provider_quota_key(self, translations_data):
+        assert "toast_ocr_provider_quota" in translations_data["se"]
+
+
+class TestProviderQuotaError:
+    """429 / RESOURCE_EXHAUSTED errors should return error_type=provider_quota."""
+
+    def test_http_429_returns_provider_quota(self, client):
+        """Exception with status_code=429 should map to provider_quota."""
+
+        class APIRateLimitError(Exception):
+            status_code = 429
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=APIRateLimitError("Too Many Requests"),
+        ):
+            resp = client.post("/api/ocr/ingredients", json=VALID_IMAGE_PAYLOAD)
+            assert resp.status_code == 429
+            data = resp.get_json()
+            assert data["error_type"] == "provider_quota"
+
+    def test_resource_exhausted_message_returns_provider_quota(self, client):
+        """Exception message containing 'RESOURCE_EXHAUSTED' maps to provider_quota."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=RuntimeError("RESOURCE_EXHAUSTED: quota exceeded"),
+        ):
+            resp = client.post("/api/ocr/ingredients", json=VALID_IMAGE_PAYLOAD)
+            assert resp.status_code == 429
+            data = resp.get_json()
+            assert data["error_type"] == "provider_quota"
+
+    def test_rate_limit_message_returns_provider_quota(self, client):
+        """Exception message containing 'rate limit' maps to provider_quota."""
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=RuntimeError("rate limit exceeded"),
+        ):
+            resp = client.post("/api/ocr/ingredients", json=VALID_IMAGE_PAYLOAD)
+            assert resp.status_code == 429
+            data = resp.get_json()
+            assert data["error_type"] == "provider_quota"
+
+    def test_quota_error_has_error_detail(self, client):
+        """provider_quota response should include error_detail."""
+
+        class APIRateLimitError(Exception):
+            status_code = 429
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=APIRateLimitError("Too Many Requests"),
+        ):
+            resp = client.post("/api/ocr/ingredients", json=VALID_IMAGE_PAYLOAD)
+            data = resp.get_json()
+            assert "error_detail" in data
