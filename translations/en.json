@@ -679,6 +679,7 @@
   "toast_ocr_generic_error": "Failed to read image — {error_detail}.",
   "toast_ocr_invalid_image": "Could not read image — invalid image format. Try a different image.",
   "toast_ocr_provider_timeout": "Could not read image — the service is not responding. Try again shortly.",
+  "toast_ocr_provider_quota": "Could not read image — OCR provider quota exceeded. Try switching to a different provider in OCR settings.",
   "btn_fetch_disabled_title": "Enter a valid EAN barcode or product name first",
   "hint_ean": "8-13 digits",
   "toast_uploading": "Uploading...",
