@@ -111,6 +111,9 @@ export function renderResults(results, search) {
     : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
   const container = document.getElementById('results-container');
   if (!results.length) {
+    // Clean up any existing delegation listener — prevents ghost handlers when
+    // transitioning from results state to empty state.
+    if (_resultsAbort) { _resultsAbort.abort(); _resultsAbort = null; }
     container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p>'
       + (search ? '<button class="btn-create-from-search" data-action="create-from-search">' + t('create_product') + '</button>' : '')
       + '</div>';
