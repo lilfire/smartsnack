@@ -540,7 +540,7 @@ class TestGeminiBackend:
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
-                with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+                with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
                     svg_bytes = _make_minimal_svg()
                     result = extract_text(_b64(svg_bytes))
 
@@ -656,7 +656,7 @@ class TestConvertForGemini:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
             out_bytes, mime = _convert_for_gemini(svg_bytes)
 
         mock_svg.assert_called_once_with(svg_bytes)
@@ -670,7 +670,7 @@ class TestConvertForGemini:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
             with caplog.at_level(logging.INFO, logger="services.ocr_service"):
                 _convert_for_gemini(svg_bytes)
 
@@ -683,7 +683,7 @@ class TestConvertForGemini:
         svg_bytes = b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_service._svg_to_png", return_value=fake_png) as mock_svg:
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
             out_bytes, mime = _convert_for_gemini(svg_bytes)
 
         mock_svg.assert_called_once()
@@ -1388,3 +1388,44 @@ class TestLegacyEnvVarRemoved:
         assert not hasattr(mod, "_OCR_BACKEND"), (
             "_OCR_BACKEND module-level variable should be removed"
         )
+
+
+# ---------------------------------------------------------------------------
+# LSO-383: _extract_gemini must pass raw bytes to inline_data.data
+# ---------------------------------------------------------------------------
+
+@patch("services.settings_service.get_ocr_backend", return_value="gemini")
+class TestGeminiRawBytesPassthrough:
+    """_extract_gemini must pass raw image_bytes (not a base64 string) to inline_data.data."""
+
+    def _patch_genai(self, mock_client):
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+        return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
+
+    def test_inline_data_receives_bytes_not_string(self, _mock_backend):
+        """inline_data.data must be bytes, not a base64-encoded string."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker, mel"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _mock_genai = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                png_bytes = _make_tiny_png()
+                extract_text(_b64(png_bytes))
+
+                call_kwargs = mock_client.models.generate_content.call_args
+                contents = call_kwargs[1]["contents"]
+                inline_data = contents[0]["parts"][0]["inline_data"]
+                assert isinstance(inline_data["data"], bytes), (
+                    "inline_data.data must be raw bytes, not a string — "
+                    "passing a base64 string causes double-encoding (LSO-383)"
+                )

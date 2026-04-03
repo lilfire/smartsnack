@@ -120,7 +120,7 @@ class TestDispatchOcrFormatConversion:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
                         result = dispatch_ocr(_b64(svg_bytes))
 
         assert result["text"] == "ingredienser fra svg"
@@ -240,15 +240,15 @@ class TestConvertForGeminiWebP:
 class TestConvertForGeminiEdgeCases:
     """Edge cases for format conversion."""
 
-    def test_unrecognizable_bytes_returns_png_mime(self):
-        """Corrupt/unknown bytes should fall back to image/png mime type."""
-        from services.ocr_service import _convert_for_gemini
+    def test_unrecognizable_bytes_returns_detected_mime(self):
+        """Corrupt/unknown bytes should fall back to _detect_mime_type result (image/jpeg by default)."""
+        from services.ocr_service import _convert_for_gemini, _detect_mime_type
 
         garbage = b"\x00\x01\x02\x03\x04\x05"
         out_bytes, mime = _convert_for_gemini(garbage)
 
-        # Should return original bytes with png mime as fallback
-        assert mime == "image/png"
+        # Should return original bytes with mime type detected from magic bytes
+        assert mime == _detect_mime_type(garbage)
         assert out_bytes == garbage
 
     def test_converted_bmp_is_valid_png(self):
@@ -333,7 +333,7 @@ class TestFormatConversionLogging:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
                         with caplog.at_level(logging.INFO, logger="services.ocr_service"):
                             dispatch_ocr(_b64(svg_bytes))
 
@@ -423,7 +423,7 @@ class TestBlueprintFormatConversion:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
                         resp = client.post(
                             "/api/ocr/ingredients",
                             json={"image": _b64(svg_bytes)},

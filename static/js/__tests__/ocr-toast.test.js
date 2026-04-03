@@ -355,7 +355,59 @@ describe('OCR Toast Notifications', () => {
     });
   });
 
-  describe('Scenario 4d: Failure — No Text (via error path)', () => {
+  describe('Scenario 4d: Failure — Provider Quota Exceeded', () => {
+    it('shows error toast with provider_quota translation key', async () => {
+      createDOM(prefix);
+      const err = new Error('Too Many Requests');
+      err.data = { error: 'OCR provider quota exceeded', error_type: 'provider_quota' };
+      api.mockRejectedValueOnce(err);
+
+      await triggerScan(prefix);
+
+      await vi.waitFor(() => {
+        expect(showToast).toHaveBeenCalled();
+      }, { timeout: 2000 });
+
+      const calls = showToast.mock.calls;
+      const toastCall = calls[calls.length - 1];
+      expect(toastCall[0]).toBe('toast_ocr_provider_quota');
+      expect(toastCall[1]).toBe('error');
+    });
+
+    it('uses 6s duration for provider_quota error toast', async () => {
+      createDOM(prefix);
+      const err = new Error('Too Many Requests');
+      err.data = { error: 'OCR provider quota exceeded', error_type: 'provider_quota' };
+      api.mockRejectedValueOnce(err);
+
+      await triggerScan(prefix);
+
+      await vi.waitFor(() => {
+        expect(showToast).toHaveBeenCalled();
+      }, { timeout: 2000 });
+
+      const calls = showToast.mock.calls;
+      const toastCall = calls[calls.length - 1];
+      expect(toastCall[2]).toMatchObject({ duration: 6000 });
+    });
+
+    it('does not set textarea on provider_quota error', async () => {
+      const { textarea } = createDOM(prefix);
+      const err = new Error('Too Many Requests');
+      err.data = { error: 'OCR provider quota exceeded', error_type: 'provider_quota' };
+      api.mockRejectedValueOnce(err);
+
+      await triggerScan(prefix);
+
+      await vi.waitFor(() => {
+        expect(showToast).toHaveBeenCalled();
+      }, { timeout: 2000 });
+
+      expect(textarea.value).toBe('');
+    });
+  });
+
+  describe('Scenario 4e: Failure — No Text (via error path)', () => {
     it('shows error toast with no_text translation key', async () => {
       createDOM(prefix);
       const err = new Error('No text');

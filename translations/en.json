@@ -561,6 +561,7 @@
   "adv_op_lte": "at most",
   "adv_op_gte": "at least",
   "adv_op_contains": "contains",
+  "adv_op_not_contains": "does not contain",
   "adv_op_is": "is",
   "adv_op_is_not": "is not",
   "adv_group_category": "Category",
@@ -679,6 +680,7 @@
   "toast_ocr_generic_error": "Failed to read image — {error_detail}.",
   "toast_ocr_invalid_image": "Could not read image — invalid image format. Try a different image.",
   "toast_ocr_provider_timeout": "Could not read image — the service is not responding. Try again shortly.",
+  "toast_ocr_provider_quota": "Could not read image — OCR provider quota exceeded. Try switching to a different provider in OCR settings.",
   "btn_fetch_disabled_title": "Enter a valid EAN barcode or product name first",
   "hint_ean": "8-13 digits",
   "toast_uploading": "Uploading...",
@@ -703,5 +705,6 @@
   "toast_ean_set_primary": "EAN {ean} set as primary",
   "error_ean_already_exists": "This EAN already exists on this product",
   "error_cannot_remove_only_ean": "Cannot remove the only EAN",
-  "label_ean_primary": "Primary"
+  "label_ean_primary": "Primary",
+  "tags": "Tags"
 }

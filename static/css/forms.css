@@ -373,6 +373,26 @@ label.field-label.field-required::after {
   .custom-select-wrap select {
     display: none;
   }
+  .custom-select-search {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e8e6e3;
+    font-size: 13px;
+    outline: none;
+    border-radius: 0;
+  }
+  .custom-select-search::placeholder {
+    color: rgba(232, 230, 227, 0.4);
+  }
+  .custom-select-search:focus {
+    background: rgba(255, 255, 255, 0.09);
+    border-bottom-color: rgba(232, 184, 75, 0.4);
+  }
 }
 
 .grid-2,

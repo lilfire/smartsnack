@@ -561,6 +561,7 @@
   "adv_op_lte": "maks",
   "adv_op_gte": "minst",
   "adv_op_contains": "inneholder",
+  "adv_op_not_contains": "inneholder ikke",
   "adv_op_is": "er",
   "adv_op_is_not": "er ikke",
   "adv_group_category": "Kategori",
@@ -679,6 +680,7 @@
   "toast_ocr_generic_error": "Kunne ikke lese bildet — {error_detail}.",
   "toast_ocr_invalid_image": "Kunne ikke lese bildet — ugyldig bildeformat. Prøv et annet bilde.",
   "toast_ocr_provider_timeout": "Kunne ikke lese bildet — tjenesten svarer ikke. Prøv igjen om litt.",
+  "toast_ocr_provider_quota": "Kunne ikke lese bildet — OCR-leverandørens kvote er brukt opp. Prøv å bytte til en annen leverandør i OCR-innstillingene.",
   "btn_fetch_disabled_title": "Skriv inn en gyldig EAN-strekkode eller produktnavn først",
   "hint_ean": "8-13 siffer",
   "toast_uploading": "Laster opp...",
@@ -703,5 +705,6 @@
   "toast_ean_set_primary": "EAN {ean} satt som primær",
   "error_ean_already_exists": "Denne EAN finnes allerede på produktet",
   "error_cannot_remove_only_ean": "Kan ikke fjerne den eneste EAN",
-  "label_ean_primary": "Primær"
+  "label_ean_primary": "Primær",
+  "tags": "Tagger"
 }

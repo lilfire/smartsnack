@@ -78,11 +78,10 @@ vi.mock('../products.js', () => ({
   setEanPrimary: vi.fn(),
 }));
 
-vi.mock('../settings.js', () => ({
+vi.mock('../settings-weights.js', () => ({
   SCORE_CFG_MAP: {},
   weightData: [],
   loadSettings: vi.fn(),
-  toggleSettingsSection: vi.fn(),
   toggleWeightConfig: vi.fn(),
   removeWeight: vi.fn(),
   addWeightFromDropdown: vi.fn(),
@@ -92,25 +91,37 @@ vi.mock('../settings.js', () => ({
   onWeightMax: vi.fn(),
   onWeightSlider: vi.fn(),
   saveWeights: vi.fn(),
+}));
+vi.mock('../settings-categories.js', () => ({
   updateCategoryLabel: vi.fn(),
   addCategory: vi.fn(),
   deleteCategory: vi.fn(),
+}));
+vi.mock('../settings-flags.js', () => ({
   addFlag: vi.fn(),
   deleteFlag: vi.fn(),
   updateFlagLabel: vi.fn(),
+}));
+vi.mock('../settings-pq.js', () => ({
   autosavePq: vi.fn(),
   deletePq: vi.fn(),
   addPq: vi.fn(),
+}));
+vi.mock('../settings-backup.js', () => ({
   downloadBackup: vi.fn(),
   handleRestore: vi.fn(),
   handleImport: vi.fn(),
   initRestoreDragDrop: vi.fn(),
-  saveOffCredentials: vi.fn(),
-  saveOcrSettings: vi.fn(),
-  refreshAllFromOff: vi.fn(),
+  toggleSettingsSection: vi.fn(),
   estimateAllPq: vi.fn(),
+}));
+vi.mock('../settings-ocr.js', () => ({
   loadOcrSettings: vi.fn(),
   saveOcrSettings: vi.fn(),
+}));
+vi.mock('../settings-off.js', () => ({
+  saveOffCredentials: vi.fn(),
+  refreshAllFromOff: vi.fn(),
 }));
 
 vi.mock('../scanner.js', () => ({
@@ -136,14 +147,20 @@ vi.mock('../ocr.js', () => ({
   scanIngredients: vi.fn(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   validateOffBtn: vi.fn(),
+  estimateProteinQuality: vi.fn(),
+  updateEstimateBtn: vi.fn(),
+}));
+vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn(),
+}));
+vi.mock('../off-picker.js', () => ({
   closeOffPicker: vi.fn(),
   offModalSearch: vi.fn(),
   selectOffResult: vi.fn(),
-  estimateProteinQuality: vi.fn(),
-  updateEstimateBtn: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
   showOffAddReview: vi.fn(),
   closeOffAddReview: vi.fn(),
   submitToOff: vi.fn(),
@@ -265,7 +282,7 @@ describe('app.js initialization', () => {
     await import('../app.js');
     await flushPromises();
 
-    const { weightData, SCORE_CFG_MAP } = await import('../settings.js');
+    const { weightData, SCORE_CFG_MAP } = await import('../settings-weights.js');
 
     expect(weightData).toHaveLength(2);
     expect(weightData[0]).toEqual({ field: 'fat', label: 'Fat', desc: 'Fat desc', direction: 'lower' });

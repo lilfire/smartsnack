@@ -156,10 +156,10 @@ class TestOcrErrorResponse:
 
 
 class TestClientError4xxMapping:
-    """ClientError with 4xx status_code should map to invalid_image (LSO-277)."""
+    """ClientError with 4xx status_code should map to provider_error (LSO-383)."""
 
-    def test_client_error_400_returns_invalid_image(self, client):
-        """ClientError with status_code=400 → HTTP 400, error_type=invalid_image."""
+    def test_client_error_400_returns_provider_error(self, client):
+        """ClientError with status_code=400 → HTTP 400, error_type=provider_error."""
 
         class ClientError(Exception):
             def __init__(self, message, status_code):
@@ -176,11 +176,11 @@ class TestClientError4xxMapping:
             )
             assert resp.status_code == 400
             data = resp.get_json()
-            assert data["error_type"] == "invalid_image"
-            assert data["error"] == "Invalid or corrupt image"
+            assert data["error_type"] == "provider_error"
+            assert "Bad Request" in data["error"]
 
-    def test_client_error_422_returns_invalid_image(self, client):
-        """ClientError with status_code=422 → HTTP 400, error_type=invalid_image."""
+    def test_client_error_422_returns_provider_error(self, client):
+        """ClientError with status_code=422 → HTTP 422, error_type=provider_error."""
 
         class ClientError(Exception):
             def __init__(self, message, status_code):
@@ -195,12 +195,12 @@ class TestClientError4xxMapping:
                 "/api/ocr/ingredients",
                 json={"image": "data:image/png;base64,iVBORw0KGgo="},
             )
-            assert resp.status_code == 400
+            assert resp.status_code == 422
             data = resp.get_json()
-            assert data["error_type"] == "invalid_image"
+            assert data["error_type"] == "provider_error"
 
     def test_server_error_5xx_still_generic(self, client):
-        """Exception with status_code=500 should NOT map to invalid_image."""
+        """Exception with status_code=500 should NOT map to provider_error."""
 
         class ServerError(Exception):
             def __init__(self, message, status_code):
@@ -221,11 +221,11 @@ class TestClientError4xxMapping:
 
 
 class TestOcrClientErrorClassification:
-    """4xx errors via code attribute (google.genai) must also map to invalid_image."""
+    """4xx errors via code attribute (google.genai) must map to provider_error."""
 
     @patch("services.ocr_service.dispatch_ocr")
-    def test_google_genai_code_400_returns_invalid_image(self, mock_dispatch, client):
-        """google.genai ClientError with code=400 → HTTP 400, error_type=invalid_image."""
+    def test_google_genai_code_400_returns_provider_error(self, mock_dispatch, client):
+        """google.genai ClientError with code=400 → HTTP 400, error_type=provider_error."""
         err = Exception("Invalid image format")
         err.code = 400
         mock_dispatch.side_effect = err
@@ -235,7 +235,7 @@ class TestOcrClientErrorClassification:
         )
         assert resp.status_code == 400
         data = resp.get_json()
-        assert data["error_type"] == "invalid_image"
+        assert data["error_type"] == "provider_error"
 
     @patch("services.ocr_service.dispatch_ocr")
     def test_no_status_attribute_still_returns_500_generic(self, mock_dispatch, client):
@@ -264,3 +264,54 @@ class TestOcrBackwardsCompat:
     def test_no_image_status_400(self, client):
         resp = client.post("/api/ocr/ingredients", json={})
         assert resp.status_code == 400
+
+
+class TestProviderError4xxMapping:
+    """LSO-383: 4xx provider exceptions must produce error_type=provider_error with actual message."""
+
+    def test_4xx_json_path_returns_provider_error(self, client):
+        """JSON path: 4xx exception → error_type=provider_error, actual error message."""
+
+        class ProviderError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ProviderError("image too large", 413),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                json={"image": "data:image/png;base64,iVBORw0KGgo="},
+            )
+            assert resp.status_code == 413
+            data = resp.get_json()
+            assert data["error_type"] == "provider_error"
+            assert "image too large" in data["error"]
+            assert data["error"] != "Invalid or corrupt image"
+
+    def test_4xx_multipart_path_returns_provider_error(self, client):
+        """Multipart path: 4xx exception → error_type=provider_error, actual error message."""
+        import io
+
+        class ProviderError(Exception):
+            def __init__(self, message, status_code):
+                super().__init__(message)
+                self.status_code = status_code
+
+        with patch(
+            "services.ocr_service.dispatch_ocr_bytes",
+            side_effect=ProviderError("bad image data", 400),
+        ):
+            data = io.BytesIO(b"\x89PNG\r\n")
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data={"image": (data, "test.png")},
+                content_type="multipart/form-data",
+            )
+            assert resp.status_code == 400
+            result = resp.get_json()
+            assert result["error_type"] == "provider_error"
+            assert "bad image data" in result["error"]
+            assert result["error"] != "Invalid or corrupt image"

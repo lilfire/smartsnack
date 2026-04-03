@@ -14,29 +14,29 @@ import {
 } from './products.js';
 import {
   SCORE_CFG_MAP, weightData,
-  loadSettings, toggleSettingsSection, toggleWeightConfig, removeWeight, addWeightFromDropdown,
+  loadSettings, toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights,
-  updateCategoryLabel, addCategory, deleteCategory,
-  addFlag, deleteFlag, updateFlagLabel,
-  autosavePq, deletePq, addPq,
+} from './settings-weights.js';
+import { updateCategoryLabel, addCategory, deleteCategory } from './settings-categories.js';
+import { addFlag, deleteFlag, updateFlagLabel } from './settings-flags.js';
+import { autosavePq, deletePq, addPq } from './settings-pq.js';
+import {
   downloadBackup, handleRestore, handleImport,
-  initRestoreDragDrop,
-  saveOffCredentials,
-  refreshAllFromOff, estimateAllPq,
-  loadOcrSettings, saveOcrSettings
-} from './settings.js';
+  initRestoreDragDrop, toggleSettingsSection, estimateAllPq,
+} from './settings-backup.js';
+import { loadOcrSettings, saveOcrSettings } from './settings-ocr.js';
+import { saveOffCredentials, refreshAllFromOff } from './settings-off.js';
 import {
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
   closeScanPicker, scanPickerSearch, scanPickerSelect,
   showScanOffConfirm, closeScanOffConfirm, scanOffFetch
 } from './scanner.js';
-import {
-  validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
-  selectOffResult, estimateProteinQuality, updateEstimateBtn,
-  showOffAddReview, closeOffAddReview, submitToOff
-} from './openfoodfacts.js';
+import { validateOffBtn, estimateProteinQuality, updateEstimateBtn } from './off-utils.js';
+import { lookupOFF } from './off-api.js';
+import { closeOffPicker, offModalSearch, selectOffResult } from './off-picker.js';
+import { showOffAddReview, closeOffAddReview, submitToOff } from './off-review.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
 import { scanIngredients } from './ocr.js';
 

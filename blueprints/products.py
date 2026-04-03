@@ -34,6 +34,14 @@ def add_product():
     return jsonify(result), status
 
 
+@bp.route("/api/products/tags/suggestions", methods=["GET"])
+def tag_suggestions():
+    prefix = request.args.get("q", "").strip()
+    if not prefix:
+        return jsonify([])
+    return jsonify(product_service.get_tag_suggestions(prefix))
+
+
 @bp.route("/api/products/<int:pid>", methods=["PUT"])
 def update_product(pid):
     try:
