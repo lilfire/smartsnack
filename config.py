@@ -16,12 +16,39 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # ── OCR backend configuration (user-settings-driven) ──
 OCR_BACKENDS = {
-    "tesseract": {"name": "Tesseract (Local)", "env_key": None},
-    "claude_vision": {"name": "Claude Vision", "env_key": "ANTHROPIC_API_KEY"},
-    "gemini": {"name": "Gemini Vision", "env_key": "GEMINI_API_KEY"},
-    "openai": {"name": "GPT-4 Vision", "env_key": "OPENAI_API_KEY"},
-    "openrouter": {"name": "OpenRouter Vision", "env_key": "OPENROUTER_API_KEY"},
-    "groq": {"name": "Groq Vision", "env_key": "GROQ_API_KEY"},
+    "tesseract": {"name": "Tesseract (Local)", "env_key": None, "models": []},
+    "claude_vision": {
+        "name": "Claude Vision",
+        "env_key": "ANTHROPIC_API_KEY",
+        "models": [
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-5",
+            "claude-haiku-4-5-20251001",
+        ],
+    },
+    "gemini": {
+        "name": "Gemini Vision",
+        "env_key": "GEMINI_API_KEY",
+        "models": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-1.5-pro"],
+    },
+    "openai": {
+        "name": "GPT-4 Vision",
+        "env_key": "OPENAI_API_KEY",
+        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"],
+    },
+    "openrouter": {
+        "name": "OpenRouter Vision",
+        "env_key": "OPENROUTER_API_KEY",
+        "models": [],  # free-text; no fixed list
+    },
+    "groq": {
+        "name": "Groq Vision",
+        "env_key": "GROQ_API_KEY",
+        "models": [
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+        ],
+    },
 }
 DEFAULT_OCR_BACKEND = "tesseract"
 

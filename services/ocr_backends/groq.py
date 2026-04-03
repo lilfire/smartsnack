@@ -1,8 +1,10 @@
 """Groq Vision OCR backend."""
 from . import _get_api_key, _INGREDIENT_PROMPT
 
+_DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
-def _extract_groq(image_bytes, image_b64, mime_type="image/png"):
+
+def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None):
     """Use Groq Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("GROQ_API_KEY")
 
@@ -10,7 +12,7 @@ def _extract_groq(image_bytes, image_b64, mime_type="image/png"):
 
     client = Groq(api_key=api_key)
     response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        model=model or _DEFAULT_MODEL,
         max_tokens=1024,
         messages=[
             {

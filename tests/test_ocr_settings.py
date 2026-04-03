@@ -307,7 +307,7 @@ class TestOcrDispatchWiring:
 
         called_with = {}
 
-        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg"):
+        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg", model=None):
             called_with["backend"] = "claude_vision"
             return "claude text"
 
@@ -353,7 +353,7 @@ class TestOcrDispatchWiring:
 
         called = {}
 
-        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg"):
+        def mock_claude(image_bytes, image_b64, mime_type="image/jpeg", model=None):
             called["called"] = True
             return "text"
 
