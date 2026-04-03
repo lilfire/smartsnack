@@ -212,6 +212,26 @@ class TestOcrErrorResponse:
         assert "RuntimeError" in data["error_detail"]
 
 
+    def test_provider_quota_returns_correct_error_type(self, client):
+        """429/RESOURCE_EXHAUSTED from OCR provider returns error_type='provider_quota'."""
+
+        class ProviderQuotaError(Exception):
+            code = 429
+
+        with patch(
+            "services.ocr_service.dispatch_ocr",
+            side_effect=ProviderQuotaError("RESOURCE_EXHAUSTED: quota exceeded"),
+        ):
+            resp = client.post(
+                "/api/ocr/ingredients",
+                data=json.dumps({"image": "data:image/png;base64,iVBORw0KGgo="}),
+                content_type="application/json",
+            )
+        data = resp.get_json()
+        assert resp.status_code == 429
+        assert data["error_type"] == "provider_quota"
+
+
 class TestOcrBackwardsCompat:
     """Backwards compatibility: existing text/error fields still present."""
 

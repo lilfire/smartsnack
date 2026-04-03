@@ -9,9 +9,27 @@ from config import (
     _VALID_COLUMNS,
 )
 
+_weight_cache = None
+_ranges_cache = None
+
+
+def invalidate_weight_cache() -> None:
+    """Invalidate the cached weight config so the next call reloads from DB."""
+    global _weight_cache
+    _weight_cache = None
+
+
+def invalidate_ranges_cache() -> None:
+    """Invalidate the cached category ranges so the next call recomputes from DB."""
+    global _ranges_cache
+    _ranges_cache = None
+
 
 def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
     """Load enabled score weights and their config from the database."""
+    global _weight_cache
+    if _weight_cache is not None:
+        return _weight_cache
     weight_rows = cur.execute(
         "SELECT field, enabled, weight, direction, formula, "
         "formula_min, formula_max FROM score_weights"
@@ -28,7 +46,8 @@ def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
                 "formula_max": r["formula_max"],
             }
     enabled_fields = [f for f in enabled_weights if f in SCORE_CONFIG_MAP]
-    return enabled_weights, weight_config, enabled_fields
+    _weight_cache = (enabled_weights, weight_config, enabled_fields)
+    return _weight_cache
 
 
 def _compute_category_ranges(
@@ -36,6 +55,9 @@ def _compute_category_ranges(
     enabled_fields: list,
 ) -> dict:
     """Compute min/max ranges per category for minmax scoring."""
+    global _ranges_cache
+    if _ranges_cache is not None:
+        return _ranges_cache
     cat_ranges = {}
     db_fields = [f for f in enabled_fields if f not in COMPUTED_FIELDS]
     if db_fields:
@@ -50,7 +72,8 @@ def _compute_category_ranges(
             cat_ranges[tr["type"]] = {
                 f: (tr[f"min_{f}"] or 0, tr[f"max_{f}"] or 0) for f in db_fields
             }
-    return cat_ranges
+    _ranges_cache = cat_ranges
+    return _ranges_cache
 
 
 def _score_product(

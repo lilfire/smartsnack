@@ -176,7 +176,14 @@ def dispatch_ocr(image_base64):
 
     # Resolve display name from config
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
-    text = provider_fn(image_bytes, raw, mime_type)
+    model = None
+    if backend_id != DEFAULT_OCR_BACKEND:
+        try:
+            from services import ocr_settings_service
+            model = ocr_settings_service.get_model_for_provider(backend_id)
+        except RuntimeError:
+            pass  # No app context — backend falls back to its own default
+    text = provider_fn(image_bytes, raw, mime_type, model=model) if model else provider_fn(image_bytes, raw, mime_type)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}
 
@@ -220,6 +227,13 @@ def dispatch_ocr_bytes(image_bytes):
     raw_b64 = base64.b64encode(image_bytes).decode()
     mime_type = _detect_mime_type(image_bytes)
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
-    text = provider_fn(image_bytes, raw_b64, mime_type)
+    model = None
+    if backend_id != DEFAULT_OCR_BACKEND:
+        try:
+            from services import ocr_settings_service
+            model = ocr_settings_service.get_model_for_provider(backend_id)
+        except RuntimeError:
+            pass  # No app context — backend falls back to its own default
+    text = provider_fn(image_bytes, raw_b64, mime_type, model=model) if model else provider_fn(image_bytes, raw_b64, mime_type)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}

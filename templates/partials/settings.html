@@ -161,6 +161,11 @@
                   <option value="tesseract">Tesseract OCR</option>
                 </select>
               </div>
+              <div id="ocr-model-row" style="display:none">
+                <label class="field-label" for="ocr-model-select" data-i18n="ocr_model_label">Model</label>
+                <select class="field-select" id="ocr-model-select"></select>
+                <input class="field-input" id="ocr-model-input" type="text" style="display:none" placeholder="e.g. google/gemini-2.0-flash-001">
+              </div>
               <div id="ocr-fallback-wrapper" aria-live="polite">
                 <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
                   <input type="checkbox" id="ocr-fallback-checkbox">

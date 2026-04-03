@@ -1,3 +1,92 @@
+// ── LRU Cache ─────────────────────────────────────────
+// Returns a Proxy that behaves like a plain object but evicts the least recently
+// used entry when the cache grows beyond maxSize.
+export const IMAGE_CACHE_MAX_SIZE = 100;
+
+export function createLRUCache(maxSize) {
+  // Doubly-linked list sentinel nodes; head.next = MRU, tail.prev = LRU
+  const head = { key: null, value: undefined, prev: null, next: null };
+  const tail = { key: null, value: undefined, prev: null, next: null };
+  head.next = tail;
+  tail.prev = head;
+  const map = new Map();
+
+  function _remove(node) {
+    node.prev.next = node.next;
+    node.next.prev = node.prev;
+  }
+  function _insertMRU(node) {
+    node.next = head.next;
+    node.prev = head;
+    head.next.prev = node;
+    head.next = node;
+  }
+
+  const impl = {
+    _get(key) {
+      if (!map.has(key)) return undefined;
+      const node = map.get(key);
+      _remove(node);
+      _insertMRU(node);
+      return node.value;
+    },
+    _set(key, value) {
+      if (map.has(key)) {
+        const node = map.get(key);
+        node.value = value;
+        _remove(node);
+        _insertMRU(node);
+      } else {
+        if (map.size >= maxSize) {
+          const lru = tail.prev;
+          _remove(lru);
+          map.delete(lru.key);
+        }
+        const node = { key, value, prev: null, next: null };
+        _insertMRU(node);
+        map.set(key, node);
+      }
+    },
+    _delete(key) {
+      if (!map.has(key)) return false;
+      _remove(map.get(key));
+      map.delete(key);
+      return true;
+    },
+    _has(key) { return map.has(key); },
+    _map: map,
+  };
+
+  const _internal = new Set(['_get', '_set', '_delete', '_has', '_map']);
+
+  return new Proxy(impl, {
+    get(target, prop) {
+      if (_internal.has(prop) || typeof prop === 'symbol') return target[prop];
+      return target._get(prop);
+    },
+    set(target, prop, value) {
+      if (_internal.has(prop)) { target[prop] = value; return true; }
+      target._set(prop, value);
+      return true;
+    },
+    deleteProperty(target, prop) {
+      return target._delete(prop);
+    },
+    has(target, prop) {
+      return target._has(prop);
+    },
+    ownKeys(target) {
+      return [...target._map.keys()];
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      if (target._map.has(prop)) {
+        return { configurable: true, enumerable: true, writable: true, value: target._get(prop) };
+      }
+      return undefined;
+    },
+  });
+}
+
 // ── Shared state & utilities ─────────────────────────
 
 // Focus trap: keeps Tab/Shift+Tab cycling within a container.
@@ -31,7 +120,7 @@ export const state = {
   sortCol: 'total_score',
   sortDir: 'desc',
   categories: [],
-  imageCache: {},
+  imageCache: createLRUCache(IMAGE_CACHE_MAX_SIZE),
   advancedFilters: null,
 };
 
