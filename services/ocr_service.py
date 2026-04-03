@@ -299,25 +299,16 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
     api_key = _get_api_key("GEMINI_API_KEY")
 
     image_bytes, mime_type = _convert_for_gemini(image_bytes)
-    image_b64 = base64.b64encode(image_bytes).decode()
 
     from google import genai
+    from google.genai import types
 
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model="gemini-2.0-flash",
         contents=[
-            {
-                "parts": [
-                    {
-                        "inline_data": {
-                            "mime_type": mime_type,
-                            "data": image_b64,
-                        }
-                    },
-                    {"text": _INGREDIENT_PROMPT},
-                ]
-            }
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            _INGREDIENT_PROMPT,
         ],
     )
     return response.text.strip() if response.text else ""

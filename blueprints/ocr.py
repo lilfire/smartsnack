@@ -1,5 +1,7 @@
 """Blueprint for OCR ingredient extraction endpoint."""
 
+import logging
+
 from flask import Blueprint, jsonify, request
 from PIL import UnidentifiedImageError
 
@@ -8,6 +10,7 @@ from helpers import _require_json
 from services import ocr_service
 
 bp = Blueprint("ocr", __name__)
+logger = logging.getLogger(__name__)
 
 _TOKEN_LIMIT_KEYWORDS = ("token limit", "token_limit", "usage budget", "quota exceeded")
 
@@ -58,6 +61,7 @@ def ocr_ingredients():
                 "Invalid or corrupt image", 400, error_type="invalid_image",
             )
         except Exception as e:
+            logger.error("OCR provider error: %s %s", type(e).__name__, e)
             if _is_timeout_or_connection_error(e):
                 return _error_response(
                     "OCR provider is not responding", 503, error_type="provider_timeout",
@@ -96,6 +100,7 @@ def ocr_ingredients():
                 "Invalid or corrupt image", 400, error_type="invalid_image",
             )
         except Exception as e:
+            logger.error("OCR provider error: %s %s", type(e).__name__, e)
             if _is_timeout_or_connection_error(e):
                 return _error_response(
                     "OCR provider is not responding", 503, error_type="provider_timeout",

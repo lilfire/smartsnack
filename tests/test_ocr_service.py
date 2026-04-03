@@ -427,10 +427,8 @@ class TestGeminiBackend:
                 result = extract_text(_b64(bmp_bytes))
 
                 assert result == "sukker, mel"
-                call_kwargs = mock_client.models.generate_content.call_args
-                parts = call_kwargs[1]["contents"][0]["parts"]
-                mime_type = parts[0]["inline_data"]["mime_type"]
-                assert mime_type == "image/png"
+                mock_genai.types.Part.from_bytes.assert_called_once()
+                assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     def test_tiff_converted_before_gemini_call(self, _mock_backend):
         """TIFF image should be converted to PNG before calling Gemini API."""
@@ -442,7 +440,7 @@ class TestGeminiBackend:
         mock_client = MagicMock()
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, _ = self._patch_genai(mock_client)
+        patcher, mock_genai = self._patch_genai(mock_client)
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
@@ -450,10 +448,8 @@ class TestGeminiBackend:
                 result = extract_text(_b64(tiff_bytes))
 
                 assert result == "ingredients"
-                call_kwargs = mock_client.models.generate_content.call_args
-                parts = call_kwargs[1]["contents"][0]["parts"]
-                mime_type = parts[0]["inline_data"]["mime_type"]
-                assert mime_type == "image/png"
+                mock_genai.types.Part.from_bytes.assert_called_once()
+                assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     def test_gif_converted_before_gemini_call(self, _mock_backend):
         """GIF image should be converted to PNG before calling Gemini API."""
@@ -465,7 +461,7 @@ class TestGeminiBackend:
         mock_client = MagicMock()
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, _ = self._patch_genai(mock_client)
+        patcher, mock_genai = self._patch_genai(mock_client)
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
@@ -473,10 +469,8 @@ class TestGeminiBackend:
                 result = extract_text(_b64(gif_bytes))
 
                 assert result == "ingredients"
-                call_kwargs = mock_client.models.generate_content.call_args
-                parts = call_kwargs[1]["contents"][0]["parts"]
-                mime_type = parts[0]["inline_data"]["mime_type"]
-                assert mime_type == "image/png"
+                mock_genai.types.Part.from_bytes.assert_called_once()
+                assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     def test_jpeg_passthrough_with_correct_mime_type(self, _mock_backend):
         """JPEG should pass through with image/jpeg mime type."""
@@ -488,7 +482,7 @@ class TestGeminiBackend:
         mock_client = MagicMock()
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, _ = self._patch_genai(mock_client)
+        patcher, mock_genai = self._patch_genai(mock_client)
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
@@ -496,10 +490,8 @@ class TestGeminiBackend:
                 result = extract_text(_b64(jpeg_bytes))
 
                 assert result == "sukker"
-                call_kwargs = mock_client.models.generate_content.call_args
-                parts = call_kwargs[1]["contents"][0]["parts"]
-                mime_type = parts[0]["inline_data"]["mime_type"]
-                assert mime_type == "image/jpeg"
+                mock_genai.types.Part.from_bytes.assert_called_once()
+                assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/jpeg"
 
     def test_png_passthrough_with_correct_mime_type(self, _mock_backend):
         """PNG should pass through with image/png mime type."""
@@ -511,7 +503,7 @@ class TestGeminiBackend:
         mock_client = MagicMock()
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, _ = self._patch_genai(mock_client)
+        patcher, mock_genai = self._patch_genai(mock_client)
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
@@ -519,10 +511,8 @@ class TestGeminiBackend:
                 result = extract_text(_b64(png_bytes))
 
                 assert result == "mel"
-                call_kwargs = mock_client.models.generate_content.call_args
-                parts = call_kwargs[1]["contents"][0]["parts"]
-                mime_type = parts[0]["inline_data"]["mime_type"]
-                assert mime_type == "image/png"
+                mock_genai.types.Part.from_bytes.assert_called_once()
+                assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     def test_svg_converted_before_gemini_call(self, _mock_backend):
         """SVG image should be converted to PNG before calling Gemini API."""
@@ -534,7 +524,7 @@ class TestGeminiBackend:
         mock_client = MagicMock()
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, _ = self._patch_genai(mock_client)
+        patcher, mock_genai = self._patch_genai(mock_client)
 
         fake_png = _make_tiny_png()
 
@@ -546,10 +536,8 @@ class TestGeminiBackend:
 
                     assert result == "ingredients"
                     mock_svg.assert_called_once_with(svg_bytes)
-                    call_kwargs = mock_client.models.generate_content.call_args
-                    parts = call_kwargs[1]["contents"][0]["parts"]
-                    mime_type = parts[0]["inline_data"]["mime_type"]
-                    assert mime_type == "image/png"
+                    mock_genai.types.Part.from_bytes.assert_called_once()
+                    assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
 
 # ---------------------------------------------------------------------------
@@ -1079,10 +1067,7 @@ class TestMimeTypeExtraction:
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(jpeg_uri)
 
-        call_args = mock_client.models.generate_content.call_args
-        contents = call_args[1]["contents"]
-        inline_data = contents[0]["parts"][0]["inline_data"]
-        assert inline_data["mime_type"] == "image/jpeg"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/jpeg"
 
     def test_png_data_uri_passes_correct_mime_to_gemini(self):
         """Gemini should receive image/png when the data URI declares PNG."""
@@ -1106,10 +1091,7 @@ class TestMimeTypeExtraction:
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(png_uri)
 
-        call_args = mock_client.models.generate_content.call_args
-        contents = call_args[1]["contents"]
-        inline_data = contents[0]["parts"][0]["inline_data"]
-        assert inline_data["mime_type"] == "image/png"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     def test_jpeg_data_uri_passes_correct_mime_to_openai(self):
         """OpenAI data URI should contain image/jpeg when input is JPEG."""
@@ -1225,10 +1207,7 @@ class TestMagicByteFallback:
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(raw_b64)
 
-        call_args = mock_client.models.generate_content.call_args
-        contents = call_args[1]["contents"]
-        inline_data = contents[0]["parts"][0]["inline_data"]
-        assert inline_data["mime_type"] == "image/jpeg"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/jpeg"
 
     def test_raw_png_base64_detects_png(self):
         """Raw PNG base64 (no data URI) should be detected as image/png."""
@@ -1252,10 +1231,7 @@ class TestMagicByteFallback:
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(raw_b64)
 
-        call_args = mock_client.models.generate_content.call_args
-        contents = call_args[1]["contents"]
-        inline_data = contents[0]["parts"][0]["inline_data"]
-        assert inline_data["mime_type"] == "image/png"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     def test_unknown_magic_bytes_defaults_to_jpeg(self):
         """When magic bytes are unrecognized, _detect_mime_type defaults to image/jpeg.

@@ -56,7 +56,7 @@ def _mock_genai_modules(mock_client):
     mock_genai.Client.return_value = mock_client
     mock_google = MagicMock()
     mock_google.genai = mock_genai
-    return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai})
+    return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
 
 
 def _make_gemini_response(text="sukker, mel, vann"):
@@ -92,7 +92,7 @@ class TestDispatchOcrFormatConversion:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("ingredienser")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         image_bytes = _make_image(fmt)
 
@@ -103,16 +103,14 @@ class TestDispatchOcrFormatConversion:
 
         assert result["text"] == "ingredienser"
         # Verify the API was called with PNG mime type
-        call_kwargs = mock_client.models.generate_content.call_args
-        parts = call_kwargs[1]["contents"][0]["parts"]
-        assert parts[0]["inline_data"]["mime_type"] == expected_mime
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == expected_mime
 
     def test_svg_converted_and_ocr_succeeds(self):
         """SVG should be converted to PNG via cairosvg; OCR returns text."""
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("ingredienser fra svg")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         svg_bytes = _make_svg()
         fake_png = _make_image("PNG")
@@ -124,9 +122,7 @@ class TestDispatchOcrFormatConversion:
                         result = dispatch_ocr(_b64(svg_bytes))
 
         assert result["text"] == "ingredienser fra svg"
-        call_kwargs = mock_client.models.generate_content.call_args
-        parts = call_kwargs[1]["contents"][0]["parts"]
-        assert parts[0]["inline_data"]["mime_type"] == "image/png"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
     @pytest.mark.parametrize("fmt,expected_mime", [
         ("JPEG", "image/jpeg"),
@@ -137,7 +133,7 @@ class TestDispatchOcrFormatConversion:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("sukker")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         image_bytes = _make_image(fmt)
 
@@ -147,16 +143,14 @@ class TestDispatchOcrFormatConversion:
                     result = dispatch_ocr(_b64(image_bytes))
 
         assert result["text"] == "sukker"
-        call_kwargs = mock_client.models.generate_content.call_args
-        parts = call_kwargs[1]["contents"][0]["parts"]
-        assert parts[0]["inline_data"]["mime_type"] == expected_mime
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == expected_mime
 
     def test_webp_passes_through(self):
         """WebP should pass through as image/webp (Gemini-supported)."""
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("mel")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         webp_bytes = _make_webp()
 
@@ -166,16 +160,14 @@ class TestDispatchOcrFormatConversion:
                     result = dispatch_ocr(_b64(webp_bytes))
 
         assert result["text"] == "mel"
-        call_kwargs = mock_client.models.generate_content.call_args
-        parts = call_kwargs[1]["contents"][0]["parts"]
-        assert parts[0]["inline_data"]["mime_type"] == "image/webp"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/webp"
 
     def test_dispatch_ocr_returns_provider_name(self):
         """dispatch_ocr should include the provider name in the result."""
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("test")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         png_bytes = _make_image("PNG")
 
@@ -192,7 +184,7 @@ class TestDispatchOcrFormatConversion:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("data uri test")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         bmp_bytes = _make_image("BMP")
 
@@ -202,9 +194,7 @@ class TestDispatchOcrFormatConversion:
                     result = dispatch_ocr(_data_uri(bmp_bytes, mime="image/bmp"))
 
         assert result["text"] == "data uri test"
-        call_kwargs = mock_client.models.generate_content.call_args
-        parts = call_kwargs[1]["contents"][0]["parts"]
-        assert parts[0]["inline_data"]["mime_type"] == "image/png"
+        assert mock_genai.types.Part.from_bytes.call_args[1]["mime_type"] == "image/png"
 
 
 # ---------------------------------------------------------------------------
@@ -309,7 +299,7 @@ class TestFormatConversionLogging:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("text")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         image_bytes = _make_image(fmt)
 
@@ -325,7 +315,7 @@ class TestFormatConversionLogging:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("text")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         svg_bytes = _make_svg()
         fake_png = _make_image("PNG")
@@ -345,7 +335,7 @@ class TestFormatConversionLogging:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("text")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         image_bytes = _make_image(fmt)
 
@@ -361,7 +351,7 @@ class TestFormatConversionLogging:
         from services.ocr_service import dispatch_ocr
 
         mock_client = _make_gemini_response("text")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         webp_bytes = _make_webp()
 
@@ -396,7 +386,7 @@ class TestBlueprintFormatConversion:
     def test_endpoint_with_unsupported_format_returns_200(self, fmt, label, client):
         """Posting an unsupported image format should succeed (200) after conversion."""
         mock_client = _make_gemini_response(f"ingredients from {label}")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         image_bytes = _make_image(fmt)
 
@@ -415,7 +405,7 @@ class TestBlueprintFormatConversion:
 
     def test_endpoint_with_svg_returns_200(self, client):
         mock_client = _make_gemini_response("svg ingredients")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         svg_bytes = _make_svg()
         fake_png = _make_image("PNG")
@@ -437,7 +427,7 @@ class TestBlueprintFormatConversion:
     def test_endpoint_with_supported_format_returns_200(self, fmt, client):
         """Supported formats should work without any conversion."""
         mock_client = _make_gemini_response("normal ingredients")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         image_bytes = _make_image(fmt)
 
@@ -455,7 +445,7 @@ class TestBlueprintFormatConversion:
 
     def test_endpoint_with_webp_returns_200(self, client):
         mock_client = _make_gemini_response("webp ingredients")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         webp_bytes = _make_webp()
 
@@ -474,7 +464,7 @@ class TestBlueprintFormatConversion:
     def test_endpoint_no_ui_change_unsupported_format(self, client):
         """Response shape for unsupported formats should match supported ones."""
         mock_client = _make_gemini_response("bmp text")
-        genai_patch = _mock_genai_modules(mock_client)
+        genai_patch, mock_genai = _mock_genai_modules(mock_client)
 
         bmp_bytes = _make_image("BMP")
 
