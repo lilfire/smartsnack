@@ -48,7 +48,7 @@ vi.mock('../render.js', () => ({
   getFlagConfig: vi.fn(() => ({})),
 }));
 
-vi.mock('../settings.js', () => ({
+vi.mock('../settings-weights.js', () => ({
   loadSettings: vi.fn(),
 }));
 

@@ -3,7 +3,7 @@ import { state, esc, safeDataUri, catEmoji, catLabel, upgradeSelect } from './st
 import { t } from './i18n.js';
 import { applySorting, sortIndicator } from './filters.js';
 import { loadProductImage } from './images.js';
-import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings.js';
+import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings-weights.js';
 import { isValidEan } from './openfoodfacts.js';
 
 let _resultsAbort = null;
