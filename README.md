@@ -8,7 +8,7 @@ A mobile-first web app for tracking and scoring food products. Search by name or
 ## Features
 
 - **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera. Detected codes auto-lookup product data from OpenFoodFacts.
-- **OCR Ingredient Scanning** — Use the device camera to scan ingredient lists via OCR (powered by EasyOCR), with duplicate detection to skip already-registered products.
+- **OCR Ingredient Scanning** — Use the device camera to scan ingredient lists via OCR. Multiple backend providers supported: Tesseract (local), Claude Vision, Gemini Vision, GPT-4 Vision (OpenAI), OpenRouter Vision, and Groq Vision.
 - **OpenFoodFacts Integration** — Fetch nutrition info, product names, brand, and images by barcode or text search.
 - **Configurable Scoring** — 17 weight fields (kcal, sugar, protein, fiber, fat, price, taste, macro %kcal, etc.) each with toggleable enable, weight slider (0–100), direction (lower/higher is better), and formula (MinMax normalization or Direct mapping). Total score is a weighted average from 1–100.
 - **Categories** — Create custom categories with built-in emoji picker. Change emoji on existing categories. Auto-create categories when importing products with unknown types. Multi-select filtering on the product list.
@@ -33,7 +33,6 @@ That's it. Everything else (Python 3.12, Flask, Gunicorn, OpenSSL) is handled in
   - `gunicorn==23.0.0`
   - `pyopenssl==24.3.0`
   - `cryptography>=43.0.0`
-  - `easyocr>=1.7.0` (OCR ingredient scanning)
 
 ## Installation
 
@@ -63,6 +62,28 @@ python app.py
 
 The SQLite database is created automatically at startup. Set the `DB_PATH` environment variable to control where it's stored (default: `./smartsnack.sqlite`).
 
+## OCR Providers
+
+Tesseract runs locally and is always available (no API key needed). The other providers require API keys set as environment variables:
+
+| Provider | Environment Variable |
+|---|---|
+| Claude Vision | `ANTHROPIC_API_KEY` |
+| Gemini Vision | `GEMINI_API_KEY` |
+| GPT-4 Vision (OpenAI) | `OPENAI_API_KEY` |
+| OpenRouter Vision | `OPENROUTER_API_KEY` |
+| Groq Vision | `GROQ_API_KEY` |
+
+Providers with a valid key appear automatically in **Settings → OCR**. You can also set a fallback to Tesseract if the selected provider fails.
+
+**Docker users:** pass API keys via a `.env` file or an `environment:` block in `docker-compose.yml`:
+
+```yaml
+environment:
+  - ANTHROPIC_API_KEY=your_key_here
+  - GROQ_API_KEY=your_key_here
+```
+
 ## Project Structure
 
 ```
@@ -83,7 +104,7 @@ The SQLite database is created automatically at startup. Set the `DB_PATH` envir
 │   ├── no.json             # Norwegian translations
 │   ├── en.json             # English translations
 │   └── se.json             # Swedish translations
-├── Dockerfile              # Python 3.12-slim + EasyOCR + OpenSSL
+├── Dockerfile              # Python 3.12-slim + Tesseract + OpenSSL
 ├── docker-compose.yml      # Service config, persistent volume
 ├── entrypoint.sh           # SSL cert generation + Gunicorn startup
 └── requirements.txt        # Python dependencies
