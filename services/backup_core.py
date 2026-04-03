@@ -362,6 +362,8 @@ def restore_backup(data: dict) -> str:
         for p in data["products"]:
             _restore_product(cur, p, valid_flags=valid_flags)
         conn.commit()
+        from services.product_scoring import invalidate_scoring_cache
+        invalidate_scoring_cache()
     except Exception as e:
         conn.rollback()
         logger.error("Restore failed: %s", e)

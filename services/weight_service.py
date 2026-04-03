@@ -87,3 +87,5 @@ def update_weights(data: list) -> None:
             (f, enabled, weight, direction, formula, formula_min, formula_max),
         )
     conn.commit()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
