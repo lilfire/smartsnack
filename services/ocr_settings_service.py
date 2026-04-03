@@ -4,12 +4,14 @@ import os
 
 from db import get_db
 
-VALID_PROVIDERS = {"tesseract", "claude_vision", "gemini", "openai"}
+VALID_PROVIDERS = {"tesseract", "claude_vision", "gemini", "openai", "openrouter", "groq"}
 
 _LLM_PROVIDERS = [
-    {"env_var": "ANTHROPIC_API_KEY", "key": "claude_vision", "label": "Claude Vision"},
-    {"env_var": "GEMINI_API_KEY", "key": "gemini", "label": "Gemini"},
-    {"env_var": "OPENAI_API_KEY", "key": "openai", "label": "OpenAI"},
+    {"env_var": "ANTHROPIC_API_KEY",  "key": "claude_vision", "label": "Claude Vision"},
+    {"env_var": "GEMINI_API_KEY",     "key": "gemini",        "label": "Gemini"},
+    {"env_var": "OPENAI_API_KEY",     "key": "openai",        "label": "OpenAI"},
+    {"env_var": "OPENROUTER_API_KEY", "key": "openrouter",    "label": "OpenRouter"},
+    {"env_var": "GROQ_API_KEY",       "key": "groq",          "label": "Groq"},
 ]
 
 
