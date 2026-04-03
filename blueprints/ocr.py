@@ -65,7 +65,9 @@ def ocr_ingredients():
             http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
             if isinstance(http_status, int) and 400 <= http_status < 500:
                 return _error_response(
-                    "Invalid or corrupt image", 400, error_type="invalid_image",
+                    f"OCR provider error: {e}", http_status,
+                    error_type="provider_error",
+                    error_detail=str(e),
                 )
             exc_name = type(e).__name__
             return _error_response(
@@ -103,7 +105,9 @@ def ocr_ingredients():
             http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
             if isinstance(http_status, int) and 400 <= http_status < 500:
                 return _error_response(
-                    "Invalid or corrupt image", 400, error_type="invalid_image",
+                    f"OCR provider error: {e}", http_status,
+                    error_type="provider_error",
+                    error_detail=str(e),
                 )
             exc_name = type(e).__name__
             return _error_response(

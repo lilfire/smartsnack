@@ -1388,3 +1388,44 @@ class TestLegacyEnvVarRemoved:
         assert not hasattr(mod, "_OCR_BACKEND"), (
             "_OCR_BACKEND module-level variable should be removed"
         )
+
+
+# ---------------------------------------------------------------------------
+# LSO-383: _extract_gemini must pass raw bytes to inline_data.data
+# ---------------------------------------------------------------------------
+
+@patch("services.settings_service.get_ocr_backend", return_value="gemini")
+class TestGeminiRawBytesPassthrough:
+    """_extract_gemini must pass raw image_bytes (not a base64 string) to inline_data.data."""
+
+    def _patch_genai(self, mock_client):
+        mock_genai = MagicMock()
+        mock_genai.Client.return_value = mock_client
+        mock_google = MagicMock()
+        mock_google.genai = mock_genai
+        return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
+
+    def test_inline_data_receives_bytes_not_string(self, _mock_backend):
+        """inline_data.data must be bytes, not a base64-encoded string."""
+        from services.ocr_service import extract_text
+
+        mock_response = MagicMock()
+        mock_response.text = "sukker, mel"
+
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = mock_response
+
+        patcher, _mock_genai = self._patch_genai(mock_client)
+
+        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
+            with patcher:
+                png_bytes = _make_tiny_png()
+                extract_text(_b64(png_bytes))
+
+                call_kwargs = mock_client.models.generate_content.call_args
+                contents = call_kwargs[1]["contents"]
+                inline_data = contents[0]["parts"][0]["inline_data"]
+                assert isinstance(inline_data["data"], bytes), (
+                    "inline_data.data must be raw bytes, not a string — "
+                    "passing a base64 string causes double-encoding (LSO-383)"
+                )

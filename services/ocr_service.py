@@ -300,7 +300,6 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
     api_key = _get_api_key("GEMINI_API_KEY")
 
     image_bytes, mime_type = _convert_for_gemini(image_bytes)
-    image_b64 = base64.b64encode(image_bytes).decode()
 
     from google import genai
 
@@ -313,7 +312,7 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
                     {
                         "inline_data": {
                             "mime_type": mime_type,
-                            "data": image_b64,
+                            "data": image_bytes,
                         }
                     },
                     {"text": _INGREDIENT_PROMPT},
