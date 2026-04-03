@@ -4,7 +4,7 @@ import { t } from './i18n.js';
 import { applySorting, sortIndicator } from './filters.js';
 import { loadProductImage } from './images.js';
 import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings-weights.js';
-import { isValidEan } from './openfoodfacts.js';
+import { isValidEan } from './off-utils.js';
 
 let _resultsAbort = null;
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };

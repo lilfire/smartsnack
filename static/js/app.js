@@ -33,11 +33,10 @@ import {
   closeScanPicker, scanPickerSearch, scanPickerSelect,
   showScanOffConfirm, closeScanOffConfirm, scanOffFetch
 } from './scanner.js';
-import {
-  validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
-  selectOffResult, estimateProteinQuality, updateEstimateBtn,
-  showOffAddReview, closeOffAddReview, submitToOff
-} from './openfoodfacts.js';
+import { validateOffBtn, estimateProteinQuality, updateEstimateBtn } from './off-utils.js';
+import { lookupOFF } from './off-api.js';
+import { closeOffPicker, offModalSearch, selectOffResult } from './off-picker.js';
+import { showOffAddReview, closeOffAddReview, submitToOff } from './off-review.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
 import { scanIngredients } from './ocr.js';
 

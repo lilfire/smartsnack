@@ -3,7 +3,10 @@ import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, sho
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal, showOffAddReview } from './openfoodfacts.js';
+import { isValidEan } from './off-utils.js';
+import { showEditDuplicateModal, showMergeConflictModal } from './off-conflicts.js';
+import { showDuplicateMergeModal } from './off-duplicates.js';
+import { showOffAddReview } from './off-review.js';
 import { initTagInput, getTagsForSave } from './tags.js';
 
 // Re-export showToast so existing importers continue to work
@@ -559,7 +562,7 @@ export async function registerProduct() {
     const pqr = document.getElementById('f-pq-result');
     if (pqr) pqr.style.display = 'none';
     // Lazy import to avoid circular dep
-    import('./openfoodfacts.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
+    import('./off-utils.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
     NUTRI_IDS.forEach((id) => { document.getElementById('f-' + id).value = ''; });
     document.getElementById('f-volume').value = '';
     upgradeSelect(document.getElementById('f-volume'));
