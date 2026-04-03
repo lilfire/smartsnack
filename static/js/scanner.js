@@ -5,6 +5,7 @@ import { buildFilters, rerender } from './filters.js';
 import { loadProductImage } from './images.js';
 import { showToast, switchView, loadData } from './products.js';
 import { renderResults } from './render.js';
+import { createTorchButton, checkTorchSupport, resetTorch } from './scanner-torch.js';
 
 let _scanner = null;
 let _scannerCtx = { prefix: null, productId: null };
@@ -37,6 +38,8 @@ function buildScannerUI(headerHtml, hintText, closeFn) {
   hint.className = 'scanner-hint';
   hint.textContent = hintText;
   wrap.appendChild(hint);
+  wrap.appendChild(createTorchButton());
+
   bg.appendChild(wrap);
 
   document.body.appendChild(bg);
@@ -59,7 +62,7 @@ function startScannerHardware(onSuccess, closeFn) {
     ] },
     onSuccess,
     () => {}
-  ).catch((err) => {
+  ).then(() => { setTimeout(checkTorchSupport, 600); }).catch((err) => {
     showToast(t('toast_scanner_load_error'), 'error');
     const videoWrap = document.querySelector('.scanner-video-wrap');
     if (videoWrap) {
@@ -122,6 +125,7 @@ function onBarcodeDetected(code) {
 }
 
 export function closeScanner() {
+  resetTorch();
   if (_scanner) {
     const s = _scanner;
     _scanner = null;

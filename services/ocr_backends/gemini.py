@@ -73,7 +73,10 @@ def _convert_for_gemini(image_bytes):
     return converted_bytes, "image/png"
 
 
-def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
+_DEFAULT_MODEL = "gemini-2.0-flash"
+
+
+def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None):
     """Use Google Gemini API to extract ingredient text from an image."""
     api_key = _get_api_key("GEMINI_API_KEY")
 
@@ -83,7 +86,7 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png"):
 
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=model or _DEFAULT_MODEL,
         contents=[
             {
                 "parts": [

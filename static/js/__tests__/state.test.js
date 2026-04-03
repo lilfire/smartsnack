@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { state, NUTRI_IDS, catEmoji, catLabel, esc, safeDataUri, fmtNum, showToast, api, fetchProducts, fetchStats, showConfirmModal, upgradeSelect } from '../state.js';
+import { state, NUTRI_IDS, catEmoji, catLabel, esc, safeDataUri, fmtNum, showToast, api, fetchProducts, fetchStats, showConfirmModal, upgradeSelect, initAllFieldSelects } from '../state.js';
 
 // jsdom does not implement scrollIntoView
 if (!Element.prototype.scrollIntoView) {
@@ -745,5 +745,80 @@ describe('fetchProducts - additional branches', () => {
     const url = global.fetch.mock.calls[0][0];
     expect(url).toContain('filters=sugar%3C10');
     state.advancedFilters = null;
+  });
+});
+
+describe('initAllFieldSelects', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
+    document.body.innerHTML = '';
+  });
+
+  it('upgrades field-select elements not in excluded contexts', () => {
+    const container = document.createElement('div');
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    sel.innerHTML = '<option value="a">A</option>';
+    container.appendChild(sel);
+    document.body.appendChild(container);
+
+    initAllFieldSelects();
+    expect(container.querySelector('.custom-select-wrap')).not.toBeNull();
+  });
+
+  it('skips selects inside .adv-row', () => {
+    const row = document.createElement('div');
+    row.className = 'adv-row';
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    row.appendChild(sel);
+    document.body.appendChild(row);
+
+    initAllFieldSelects();
+    expect(row.querySelector('.custom-select-wrap')).toBeNull();
+  });
+
+  it('skips selects inside .wc-row', () => {
+    const row = document.createElement('div');
+    row.className = 'wc-row';
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    row.appendChild(sel);
+    document.body.appendChild(row);
+
+    initAllFieldSelects();
+    expect(row.querySelector('.custom-select-wrap')).toBeNull();
+  });
+
+  it('skips selects inside .edit-grid', () => {
+    const grid = document.createElement('div');
+    grid.className = 'edit-grid';
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    grid.appendChild(sel);
+    document.body.appendChild(grid);
+
+    initAllFieldSelects();
+    expect(grid.querySelector('.custom-select-wrap')).toBeNull();
+  });
+
+  it('accepts a root element to scope the query', () => {
+    const outside = document.createElement('div');
+    const outSel = document.createElement('select');
+    outSel.className = 'field-select';
+    outSel.innerHTML = '<option value="x">X</option>';
+    outside.appendChild(outSel);
+    document.body.appendChild(outside);
+
+    const inside = document.createElement('div');
+    const inSel = document.createElement('select');
+    inSel.className = 'field-select';
+    inSel.innerHTML = '<option value="y">Y</option>';
+    inside.appendChild(inSel);
+    document.body.appendChild(inside);
+
+    initAllFieldSelects(inside);
+    expect(inside.querySelector('.custom-select-wrap')).not.toBeNull();
+    expect(outside.querySelector('.custom-select-wrap')).toBeNull();
   });
 });

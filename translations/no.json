@@ -690,6 +690,7 @@
   "settings_ocr_subtitle": "Innstillinger for bildegjenkjenning",
   "settings_ocr_desc": "Velg OCR-leverandør for bildegjenkjenning",
   "settings_ocr_provider_label": "OCR-leverandør",
+  "ocr_model_label": "Modell",
   "settings_ocr_fallback_label": "Bruk Tesseract OCR som reserve",
   "settings_ocr_unavailable": "(API-nøkkel ikke konfigurert)",
   "btn_save_ocr_settings": "Lagre OCR-innstillinger",
@@ -707,5 +708,7 @@
   "error_cannot_remove_only_ean": "Kan ikke fjerne den eneste EAN",
   "label_ean_primary": "Primær",
   "tags": "Tagger",
-  "tag_input_placeholder": "Legg til tag…"
+  "tag_input_placeholder": "Legg til tag…",
+  "torch_toggle_off": "Slå på lommelykt",
+  "torch_toggle_on": "Slå av lommelykt"
 }

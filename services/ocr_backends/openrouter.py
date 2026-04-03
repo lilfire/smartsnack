@@ -11,10 +11,13 @@ _OPENROUTER_SYSTEM_PROMPT = (
 )
 
 
-def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg"):
+_DEFAULT_MODEL = "google/gemini-2.0-flash-001"
+
+
+def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg", model=None):
     """Use OpenRouter Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("OPENROUTER_API_KEY")
-    model = os.environ.get("OPENROUTER_MODEL", "google/gemini-2.0-flash-001")
+    model = model or os.environ.get("OPENROUTER_MODEL", _DEFAULT_MODEL)
 
     import openai
 

@@ -2,6 +2,7 @@
 
 from flask import Blueprint, jsonify
 
+from config import OCR_BACKENDS
 from helpers import _require_json
 from services import ocr_settings_service
 
@@ -33,8 +34,27 @@ def save_settings():
 
     fallback = bool(data.get("fallback_to_tesseract", False))
 
+    # Validate and process optional models dict
+    models = data.get("models")
+    if models is not None:
+        if not isinstance(models, dict):
+            return jsonify({"error": "models must be an object"}), 400
+        for provider_key, model_value in models.items():
+            if provider_key not in OCR_BACKENDS:
+                return jsonify({"error": f"Invalid provider in models: {provider_key}"}), 400
+            provider_models = OCR_BACKENDS[provider_key].get("models", [])
+            if provider_key == "openrouter":
+                # Free-text: reject empty string
+                if not model_value or not isinstance(model_value, str):
+                    return jsonify({"error": "OpenRouter model must be a non-empty string"}), 400
+            elif provider_models:
+                if model_value not in provider_models:
+                    return jsonify({
+                        "error": f"Invalid model '{model_value}' for provider '{provider_key}'"
+                    }), 400
+
     try:
-        ocr_settings_service.save_ocr_settings(provider, fallback)
+        ocr_settings_service.save_ocr_settings(provider, fallback, models)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
 
