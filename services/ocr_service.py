@@ -5,6 +5,7 @@ Supports multiple backends controlled by user settings (ocr_provider):
 - "claude_vision": uses Claude Vision API via anthropic SDK
 - "gemini": uses Google Gemini API via google-genai SDK
 - "openai": uses OpenAI Vision API via openai SDK
+- "groq": uses Groq Vision API via groq SDK
 - "llm": alias for claude_vision (backward compatibility)
 """
 
@@ -360,6 +361,42 @@ def _extract_openai(image_bytes, image_b64, mime_type="image/png"):
 
 
 # ---------------------------------------------------------------------------
+# Groq backend
+# ---------------------------------------------------------------------------
+
+def _extract_groq(image_bytes, image_b64, mime_type="image/png"):
+    """Use Groq Vision API to extract ingredient text from an image."""
+    api_key = _get_api_key("GROQ_API_KEY")
+
+    from groq import Groq
+
+    client = Groq(api_key=api_key)
+    response = client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        max_tokens=1024,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{image_b64}",
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": _INGREDIENT_PROMPT,
+                    },
+                ],
+            }
+        ],
+    )
+    content = response.choices[0].message.content if response.choices else ""
+    return content.strip() if content else ""
+
+
+# ---------------------------------------------------------------------------
 # Provider registry
 # ---------------------------------------------------------------------------
 
@@ -368,6 +405,7 @@ _PROVIDERS = {
     "claude_vision": _extract_claude_vision,
     "gemini": _extract_gemini,
     "openai": _extract_openai,
+    "groq": _extract_groq,
     "llm": _extract_claude_vision,  # backward compatibility alias
 }
 

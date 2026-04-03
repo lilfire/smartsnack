@@ -96,6 +96,7 @@ class TestGetAvailableBackends:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test")
         monkeypatch.setenv("GEMINI_API_KEY", "gm-test")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-test")
+        monkeypatch.setenv("GROQ_API_KEY", "gq-test")
         from services import ocr_service
         backends = ocr_service.get_available_backends()
         for b in backends:

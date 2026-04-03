@@ -6,7 +6,7 @@ APP_VERSION = "0.13"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 
-# OCR backend: "tesseract" (default), "claude_vision", "gemini", "openai", "llm" (alias for claude_vision)
+# OCR backend: "tesseract" (default), "claude_vision", "gemini", "openai", "groq", "llm" (alias for claude_vision)
 OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
 LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -20,6 +20,7 @@ OCR_BACKENDS = {
     "claude_vision": {"name": "Claude Vision", "env_key": "ANTHROPIC_API_KEY"},
     "gemini": {"name": "Gemini Vision", "env_key": "GEMINI_API_KEY"},
     "openai": {"name": "GPT-4 Vision", "env_key": "OPENAI_API_KEY"},
+    "groq": {"name": "Groq Vision", "env_key": "GROQ_API_KEY"},
 }
 DEFAULT_OCR_BACKEND = "tesseract"
 
