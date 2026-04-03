@@ -69,7 +69,7 @@ MIGRATIONS = [
         ],
     ),
     (
-        "007_add_performance_indexes",
+        "007_add_fk_indexes",
         [
             "CREATE INDEX IF NOT EXISTS idx_product_flags_product_id ON product_flags(product_id)",
             "CREATE INDEX IF NOT EXISTS idx_product_eans_product_id ON product_eans(product_id)",

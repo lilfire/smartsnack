@@ -20,7 +20,6 @@ from services.product_scoring import (
     _compute_category_ranges,
     _score_product,
     _compute_completeness,
-    invalidate_ranges_cache,
 )
 from services.product_filters import _parse_advanced_filters, _apply_post_filters
 from services.product_duplicate import _find_duplicate
@@ -362,7 +361,8 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     if data.get("from_off"):
         set_system_flag(new_id, "is_synced_with_off", True)
     conn.commit()
-    invalidate_ranges_cache()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
     return {"id": new_id, "message": "Product added"}
 
 
@@ -425,7 +425,8 @@ def update_product(pid: int, data: dict) -> None:
     if incoming_tags is not None and isinstance(incoming_tags, list):
         _set_tags(conn, pid, incoming_tags)
     conn.commit()
-    invalidate_ranges_cache()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
 
@@ -435,7 +436,8 @@ def delete_product(pid: int) -> bool:
     cur = conn.cursor()
     cur.execute("DELETE FROM products WHERE id = ?", (pid,))
     conn.commit()
-    invalidate_ranges_cache()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
     return cur.rowcount > 0
 
 

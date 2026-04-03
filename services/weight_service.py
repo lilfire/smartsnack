@@ -4,7 +4,7 @@ from db import get_db
 from config import SCORE_CONFIG, SCORE_CONFIG_MAP
 from translations import _t, _get_current_lang
 from helpers import _safe_float
-from services.product_scoring import invalidate_weight_cache
+from services.product_scoring import invalidate_scoring_cache
 
 _VALID_DIRECTIONS = frozenset({"lower", "higher"})
 _VALID_FORMULAS = frozenset({"minmax", "direct"})
@@ -88,4 +88,4 @@ def update_weights(data: list) -> None:
             (f, enabled, weight, direction, formula, formula_min, formula_max),
         )
     conn.commit()
-    invalidate_weight_cache()
+    invalidate_scoring_cache()
