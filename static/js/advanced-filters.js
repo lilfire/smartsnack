@@ -304,6 +304,7 @@ function _addRow(container) {
   _syncValInput(valInput, fieldSel.value, opSel.value);
 
   // Upgrade to custom styled selects
+  fieldSel.setAttribute('data-searchable', 'true');
   upgradeSelect(fieldSel, (val) => {
     _updateOps(opSel, val);
     upgradeSelect(opSel);
