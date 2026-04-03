@@ -690,6 +690,7 @@
   "settings_ocr_subtitle": "Image recognition settings",
   "settings_ocr_desc": "Choose OCR provider for image recognition",
   "settings_ocr_provider_label": "OCR provider",
+  "ocr_model_label": "Model",
   "settings_ocr_fallback_label": "Fallback to Tesseract OCR",
   "settings_ocr_unavailable": "(API key not configured)",
   "btn_save_ocr_settings": "Save OCR settings",
