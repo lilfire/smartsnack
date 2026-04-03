@@ -274,6 +274,41 @@ export function upgradeSelect(sel, onSelect) {
 
   let highlighted = -1;
 
+  // Inject search input for searchable selects (desktop only)
+  if (sel.dataset.searchable === 'true') {
+    const si = document.createElement('input');
+    si.className = 'custom-select-search';
+    si.type = 'text';
+    si.autocomplete = 'off';
+    si.spellcheck = false;
+    si.placeholder = 'Search...';
+    si.setAttribute('aria-label', 'Search options');
+    optionsDiv.appendChild(si);
+    wrap._searchInput = si;
+    si.addEventListener('input', () => {
+      const q = si.value.toLowerCase();
+      optionsDiv.querySelectorAll('.custom-select-option').forEach(opt => {
+        opt.style.display = (!q || opt.textContent.toLowerCase().includes(q)) ? '' : 'none';
+      });
+      optionsDiv.querySelectorAll('.custom-select-group').forEach(grp => {
+        let next = grp.nextElementSibling;
+        let anyVisible = false;
+        while (next && !next.classList.contains('custom-select-group')) {
+          if (next.classList.contains('custom-select-option') && next.style.display !== 'none') {
+            anyVisible = true;
+            break;
+          }
+          next = next.nextElementSibling;
+        }
+        grp.style.display = (q && !anyVisible) ? 'none' : '';
+      });
+    });
+    si.addEventListener('click', e => e.stopPropagation());
+    si.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.preventDefault(); _close(); trigger.focus(); }
+    });
+  }
+
   // Build custom option items (with optgroup support)
   function _addOption(o) {
     if (!o.value && !o.textContent.trim()) return;
@@ -312,21 +347,36 @@ export function upgradeSelect(sel, onSelect) {
       trigger.setAttribute('aria-expanded', isOpen);
       highlighted = -1;
       _clearHL();
+      if (isOpen && wrap._searchInput) {
+        wrap._searchInput.focus();
+      }
     });
 
     trigger.addEventListener('keydown', (e) => {
-      const curItems = wrap.querySelectorAll('.custom-select-option');
       if (!wrap.classList.contains('open')) {
         if (e.key === 'ArrowDown' || e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           _closeAllCustomSelects(wrap);
           wrap.classList.add('open');
           trigger.setAttribute('aria-expanded', 'true');
-          highlighted = 0;
-          _updateHL();
+          if (wrap._searchInput) {
+            wrap._searchInput.focus();
+          } else {
+            highlighted = 0;
+            _updateHL();
+          }
+        } else if (wrap._searchInput && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          _closeAllCustomSelects(wrap);
+          wrap.classList.add('open');
+          trigger.setAttribute('aria-expanded', 'true');
+          wrap._searchInput.value = e.key;
+          wrap._searchInput.dispatchEvent(new Event('input'));
+          wrap._searchInput.focus();
         }
         return;
       }
+      const curItems = Array.from(wrap.querySelectorAll('.custom-select-option')).filter(o => o.style.display !== 'none');
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         highlighted = Math.min(highlighted + 1, curItems.length - 1);
@@ -343,6 +393,7 @@ export function upgradeSelect(sel, onSelect) {
       } else if (e.key === 'Escape') {
         e.preventDefault();
         _close();
+        trigger.focus();
       }
     });
 
@@ -358,13 +409,19 @@ export function upgradeSelect(sel, onSelect) {
     trigger.setAttribute('aria-expanded', 'false');
     highlighted = -1;
     _clearHL();
+    if (wrap._searchInput) {
+      wrap._searchInput.value = '';
+      optionsDiv.querySelectorAll('.custom-select-option, .custom-select-group').forEach(el => {
+        el.style.display = '';
+      });
+    }
   }
   function _clearHL() {
     wrap.querySelectorAll('.custom-select-option').forEach((o) => { o.classList.remove('highlighted'); });
   }
   function _updateHL() {
     _clearHL();
-    const curItems = wrap.querySelectorAll('.custom-select-option');
+    const curItems = Array.from(wrap.querySelectorAll('.custom-select-option')).filter(o => o.style.display !== 'none');
     if (highlighted >= 0 && highlighted < curItems.length) {
       curItems[highlighted].classList.add('highlighted');
       curItems[highlighted].scrollIntoView({ block: 'nearest' });
@@ -384,6 +441,12 @@ function _closeAllCustomSelects(except) {
       w.classList.remove('open');
       const triggerEl = w.querySelector('.custom-select-trigger');
       if (triggerEl) triggerEl.setAttribute('aria-expanded', 'false');
+      if (w._searchInput) {
+        w._searchInput.value = '';
+        w.querySelectorAll('.custom-select-option, .custom-select-group').forEach(el => {
+          el.style.display = '';
+        });
+      }
     }
   });
 }
