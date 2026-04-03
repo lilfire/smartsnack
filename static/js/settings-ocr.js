@@ -1,5 +1,5 @@
 // ── Settings: OCR Provider and Settings ──────────────
-import { api, showToast } from './state.js';
+import { api, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
 // Cache of provider key → models list (populated by loadOcrProviders)
@@ -78,6 +78,7 @@ export async function loadOcrProviders() {
     }
     showToast(t('toast_ocr_settings_error'), 'error');
   }
+  upgradeSelect(sel, _updateOcrFallbackVisibility);
 }
 
 export async function loadOcrSettings() {
