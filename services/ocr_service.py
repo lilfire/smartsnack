@@ -274,8 +274,9 @@ def _convert_for_gemini(image_bytes):
     try:
         img = Image.open(io.BytesIO(image_bytes))
         pil_format = img.format or "PNG"
-    except Exception:
-        return image_bytes, "image/png"
+    except Exception as e:
+        logger.warning("OCR: PIL failed to open image (%s), falling back to mime detection", e)
+        return image_bytes, _detect_mime_type(image_bytes)
 
     mime_type = _PIL_FORMAT_TO_MIME.get(pil_format, "image/png")
 
@@ -551,7 +552,8 @@ def dispatch_ocr_bytes(image_bytes):
         )
 
     raw_b64 = base64.b64encode(image_bytes).decode()
+    mime_type = _detect_mime_type(image_bytes)
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
-    text = provider_fn(image_bytes, raw_b64)
+    text = provider_fn(image_bytes, raw_b64, mime_type)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}
