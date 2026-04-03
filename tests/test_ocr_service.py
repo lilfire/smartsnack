@@ -806,6 +806,127 @@ class TestOpenAIBackend:
 
 
 # ---------------------------------------------------------------------------
+# OpenRouter backend
+# ---------------------------------------------------------------------------
+
+@patch("services.settings_service.get_ocr_backend", return_value="openrouter")
+class TestOpenRouterBackend:
+    """Tests for the OpenRouter Vision OCR backend."""
+
+    def test_extract_text_calls_openrouter(self, _mock_backend):
+        """Should call openai.OpenAI with base_url for OpenRouter and correct API key."""
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "sukker, mel, vann"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-openrouter-key"}, clear=False):
+            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                result = extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(
+                    api_key="test-openrouter-key",
+                    base_url="https://openrouter.ai/api/v1",
+                    default_headers={"HTTP-Referer": "https://smartsnack.app"},
+                )
+                mock_client.chat.completions.create.assert_called_once()
+                call_kwargs = mock_client.chat.completions.create.call_args
+                assert call_kwargs[1]["model"] == "google/gemini-2.0-flash-001"
+                # Verify system prompt is included in messages
+                messages = call_kwargs[1]["messages"]
+                assert messages[0]["role"] == "system"
+                assert result == "sukker, mel, vann"
+
+    def test_missing_api_key_raises(self, _mock_backend):
+        """When both OPENROUTER_API_KEY and LLM_API_KEY are absent, raise ValueError."""
+        from services.ocr_service import extract_text
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("OPENROUTER_API_KEY", None)
+            os.environ.pop("LLM_API_KEY", None)
+
+            png_bytes = _make_tiny_png()
+            with pytest.raises(ValueError, match="API key"):
+                extract_text(_b64(png_bytes))
+
+    def test_falls_back_to_llm_api_key(self, _mock_backend):
+        """When OPENROUTER_API_KEY absent but LLM_API_KEY set, use LLM_API_KEY."""
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "ingredients"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
+            os.environ.pop("OPENROUTER_API_KEY", None)
+            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+                png_bytes = _make_tiny_png()
+                extract_text(_b64(png_bytes))
+
+                mock_cls.assert_called_once_with(
+                    api_key="fallback-key",
+                    base_url="https://openrouter.ai/api/v1",
+                    default_headers={"HTTP-Referer": "https://smartsnack.app"},
+                )
+
+    def test_custom_model_override(self, _mock_backend):
+        """When OPENROUTER_MODEL env var is set, use that model instead of default."""
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "mel"
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {
+            "OPENROUTER_API_KEY": "test-key",
+            "OPENROUTER_MODEL": "anthropic/claude-3.5-sonnet",
+        }, clear=False):
+            with patch("openai.OpenAI", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                extract_text(_b64(png_bytes))
+
+                call_kwargs = mock_client.chat.completions.create.call_args
+                assert call_kwargs[1]["model"] == "anthropic/claude-3.5-sonnet"
+
+    def test_empty_response(self, _mock_backend):
+        """When response content is empty string, extract_text() returns empty string."""
+        from services.ocr_service import extract_text
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+
+        mock_response = MagicMock()
+        mock_response.choices = [mock_choice]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = mock_response
+
+        with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=False):
+            with patch("openai.OpenAI", return_value=mock_client):
+                png_bytes = _make_tiny_png()
+                result = extract_text(_b64(png_bytes))
+
+                assert result == ""
+
+
+# ---------------------------------------------------------------------------
 # Groq backend
 # ---------------------------------------------------------------------------
 
@@ -955,7 +1076,7 @@ class TestProviderRegistry:
     def test_all_providers_in_registry(self):
         """All valid backend names should be in the _PROVIDERS dict."""
         import services.ocr_service as mod
-        expected = {"tesseract", "claude_vision", "gemini", "openai", "groq", "llm"}
+        expected = {"tesseract", "claude_vision", "gemini", "openai", "openrouter", "groq", "llm"}
         assert expected == set(mod._PROVIDERS.keys())
 
 
