@@ -10,12 +10,22 @@ from services import ocr_service
 bp = Blueprint("ocr", __name__)
 
 _TOKEN_LIMIT_KEYWORDS = ("token limit", "token_limit", "usage budget", "quota exceeded")
+_QUOTA_KEYWORDS = ("resource_exhausted", "quota exceeded", "rate limit", "rate_limit")
 
 
 def _is_token_limit_error(message):
     """Check if an error message indicates a token/usage limit issue."""
     lower = message.lower()
     return any(kw in lower for kw in _TOKEN_LIMIT_KEYWORDS)
+
+
+def _is_quota_error(exc):
+    """Check if an exception is a provider quota / rate-limit error."""
+    http_status = getattr(exc, "status_code", None) or getattr(exc, "code", None)
+    if http_status == 429:
+        return True
+    msg = str(exc).lower()
+    return any(kw in msg for kw in _QUOTA_KEYWORDS)
 
 
 def _error_response(message, status_code, error_type=None, error_detail=None):
@@ -62,6 +72,13 @@ def ocr_ingredients():
                 return _error_response(
                     "OCR provider is not responding", 503, error_type="provider_timeout",
                 )
+            if _is_quota_error(e):
+                return _error_response(
+                    "OCR provider quota exceeded",
+                    429,
+                    error_type="provider_quota",
+                    error_detail="The selected OCR provider has reached its usage quota.",
+                )
             http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
             if isinstance(http_status, int) and 400 <= http_status < 500:
                 return _error_response(
@@ -99,6 +116,13 @@ def ocr_ingredients():
             if _is_timeout_or_connection_error(e):
                 return _error_response(
                     "OCR provider is not responding", 503, error_type="provider_timeout",
+                )
+            if _is_quota_error(e):
+                return _error_response(
+                    "OCR provider quota exceeded",
+                    429,
+                    error_type="provider_quota",
+                    error_detail="The selected OCR provider has reached its usage quota.",
                 )
             http_status = getattr(e, "status_code", None) or getattr(e, "code", None)
             if isinstance(http_status, int) and 400 <= http_status < 500:
