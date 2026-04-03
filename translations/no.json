@@ -707,5 +707,7 @@
   "error_ean_already_exists": "Denne EAN finnes allerede på produktet",
   "error_cannot_remove_only_ean": "Kan ikke fjerne den eneste EAN",
   "label_ean_primary": "Primær",
-  "tags": "Tagger"
+  "tags": "Tagger",
+  "torch_toggle_off": "Slå på lommelykt",
+  "torch_toggle_on": "Slå av lommelykt"
 }
