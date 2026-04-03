@@ -8,7 +8,7 @@ A mobile-first web app for tracking and scoring food products. Search by name or
 ## Features
 
 - **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera. Detected codes auto-lookup product data from OpenFoodFacts.
-- **OCR Ingredient Scanning** — Use the device camera to scan ingredient lists via OCR. Multiple backend providers supported: EasyOCR, Tesseract, Groq Vision, OpenRouter Vision, Claude, Gemini, and OpenAI. Includes duplicate detection and quota/rate-limit error handling (429 toast notifications).
+- **OCR Ingredient Scanning** — Use the device camera to scan ingredient lists via OCR. Multiple backend providers supported: Tesseract (local), Claude Vision, Gemini Vision, GPT-4 Vision (OpenAI), OpenRouter Vision, and Groq Vision. Includes duplicate detection and quota/rate-limit error handling (429 toast notifications).
 - **Protein Quality** — Protein quality scoring based on amino acid completeness, integrated into the configurable scoring system.
 - **OpenFoodFacts Integration** — Fetch nutrition info, product names, brand, and images by barcode or text search.
 - **Configurable Scoring** — 17 weight fields (kcal, sugar, protein, fiber, fat, price, taste, macro %kcal, etc.) each with toggleable enable, weight slider (0–100), direction (lower/higher is better), and formula (MinMax normalization or Direct mapping). Total score is a weighted average from 1–100.
@@ -70,6 +70,28 @@ python app.py
 ```
 
 The SQLite database is created automatically at startup. Set the `DB_PATH` environment variable to control where it's stored (default: `./smartsnack.sqlite`).
+
+## OCR Providers
+
+Tesseract runs locally and is always available (no API key needed). The other providers require API keys set as environment variables:
+
+| Provider | Environment Variable |
+|---|---|
+| Claude Vision | `ANTHROPIC_API_KEY` |
+| Gemini Vision | `GEMINI_API_KEY` |
+| GPT-4 Vision (OpenAI) | `OPENAI_API_KEY` |
+| OpenRouter Vision | `OPENROUTER_API_KEY` |
+| Groq Vision | `GROQ_API_KEY` |
+
+Providers with a valid key appear automatically in **Settings → OCR**. You can also set a fallback to Tesseract if the selected provider fails.
+
+**Docker users:** pass API keys via a `.env` file or an `environment:` block in `docker-compose.yml`:
+
+```yaml
+environment:
+  - ANTHROPIC_API_KEY=your_key_here
+  - GROQ_API_KEY=your_key_here
+```
 
 ## Project Structure
 
