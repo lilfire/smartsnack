@@ -120,7 +120,7 @@ class TestDispatchOcrFormatConversion:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
                         result = dispatch_ocr(_b64(svg_bytes))
 
         assert result["text"] == "ingredienser fra svg"
@@ -333,7 +333,7 @@ class TestFormatConversionLogging:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
                         with caplog.at_level(logging.INFO, logger="services.ocr_service"):
                             dispatch_ocr(_b64(svg_bytes))
 
@@ -423,7 +423,7 @@ class TestBlueprintFormatConversion:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_service._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
                         resp = client.post(
                             "/api/ocr/ingredients",
                             json={"image": _b64(svg_bytes)},
