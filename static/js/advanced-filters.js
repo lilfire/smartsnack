@@ -566,6 +566,7 @@ let _reloadTimer = null;
 function _triggerReload() {
   clearTimeout(_reloadTimer);
   _reloadTimer = setTimeout(() => {
+    state.cachedResults = [];
     // Use dynamic import to avoid circular dependency
     import('./products.js').then(mod => { mod.loadData(); }).catch(e => { console.error('Failed to load products module:', e); });
   }, 100);
