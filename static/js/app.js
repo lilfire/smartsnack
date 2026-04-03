@@ -14,18 +14,19 @@ import {
 } from './products.js';
 import {
   SCORE_CFG_MAP, weightData,
-  loadSettings, toggleSettingsSection, toggleWeightConfig, removeWeight, addWeightFromDropdown,
+  loadSettings, toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights,
-  updateCategoryLabel, addCategory, deleteCategory,
-  addFlag, deleteFlag, updateFlagLabel,
-  autosavePq, deletePq, addPq,
+} from './settings-weights.js';
+import { updateCategoryLabel, addCategory, deleteCategory } from './settings-categories.js';
+import { addFlag, deleteFlag, updateFlagLabel } from './settings-flags.js';
+import { autosavePq, deletePq, addPq } from './settings-pq.js';
+import {
   downloadBackup, handleRestore, handleImport,
-  initRestoreDragDrop,
-  saveOffCredentials,
-  refreshAllFromOff, estimateAllPq,
-  loadOcrSettings, saveOcrSettings
-} from './settings.js';
+  initRestoreDragDrop, toggleSettingsSection, estimateAllPq,
+} from './settings-backup.js';
+import { loadOcrSettings, saveOcrSettings } from './settings-ocr.js';
+import { saveOffCredentials, refreshAllFromOff } from './settings-off.js';
 import {
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,

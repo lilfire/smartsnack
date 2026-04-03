@@ -39,7 +39,7 @@ vi.mock('../state.js', () => {
 
 // Mock dynamic imports used by changeLanguage()
 vi.mock('../products.js', () => ({ loadData: vi.fn() }));
-vi.mock('../settings.js', () => ({ loadSettings: vi.fn() }));
+vi.mock('../settings-weights.js', () => ({ loadSettings: vi.fn() }));
 vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn() }));
 vi.mock('../advanced-filters.js', () => ({ rebuildAdvancedFilters: vi.fn() }));
 

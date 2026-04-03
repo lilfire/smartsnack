@@ -377,7 +377,7 @@ export function switchView(v) {
   document.getElementById('view-register').style.display = v === 'register' ? '' : 'none';
   document.getElementById('view-settings').style.display = v === 'settings' ? '' : 'none';
   if (v === 'settings') {
-    import('./settings.js').then((mod) => { mod.loadSettings(); });
+    import('./settings-weights.js').then((mod) => { mod.loadSettings(); });
   } else {
     loadData();
   }

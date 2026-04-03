@@ -89,7 +89,7 @@ export async function changeLanguage(lang) {
   }
   // Reload dynamic content — use lazy imports to avoid circular deps
   if (state.currentView === 'settings') {
-    const { loadSettings } = await import('./settings.js');
+    const { loadSettings } = await import('./settings-weights.js');
     await loadSettings();
   } else {
     const { loadData } = await import('./products.js');

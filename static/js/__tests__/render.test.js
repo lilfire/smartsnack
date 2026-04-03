@@ -50,7 +50,7 @@ vi.mock('../images.js', () => ({
   loadProductImage: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('../settings.js', () => ({
+vi.mock('../settings-weights.js', () => ({
   SCORE_COLORS: { kcal: '#aa66ff', protein: '#00d4ff' },
   SCORE_CFG_MAP: { kcal: { label: 'Kcal' }, protein: { label: 'Protein' } },
   weightData: [],
@@ -62,7 +62,7 @@ vi.mock('../openfoodfacts.js', () => ({
 
 import { renderNutriTable, fmtCell, getActiveCols, getGridTemplate, renderResults, getFlagConfig, loadFlagConfig } from '../render.js';
 import { state } from '../state.js';
-import { weightData } from '../settings.js';
+import { weightData } from '../settings-weights.js';
 
 beforeEach(() => {
   state.expandedId = null;
