@@ -3,6 +3,11 @@ import { initTagInput, getTagsForSave } from '../tags.js';
 
 beforeEach(() => {
   vi.restoreAllMocks();
+  // Default fetch mock: return empty suggestions so tests that incidentally
+  // trigger focus/fetch don't throw "fetch is not defined".
+  global.fetch = vi.fn().mockResolvedValue({
+    json: () => Promise.resolve([]),
+  });
   document.body.innerHTML = `
     <div id="tag-field-ed">
       <input id="tag-input-ed" value="" />
@@ -79,7 +84,7 @@ describe('tag pill interactions', () => {
 });
 
 describe('keyboard interactions', () => {
-  it('adds a tag on Enter key', () => {
+  it('adds a tag on Enter key (no suggestion highlighted)', () => {
     initTagInput([]);
     const input = document.getElementById('tag-input-ed');
     input.value = 'spicy';
@@ -88,12 +93,15 @@ describe('keyboard interactions', () => {
     expect(input.value).toBe('');
   });
 
-  it('adds a tag on comma key', () => {
+  it('comma key does NOT add a tag', () => {
     initTagInput([]);
     const input = document.getElementById('tag-input-ed');
     input.value = 'sweet';
     input.dispatchEvent(new KeyboardEvent('keydown', { key: ',', bubbles: true }));
-    expect(getTagsForSave()).toContain('sweet');
+    // comma is no longer a trigger — input value should be unchanged
+    expect(input.value).toBe('sweet');
+    // No pill rendered means the tag was not immediately added to _tags
+    expect(document.querySelectorAll('.tag-pill').length).toBe(0);
   });
 
   it('removes last tag on Backspace with empty input', () => {
@@ -131,6 +139,78 @@ describe('keyboard interactions', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(getTagsForSave()).toEqual([]);
   });
+
+  it('Escape clears input and hides dropdown without adding a tag', () => {
+    initTagInput([]);
+    const input = document.getElementById('tag-input-ed');
+    const list = document.getElementById('tag-suggestions-ed');
+    input.value = 'test';
+    list.hidden = false;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(input.value).toBe('');
+    expect(list.hidden).toBe(true);
+    expect(getTagsForSave()).toEqual([]);
+  });
+});
+
+describe('arrow key navigation', () => {
+  async function setupWithSuggestions(suggestions) {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(suggestions),
+    });
+    initTagInput([]);
+    const input = document.getElementById('tag-input-ed');
+    const list = document.getElementById('tag-suggestions-ed');
+    input.value = 'sa';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+    return { input, list };
+  }
+
+  it('ArrowDown highlights the first li', async () => {
+    const { input, list } = await setupWithSuggestions(['salty', 'savory']);
+    expect(list.hidden).toBe(false);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const items = list.querySelectorAll('li');
+    expect(items[0].classList.contains('highlighted')).toBe(true);
+    expect(items[1].classList.contains('highlighted')).toBe(false);
+  });
+
+  it('subsequent ArrowDown advances highlight', async () => {
+    const { input, list } = await setupWithSuggestions(['salty', 'savory', 'smoky']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const items = list.querySelectorAll('li');
+    expect(items[0].classList.contains('highlighted')).toBe(false);
+    expect(items[1].classList.contains('highlighted')).toBe(true);
+  });
+
+  it('ArrowUp moves highlight back', async () => {
+    const { input, list } = await setupWithSuggestions(['salty', 'savory']);
+    // Go down twice, then up once
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    const items = list.querySelectorAll('li');
+    expect(items[0].classList.contains('highlighted')).toBe(true);
+    expect(items[1].classList.contains('highlighted')).toBe(false);
+  });
+
+  it('Enter with highlighted item adds that tag', async () => {
+    const { input, list } = await setupWithSuggestions(['salty', 'savory']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    // Second item is now highlighted
+    const items = list.querySelectorAll('li');
+    expect(items[1].classList.contains('highlighted')).toBe(true);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(getTagsForSave()).toContain('savory');
+    expect(getTagsForSave()).not.toContain('salty');
+    expect(list.hidden).toBe(true);
+  });
 });
 
 describe('suggestion list', () => {
@@ -138,6 +218,7 @@ describe('suggestion list', () => {
     initTagInput([]);
     const input = document.getElementById('tag-input-ed');
     const list = document.getElementById('tag-suggestions-ed');
+    list.hidden = false;
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     expect(list.hidden).toBe(true);
@@ -152,6 +233,22 @@ describe('suggestion list', () => {
     input.dispatchEvent(new Event('blur', { bubbles: true }));
     vi.advanceTimersByTime(200);
     expect(list.hidden).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('focus event triggers fetch with q= and shows dropdown', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(['salty', 'savory']),
+    });
+    initTagInput([]);
+    const input = document.getElementById('tag-input-ed');
+    const list = document.getElementById('tag-suggestions-ed');
+    input.dispatchEvent(new Event('focus', { bubbles: true }));
+    await vi.runAllTimersAsync();
+    expect(global.fetch).toHaveBeenCalledWith('/api/products/tags/suggestions?q=');
+    expect(list.hidden).toBe(false);
+    expect(list.querySelectorAll('li').length).toBe(2);
     vi.useRealTimers();
   });
 
@@ -229,6 +326,26 @@ describe('suggestion list', () => {
     expect(getTagsForSave()).toContain('salty');
     expect(input.value).toBe('');
     expect(list.hidden).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('dropdown does not show already-selected tags', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(['salty', 'savory']),
+    });
+
+    initTagInput(['salty']);
+    const input = document.getElementById('tag-input-ed');
+    const list = document.getElementById('tag-suggestions-ed');
+    input.value = 'sa';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    await vi.runAllTimersAsync();
+
+    const items = list.querySelectorAll('li');
+    expect(items.length).toBe(1);
+    expect(items[0].textContent).toBe('savory');
     vi.useRealTimers();
   });
 
