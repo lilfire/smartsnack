@@ -14,6 +14,7 @@ vi.mock('../state.js', () => {
     categories: [],
     imageCache: {},
     advancedFilters: null,
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -68,6 +69,10 @@ vi.mock('../off-review.js', () => ({
   closeOffAddReview: vi.fn(),
   submitToOff: vi.fn(),
 }));
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+}));
 
 import { loadData, setFilter, switchView, onSearchInput, clearSearch } from '../products.js';
 import { state, fetchProducts, fetchStats } from '../state.js';
@@ -82,6 +87,7 @@ beforeEach(() => {
   state.cachedResults = [];
   state.advancedFilters = null;
   state.searchTimeout = null;
+  state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
 
   document.body.innerHTML = `
     <div id="stats-line"></div>
@@ -103,31 +109,32 @@ describe('Pagination: initial load', () => {
       { id: 1, name: 'A', total_score: 80 },
       { id: 2, name: 'B', total_score: 70 },
     ];
-    fetchProducts.mockResolvedValue(mockProducts);
+    fetchProducts.mockResolvedValue({ products: mockProducts, total: 2 });
 
     await loadData();
 
     expect(fetchProducts).toHaveBeenCalledTimes(1);
+    expect(fetchProducts).toHaveBeenCalledWith('', [], { limit: 50, offset: 0 });
     expect(renderResults).toHaveBeenCalledWith(mockProducts, '');
   });
 
   it('uses search input value when in search view', async () => {
     document.getElementById('search-input').value = 'Popcorn';
-    const mockResult = { products: [{ id: 1, name: 'Popcorn', total_score: 90 }], total: 1 };
-    fetchProducts.mockResolvedValue(mockResult);
+    const mockProducts = [{ id: 1, name: 'Popcorn', total_score: 90 }];
+    fetchProducts.mockResolvedValue({ products: mockProducts, total: 1 });
 
     await loadData();
 
-    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', []);
+    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', [], { limit: 50, offset: 0 });
   });
 
   it('passes current filters to fetchProducts', async () => {
     state.currentFilter = ['Snacks', 'Drikke'];
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     await loadData();
 
-    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke']);
+    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke'], { limit: 50, offset: 0 });
   });
 });
 
