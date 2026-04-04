@@ -421,3 +421,48 @@ export function renderResults(results, search) {
     }
   });
 }
+
+export function appendResults(newProducts) {
+  const tableWrap = document.querySelector('#results-container .table-wrap');
+  if (!tableWrap) return;
+  const cols = getActiveCols();
+  const gridTpl = getGridTemplate(cols);
+  const sorted = applySorting(newProducts);
+  let h = '';
+  sorted.forEach((p) => {
+    const hasImg = p.has_image;
+    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="' + esc(p.name) + '">' : '') + '</div>';
+    const eanCount = p.ean_count || 1;
+    const eanSuffix = eanCount > 1 ? '<span class="ean-count-suffix"> (+' + (eanCount - 1) + ')</span>' : '';
+    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + eanSuffix + '</span>' : '';
+    const brandHtml = p.brand ? '<span class="prod-brand">' + esc(p.brand) + '</span>' : '';
+    const prodName = (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase()))
+      ? p.name.substring(p.brand.length).replace(/^\s+/, '') : p.name;
+    const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="row" aria-label="' + esc(p.name) + '">'
+      + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
+      + '<div class="prod-meta">' + eanHtml
+      + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
+      + '</div></div></div></div>';
+    for (let ci = 1; ci < cols.length; ci++) {
+      const c = cols[ci];
+      if (c.key === 'total_score') {
+        const scoreDisplay = (p.total_score != null) ? Number(p.total_score).toFixed(1) : '-';
+        h += '<span class="cell-score">' + scoreDisplay + (p.has_missing_scores ? '<span style="color:#f5a623;margin-left:1px" title="Score based on incomplete data \u2014 some values are 0 or missing">*</span>' : '') + '</span>';
+      } else {
+        h += '<span class="cell-right">' + fmtCell(c.key, p[c.key]) + '</span>';
+      }
+    }
+    h += '</div>';
+  });
+  tableWrap.insertAdjacentHTML('beforeend', h);
+  sorted.forEach((p) => {
+    if (p.has_image) {
+      loadProductImage(p.id).then((dataUri) => {
+        if (!dataUri) return;
+        const thumb = document.getElementById('thumb-' + p.id);
+        if (thumb) thumb.src = dataUri;
+      });
+    }
+  });
+}

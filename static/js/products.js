@@ -1,5 +1,6 @@
 // ── Product CRUD & Registration ─────────────────────
 import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus, trapFocus, esc } from './state.js';
+import { initInfiniteScroll, teardownInfiniteScroll } from './scroll.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
@@ -225,6 +226,12 @@ export async function deleteProduct(id, name) {
 
 export async function loadData() {
   try {
+    // Reset pagination for fresh load
+    teardownInfiniteScroll();
+    state.pagination.offset = 0;
+    state.pagination.total = null;
+    state.pagination.inFlight = false;
+
     await fetchStats();
     buildFilters();
     const statsEl = document.getElementById('stats-line');
@@ -233,9 +240,25 @@ export async function loadData() {
     upgradeSelect(document.getElementById('f-volume'));
     const searchInputEl = document.getElementById('search-input');
     const search = state.currentView === 'search' && searchInputEl ? searchInputEl.value.trim() : '';
-    const results = await fetchProducts(search, state.currentFilter);
+    const data = await fetchProducts(search, state.currentFilter, {
+      limit: state.pagination.pageSize,
+      offset: 0,
+    });
+    // Handle {products, total} response or plain array (backend compat)
+    const results = Array.isArray(data) ? data : (data.products || []);
+    const total = Array.isArray(data) ? null : (data.total != null ? data.total : null);
+    if (total !== null) state.pagination.total = total;
+    state.pagination.offset = results.length > 0 ? state.pagination.pageSize : 0;
     renderResults(results, search);
     announceStatus(t('stats_line', { total: results.length, types: state.cachedStats.types }));
+    // Set up infinite scroll if more results may exist
+    const allLoaded = total !== null && results.length >= total;
+    if (!allLoaded) {
+      initInfiniteScroll(() => {
+        const si = document.getElementById('search-input');
+        return state.currentView === 'search' && si ? si.value.trim() : '';
+      });
+    }
   } catch (e) {
     console.error(e);
     showToast(t('toast_load_error'), 'error');
@@ -243,6 +266,7 @@ export async function loadData() {
 }
 
 export function switchView(v) {
+  teardownInfiniteScroll();
   state.cachedResults = [];
   state.currentView = v;
   state.expandedId = null;
