@@ -9,10 +9,7 @@ All implementation has been split into focused modules:
 
 from services.product_crud import (
     _get_product_flags,
-    _get_product_tags,
     _set_user_flags,
-    _set_tags,
-    get_tag_suggestions,
     set_system_flag,
     list_products,
     add_product,
@@ -46,10 +43,7 @@ from services.product_duplicate import (
 
 __all__ = [
     "_get_product_flags",
-    "_get_product_tags",
     "_set_user_flags",
-    "_set_tags",
-    "get_tag_suggestions",
     "set_system_flag",
     "list_products",
     "add_product",

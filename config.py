@@ -54,6 +54,8 @@ DEFAULT_OCR_BACKEND = "tesseract"
 
 DEFAULT_PAGE_SIZE = 50
 
+TAG_LABEL_MAX_LEN = 50
+
 
 TRANSLATIONS_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "translations"

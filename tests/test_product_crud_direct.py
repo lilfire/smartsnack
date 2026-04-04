@@ -137,8 +137,10 @@ class TestDeleteProduct:
 
     def test_related_tags_cascade_deleted(self, db):
         from services.product_crud import update_product, delete_product
+        from services import tag_service
         pid = _add("P")["id"]
-        update_product(pid, {"tags": ["healthy"]})
+        tag = tag_service.create_tag("healthy")
+        update_product(pid, {"tagIds": [tag["id"]]})
         delete_product(pid)
         assert db.execute("SELECT product_id FROM product_tags WHERE product_id=?", (pid,)).fetchone() is None
 

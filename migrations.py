@@ -1,7 +1,70 @@
 """Database migrations tracked in the schema_migrations table.
 
-Each migration is a (name, sql_list) tuple. Add new migrations at the end.
+Each migration entry is (name, steps) where steps is either:
+  list[str]   — SQL statements executed in order
+  callable    — Python function called with (cur,) for complex migrations
+Add new migrations at the end.
 """
+
+
+def _migrate_008_tag_system(cur):
+    """Migrate product_tags from text-based to integer FK schema.
+
+    Detects old schema (tag TEXT column) via PRAGMA table_info.
+    If old schema: renames, creates new tables, migrates data, drops old.
+    If already new schema or no table: creates tags + product_tags with IF NOT EXISTS.
+    Idempotent.
+    """
+    cols = {
+        row[1]
+        for row in cur.execute("PRAGMA table_info(product_tags)").fetchall()
+    }
+    has_old_schema = "tag" in cols
+
+    if has_old_schema:
+        cur.execute("ALTER TABLE product_tags RENAME TO product_tags_old")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT    NOT NULL UNIQUE COLLATE NOCASE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS product_tags (
+            product_id INTEGER NOT NULL,
+            tag_id     INTEGER NOT NULL,
+            PRIMARY KEY (product_id, tag_id),
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id)     REFERENCES tags(id)     ON DELETE CASCADE
+        )
+    """)
+
+    if has_old_schema:
+        cur.execute("""
+            INSERT OR IGNORE INTO tags (label)
+            SELECT DISTINCT LOWER(TRIM(tag)) FROM product_tags_old
+            WHERE TRIM(tag) != ''
+        """)
+        cur.execute("""
+            INSERT OR IGNORE INTO product_tags (product_id, tag_id)
+            SELECT o.product_id, t.id
+            FROM product_tags_old o
+            JOIN tags t ON LOWER(TRIM(o.tag)) = t.label COLLATE NOCASE
+        """)
+        cur.execute("DROP TABLE product_tags_old")
+
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag_id ON product_tags(tag_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tags_label ON tags(label COLLATE NOCASE)"
+    )
+
 
 MIGRATIONS = [
     (
@@ -83,6 +146,10 @@ MIGRATIONS = [
             "ALTER TABLE product_eans ADD COLUMN synced_with_off INTEGER NOT NULL DEFAULT 0",
         ],
     ),
+    (
+        "009_tag_system_reimplementation",
+        _migrate_008_tag_system,
+    ),
 ]
 
 
@@ -96,9 +163,12 @@ def run_migrations(cur):
     applied = {
         r[0] for r in cur.execute("SELECT name FROM schema_migrations").fetchall()
     }
-    for name, statements in MIGRATIONS:
+    for name, steps in MIGRATIONS:
         if name in applied:
             continue
-        for sql in statements:
-            cur.execute(sql)
+        if callable(steps):
+            steps(cur)
+        else:
+            for sql in steps:
+                cur.execute(sql)
         cur.execute("INSERT INTO schema_migrations (name) VALUES (?)", (name,))
