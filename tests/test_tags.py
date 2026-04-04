@@ -95,7 +95,7 @@ def test_clear_tags(client, product_id):
 
 
 def test_autocomplete_empty_query(client, product_id):
-    """?q= (empty) returns []."""
+    """?q= (empty) returns all existing tags."""
     pid = product_id
     client.put(
         f"/api/products/{pid}",
@@ -104,7 +104,7 @@ def test_autocomplete_empty_query(client, product_id):
     )
     resp = client.get("/api/products/tags/suggestions?q=")
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json() == ["popcorn"]
 
 
 def test_autocomplete_no_q_param(client, product_id):
@@ -186,3 +186,93 @@ def test_tags_update_replaces(client, product_id):
     product = next((p for p in get_resp.get_json()["products"] if p["id"] == pid), None)
     assert product is not None
     assert product["tags"] == ["new1"]
+
+
+# ── /api/tags CRUD ──────────────────────────────────────────────────────────
+
+
+def test_list_tags_initially_empty(client):
+    """GET /api/tags returns [] on fresh database."""
+    resp = client.get("/api/tags")
+    assert resp.status_code == 200
+    assert resp.get_json() == []
+
+
+def test_create_tag(client):
+    """POST /api/tags creates a tag and returns it."""
+    resp = client.post("/api/tags", json={"label": "gluten-free"})
+    assert resp.status_code == 201
+    data = resp.get_json()
+    assert data["label"] == "gluten-free"
+    assert "id" in data
+
+
+def test_create_tag_duplicate_returns_409(client):
+    """POST /api/tags with duplicate label returns 409."""
+    client.post("/api/tags", json={"label": "vegan"})
+    resp = client.post("/api/tags", json={"label": "vegan"})
+    assert resp.status_code == 409
+    assert resp.get_json()["error"] == "tag_already_exists"
+
+
+def test_create_tag_empty_label_returns_400(client):
+    """POST /api/tags with empty label returns 400."""
+    resp = client.post("/api/tags", json={"label": ""})
+    assert resp.status_code == 400
+
+
+def test_create_tag_too_long_returns_400(client):
+    """POST /api/tags with label > 50 chars returns 400."""
+    resp = client.post("/api/tags", json={"label": "x" * 51})
+    assert resp.status_code == 400
+
+
+def test_list_tags_after_create(client):
+    """GET /api/tags returns created tags sorted alphabetically."""
+    client.post("/api/tags", json={"label": "omega-3"})
+    client.post("/api/tags", json={"label": "bio"})
+    resp = client.get("/api/tags")
+    labels = [t["label"] for t in resp.get_json()]
+    assert labels == sorted(labels)
+    assert "bio" in labels
+    assert "omega-3" in labels
+
+
+def test_delete_tag(client):
+    """DELETE /api/tags/{id} removes the tag."""
+    create_resp = client.post("/api/tags", json={"label": "disposable"})
+    tid = create_resp.get_json()["id"]
+    del_resp = client.delete(f"/api/tags/{tid}")
+    assert del_resp.status_code == 200
+    tags = [t["id"] for t in client.get("/api/tags").get_json()]
+    assert tid not in tags
+
+
+def test_delete_tag_not_found(client):
+    """DELETE /api/tags/9999 returns 404."""
+    resp = client.delete("/api/tags/9999")
+    assert resp.status_code == 404
+
+
+def test_delete_tag_removes_from_products(client, product_id):
+    """Deleting a tag also removes it from associated products."""
+    pid = product_id
+    client.put(f"/api/products/{pid}", json={"name": "Test Popcorn", "tags": ["organic"]})
+    # Tag should now be in the catalog
+    tags = client.get("/api/tags").get_json()
+    tag = next((t for t in tags if t["label"] == "organic"), None)
+    assert tag is not None
+    # Delete it
+    client.delete(f"/api/tags/{tag['id']}")
+    # Product should no longer have the tag
+    products = client.get("/api/products").get_json()["products"]
+    product = next((p for p in products if p["id"] == pid), None)
+    assert "organic" not in product["tags"]
+
+
+def test_autocomplete_uses_tags_catalog(client):
+    """Suggestions come from tags catalog, not just product assignments."""
+    client.post("/api/tags", json={"label": "superfood"})
+    resp = client.get("/api/products/tags/suggestions?q=super")
+    assert resp.status_code == 200
+    assert "superfood" in resp.get_json()

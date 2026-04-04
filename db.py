@@ -177,6 +177,14 @@ def _init_schema(cur, conn):
         )
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT NOT NULL COLLATE NOCASE,
+            UNIQUE(label COLLATE NOCASE)
+        )
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS product_tags (
             product_id INTEGER NOT NULL,
             tag        TEXT    NOT NULL COLLATE NOCASE,

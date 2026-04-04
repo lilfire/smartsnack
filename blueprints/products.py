@@ -42,9 +42,9 @@ def add_product():
 
 @bp.route("/api/products/tags/suggestions", methods=["GET"])
 def tag_suggestions():
-    prefix = request.args.get("q", "").strip()
-    if not prefix:
+    if "q" not in request.args:
         return jsonify([])
+    prefix = request.args.get("q", "").strip()
     return jsonify(product_service.get_tag_suggestions(prefix))
 
 

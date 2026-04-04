@@ -77,6 +77,18 @@ MIGRATIONS = [
             "CREATE INDEX IF NOT EXISTS idx_products_type ON products(type)",
         ],
     ),
+    (
+        "008_create_tags_table",
+        [
+            """CREATE TABLE IF NOT EXISTS tags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                label TEXT NOT NULL COLLATE NOCASE,
+                UNIQUE(label COLLATE NOCASE)
+            )""",
+            "INSERT OR IGNORE INTO tags (label) SELECT DISTINCT LOWER(tag) FROM product_tags",
+            "CREATE INDEX IF NOT EXISTS idx_tags_label ON tags(label COLLATE NOCASE)",
+        ],
+    ),
 ]
 
 

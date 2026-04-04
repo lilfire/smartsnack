@@ -18,6 +18,8 @@ from services.product_crud import (
     add_product,
     update_product,
     delete_product,
+)
+from services.product_eans import (
     list_eans,
     add_ean,
     delete_ean,
