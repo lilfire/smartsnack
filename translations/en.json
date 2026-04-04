@@ -709,5 +709,12 @@
   "label_ean_primary": "Primary",
   "tags": "Tags",
   "torch_toggle_off": "Turn on flashlight",
-  "torch_toggle_on": "Turn off flashlight"
+  "torch_toggle_on": "Turn off flashlight",
+  "off_lang_priority_title": "OFF Language Priority",
+  "off_lang_priority_desc": "Choose which languages to use when fetching data from Open Food Facts, in preferred priority order.",
+  "off_lang_add": "Add language",
+  "off_lang_remove": "Remove",
+  "off_lang_move_up": "Move up",
+  "off_lang_move_down": "Move down",
+  "toast_off_lang_priority_saved": "Language priority saved"
 }

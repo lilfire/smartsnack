@@ -298,6 +298,120 @@ function _showRefreshOffModal() {
   });
 }
 
+// ── OFF Language Priority ────────────────────────────
+let _offLangPriority = [];
+let _offAllLangs = [];
+
+function _renderOffLangPriority() {
+  const list = document.getElementById('off-lang-priority-list');
+  const addSelect = document.getElementById('off-lang-add-select');
+  if (!list) return;
+
+  list.innerHTML = '';
+  _offLangPriority.forEach((code, idx) => {
+    const item = document.createElement('div');
+    item.className = 'off-lang-item';
+
+    const label = document.createElement('span');
+    label.className = 'off-lang-code';
+    label.textContent = code;
+    item.appendChild(label);
+
+    const upBtn = document.createElement('button');
+    upBtn.type = 'button';
+    upBtn.className = 'btn-sm';
+    upBtn.textContent = '↑';
+    upBtn.setAttribute('aria-label', t('off_lang_move_up'));
+    upBtn.disabled = idx === 0;
+    upBtn.addEventListener('click', () => {
+      _offLangPriority.splice(idx - 1, 0, _offLangPriority.splice(idx, 1)[0]);
+      _renderOffLangPriority();
+      _saveOffLangPriority();
+    });
+    item.appendChild(upBtn);
+
+    const downBtn = document.createElement('button');
+    downBtn.type = 'button';
+    downBtn.className = 'btn-sm';
+    downBtn.textContent = '↓';
+    downBtn.setAttribute('aria-label', t('off_lang_move_down'));
+    downBtn.disabled = idx === _offLangPriority.length - 1;
+    downBtn.addEventListener('click', () => {
+      _offLangPriority.splice(idx + 1, 0, _offLangPriority.splice(idx, 1)[0]);
+      _renderOffLangPriority();
+      _saveOffLangPriority();
+    });
+    item.appendChild(downBtn);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-sm btn-red';
+    removeBtn.textContent = t('off_lang_remove');
+    removeBtn.disabled = _offLangPriority.length === 1;
+    removeBtn.addEventListener('click', () => {
+      _offLangPriority.splice(idx, 1);
+      _renderOffLangPriority();
+      _saveOffLangPriority();
+    });
+    item.appendChild(removeBtn);
+
+    list.appendChild(item);
+  });
+
+  if (addSelect) {
+    addSelect.innerHTML = '';
+    const available = _offAllLangs.filter((l) => !_offLangPriority.includes(l.code));
+    available.forEach((l) => {
+      const opt = document.createElement('option');
+      opt.value = l.code;
+      opt.textContent = l.name || l.code;
+      addSelect.appendChild(opt);
+    });
+    const addBtn = document.getElementById('off-lang-add-btn');
+    if (addBtn) addBtn.disabled = available.length === 0;
+  }
+}
+
+async function _saveOffLangPriority() {
+  try {
+    await api('/api/settings/off-language-priority', {
+      method: 'PUT',
+      body: JSON.stringify({ languages: _offLangPriority }),
+    });
+    showToast(t('toast_off_lang_priority_saved'), 'success');
+  } catch(e) {
+    showToast(t('toast_save_error'), 'error');
+  }
+}
+
+export async function loadOffLanguagePriority() {
+  const list = document.getElementById('off-lang-priority-list');
+  if (!list) return;
+  try {
+    const [priority, langs] = await Promise.all([
+      api('/api/settings/off-language-priority'),
+      api('/api/settings/off-languages'),
+    ]);
+    _offLangPriority = priority.languages || [];
+    _offAllLangs = langs.languages || [];
+    _renderOffLangPriority();
+
+    const addBtn = document.getElementById('off-lang-add-btn');
+    if (addBtn && !addBtn.dataset.bound) {
+      addBtn.dataset.bound = '1';
+      addBtn.addEventListener('click', () => {
+        const addSelect = document.getElementById('off-lang-add-select');
+        if (!addSelect || !addSelect.value) return;
+        _offLangPriority.push(addSelect.value);
+        _renderOffLangPriority();
+        _saveOffLangPriority();
+      });
+    }
+  } catch(e) {
+    showToast(t('toast_load_error'), 'error');
+  }
+}
+
 export async function refreshAllFromOff() {
   const opts = await _showRefreshOffModal();
   if (!opts) return;

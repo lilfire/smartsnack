@@ -709,5 +709,12 @@
   "label_ean_primary": "Primär",
   "tags": "Taggar",
   "torch_toggle_off": "Sätt på ficklampa",
-  "torch_toggle_on": "Stäng av ficklampa"
+  "torch_toggle_on": "Stäng av ficklampa",
+  "off_lang_priority_title": "OFF-språkprioritet",
+  "off_lang_priority_desc": "Välj vilka språk som ska användas när du hämtar data från Open Food Facts, i önskad prioritetsordning.",
+  "off_lang_add": "Lägg till språk",
+  "off_lang_remove": "Ta bort",
+  "off_lang_move_up": "Flytta upp",
+  "off_lang_move_down": "Flytta ned",
+  "toast_off_lang_priority_saved": "Språkprioritet sparad"
 }
