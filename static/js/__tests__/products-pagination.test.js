@@ -1,0 +1,196 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../state.js', () => {
+  const _state = {
+    currentView: 'search',
+    currentFilter: [],
+    expandedId: null,
+    editingId: null,
+    searchTimeout: null,
+    cachedStats: { total: 5, types: 2, categories: [] },
+    cachedResults: [],
+    sortCol: 'total_score',
+    sortDir: 'desc',
+    categories: [],
+    imageCache: {},
+    advancedFilters: null,
+  };
+  return {
+    state: _state,
+    api: vi.fn().mockResolvedValue({ products: [], total: 0 }),
+    fetchProducts: vi.fn().mockResolvedValue({ products: [], total: 0 }),
+    fetchStats: vi.fn().mockResolvedValue({ total: 5, types: 2 }),
+    NUTRI_IDS: ['kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt', 'weight', 'portion'],
+    showConfirmModal: vi.fn().mockResolvedValue(true),
+    showToast: vi.fn(),
+    upgradeSelect: vi.fn(),
+    announceStatus: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
+  };
+});
+
+vi.mock('../i18n.js', () => ({
+  t: vi.fn((key) => key),
+}));
+
+vi.mock('../filters.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    buildFilters: vi.fn(),
+    rerender: vi.fn(),
+    buildTypeSelect: vi.fn(),
+  };
+});
+
+vi.mock('../render.js', () => ({
+  renderResults: vi.fn(),
+  getFlagConfig: vi.fn(() => ({})),
+}));
+
+vi.mock('../settings-weights.js', () => ({
+  loadSettings: vi.fn(),
+}));
+
+vi.mock('../off-utils.js', () => ({
+  isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
+  validateOffBtn: vi.fn(),
+}));
+vi.mock('../off-conflicts.js', () => ({
+  showMergeConflictModal: vi.fn(),
+  showEditDuplicateModal: vi.fn(),
+}));
+vi.mock('../off-duplicates.js', () => ({
+  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
+  showOffAddReview: vi.fn(),
+  closeOffAddReview: vi.fn(),
+  submitToOff: vi.fn(),
+}));
+
+import { loadData, setFilter, switchView, onSearchInput, clearSearch } from '../products.js';
+import { state, fetchProducts, fetchStats } from '../state.js';
+import { renderResults } from '../render.js';
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  state.currentView = 'search';
+  state.currentFilter = [];
+  state.expandedId = null;
+  state.editingId = null;
+  state.cachedResults = [];
+  state.advancedFilters = null;
+  state.searchTimeout = null;
+
+  document.body.innerHTML = `
+    <div id="stats-line"></div>
+    <input id="search-input" value="" />
+    <span id="search-clear"></span>
+    <select id="f-volume"><option value="">--</option></select>
+    <div id="view-search"></div>
+    <div id="view-register" style="display:none"></div>
+    <div id="view-settings" style="display:none"></div>
+    <div class="nav-tab" data-view="search"></div>
+    <div class="nav-tab" data-view="register"></div>
+    <div class="nav-tab" data-view="settings"></div>
+  `;
+});
+
+describe('Pagination: initial load', () => {
+  it('calls fetchProducts and passes result to renderResults', async () => {
+    const mockProducts = [
+      { id: 1, name: 'A', total_score: 80 },
+      { id: 2, name: 'B', total_score: 70 },
+    ];
+    fetchProducts.mockResolvedValue(mockProducts);
+
+    await loadData();
+
+    expect(fetchProducts).toHaveBeenCalledTimes(1);
+    expect(renderResults).toHaveBeenCalledWith(mockProducts, '');
+  });
+
+  it('uses search input value when in search view', async () => {
+    document.getElementById('search-input').value = 'Popcorn';
+    const mockResult = { products: [{ id: 1, name: 'Popcorn', total_score: 90 }], total: 1 };
+    fetchProducts.mockResolvedValue(mockResult);
+
+    await loadData();
+
+    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', []);
+  });
+
+  it('passes current filters to fetchProducts', async () => {
+    state.currentFilter = ['Snacks', 'Drikke'];
+    fetchProducts.mockResolvedValue([]);
+
+    await loadData();
+
+    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke']);
+  });
+});
+
+describe('Pagination: filter/sort reset', () => {
+  it('setFilter clears cachedResults and reloads', async () => {
+    state.cachedResults = [{ id: 1, name: 'Old' }];
+    fetchProducts.mockResolvedValue([]);
+
+    setFilter('Snacks');
+
+    expect(state.cachedResults).toEqual([]);
+    // loadData is called asynchronously
+  });
+
+  it('setFilter with "all" resets currentFilter to empty', () => {
+    state.currentFilter = ['Snacks', 'Drikke'];
+    fetchProducts.mockResolvedValue([]);
+
+    setFilter('all');
+
+    expect(state.currentFilter).toEqual([]);
+  });
+
+  it('setFilter toggles a single filter type', () => {
+    state.currentFilter = [];
+    fetchProducts.mockResolvedValue([]);
+
+    setFilter('Snacks');
+    expect(state.currentFilter).toContain('Snacks');
+
+    setFilter('Snacks');
+    expect(state.currentFilter).not.toContain('Snacks');
+  });
+
+  it('switchView clears cachedResults', () => {
+    state.cachedResults = [{ id: 1, name: 'Cached' }];
+    fetchProducts.mockResolvedValue([]);
+
+    switchView('search');
+
+    expect(state.cachedResults).toEqual([]);
+  });
+
+  it('onSearchInput clears expandedId, editingId, and cachedResults', () => {
+    vi.useFakeTimers();
+    state.expandedId = 5;
+    state.editingId = 3;
+    state.cachedResults = [{ id: 1 }];
+
+    onSearchInput();
+
+    expect(state.expandedId).toBeNull();
+    expect(state.editingId).toBeNull();
+    expect(state.cachedResults).toEqual([]);
+    vi.useRealTimers();
+  });
+
+  it('clearSearch resets input and reloads data', async () => {
+    document.getElementById('search-input').value = 'test';
+    fetchProducts.mockResolvedValue([]);
+
+    clearSearch();
+
+    expect(document.getElementById('search-input').value).toBe('');
+  });
+});
