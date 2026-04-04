@@ -48,6 +48,40 @@ function _renderPills() {
   }
 }
 
+function _fetchSuggestions(q, list, input) {
+  return fetch(`/api/products/tags/suggestions?q=${encodeURIComponent(q)}`)
+    .then(res => res.json())
+    .then(suggestions => {
+      // Filter out already-selected tags
+      const filtered = suggestions.filter(
+        s => !_tags.has(s.trim().toLowerCase())
+      );
+      list.innerHTML = '';
+      if (!filtered.length) { list.hidden = true; return; }
+      for (const s of filtered) {
+        const li = document.createElement('li');
+        li.textContent = s;
+        li.addEventListener('mousedown', e => {
+          e.preventDefault();
+          _addTag(s);
+          input.value = '';
+          list.hidden = true;
+        });
+        list.appendChild(li);
+      }
+      list.hidden = false;
+    })
+    .catch(() => { list.hidden = true; });
+}
+
+function _getHighlighted(list) {
+  return list.querySelector('li.highlighted');
+}
+
+function _clearHighlight(list) {
+  list.querySelectorAll('li.highlighted').forEach(li => li.classList.remove('highlighted'));
+}
+
 function _bindInput() {
   const field = document.getElementById('tag-field-ed');
   const input = document.getElementById('tag-input-ed');
@@ -63,61 +97,92 @@ function _bindInput() {
 
   let _debounce = null;
 
+  // On focus: fetch with empty query to show available suggestions
+  input.addEventListener('focus', () => {
+    clearTimeout(_debounce);
+    _fetchSuggestions('', list, input);
+  });
+
   input.addEventListener('input', () => {
     clearTimeout(_debounce);
     const q = input.value.trim();
     if (!q) { list.hidden = true; return; }
-    _debounce = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/products/tags/suggestions?q=${encodeURIComponent(q)}`);
-        const suggestions = await res.json();
-        list.innerHTML = '';
-        if (!suggestions.length) { list.hidden = true; return; }
-        for (const s of suggestions) {
-          const li = document.createElement('li');
-          li.textContent = s;
-          li.addEventListener('mousedown', e => {
-            e.preventDefault();
-            _addTag(s);
-            input.value = '';
-            list.hidden = true;
-          });
-          list.appendChild(li);
-        }
-        list.hidden = false;
-      } catch (_) {
-        list.hidden = true;
-      }
+    _debounce = setTimeout(() => {
+      _fetchSuggestions(q, list, input);
     }, 200);
   });
 
   input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ',') {
+    const items = list.hidden ? [] : [...list.querySelectorAll('li')];
+    const highlighted = _getHighlighted(list);
+
+    if (e.key === 'ArrowDown') {
       e.preventDefault();
-      _addTag(input.value);
+      if (!items.length) return;
+      const current = highlighted;
+      _clearHighlight(list);
+      if (!current) {
+        items[0].classList.add('highlighted');
+      } else {
+        const idx = items.indexOf(current);
+        if (idx < items.length - 1) items[idx + 1].classList.add('highlighted');
+        else items[idx].classList.add('highlighted');
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!items.length) return;
+      const current = highlighted;
+      _clearHighlight(list);
+      if (!current) {
+        items[items.length - 1].classList.add('highlighted');
+      } else {
+        const idx = items.indexOf(current);
+        if (idx > 0) items[idx - 1].classList.add('highlighted');
+        else items[idx].classList.add('highlighted');
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (highlighted) {
+        _addTag(highlighted.textContent);
+        input.value = '';
+        list.hidden = true;
+        _clearHighlight(list);
+      } else if (input.value.trim()) {
+        // No highlighted item: create new tag from input text if non-empty
+        _addTag(input.value);
+        input.value = '';
+        list.hidden = true;
+      }
+      // If input is empty and nothing highlighted: do nothing
+    } else if (e.key === 'Escape') {
       input.value = '';
       list.hidden = true;
+      _clearHighlight(list);
     } else if (e.key === 'Tab' && !list.hidden) {
-      // Tab completes the first visible suggestion
-      const first = list.querySelector('li');
+      // Tab selects first highlighted or first visible suggestion
+      const first = highlighted || items[0];
       if (first) {
         e.preventDefault();
         _addTag(first.textContent);
         input.value = '';
         list.hidden = true;
+        _clearHighlight(list);
       }
     } else if (e.key === 'Backspace' && input.value === '') {
-      // Backspace with empty input removes the last tag
+      // Backspace with empty input removes the alphabetically last tag
       const sorted = [..._tags].sort();
       if (sorted.length > 0) {
         _tags.delete(sorted[sorted.length - 1]);
         _renderPills();
       }
     }
+    // Comma key: no longer a trigger — ignore
   });
 
   input.addEventListener('blur', () => {
-    setTimeout(() => { list.hidden = true; }, 150);
+    setTimeout(() => {
+      list.hidden = true;
+      _clearHighlight(list);
+    }, 150);
   });
 }
-
