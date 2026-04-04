@@ -9,6 +9,8 @@ import secrets
 from cryptography.fernet import Fernet, InvalidToken
 
 from db import get_db
+import json
+
 from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, OCR_BACKENDS, DEFAULT_OCR_BACKEND
 
 logger = logging.getLogger(__name__)
@@ -176,3 +178,31 @@ def set_ocr_backend(backend_id: str) -> str:
     )
     conn.commit()
     return backend_id
+
+
+_OFF_LANGUAGE_PRIORITY_KEY = "off_language_priority"
+
+
+def get_off_language_priority() -> list:
+    """Return the OFF language priority list, defaulting to [current_language]."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT value FROM user_settings WHERE key = ?",
+        (_OFF_LANGUAGE_PRIORITY_KEY,),
+    ).fetchone()
+    if row:
+        try:
+            return json.loads(row["value"])
+        except Exception:
+            pass
+    return [get_language()]
+
+
+def set_off_language_priority(priority: list) -> None:
+    """Save the OFF language priority list as JSON."""
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+        (_OFF_LANGUAGE_PRIORITY_KEY, json.dumps(priority)),
+    )
+    conn.commit()
