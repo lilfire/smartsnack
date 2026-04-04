@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+}));
+
 vi.mock('../state.js', () => {
   const _state = {
     currentView: 'search',
@@ -14,6 +19,7 @@ vi.mock('../state.js', () => {
     categories: [],
     imageCache: {},
     advancedFilters: null,
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -82,6 +88,7 @@ beforeEach(() => {
   state.cachedResults = [];
   state.advancedFilters = null;
   state.searchTimeout = null;
+  state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
 
   document.body.innerHTML = `
     <div id="stats-line"></div>
@@ -118,7 +125,7 @@ describe('Pagination: initial load', () => {
 
     await loadData();
 
-    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', []);
+    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', [], { limit: 50, offset: 0 });
   });
 
   it('passes current filters to fetchProducts', async () => {
@@ -127,7 +134,7 @@ describe('Pagination: initial load', () => {
 
     await loadData();
 
-    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke']);
+    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke'], { limit: 50, offset: 0 });
   });
 });
 
