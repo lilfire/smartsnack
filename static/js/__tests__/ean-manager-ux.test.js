@@ -166,12 +166,12 @@ describe('Locked state (is_synced_with_off present)', () => {
     expect(values[1].textContent).toBe('5000000000001');
   });
 
-  it('does not render add input when locked', async () => {
+  it('renders add input even when locked', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
     await loadEanManager(PRODUCT_ID, true);
 
-    expect(document.querySelector('.ean-add-input')).toBeNull();
-    expect(document.getElementById('ean-add-input-' + PRODUCT_ID)).toBeNull();
+    expect(document.querySelector('.ean-add-input')).not.toBeNull();
+    expect(document.getElementById('ean-add-input-' + PRODUCT_ID)).not.toBeNull();
   });
 
   it('does not render delete buttons when locked', async () => {
