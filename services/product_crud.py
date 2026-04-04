@@ -12,6 +12,7 @@ from config import (
     _VALID_COLUMNS,
     _TEXT_FIELD_LIMITS,
     COMPUTED_FIELDS,
+    DEFAULT_PAGE_SIZE,
 )
 from services import flag_service
 from helpers import _num, _safe_float
@@ -173,9 +174,13 @@ def _sync_primary_ean(conn, pid: int, new_ean: str) -> None:
 
 
 def list_products(
-    search: str | None, type_filter: str | None, advanced_filters: str | None = None
-) -> list:
-    """List products with computed scores, filtered and sorted."""
+    search: str | None,
+    type_filter: str | None,
+    advanced_filters: str | None = None,
+    limit: int = DEFAULT_PAGE_SIZE,
+    offset: int = 0,
+) -> dict:
+    """List products with computed scores, filtered and sorted. Returns {products, total}."""
     conn = get_db()
     cur = conn.cursor()
 
@@ -217,9 +222,14 @@ def list_products(
             params.extend(af_params)
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+
+    total_count = cur.execute(
+        f"SELECT COUNT(*) FROM products {where}", params
+    ).fetchone()[0]
+
     rows = cur.execute(
-        f"SELECT {PRODUCT_COLS_NO_IMAGE} FROM products {where} ORDER BY name",
-        params,
+        f"SELECT {PRODUCT_COLS_NO_IMAGE} FROM products {where} ORDER BY name LIMIT ? OFFSET ?",
+        params + [limit, offset],
     ).fetchall()
 
     results = []
@@ -249,7 +259,7 @@ def list_products(
     results = _apply_post_filters(results, post_filter_spec)
 
     results.sort(key=lambda x: x["total_score"], reverse=True)
-    return results
+    return {"products": results, "total": total_count}
 
 
 def add_product(data: dict, on_duplicate: str | None = None) -> dict:
