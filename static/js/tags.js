@@ -1,77 +1,92 @@
-let _tags = new Set();
+// tags.js — Tag input widget. Internal state: Map<number, string> (id → label).
+let _tags = new Map();
 
 export function initTagInput(existingTags) {
-  _tags = new Set((existingTags || []).map(t => t.trim().toLowerCase()));
+  _tags = new Map();
+  for (const t of (existingTags || [])) {
+    if (t && t.id != null && t.label != null) {
+      _tags.set(Number(t.id), String(t.label));
+    }
+  }
   _renderPills();
   _bindInput();
 }
 
 export function getTagsForSave() {
-  // Flush any uncommitted text from the inline input before returning
   const input = document.getElementById('tag-input-ed');
   if (input && input.value.trim()) {
-    _addTag(input.value);
     input.value = '';
   }
-  return Array.from(_tags);
+  return Array.from(_tags.keys());
 }
 
-function _addTag(value) {
-  const tag = value.trim().toLowerCase();
-  if (!tag || tag.length > 50 || _tags.has(tag)) return;
-  _tags.add(tag);
-  _renderPills();
+function _sortedEntries() {
+  return Array.from(_tags.entries()).sort((a, b) => a[1].localeCompare(b[1]));
 }
 
 function _renderPills() {
   const field = document.getElementById('tag-field-ed');
   if (!field) return;
-  // Remove existing pill elements only (preserve input and suggestions list)
   field.querySelectorAll('.tag-pill').forEach(el => el.remove());
-  const input = field.querySelector('#tag-input-ed');
-  for (const tag of [..._tags].sort()) {
+  const inputEl = field.querySelector('#tag-input-ed');
+  for (const [id, label] of _sortedEntries()) {
     const span = document.createElement('span');
     span.className = 'tag-pill';
-    const textNode = document.createTextNode(tag);
-    span.appendChild(textNode);
+    span.dataset.tagId = id;
+    span.appendChild(document.createTextNode(label));
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'tag-remove';
-    btn.setAttribute('data-tag', tag);
+    btn.setAttribute('aria-label', 'Remove tag ' + label);
     btn.textContent = '\u00D7';
     btn.addEventListener('click', () => {
-      _tags.delete(tag);
+      _tags.delete(id);
       _renderPills();
     });
     span.appendChild(btn);
-    field.insertBefore(span, input);
+    field.insertBefore(span, inputEl);
   }
 }
 
-function _fetchSuggestions(q, list, input) {
-  return fetch(`/api/products/tags/suggestions?q=${encodeURIComponent(q)}`)
-    .then(res => res.json())
-    .then(suggestions => {
-      // Filter out already-selected tags
-      const filtered = suggestions.filter(
-        s => !_tags.has(s.trim().toLowerCase())
-      );
-      list.innerHTML = '';
-      if (!filtered.length) { list.hidden = true; return; }
-      for (const s of filtered) {
-        const li = document.createElement('li');
-        li.textContent = s;
-        li.addEventListener('mousedown', e => {
-          e.preventDefault();
-          _addTag(s);
-          input.value = '';
-          list.hidden = true;
-        });
-        list.appendChild(li);
-      }
-      list.hidden = false;
-    })
-    .catch(() => { list.hidden = true; });
+async function _fetchSuggestions(q, list, input) {
+  try {
+    const res = await fetch('/api/tags?q=' + encodeURIComponent(q));
+    const suggestions = await res.json();
+    const filtered = suggestions.filter(s => !_tags.has(Number(s.id)));
+    list.innerHTML = '';
+    if (!filtered.length) { list.hidden = true; return; }
+    for (const s of filtered) {
+      const li = document.createElement('li');
+      li.dataset.tagId = s.id;
+      li.dataset.tagLabel = s.label;
+      li.textContent = s.label;
+      li.addEventListener('mousedown', e => {
+        e.preventDefault();
+        _tags.set(Number(s.id), s.label);
+        _renderPills();
+        input.value = '';
+        list.hidden = true;
+      });
+      list.appendChild(li);
+    }
+    list.hidden = false;
+  } catch (_) {
+    list.hidden = true;
+  }
+}
+
+async function _createTag(label) {
+  try {
+    const res = await fetch('/api/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'SmartSnack' },
+      body: JSON.stringify({ label }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) {
+    return null;
+  }
 }
 
 function _getHighlighted(list) {
@@ -88,16 +103,14 @@ function _bindInput() {
   const list = document.getElementById('tag-suggestions-ed');
   if (!input || !list) return;
 
-  // Click anywhere on the field container focuses the input
   if (field) {
-    field.addEventListener('click', (e) => {
+    field.addEventListener('click', e => {
       if (e.target === field) input.focus();
     });
   }
 
   let _debounce = null;
 
-  // On focus: fetch with empty query to show available suggestions
   input.addEventListener('focus', () => {
     clearTimeout(_debounce);
     _fetchSuggestions('', list, input);
@@ -107,76 +120,72 @@ function _bindInput() {
     clearTimeout(_debounce);
     const q = input.value.trim();
     if (!q) { list.hidden = true; return; }
-    _debounce = setTimeout(() => {
-      _fetchSuggestions(q, list, input);
-    }, 200);
+    _debounce = setTimeout(() => _fetchSuggestions(q, list, input), 200);
   });
 
-  input.addEventListener('keydown', e => {
+  input.addEventListener('keydown', async e => {
     const items = list.hidden ? [] : [...list.querySelectorAll('li')];
     const highlighted = _getHighlighted(list);
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (!items.length) return;
-      const current = highlighted;
       _clearHighlight(list);
-      if (!current) {
+      if (!highlighted) {
         items[0].classList.add('highlighted');
       } else {
-        const idx = items.indexOf(current);
-        if (idx < items.length - 1) items[idx + 1].classList.add('highlighted');
-        else items[idx].classList.add('highlighted');
+        const idx = items.indexOf(highlighted);
+        items[idx < items.length - 1 ? idx + 1 : idx].classList.add('highlighted');
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       if (!items.length) return;
-      const current = highlighted;
       _clearHighlight(list);
-      if (!current) {
+      if (!highlighted) {
         items[items.length - 1].classList.add('highlighted');
       } else {
-        const idx = items.indexOf(current);
-        if (idx > 0) items[idx - 1].classList.add('highlighted');
-        else items[idx].classList.add('highlighted');
+        const idx = items.indexOf(highlighted);
+        items[idx > 0 ? idx - 1 : idx].classList.add('highlighted');
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (highlighted) {
-        _addTag(highlighted.textContent);
+        _tags.set(Number(highlighted.dataset.tagId), highlighted.dataset.tagLabel);
+        _renderPills();
         input.value = '';
         list.hidden = true;
         _clearHighlight(list);
       } else if (input.value.trim()) {
-        // No highlighted item: create new tag from input text if non-empty
-        _addTag(input.value);
+        const label = input.value.trim();
+        const tag = await _createTag(label);
+        if (tag) {
+          _tags.set(Number(tag.id), tag.label);
+          _renderPills();
+        }
         input.value = '';
         list.hidden = true;
       }
-      // If input is empty and nothing highlighted: do nothing
     } else if (e.key === 'Escape') {
       input.value = '';
       list.hidden = true;
       _clearHighlight(list);
     } else if (e.key === 'Tab' && !list.hidden) {
-      // Tab selects first highlighted or first visible suggestion
       const first = highlighted || items[0];
       if (first) {
         e.preventDefault();
-        _addTag(first.textContent);
+        _tags.set(Number(first.dataset.tagId), first.dataset.tagLabel);
+        _renderPills();
         input.value = '';
         list.hidden = true;
         _clearHighlight(list);
       }
     } else if (e.key === 'Backspace' && input.value === '') {
-      // Backspace with empty input removes the alphabetically last tag
-      const sorted = [..._tags].sort();
-      if (sorted.length > 0) {
-        _tags.delete(sorted[sorted.length - 1]);
+      const sorted = _sortedEntries();
+      if (sorted.length) {
+        _tags.delete(sorted[sorted.length - 1][0]);
         _renderPills();
       }
     }
-    // Comma key: no longer a trigger — ignore
   });
 
   input.addEventListener('blur', () => {
