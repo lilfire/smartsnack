@@ -326,7 +326,7 @@ class TestSearchByEan:
         _add_product(client, name="PrimarySearch", ean="55555555")
         resp = client.get("/api/products?search=55555555")
         assert resp.status_code == 200
-        results = resp.get_json()
+        results = resp.get_json()["products"]
         names = [p["name"] for p in results]
         assert "PrimarySearch" in names
 
@@ -336,7 +336,7 @@ class TestSearchByEan:
 
         resp = client.get("/api/products?search=77777777")
         assert resp.status_code == 200
-        results = resp.get_json()
+        results = resp.get_json()["products"]
         names = [p["name"] for p in results]
         assert "SecondarySearch" in names
 
