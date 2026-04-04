@@ -147,18 +147,24 @@ def test_autocomplete_no_match(client, product_id):
     assert resp.get_json() == []
 
 
-def test_tags_on_create(client):
-    """Tags are stored when creating a product via POST."""
+def test_tags_on_create_then_update(client):
+    """Tags are stored when updating a newly created product via PUT."""
     resp = client.post(
         "/api/products",
-        data=json.dumps({"name": "Tag Create Test", "type": "Snacks", "ean": "", "tags": ["fresh", "organic"]}),
+        data=json.dumps({"name": "Tag Create Test", "type": "Snacks", "ean": ""}),
         content_type="application/json",
     )
     assert resp.status_code == 201
     pid = resp.get_json()["id"]
 
+    client.put(
+        f"/api/products/{pid}",
+        data=json.dumps({"name": "Tag Create Test", "tags": ["fresh", "organic"]}),
+        content_type="application/json",
+    )
+
     get_resp = client.get("/api/products")
-    product = next((p for p in get_resp.get_json() if p["id"] == pid), None)
+    product = next((p for p in get_resp.get_json()["products"] if p["id"] == pid), None)
     assert product is not None
     assert sorted(product["tags"]) == ["fresh", "organic"]
 
@@ -177,6 +183,6 @@ def test_tags_update_replaces(client, product_id):
         content_type="application/json",
     )
     get_resp = client.get("/api/products")
-    product = next((p for p in get_resp.get_json() if p["id"] == pid), None)
+    product = next((p for p in get_resp.get_json()["products"] if p["id"] == pid), None)
     assert product is not None
     assert product["tags"] == ["new1"]
