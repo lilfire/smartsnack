@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+}));
+
 vi.mock('../state.js', () => {
   const _state = {
     currentView: 'search',
