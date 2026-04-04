@@ -402,6 +402,13 @@ export function renderResults(results, search) {
     if (window.loadEanManager) window.loadEanManager(state.editingId);
   }
 
+  // Initialize tag input after edit form HTML is in DOM
+  if (state.editingId && document.getElementById('tag-container-ed')) {
+    const tagProduct = state.cachedResults && state.cachedResults.find(p => p.id === state.editingId);
+    const existingTags = tagProduct ? (tagProduct.tags || []) : [];
+    import('./tags.js').then(mod => mod.initTagInput(existingTags));
+  }
+
   const edType = document.getElementById('ed-type');
   if (edType) upgradeSelect(edType);
   const edVol = document.getElementById('ed-volume');
