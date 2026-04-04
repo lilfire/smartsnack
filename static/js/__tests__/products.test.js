@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+  showScrollLoader: vi.fn(),
+  hideScrollLoader: vi.fn(),
+}));
+
 vi.mock('../state.js', () => {
   const _state = {
     currentView: 'search',
@@ -16,6 +23,7 @@ vi.mock('../state.js', () => {
     sortDir: 'desc',
     categories: [],
     imageCache: {},
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -84,6 +92,7 @@ beforeEach(() => {
   state.currentFilter = [];
   state.expandedId = null;
   state.editingId = null;
+  state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
   state.cachedResults = [
     { id: 1, name: 'Milk', type: 'dairy' },
     { id: 2, name: 'Bread', type: 'bakery' },

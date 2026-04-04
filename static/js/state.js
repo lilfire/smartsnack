@@ -122,6 +122,7 @@ export const state = {
   categories: [],
   imageCache: createLRUCache(IMAGE_CACHE_MAX_SIZE),
   advancedFilters: null,
+  pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
 };
 
 // All nutrition field IDs used in register/edit forms
@@ -245,11 +246,13 @@ export async function api(path, opts) {
   }
 }
 
-export async function fetchProducts(search, types) {
+export async function fetchProducts(search, types, opts) {
   const p = new URLSearchParams();
   if (search) p.set('search', search);
   if (types && types.length) p.set('type', types.join(','));
   if (state.advancedFilters) p.set('filters', state.advancedFilters);
+  if (opts && opts.limit != null) p.set('limit', String(opts.limit));
+  if (opts && opts.offset != null) p.set('offset', String(opts.offset));
   return api('/api/products?' + p);
 }
 
