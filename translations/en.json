@@ -707,6 +707,9 @@
   "error_ean_already_exists": "This EAN already exists on this product",
   "error_cannot_remove_only_ean": "Cannot remove the only EAN",
   "label_ean_primary": "Primary",
+  "ean_off_fetch_tooltip": "This EAN is used for fetching from OpenFoodFacts",
+  "ean_fetch_off_btn_tooltip": "Set as primary and fetch data from OpenFoodFacts",
+  "ean_locked_notice": "EAN codes are locked because this product is synced with OFF",
   "tags": "Tags",
   "torch_toggle_off": "Turn on flashlight",
   "torch_toggle_on": "Turn off flashlight"

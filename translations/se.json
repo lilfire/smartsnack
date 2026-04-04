@@ -707,6 +707,9 @@
   "error_ean_already_exists": "Denna EAN finns redan på produkten",
   "error_cannot_remove_only_ean": "Kan inte ta bort den enda EAN",
   "label_ean_primary": "Primär",
+  "ean_off_fetch_tooltip": "Denna EAN används för hämtning från OpenFoodFacts",
+  "ean_fetch_off_btn_tooltip": "Ange som primär och hämta data från OpenFoodFacts",
+  "ean_locked_notice": "EAN-koder är låsta eftersom produkten är synkroniserad med OFF",
   "tags": "Taggar",
   "torch_toggle_off": "Sätt på ficklampa",
   "torch_toggle_on": "Stäng av ficklampa"

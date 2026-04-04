@@ -700,3 +700,44 @@ label.field-label.field-required::after {
   color: rgba(78, 205, 196, 0.7);
   font-family: 'Space Mono', monospace;
 }
+
+.ean-badge-off {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  white-space: nowrap;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: default;
+}
+
+.btn-ean-off {
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.08);
+  color: #60a5fa;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-ean-off:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.ean-lock-notice {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 4px 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}

@@ -244,7 +244,7 @@ export function renderResults(results, search) {
               return '<div class="edit-grid-2">'
                 + '<label>' + t('label_eans') + '</label>'
                 + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
-                + '<div id="ean-manager-' + p.id + '" class="ean-manager"><div class="ean-manager-loading">\u2026</div></div>'
+                + '<div id="ean-manager-' + p.id + '" class="ean-manager" data-locked="' + (isSynced ? '1' : '0') + '"><div class="ean-manager-loading">\u2026</div></div>'
                 + '<div class="ean-row" style="margin-top:6px">'
                 + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
                 + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
@@ -398,8 +398,12 @@ export function renderResults(results, search) {
   if (edIngredients) edIngredients.addEventListener('input', () => window.updateEstimateBtn('ed'));
 
   // Load EAN manager asynchronously after edit form renders
-  if (state.editingId && document.getElementById('ean-manager-' + state.editingId)) {
-    if (window.loadEanManager) window.loadEanManager(state.editingId);
+  if (state.editingId) {
+    const eanMgr = document.getElementById('ean-manager-' + state.editingId);
+    if (eanMgr && window.loadEanManager) {
+      const locked = eanMgr.dataset.locked === '1';
+      window.loadEanManager(state.editingId, locked);
+    }
   }
 
   const edType = document.getElementById('ed-type');
