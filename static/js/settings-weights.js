@@ -7,7 +7,7 @@ import { loadCategories } from './settings-categories.js';
 import { loadFlags } from './settings-flags.js';
 import { loadPq } from './settings-pq.js';
 import { loadOcrSettings, loadOcrProviders } from './settings-ocr.js';
-import { loadOffCredentials, checkRefreshStatus } from './settings-off.js';
+import { loadOffCredentials, checkRefreshStatus, loadOffLanguagePriority } from './settings-off.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -68,6 +68,7 @@ export async function loadSettings() {
     loadFlags();
     loadPq();
     loadOffCredentials();
+    loadOffLanguagePriority();
     checkRefreshStatus();
     await loadOcrProviders();
     await loadOcrSettings();

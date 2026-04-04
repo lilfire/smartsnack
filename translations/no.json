@@ -713,5 +713,12 @@
   "tags": "Tagger",
   "tag_input_placeholder": "Legg til tag…",
   "torch_toggle_off": "Slå på lommelykt",
-  "torch_toggle_on": "Slå av lommelykt"
+  "torch_toggle_on": "Slå av lommelykt",
+  "off_lang_priority_title": "OFF-språkprioritet",
+  "off_lang_priority_desc": "Velg hvilke språk som skal brukes når du henter data fra Open Food Facts, i ønsket prioritetsrekkefølge.",
+  "off_lang_add": "Legg til språk",
+  "off_lang_remove": "Fjern",
+  "off_lang_move_up": "Flytt opp",
+  "off_lang_move_down": "Flytt ned",
+  "toast_off_lang_priority_saved": "Språkprioritet lagret"
 }
