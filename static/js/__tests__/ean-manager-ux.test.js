@@ -249,3 +249,21 @@ describe('Unlocked state (is_synced_with_off absent)', () => {
     expect(document.querySelector('.ean-lock-notice')).toBeNull();
   });
 });
+
+// ── Error Handling ──────────────────────────────────
+
+describe('Error handling', () => {
+  it('loadEanManager shows error when API fails', async () => {
+    api.mockRejectedValueOnce(new Error('Network error'));
+    await loadEanManager(PRODUCT_ID, false);
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    expect(container.querySelector('.field-error')).not.toBeNull();
+  });
+
+  it('loadEanManager exits early when container is missing', async () => {
+    document.body.innerHTML = '';
+    await loadEanManager(PRODUCT_ID, false);
+    expect(api).not.toHaveBeenCalled();
+  });
+});
