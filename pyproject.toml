@@ -21,3 +21,10 @@ e2e = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["blueprints", "services", "app", "config", "db", "helpers", "translations"]
+omit = ["tests/*", "tests/e2e/*"]
+
+[tool.coverage.report]
+fail_under = 80
