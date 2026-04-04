@@ -571,3 +571,132 @@ class TestSetPrimaryEanBlueprint:
         pid = _add_product(client, name="BPUnknownSetPrimary", ean="11111111")
         resp = client.patch(f"/api/products/{pid}/eans/99999/set-primary")
         assert resp.status_code == 404
+
+
+# ── EAN-scoped OFF sync flag ────────────────────────────────────────────────────
+
+
+class TestEanSyncedWithOff:
+    def test_add_product_from_off_marks_ean_as_synced(self, app_ctx, db):
+        from services import product_service
+
+        result = product_service.add_product(
+            {"type": "Snacks", "name": "FromOffAdd", "ean": "11111111", "from_off": True}
+        )
+        pid = result["id"]
+        row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        assert row is not None
+        assert row["synced_with_off"] == 1
+
+    def test_update_product_from_off_marks_ean_as_synced(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "FromOffUpdate", "ean": "22222222"}
+        )["id"]
+        product_service.update_product(pid, {"ean": "22222222", "from_off": True})
+        row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "22222222"),
+        ).fetchone()
+        assert row is not None
+        assert row["synced_with_off"] == 1
+
+    def test_delete_ean_clears_off_flag_when_last_synced_ean_removed(self, app_ctx, db):
+        from services import product_service
+
+        # Create product with EAN A synced from OFF
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "ClearFlag", "ean": "33333333", "from_off": True}
+        )["id"]
+        # Add a second non-synced EAN B
+        ean_b = product_service.add_ean(pid, "44444444")
+
+        # Mark EAN A as synced (already done by add_product with from_off)
+        ean_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "33333333"),
+        ).fetchone()
+
+        # Delete the synced EAN A
+        product_service.delete_ean(pid, ean_a["id"])
+
+        # Flag should be cleared since no remaining EANs are synced
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is None
+
+    def test_delete_ean_does_not_clear_off_flag_when_another_synced_ean_remains(self, app_ctx, db):
+        from services import product_service
+
+        # Create product with EAN A and EAN B both synced from OFF
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "KeepFlag", "ean": "55555555", "from_off": True}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "66666666")
+        # Mark EAN B as synced too
+        db.execute(
+            "UPDATE product_eans SET synced_with_off = 1 WHERE id = ?", (ean_b["id"],)
+        )
+        db.commit()
+
+        ean_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "55555555"),
+        ).fetchone()
+
+        # Delete EAN A — EAN B still synced so flag should remain
+        product_service.delete_ean(pid, ean_a["id"])
+
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is not None
+
+    def test_delete_ean_does_not_clear_off_flag_when_deleted_ean_was_not_synced(self, app_ctx, db):
+        from services import product_service
+
+        # Create product with EAN A synced, EAN B not synced
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "DeleteNotSynced", "ean": "77777777", "from_off": True}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "88888888")
+        # EAN B is NOT synced (synced_with_off = 0 by default)
+
+        # Delete the non-synced EAN B
+        product_service.delete_ean(pid, ean_b["id"])
+
+        # Flag should remain since EAN A is still synced
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is not None
+
+    def test_delete_ean_no_flag_set_when_no_off_eans(self, app_ctx, db):
+        from services import product_service
+
+        # Create product with 2 EANs, neither synced
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "NoFlagNoSync", "ean": "12312312"}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "32132132")
+
+        # Delete one EAN — flag should still be absent
+        ean_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "12312312"),
+        ).fetchone()
+        product_service.delete_ean(pid, ean_a["id"])
+
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is None

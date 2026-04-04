@@ -370,6 +370,11 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         _set_user_flags(conn, new_id, data["flags"])
     if data.get("from_off"):
         set_system_flag(new_id, "is_synced_with_off", True)
+        if ean:
+            conn.execute(
+                "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
+                (new_id, ean),
+            )
     conn.commit()
     from services.product_scoring import invalidate_scoring_cache
     invalidate_scoring_cache()
@@ -439,6 +444,13 @@ def update_product(pid: int, data: dict) -> None:
     invalidate_scoring_cache()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
+        ean_val = (data.get("ean") or "").strip()
+        if ean_val:
+            conn.execute(
+                "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
+                (pid, ean_val),
+            )
+            conn.commit()
 
 
 def delete_product(pid: int) -> bool:
@@ -524,6 +536,13 @@ def delete_ean(pid: int, ean_id: int) -> None:
             conn.execute(
                 "UPDATE products SET ean = ? WHERE id = ?", (next_row["ean"], pid)
             )
+    # Check if any remaining EANs are still synced with OFF
+    synced_count = conn.execute(
+        "SELECT COUNT(*) FROM product_eans WHERE product_id = ? AND synced_with_off = 1",
+        (pid,),
+    ).fetchone()[0]
+    if synced_count == 0:
+        set_system_flag(pid, "is_synced_with_off", False)
     conn.commit()
 
 

@@ -77,6 +77,12 @@ MIGRATIONS = [
             "CREATE INDEX IF NOT EXISTS idx_products_type ON products(type)",
         ],
     ),
+    (
+        "008_add_synced_with_off_to_product_eans",
+        [
+            "ALTER TABLE product_eans ADD COLUMN synced_with_off INTEGER NOT NULL DEFAULT 0",
+        ],
+    ),
 ]
 
 
