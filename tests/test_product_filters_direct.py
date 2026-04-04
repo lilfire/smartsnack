@@ -264,7 +264,7 @@ class TestRangeFilterIntegration:
         )
         resp = client.get(f"/api/products?filters={filters}")
         assert resp.status_code == 200
-        data = resp.get_json()
+        data = resp.get_json()["products"]
         names = [p["name"] for p in data]
         assert "HighProtein" in names
         assert "LowProtein" not in names
@@ -279,7 +279,7 @@ class TestRangeFilterIntegration:
         ]})
         resp = client.get(f"/api/products?filters={filters}")
         assert resp.status_code == 200
-        data = resp.get_json()
+        data = resp.get_json()["products"]
         names = [p["name"] for p in data]
         assert "Both" in names
         assert "HighKcal" not in names
@@ -295,7 +295,7 @@ class TestRangeFilterIntegration:
         ]})
         resp = client.get(f"/api/products?filters={filters}")
         assert resp.status_code == 200
-        data = resp.get_json()
+        data = resp.get_json()["products"]
         names = [p["name"] for p in data]
         assert "LowFat" in names
         assert "LowKcal" in names

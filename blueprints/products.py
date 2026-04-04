@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify
 
 from helpers import _require_json
 from services import product_service
+from config import DEFAULT_PAGE_SIZE
 
 bp = Blueprint("products", __name__)
 
@@ -14,10 +15,15 @@ def get_products():
     type_filter = request.args.get("type")
     advanced_filters = request.args.get("filters", "").strip() or None
     try:
-        results = product_service.list_products(search, type_filter, advanced_filters)
+        limit = int(request.args.get("limit", DEFAULT_PAGE_SIZE))
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        return jsonify({"error": "limit and offset must be integers"}), 400
+    try:
+        result = product_service.list_products(search, type_filter, advanced_filters, limit, offset)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(results)
+    return jsonify(result)
 
 
 @bp.route("/api/products", methods=["POST"])

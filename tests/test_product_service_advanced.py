@@ -862,8 +862,8 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert len(result) >= 1
-        assert all(p["kcal"] >= 400 for p in result)
+        assert len(result["products"]) >= 1
+        assert all(p["kcal"] >= 400 for p in result["products"])
 
     def test_filter_excludes_products(self, app_ctx, seed_product):
         from services.product_service import list_products
@@ -876,7 +876,7 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert all(p.get("kcal", 0) < 10 for p in result)
+        assert all(p.get("kcal", 0) < 10 for p in result["products"])
 
     def test_filter_by_name_contains(self, app_ctx, seed_product):
         from services.product_service import list_products
@@ -888,8 +888,8 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert len(result) >= 1
-        assert all("popcorn" in p["name"].lower() for p in result)
+        assert len(result["products"]) >= 1
+        assert all("popcorn" in p["name"].lower() for p in result["products"])
 
     def test_filter_by_total_score_uses_post_filter(self, app_ctx, seed_product):
         from services.product_service import list_products
@@ -903,7 +903,7 @@ class TestListProductsAdvancedFilters:
         )
         result_filtered = list_products(None, None, advanced_filters=filters)
         result_all = list_products(None, None)
-        assert len(result_filtered) == len(result_all)
+        assert len(result_filtered["products"]) == len(result_all["products"])
 
     def test_invalid_filters_json_raises(self, app_ctx):
         from services.product_service import list_products
@@ -930,7 +930,7 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert any(seed_product == p["id"] for p in result)
+        assert any(seed_product == p["id"] for p in result["products"])
 
     def test_filter_by_flag_false_excludes_flagged(self, app_ctx, seed_product, db):
         from services.product_service import list_products
@@ -950,7 +950,7 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert all(p["id"] != seed_product for p in result)
+        assert all(p["id"] != seed_product for p in result["products"])
 
 
 # ---------------------------------------------------------------------------

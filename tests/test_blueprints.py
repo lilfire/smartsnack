@@ -19,7 +19,10 @@ class TestProductsBlueprint:
         resp = client.get("/api/products")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert isinstance(data, list)
+        assert isinstance(data, dict)
+        assert "products" in data
+        assert "total" in data
+        assert isinstance(data["products"], list)
 
     def test_list_with_search(self, client):
         resp = client.get("/api/products?search=Popcorn")
@@ -48,7 +51,7 @@ class TestProductsBlueprint:
 
     def test_update_product(self, client):
         # Get an existing product id
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.put(f"/api/products/{pid}", json={"name": "Updated Name"})
         assert resp.status_code == 200
@@ -77,14 +80,14 @@ class TestProductsBlueprint:
 
 class TestImagesBlueprint:
     def test_get_image(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.get(f"/api/products/{pid}/image")
         # May return 200 or 404 depending on whether image exists
         assert resp.status_code in (200, 404)
 
     def test_set_image(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.put(
             f"/api/products/{pid}/image",
@@ -95,7 +98,7 @@ class TestImagesBlueprint:
         assert resp.status_code == 200
 
     def test_set_image_invalid(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.put(
             f"/api/products/{pid}/image",
@@ -106,7 +109,7 @@ class TestImagesBlueprint:
         assert resp.status_code == 400
 
     def test_delete_image(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.delete(f"/api/products/{pid}/image")
         assert resp.status_code in (200, 404)
@@ -334,7 +337,7 @@ class TestProxyBlueprint:
 
 class TestCheckDuplicateBlueprint:
     def test_check_duplicate_returns_match(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         # Add another product to be found as duplicate
         add_resp = client.post(
@@ -352,7 +355,7 @@ class TestCheckDuplicateBlueprint:
         assert data["duplicate"]["id"] == pid
 
     def test_check_duplicate_returns_null(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.post(
             f"/api/products/{pid}/check-duplicate",
@@ -383,7 +386,7 @@ class TestMergeBlueprint:
         assert resp.get_json()["ok"] is True
 
     def test_merge_source_not_found(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.post(
             f"/api/products/{pid}/merge",
@@ -392,7 +395,7 @@ class TestMergeBlueprint:
         assert resp.status_code == 404
 
     def test_merge_missing_source_id(self, client):
-        products = client.get("/api/products").get_json()
+        products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
         resp = client.post(
             f"/api/products/{pid}/merge",

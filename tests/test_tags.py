@@ -27,7 +27,7 @@ def test_save_and_get_tags(client, product_id):
     assert put_resp.status_code == 200
 
     get_resp = client.get("/api/products")
-    products = get_resp.get_json()
+    products = get_resp.get_json()["products"]
     product = next((p for p in products if p["id"] == pid), None)
     assert product is not None
     assert sorted(product["tags"]) == ["popcorn", "salty"]
@@ -68,7 +68,7 @@ def test_deduplication(client, product_id):
         content_type="application/json",
     )
     get_resp = client.get("/api/products")
-    products = get_resp.get_json()
+    products = get_resp.get_json()["products"]
     product = next((p for p in products if p["id"] == pid), None)
     assert product is not None
     assert product["tags"] == ["popcorn"]
@@ -88,7 +88,7 @@ def test_clear_tags(client, product_id):
         content_type="application/json",
     )
     get_resp = client.get("/api/products")
-    products = get_resp.get_json()
+    products = get_resp.get_json()["products"]
     product = next((p for p in products if p["id"] == pid), None)
     assert product is not None
     assert product["tags"] == []
