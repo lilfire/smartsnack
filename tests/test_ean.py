@@ -461,6 +461,28 @@ class TestAddEanBlueprint:
         resp = client.post("/api/products/99999/eans", json={"ean": "12345678"})
         assert resp.status_code == 404
 
+    def test_adds_ean_returns_201_when_product_has_is_synced_with_off(self, client, db):
+        """POST /api/products/<pid>/eans returns 201 even when the product is synced with OFF."""
+        pid = _add_product(client, name="SyncedProduct", ean="11111111")
+        # Set is_synced_with_off system flag on the product
+        db.execute(
+            "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, 'is_synced_with_off')",
+            (pid,),
+        )
+        db.commit()
+        # Verify the flag is set
+        row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert row is not None, "is_synced_with_off flag should be set"
+        # Adding a secondary EAN should still succeed with 201
+        resp = client.post(f"/api/products/{pid}/eans", json={"ean": "22222222"})
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data["ean"] == "22222222"
+        assert data["is_primary"] is False
+
 
 # ── Blueprint: DELETE /api/products/<pid>/eans/<ean_id> ───────────────────────
 

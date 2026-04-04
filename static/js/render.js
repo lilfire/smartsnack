@@ -171,9 +171,16 @@ export function renderResults(results, search) {
     h += '</div>';
     if (state.expandedId === p.id) {
       h += '<div class="expanded"><div class="expanded-top">'
-        + '<div class="expanded-img-area" data-action="trigger-image" data-id="' + p.id + '">'
+        + '<div class="expanded-img-section">'
+        + '<div class="expanded-img-area" data-action="' + (hasImg ? 'view-image' : 'change-image') + '" data-id="' + p.id + '">'
         + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" alt="' + esc(p.name) + '" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
-        + '<div class="expanded-img-overlay">' + (hasImg ? t('expanded_change_image') : t('expanded_upload_image')) + '</div></div>'
+        + (hasImg ? '' : '<div class="expanded-img-overlay">' + t('expanded_upload_image') + '</div>') + '</div>'
+        + '<div class="expanded-img-controls">'
+        + (hasImg
+          ? '<button class="btn-sm btn-outline" data-action="change-image" data-id="' + p.id + '">' + t('btn_change_image') + '</button>'
+            + '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>'
+          : '<button class="btn-sm btn-outline" data-action="change-image" data-id="' + p.id + '">' + t('btn_upload_image') + '</button>')
+        + '</div></div>'
         + '<div class="expanded-right">';
       h += '<p class="expanded-title">' + t('expanded_score_breakdown') + '</p><div class="score-grid">';
       const sc = p.scores || {};
@@ -313,9 +320,8 @@ export function renderResults(results, search) {
           + '</div></div>';
       } else {
         h += '<div class="expanded-actions">'
-          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>';
-        if (hasImg) h += '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>';
-        h += '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
+          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>'
+          + '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
           + '</div>';
       }
       h += '</div>';
@@ -346,9 +352,13 @@ export function renderResults(results, search) {
         window.toggleExpand(rowId);
       }
         break;
-      case 'trigger-image':
+      case 'change-image':
         e.stopPropagation();
         window.triggerImageUpload(id);
+        break;
+      case 'view-image':
+        e.stopPropagation();
+        window.viewProductImage(id);
         break;
       case 'save-product':
         e.stopPropagation();
@@ -403,6 +413,13 @@ export function renderResults(results, search) {
       const locked = eanMgr.dataset.locked === '1';
       window.loadEanManager(state.editingId, locked);
     }
+  }
+
+  // Initialize tag input after edit form HTML is in DOM
+  if (state.editingId && document.getElementById('tag-container-ed')) {
+    const tagProduct = state.cachedResults && state.cachedResults.find(p => p.id === state.editingId);
+    const existingTags = tagProduct ? (tagProduct.tags || []) : [];
+    import('./tags.js').then(mod => mod.initTagInput(existingTags));
   }
 
   const edType = document.getElementById('ed-type');

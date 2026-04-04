@@ -72,7 +72,7 @@ vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn().mockResolvedValue({}),
 }));
 
-import { loadEanManager } from '../ean-manager.js';
+import { loadEanManager, addEan } from '../ean-manager.js';
 import { api } from '../state.js';
 
 const PRODUCT_ID = 42;
@@ -156,12 +156,22 @@ describe('Per-EAN OFF fetch button', () => {
 // ── Locked State ────────────────────────────────────
 
 describe('Locked state (is_synced_with_off present)', () => {
-  it('does not render add input when locked', async () => {
+  it('renders existing EAN values in the list when locked', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
     await loadEanManager(PRODUCT_ID, true);
 
-    expect(document.querySelector('.ean-add-input')).toBeNull();
-    expect(document.getElementById('ean-add-input-' + PRODUCT_ID)).toBeNull();
+    const values = document.querySelectorAll('.ean-value');
+    expect(values.length).toBe(2);
+    expect(values[0].textContent).toBe('7038010069307');
+    expect(values[1].textContent).toBe('5000000000001');
+  });
+
+  it('renders add input even when locked', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, true);
+
+    expect(document.querySelector('.ean-add-input')).not.toBeNull();
+    expect(document.getElementById('ean-add-input-' + PRODUCT_ID)).not.toBeNull();
   });
 
   it('does not render delete buttons when locked', async () => {
@@ -203,6 +213,30 @@ describe('Locked state (is_synced_with_off present)', () => {
     const lockNotice = document.querySelector('.ean-lock-notice');
     expect(lockNotice).not.toBeNull();
     expect(lockNotice.textContent).toContain('ean_locked_notice');
+  });
+
+  it('clicking add-EAN button invokes addEan and calls API when locked', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, true);
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '99887766554';
+
+    // Mock the POST and subsequent reload
+    api.mockResolvedValueOnce({ id: 3, ean: '99887766554', is_primary: false });
+    api.mockResolvedValueOnce([...MOCK_EANS_TWO, { id: 3, ean: '99887766554', is_primary: false }]);
+
+    const addBtn = document.querySelector('[data-ean-action="add-ean"]');
+    expect(addBtn).not.toBeNull();
+    addBtn.click();
+
+    // Allow async handlers to settle
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans',
+        { method: 'POST', body: JSON.stringify({ ean: '99887766554' }) }
+      );
+    });
   });
 });
 
@@ -247,5 +281,23 @@ describe('Unlocked state (is_synced_with_off absent)', () => {
     await loadEanManager(PRODUCT_ID, false);
 
     expect(document.querySelector('.ean-lock-notice')).toBeNull();
+  });
+});
+
+// ── Error Handling ──────────────────────────────────
+
+describe('Error handling', () => {
+  it('loadEanManager shows error when API fails', async () => {
+    api.mockRejectedValueOnce(new Error('Network error'));
+    await loadEanManager(PRODUCT_ID, false);
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    expect(container.querySelector('.field-error')).not.toBeNull();
+  });
+
+  it('loadEanManager exits early when container is missing', async () => {
+    document.body.innerHTML = '';
+    await loadEanManager(PRODUCT_ID, false);
+    expect(api).not.toHaveBeenCalled();
   });
 });
