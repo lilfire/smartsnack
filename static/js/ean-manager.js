@@ -71,8 +71,6 @@ function _renderEanList(productId, eans, locked) {
 }
 
 async function _fetchEanOff(productId, eanId, eanValue) {
-  // Promote selected EAN to primary, update hidden field, then trigger OFF lookup
-  await setEanPrimary(productId, eanId);
   const hiddenEan = document.getElementById('ed-ean');
   if (hiddenEan && eanValue) hiddenEan.value = eanValue;
   await lookupOFF('ed', productId);

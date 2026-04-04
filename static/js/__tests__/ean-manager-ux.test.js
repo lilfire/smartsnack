@@ -74,6 +74,7 @@ vi.mock('../off-api.js', () => ({
 
 import { loadEanManager, addEan } from '../ean-manager.js';
 import { api } from '../state.js';
+import { lookupOFF } from '../off-api.js';
 
 const PRODUCT_ID = 42;
 const MOCK_EANS_TWO = [
@@ -299,5 +300,45 @@ describe('Error handling', () => {
     document.body.innerHTML = '';
     await loadEanManager(PRODUCT_ID, false);
     expect(api).not.toHaveBeenCalled();
+  });
+});
+
+// ── _fetchEanOff click behaviour ─────────────────────
+
+describe('_fetchEanOff click behaviour', () => {
+  it('does NOT promote secondary EAN to primary on fetch click', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    const setPrimaryCall = api.mock.calls.find(c => c[0].includes('set-primary'));
+    expect(setPrimaryCall).toBeUndefined();
+  });
+
+  it('sets #ed-ean to secondary EAN value on fetch click', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+
+    const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(document.getElementById('ed-ean').value).toBe('5000000000001');
+  });
+
+  it('calls lookupOFF exactly once on fetch click', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    lookupOFF.mockClear();
+
+    const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(lookupOFF).toHaveBeenCalledTimes(1);
   });
 });
