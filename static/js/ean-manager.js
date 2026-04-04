@@ -35,18 +35,17 @@ function _renderEanList(productId, eans, locked) {
 
   if (locked) {
     html += '<div class="ean-lock-notice">\uD83D\uDD12 ' + esc(t('ean_locked_notice')) + '</div>';
-  } else {
-    html += '<div class="ean-add-row">'
-      + '<input id="ean-add-input-' + productId + '" class="ean-add-input" placeholder="EAN..." maxlength="13" aria-label="' + esc(t('btn_add_ean')) + '">'
-      + '<button class="btn-ean-add" data-ean-action="add-ean" data-product-id="' + productId + '">' + t('btn_add_ean') + '</button>'
-      + '</div>'
-      + '<div id="ean-error-' + productId + '" class="field-error" style="display:none"></div>';
   }
+
+  // Always render add-EAN row regardless of locked state
+  html += '<div class="ean-add-row">'
+    + '<input id="ean-add-input-' + productId + '" class="ean-add-input" placeholder="EAN..." maxlength="13" aria-label="' + esc(t('btn_add_ean')) + '">'
+    + '<button class="btn-ean-add" data-ean-action="add-ean" data-product-id="' + productId + '">' + t('btn_add_ean') + '</button>'
+    + '</div>'
+    + '<div id="ean-error-' + productId + '" class="field-error" style="display:none"></div>';
   container.innerHTML = html;
 
-  if (locked) return;
-
-  // Attach event delegation for EAN manager buttons
+  // Attach event delegation; set-primary/delete/fetch-ean-off are skipped when locked
   container.addEventListener('click', (ev) => {
     const btn = ev.target.closest('[data-ean-action]');
     if (!btn) return;
@@ -55,9 +54,11 @@ function _renderEanList(productId, eans, locked) {
     const eid = btn.dataset.eanId ? parseInt(btn.dataset.eanId, 10) : null;
     const eanVal = btn.dataset.eanValue || null;
     if (action === 'add-ean') addEan(pid);
-    else if (action === 'delete-ean') deleteEan(pid, eid);
-    else if (action === 'set-primary') setEanPrimary(pid, eid);
-    else if (action === 'fetch-ean-off') _fetchEanOff(pid, eid, eanVal);
+    else if (!locked) {
+      if (action === 'delete-ean') deleteEan(pid, eid);
+      else if (action === 'set-primary') setEanPrimary(pid, eid);
+      else if (action === 'fetch-ean-off') _fetchEanOff(pid, eid, eanVal);
+    }
   });
 
   // Allow Enter key in add input

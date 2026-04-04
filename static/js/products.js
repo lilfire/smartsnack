@@ -8,7 +8,8 @@ import { isValidEan } from './off-utils.js';
 import { showEditDuplicateModal, showMergeConflictModal } from './off-conflicts.js';
 import { showDuplicateMergeModal } from './off-duplicates.js';
 import { showOffAddReview } from './off-review.js';
-import { getTagsForSave } from './tags.js';
+import { initTagInput, getTagsForSave } from './tags.js';
+import { loadEanManager } from './ean-manager.js';
 export { loadEanManager, addEan, deleteEan, setEanPrimary } from './ean-manager.js';
 
 // Re-export showToast so existing importers continue to work
@@ -154,10 +155,13 @@ export async function saveProduct(id) {
 export async function unlockEan(id) {
   try {
     await api('/api/products/' + id + '/unsync', { method: 'POST' });
-    // Update cached product to remove the flag
     const p = state.cachedResults.find(x => x.id === id);
     if (p) p.flags = (p.flags || []).filter(f => f !== 'is_synced_with_off');
-    rerender();
+    const mgr = document.getElementById('ean-manager-' + id);
+    if (mgr) mgr.dataset.locked = '0';
+    const unlockBtn = document.querySelector('[data-action="unlock-ean"][data-id="' + id + '"]');
+    if (unlockBtn) unlockBtn.style.display = 'none';
+    await loadEanManager(id, false);
     showToast(t('toast_ean_unlocked'), 'success');
   } catch (e) {
     console.error(e);
