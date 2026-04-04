@@ -100,7 +100,8 @@ describe('keyboard interactions', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: ',', bubbles: true }));
     // comma is no longer a trigger — input value should be unchanged
     expect(input.value).toBe('sweet');
-    expect(getTagsForSave()).not.toContain('sweet');
+    // No pill should have been created by the comma keydown
+    expect(document.querySelectorAll('.tag-pill').length).toBe(0);
   });
 
   it('removes last tag on Backspace with empty input', () => {
