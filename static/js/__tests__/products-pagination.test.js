@@ -14,6 +14,7 @@ vi.mock('../state.js', () => {
     categories: [],
     imageCache: {},
     advancedFilters: null,
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -69,6 +70,23 @@ vi.mock('../off-review.js', () => ({
   submitToOff: vi.fn(),
 }));
 
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+}));
+
+vi.mock('../tags.js', () => ({
+  initTagInput: vi.fn(),
+  getTagsForSave: vi.fn(() => []),
+}));
+
+vi.mock('../ean-manager.js', () => ({
+  loadEanManager: vi.fn(),
+  addEan: vi.fn(),
+  deleteEan: vi.fn(),
+  setEanPrimary: vi.fn(),
+}));
+
 import { loadData, setFilter, switchView, onSearchInput, clearSearch } from '../products.js';
 import { state, fetchProducts, fetchStats } from '../state.js';
 import { renderResults } from '../render.js';
@@ -82,6 +100,7 @@ beforeEach(() => {
   state.cachedResults = [];
   state.advancedFilters = null;
   state.searchTimeout = null;
+  state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
 
   document.body.innerHTML = `
     <div id="stats-line"></div>
@@ -103,7 +122,7 @@ describe('Pagination: initial load', () => {
       { id: 1, name: 'A', total_score: 80 },
       { id: 2, name: 'B', total_score: 70 },
     ];
-    fetchProducts.mockResolvedValue(mockProducts);
+    fetchProducts.mockResolvedValue({ products: mockProducts, total: 2 });
 
     await loadData();
 
@@ -118,23 +137,23 @@ describe('Pagination: initial load', () => {
 
     await loadData();
 
-    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', []);
+    expect(fetchProducts).toHaveBeenCalledWith('Popcorn', [], { limit: 50, offset: 0 });
   });
 
   it('passes current filters to fetchProducts', async () => {
     state.currentFilter = ['Snacks', 'Drikke'];
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     await loadData();
 
-    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke']);
+    expect(fetchProducts).toHaveBeenCalledWith('', ['Snacks', 'Drikke'], { limit: 50, offset: 0 });
   });
 });
 
 describe('Pagination: filter/sort reset', () => {
   it('setFilter clears cachedResults and reloads', async () => {
     state.cachedResults = [{ id: 1, name: 'Old' }];
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     setFilter('Snacks');
 
@@ -144,7 +163,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('setFilter with "all" resets currentFilter to empty', () => {
     state.currentFilter = ['Snacks', 'Drikke'];
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     setFilter('all');
 
@@ -153,7 +172,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('setFilter toggles a single filter type', () => {
     state.currentFilter = [];
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     setFilter('Snacks');
     expect(state.currentFilter).toContain('Snacks');
@@ -164,7 +183,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('switchView clears cachedResults', () => {
     state.cachedResults = [{ id: 1, name: 'Cached' }];
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     switchView('search');
 
@@ -187,7 +206,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('clearSearch resets input and reloads data', async () => {
     document.getElementById('search-input').value = 'test';
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
 
     clearSearch();
 
