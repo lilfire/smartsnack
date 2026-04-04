@@ -36,7 +36,7 @@ import {
   estimateProteinQuality,
 } from '../off-utils.js';
 import { t } from '../i18n.js';
-import { showToast } from '../state.js';
+import { showToast, api } from '../state.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -254,10 +254,7 @@ describe('estimateProteinQuality', () => {
   });
 
   it('calls fetch and populates result on success', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ est_pdcaas: 0.85, est_diaas: 0.9, sources: ['chicken'] }),
-    });
+    api.mockResolvedValueOnce({ est_pdcaas: 0.85, est_diaas: 0.9, sources: ['chicken'] });
     await estimateProteinQuality('p');
     expect(document.getElementById('p-pdcaas-val').textContent).toBe('0.85');
     expect(document.getElementById('p-diaas-val').textContent).toBe('0.90');
@@ -266,25 +263,19 @@ describe('estimateProteinQuality', () => {
   });
 
   it('shows error toast on fetch failure', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    api.mockRejectedValueOnce(new Error('Network error'));
     await estimateProteinQuality('p');
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
   });
 
   it('shows error toast on API error response', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ error: 'some_error' }),
-    });
+    api.mockResolvedValueOnce({ error: 'some_error' });
     await estimateProteinQuality('p');
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
   });
 
   it('shows no_protein_sources toast when both null', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
-    });
+    api.mockResolvedValueOnce({ est_pdcaas: null, est_diaas: null, sources: [] });
     await estimateProteinQuality('p');
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
   });
