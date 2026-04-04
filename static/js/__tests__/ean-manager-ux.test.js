@@ -214,6 +214,30 @@ describe('Locked state (is_synced_with_off present)', () => {
     expect(lockNotice).not.toBeNull();
     expect(lockNotice.textContent).toContain('ean_locked_notice');
   });
+
+  it('clicking add-EAN button invokes addEan and calls API when locked', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, true);
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '99887766554';
+
+    // Mock the POST and subsequent reload
+    api.mockResolvedValueOnce({ id: 3, ean: '99887766554', is_primary: false });
+    api.mockResolvedValueOnce([...MOCK_EANS_TWO, { id: 3, ean: '99887766554', is_primary: false }]);
+
+    const addBtn = document.querySelector('[data-ean-action="add-ean"]');
+    expect(addBtn).not.toBeNull();
+    addBtn.click();
+
+    // Allow async handlers to settle
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans',
+        { method: 'POST', body: JSON.stringify({ ean: '99887766554' }) }
+      );
+    });
+  });
 });
 
 // ── Unlocked State ──────────────────────────────────
@@ -257,30 +281,6 @@ describe('Unlocked state (is_synced_with_off absent)', () => {
     await loadEanManager(PRODUCT_ID, false);
 
     expect(document.querySelector('.ean-lock-notice')).toBeNull();
-  });
-
-  it('clicking add-EAN button invokes addEan and calls API', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
-
-    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
-    input.value = '99887766554';
-
-    // Mock the POST and subsequent reload
-    api.mockResolvedValueOnce({ id: 3, ean: '99887766554', is_primary: false });
-    api.mockResolvedValueOnce([...MOCK_EANS_TWO, { id: 3, ean: '99887766554', is_primary: false }]);
-
-    const addBtn = document.querySelector('[data-ean-action="add-ean"]');
-    expect(addBtn).not.toBeNull();
-    addBtn.click();
-
-    // Allow async handlers to settle
-    await vi.waitFor(() => {
-      expect(api).toHaveBeenCalledWith(
-        '/api/products/' + PRODUCT_ID + '/eans',
-        { method: 'POST', body: JSON.stringify({ ean: '99887766554' }) }
-      );
-    });
   });
 });
 
