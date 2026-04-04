@@ -18,6 +18,13 @@ DB_PATH=./smartsnack.sqlite python app.py
 - **Frontend**: `vitest` — run with `npx vitest` (requires Node.js >= 18)
 - No linter is configured.
 
+## Test Coverage
+
+All new code must maintain a minimum **80% test coverage** for both backend and frontend.
+
+- **Backend (pytest)**: Coverage enforced via `fail_under = 80` in `pyproject.toml` (`[tool.coverage.report]`). Run with `python -m pytest --cov --cov-report=term-missing` to check.
+- **Frontend (vitest)**: Coverage enforced via `thresholds` in `vitest.config.js` (lines, functions, branches, statements all set to 80). Run with `npx vitest --coverage` to check.
+
 ## Project Structure
 
 - `app.py` — Flask app factory, creates app and registers blueprints
