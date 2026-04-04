@@ -8,7 +8,7 @@ import { isValidEan } from './off-utils.js';
 import { showEditDuplicateModal, showMergeConflictModal } from './off-conflicts.js';
 import { showDuplicateMergeModal } from './off-duplicates.js';
 import { showOffAddReview } from './off-review.js';
-import { initTagInput, getTagsForSave } from './tags.js';
+import { getTagsForSave } from './tags.js';
 export { loadEanManager, addEan, deleteEan, setEanPrimary } from './ean-manager.js';
 
 // Re-export showToast so existing importers continue to work
@@ -60,8 +60,6 @@ export function startEdit(id) {
       const firstInput = form.querySelector('#ed-name');
       if (firstInput) firstInput.focus();
     }
-    const product = state.cachedResults && state.cachedResults.find(p => p.id === id);
-    initTagInput(product ? (product.tags || []) : []);
   });
 }
 
