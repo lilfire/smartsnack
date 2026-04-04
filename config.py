@@ -65,6 +65,16 @@ try:
 except OSError:
     SUPPORTED_LANGUAGES = [DEFAULT_LANGUAGE]
 
+# ISO 639-1 language codes that Open Food Facts supports well
+OFF_SUPPORTED_LANGUAGES = [
+    "af", "ar", "az", "be", "bg", "bn", "ca", "cs", "cy", "da",
+    "de", "el", "en", "es", "et", "fa", "fi", "fr", "gu", "he",
+    "hi", "hr", "hu", "hy", "id", "it", "ja", "ka", "kn", "ko",
+    "lt", "lv", "mk", "ml", "mn", "mr", "ms", "nl", "no", "pa",
+    "pl", "pt", "ro", "ru", "sk", "sl", "sq", "sr", "sv", "sw",
+    "ta", "te", "th", "tl", "tr", "uk", "ur", "vi", "zh",
+]
+
 # ── All product numeric fields (excluding type, name, ean, image) ─────
 NUTRITION_FIELDS = (
     "kcal",

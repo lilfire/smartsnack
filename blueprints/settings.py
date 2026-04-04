@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify
 
 from helpers import _require_json, _check_api_key
-from config import _MAX_PASSWORD_LEN
+from config import _MAX_PASSWORD_LEN, OFF_SUPPORTED_LANGUAGES
 from services import settings_service, ocr_service
 
 bp = Blueprint("settings", __name__)
@@ -69,6 +69,42 @@ def get_ocr_settings():
     current = settings_service.get_ocr_backend()
     backends = ocr_service.get_available_backends()
     return jsonify({"current_backend": current, "available_backends": backends})
+
+
+@bp.route("/api/settings/off-languages")
+def get_off_languages():
+    return jsonify({"languages": OFF_SUPPORTED_LANGUAGES})
+
+
+@bp.route("/api/settings/off-language-priority")
+def get_off_language_priority():
+    priority = settings_service.get_off_language_priority()
+    return jsonify({"priority": priority})
+
+
+@bp.route("/api/settings/off-language-priority", methods=["PUT"])
+def set_off_language_priority():
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    priority = data.get("priority")
+    if not isinstance(priority, list):
+        return jsonify({"error": "priority must be a list"}), 400
+    if not priority:
+        return jsonify({"error": "priority must not be empty"}), 400
+    if not all(isinstance(item, str) and item.strip() for item in priority):
+        return jsonify({"error": "priority must be a list of non-empty strings"}), 400
+    # Deduplicate preserving order
+    seen = set()
+    deduped = []
+    for item in priority:
+        item = item.strip()
+        if item not in seen:
+            seen.add(item)
+            deduped.append(item)
+    settings_service.set_off_language_priority(deduped)
+    return jsonify({"priority": deduped})
 
 
 @bp.route("/api/settings/ocr", methods=["PUT"])
