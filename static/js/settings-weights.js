@@ -67,11 +67,10 @@ export async function loadSettings() {
     initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));
     loadFlags();
     loadPq();
-    loadOcrSettings();
     loadOffCredentials();
     checkRefreshStatus();
-    loadOcrProviders();
-    loadOcrSettings();
+    await loadOcrProviders();
+    await loadOcrSettings();
   } finally {
     _settingsLoading = false;
   }
