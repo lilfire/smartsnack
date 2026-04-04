@@ -1,6 +1,7 @@
 """Scoring formula and weight computation for products."""
 
 import sqlite3
+import time
 
 from config import (
     SCORE_CONFIG_MAP,
@@ -9,9 +10,30 @@ from config import (
     _VALID_COLUMNS,
 )
 
+_SCORING_CACHE_TTL = 30  # seconds
+_weight_cache: tuple | None = None
+_weight_cache_at: float = 0.0
+_range_cache: dict | None = None  # keyed by frozenset(enabled_fields)
+_range_cache_key: frozenset | None = None
+_range_cache_at: float = 0.0
+
+
+def invalidate_scoring_cache() -> None:
+    """Invalidate all scoring caches (call after writes that affect scores)."""
+    global _weight_cache, _weight_cache_at, _range_cache, _range_cache_key, _range_cache_at
+    _weight_cache = None
+    _weight_cache_at = 0.0
+    _range_cache = None
+    _range_cache_key = None
+    _range_cache_at = 0.0
+
 
 def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
     """Load enabled score weights and their config from the database."""
+    global _weight_cache, _weight_cache_at
+    now = time.monotonic()
+    if _weight_cache is not None and now - _weight_cache_at < _SCORING_CACHE_TTL:
+        return _weight_cache
     weight_rows = cur.execute(
         "SELECT field, enabled, weight, direction, formula, "
         "formula_min, formula_max FROM score_weights"
@@ -28,7 +50,9 @@ def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
                 "formula_max": r["formula_max"],
             }
     enabled_fields = [f for f in enabled_weights if f in SCORE_CONFIG_MAP]
-    return enabled_weights, weight_config, enabled_fields
+    _weight_cache = (enabled_weights, weight_config, enabled_fields)
+    _weight_cache_at = now
+    return _weight_cache
 
 
 def _compute_category_ranges(
@@ -36,6 +60,15 @@ def _compute_category_ranges(
     enabled_fields: list,
 ) -> dict:
     """Compute min/max ranges per category for minmax scoring."""
+    global _range_cache, _range_cache_key, _range_cache_at
+    now = time.monotonic()
+    cache_key = frozenset(enabled_fields)
+    if (
+        _range_cache is not None
+        and _range_cache_key == cache_key
+        and now - _range_cache_at < _SCORING_CACHE_TTL
+    ):
+        return _range_cache
     cat_ranges = {}
     db_fields = [f for f in enabled_fields if f not in COMPUTED_FIELDS]
     if db_fields:
@@ -50,7 +83,10 @@ def _compute_category_ranges(
             cat_ranges[tr["type"]] = {
                 f: (tr[f"min_{f}"] or 0, tr[f"max_{f}"] or 0) for f in db_fields
             }
-    return cat_ranges
+    _range_cache = cat_ranges
+    _range_cache_key = cache_key
+    _range_cache_at = now
+    return _range_cache
 
 
 def _score_product(

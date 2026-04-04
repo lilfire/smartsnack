@@ -708,6 +708,7 @@
   "error_cannot_remove_only_ean": "Kan ikke fjerne den eneste EAN",
   "label_ean_primary": "Primær",
   "tags": "Tagger",
+  "tag_input_placeholder": "Legg til tag…",
   "torch_toggle_off": "Slå på lommelykt",
   "torch_toggle_on": "Slå av lommelykt"
 }

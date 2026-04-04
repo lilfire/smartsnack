@@ -524,6 +524,14 @@ export function upgradeSelect(sel, onSelect) {
   }
 }
 
+export function initAllFieldSelects(root = document) {
+  const EXCLUDED_CONTEXTS = ['.adv-row', '.wc-row', '.edit-grid'];
+  root.querySelectorAll('select.field-select').forEach(sel => {
+    const inExcluded = EXCLUDED_CONTEXTS.some(ctx => sel.closest(ctx));
+    if (!inExcluded) upgradeSelect(sel);
+  });
+}
+
 function _closeAllCustomSelects(except) {
   document.querySelectorAll('.custom-select-wrap.open').forEach((w) => {
     if (w !== except) {

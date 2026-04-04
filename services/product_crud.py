@@ -361,6 +361,8 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     if data.get("from_off"):
         set_system_flag(new_id, "is_synced_with_off", True)
     conn.commit()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
     return {"id": new_id, "message": "Product added"}
 
 
@@ -423,6 +425,8 @@ def update_product(pid: int, data: dict) -> None:
     if incoming_tags is not None and isinstance(incoming_tags, list):
         _set_tags(conn, pid, incoming_tags)
     conn.commit()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
 
@@ -432,6 +436,8 @@ def delete_product(pid: int) -> bool:
     cur = conn.cursor()
     cur.execute("DELETE FROM products WHERE id = ?", (pid,))
     conn.commit()
+    from services.product_scoring import invalidate_scoring_cache
+    invalidate_scoring_cache()
     return cur.rowcount > 0
 
 

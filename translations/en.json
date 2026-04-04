@@ -708,6 +708,7 @@
   "error_cannot_remove_only_ean": "Cannot remove the only EAN",
   "label_ean_primary": "Primary",
   "tags": "Tags",
+  "tag_input_placeholder": "Add tag…",
   "torch_toggle_off": "Turn on flashlight",
   "torch_toggle_on": "Turn off flashlight"
 }

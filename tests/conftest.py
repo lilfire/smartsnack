@@ -25,6 +25,15 @@ def _patch_db_path(monkeypatch, db_file):
 
 
 @pytest.fixture(autouse=True)
+def _reset_scoring_caches():
+    """Reset module-level scoring caches between tests to prevent cross-test pollution."""
+    import services.product_scoring as ps
+    ps.invalidate_scoring_cache()
+    yield
+    ps.invalidate_scoring_cache()
+
+
+@pytest.fixture(autouse=True)
 def _env_setup(request, tmp_path, monkeypatch):
     """Set up environment for every test: temp DB path and secret key.
 

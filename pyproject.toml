@@ -23,11 +23,8 @@ e2e = [
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["."]
-omit = [
-    "tests/*",
-    "tests/e2e/*",
-]
+source = ["blueprints", "services", "app", "config", "db", "helpers", "translations"]
+omit = ["tests/*", "tests/e2e/*"]
 
 [tool.coverage.report]
 fail_under = 80

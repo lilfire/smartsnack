@@ -81,12 +81,18 @@ import { loadProductImage } from '../images.js';
 import { renderResults } from '../render.js';
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   document.body.innerHTML = '';
   document.body.style.overflow = '';
   // Clean up any scanner UI
   const scanBg = document.getElementById('scanner-bg');
   if (scanBg) scanBg.remove();
+});
+
+afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
 });
 
 describe('openScanner', () => {

@@ -22,8 +22,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt pytest pytest-cov
 
-      - name: Run pytest (unit tests only)
-        run: python -m pytest --ignore=tests/e2e --tb=short -q
+      - name: Run pytest with coverage
+        run: python -m pytest --cov --ignore=tests/e2e --tb=short -q
 
   frontend-test:
     name: Frontend Tests (vitest)
@@ -41,8 +41,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run vitest
-        run: npx vitest run
+      - name: Run vitest with coverage
+        run: npx vitest run --coverage
 
   build:
     name: Docker Build
