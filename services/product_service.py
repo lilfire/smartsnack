@@ -5,6 +5,7 @@ All implementation has been split into focused modules:
 - product_scoring.py   — Scoring formula and weight computation
 - product_filters.py   — Advanced filtering logic
 - product_duplicate.py — Duplicate detection and merging
+- product_eans.py      — EAN CRUD operations
 """
 
 from services.product_crud import (
@@ -15,6 +16,8 @@ from services.product_crud import (
     add_product,
     update_product,
     delete_product,
+)
+from services.product_eans import (
     list_eans,
     add_ean,
     delete_ean,
