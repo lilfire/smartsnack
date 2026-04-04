@@ -177,15 +177,29 @@ def _init_schema(cur, conn):
         )
 
     cur.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT    NOT NULL UNIQUE COLLATE NOCASE
+        )
+    """)
+
+    cur.execute("""
         CREATE TABLE IF NOT EXISTS product_tags (
             product_id INTEGER NOT NULL,
-            tag        TEXT    NOT NULL COLLATE NOCASE,
-            PRIMARY KEY (product_id, tag),
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+            tag_id     INTEGER NOT NULL,
+            PRIMARY KEY (product_id, tag_id),
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id)     REFERENCES tags(id)     ON DELETE CASCADE
         )
     """)
     cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag ON product_tags(tag COLLATE NOCASE)"
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag_id ON product_tags(tag_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tags_label ON tags(label COLLATE NOCASE)"
     )
 
     run_migrations(cur)
