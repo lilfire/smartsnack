@@ -28,11 +28,9 @@ def _patch_db_path(monkeypatch, db_file):
 def _reset_scoring_caches():
     """Reset module-level scoring caches between tests to prevent cross-test pollution."""
     import services.product_scoring as ps
-    ps.invalidate_weight_cache()
-    ps.invalidate_ranges_cache()
+    ps.invalidate_scoring_cache()
     yield
-    ps.invalidate_weight_cache()
-    ps.invalidate_ranges_cache()
+    ps.invalidate_scoring_cache()
 
 
 @pytest.fixture(autouse=True)
