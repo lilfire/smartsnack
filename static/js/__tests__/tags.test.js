@@ -100,7 +100,7 @@ describe('keyboard interactions', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: ',', bubbles: true }));
     // comma is no longer a trigger — input value should be unchanged
     expect(input.value).toBe('sweet');
-    // No pill should have been created by the comma keydown
+    // No pill rendered means the tag was not immediately added to _tags
     expect(document.querySelectorAll('.tag-pill').length).toBe(0);
   });
 
