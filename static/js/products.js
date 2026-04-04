@@ -47,7 +47,7 @@ function collectFormFields(prefix) {
       if (cb && cb.checked) acc.push(f);
       return acc;
     }, []),
-    ...(prefix === 'ed' ? { tags: getTagsForSave() } : {}),
+    ...(prefix === 'ed' ? { tagIds: getTagsForSave() } : {}),
   };
 }
 
