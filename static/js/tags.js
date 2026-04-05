@@ -1,4 +1,5 @@
-// tags.js — Tag input widget. Internal state: Map<number, string> (id → label).
+// tags.js — Tag input widget with modal + chips UI.
+// Internal state: Map<number, string> (id -> label).
 let _tags = new Map();
 
 export function initTagInput(existingTags) {
@@ -9,14 +10,10 @@ export function initTagInput(existingTags) {
     }
   }
   _renderPills();
-  _bindInput();
+  _setupAddTagButton();
 }
 
 export function getTagsForSave() {
-  const input = document.getElementById('tag-input-ed');
-  if (input && input.value.trim()) {
-    input.value = '';
-  }
   return Array.from(_tags.keys());
 }
 
@@ -28,27 +25,41 @@ function _renderPills() {
   const field = document.getElementById('tag-field-ed');
   if (!field) return;
   field.querySelectorAll('.tag-pill').forEach(el => el.remove());
-  const inputEl = field.querySelector('#tag-input-ed');
+  const btn = field.querySelector('#add-tag-btn');
   for (const [id, label] of _sortedEntries()) {
     const span = document.createElement('span');
     span.className = 'tag-pill';
     span.dataset.tagId = id;
     span.appendChild(document.createTextNode(label));
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'tag-remove';
-    btn.setAttribute('aria-label', 'Remove tag ' + label);
-    btn.textContent = '\u00D7';
-    btn.addEventListener('click', () => {
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'tag-remove';
+    removeBtn.setAttribute('aria-label', 'Remove tag ' + label);
+    removeBtn.textContent = '\u00D7';
+    removeBtn.addEventListener('click', () => {
       _tags.delete(id);
       _renderPills();
     });
-    span.appendChild(btn);
-    field.insertBefore(span, inputEl);
+    span.appendChild(removeBtn);
+    field.insertBefore(span, btn);
   }
 }
 
-async function _fetchSuggestions(q, list, input) {
+function _setupAddTagButton() {
+  const field = document.getElementById('tag-field-ed');
+  if (!field) return;
+  if (field.querySelector('#add-tag-btn')) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'add-tag-btn';
+  btn.className = 'tag-add-btn';
+  btn.textContent = '+ Add Tag';
+  btn.setAttribute('aria-haspopup', 'dialog');
+  btn.addEventListener('click', _openModal);
+  field.appendChild(btn);
+}
+
+async function _fetchSuggestions(q, list, input, onSelect) {
   try {
     const res = await fetch('/api/tags?q=' + encodeURIComponent(q));
     const suggestions = await res.json();
@@ -62,10 +73,7 @@ async function _fetchSuggestions(q, list, input) {
       li.textContent = s.label;
       li.addEventListener('mousedown', e => {
         e.preventDefault();
-        _tags.set(Number(s.id), s.label);
-        _renderPills();
-        input.value = '';
-        list.hidden = true;
+        onSelect(s);
       });
       list.appendChild(li);
     }
@@ -97,33 +105,106 @@ function _clearHighlight(list) {
   list.querySelectorAll('li.highlighted').forEach(li => li.classList.remove('highlighted'));
 }
 
-function _bindInput() {
-  const field = document.getElementById('tag-field-ed');
-  const input = document.getElementById('tag-input-ed');
-  const list = document.getElementById('tag-suggestions-ed');
-  if (!input || !list) return;
+function _openModal() {
+  const overlay = document.createElement('div');
+  overlay.id = 'tag-modal-overlay';
+  overlay.className = 'tag-modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Add tag');
 
-  if (field) {
-    field.addEventListener('click', e => {
-      if (e.target === field) input.focus();
-    });
-  }
+  const modal = document.createElement('div');
+  modal.className = 'tag-modal';
 
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.id = 'tag-modal-input';
+  input.className = 'tag-modal-input';
+  input.setAttribute('placeholder', 'Type to search or add tag\u2026');
+  input.setAttribute('autocomplete', 'off');
+
+  const list = document.createElement('ul');
+  list.id = 'tag-modal-suggestions';
+  list.className = 'tag-suggestions';
+  list.hidden = true;
+
+  const actions = document.createElement('div');
+  actions.className = 'tag-modal-actions';
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.type = 'button';
+  confirmBtn.id = 'tag-modal-confirm';
+  confirmBtn.className = 'tag-modal-confirm';
+  confirmBtn.textContent = 'Add';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.id = 'tag-modal-cancel';
+  cancelBtn.className = 'tag-modal-cancel';
+  cancelBtn.textContent = 'Cancel';
+
+  actions.appendChild(confirmBtn);
+  actions.appendChild(cancelBtn);
+  modal.appendChild(input);
+  modal.appendChild(list);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+
+  _bindModal(overlay, input, list, confirmBtn, cancelBtn);
+  input.focus();
+  _fetchSuggestions('', list, input, s => { _addTagObj(s); _closeModal(); });
+}
+
+function _closeModal() {
+  const overlay = document.getElementById('tag-modal-overlay');
+  if (overlay) overlay.remove();
+}
+
+function _addTagObj(s) {
+  _tags.set(Number(s.id), s.label);
+  _renderPills();
+}
+
+function _bindModal(overlay, input, list, confirmBtn, cancelBtn) {
   let _debounce = null;
 
-  input.addEventListener('focus', () => {
-    clearTimeout(_debounce);
-    _fetchSuggestions('', list, input);
-  });
+  function _onSelect(s) {
+    _addTagObj(s);
+    _closeModal();
+  }
+
+  async function _confirmAdd() {
+    const highlighted = _getHighlighted(list);
+    if (highlighted) {
+      _tags.set(Number(highlighted.dataset.tagId), highlighted.dataset.tagLabel);
+      _renderPills();
+      _closeModal();
+      return;
+    }
+    const label = input.value.trim();
+    if (!label) { _closeModal(); return; }
+    const tag = await _createTag(label);
+    if (tag) {
+      _tags.set(Number(tag.id), tag.label);
+      _renderPills();
+    }
+    _closeModal();
+  }
 
   input.addEventListener('input', () => {
     clearTimeout(_debounce);
     const q = input.value.trim();
-    if (!q) { list.hidden = true; return; }
-    _debounce = setTimeout(() => _fetchSuggestions(q, list, input), 200);
+    if (!q) {
+      _fetchSuggestions('', list, input, _onSelect);
+      return;
+    }
+    _debounce = setTimeout(() => {
+      _fetchSuggestions(q, list, input, _onSelect);
+    }, 200);
   });
 
-  input.addEventListener('keydown', async e => {
+  input.addEventListener('keydown', e => {
     const items = list.hidden ? [] : [...list.querySelectorAll('li')];
     const highlighted = _getHighlighted(list);
 
@@ -135,7 +216,7 @@ function _bindInput() {
         items[0].classList.add('highlighted');
       } else {
         const idx = items.indexOf(highlighted);
-        items[idx < items.length - 1 ? idx + 1 : idx].classList.add('highlighted');
+        items[Math.min(idx + 1, items.length - 1)].classList.add('highlighted');
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
@@ -145,53 +226,19 @@ function _bindInput() {
         items[items.length - 1].classList.add('highlighted');
       } else {
         const idx = items.indexOf(highlighted);
-        items[idx > 0 ? idx - 1 : idx].classList.add('highlighted');
+        items[Math.max(idx - 1, 0)].classList.add('highlighted');
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (highlighted) {
-        _tags.set(Number(highlighted.dataset.tagId), highlighted.dataset.tagLabel);
-        _renderPills();
-        input.value = '';
-        list.hidden = true;
-        _clearHighlight(list);
-      } else if (input.value.trim()) {
-        const label = input.value.trim();
-        const tag = await _createTag(label);
-        if (tag) {
-          _tags.set(Number(tag.id), tag.label);
-          _renderPills();
-        }
-        input.value = '';
-        list.hidden = true;
-      }
+      _confirmAdd();
     } else if (e.key === 'Escape') {
-      input.value = '';
-      list.hidden = true;
-      _clearHighlight(list);
-    } else if (e.key === 'Tab' && !list.hidden) {
-      const first = highlighted || items[0];
-      if (first) {
-        e.preventDefault();
-        _tags.set(Number(first.dataset.tagId), first.dataset.tagLabel);
-        _renderPills();
-        input.value = '';
-        list.hidden = true;
-        _clearHighlight(list);
-      }
-    } else if (e.key === 'Backspace' && input.value === '') {
-      const sorted = _sortedEntries();
-      if (sorted.length) {
-        _tags.delete(sorted[sorted.length - 1][0]);
-        _renderPills();
-      }
+      _closeModal();
     }
   });
 
-  input.addEventListener('blur', () => {
-    setTimeout(() => {
-      list.hidden = true;
-      _clearHighlight(list);
-    }, 150);
+  confirmBtn.addEventListener('click', _confirmAdd);
+  cancelBtn.addEventListener('click', _closeModal);
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) _closeModal();
   });
 }
