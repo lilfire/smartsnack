@@ -192,15 +192,11 @@ def _init_schema(cur, conn):
             FOREIGN KEY (tag_id)     REFERENCES tags(id)     ON DELETE CASCADE
         )
     """)
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id)"
-    )
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag_id ON product_tags(tag_id)"
-    )
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_tags_label ON tags(label COLLATE NOCASE)"
-    )
+    # NOTE: Indexes on product_tags(tag_id) and tags(label) are created by
+    # migration 009_tag_system_reimplementation, which also handles schema
+    # migration for existing databases with the old product_tags(tag TEXT) schema.
+    # Do NOT create idx_product_tags_tag_id here — that column may not exist yet
+    # on existing databases and would cause an OperationalError before migrations run.
 
     run_migrations(cur)
 
