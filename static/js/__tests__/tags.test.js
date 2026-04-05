@@ -1,20 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { initTagInput, getTagsForSave } from '../tags.js';
 
 beforeEach(() => {
   vi.restoreAllMocks();
-  // Default fetch mock: return empty suggestions so tests that incidentally
-  // trigger focus/fetch don't throw "fetch is not defined".
   global.fetch = vi.fn().mockResolvedValue({
     json: () => Promise.resolve([]),
   });
-  document.body.innerHTML = `
-    <div id="tag-field-ed">
-      <input id="tag-input-ed" value="" />
-      <ul id="tag-suggestions-ed" hidden></ul>
-    </div>
-  `;
+  document.body.innerHTML = '<div id="tag-field-ed"></div>';
 });
+
+afterEach(() => {
+  // Clean up any open modals
+  const overlay = document.getElementById('tag-modal-overlay');
+  if (overlay) overlay.remove();
+});
+
+// ─── initTagInput ────────────────────────────────────────────────────────────
 
 describe('initTagInput', () => {
   it('initializes with empty tags', () => {
@@ -24,14 +25,13 @@ describe('initTagInput', () => {
 
   it('initializes with existing tags and renders pills', () => {
     initTagInput(['Salty', 'Sweet']);
-    expect(getTagsForSave()).toEqual(['salty', 'sweet']);
-    const pills = document.querySelectorAll('.tag-pill');
-    expect(pills.length).toBe(2);
+    expect(getTagsForSave().sort()).toEqual(['salty', 'sweet']);
+    expect(document.querySelectorAll('.tag-pill').length).toBe(2);
   });
 
   it('trims and lowercases tags', () => {
     initTagInput(['  Hello  ', 'WORLD']);
-    expect(getTagsForSave()).toEqual(['hello', 'world']);
+    expect(getTagsForSave().sort()).toEqual(['hello', 'world']);
   });
 
   it('deduplicates tags', () => {
@@ -39,140 +39,341 @@ describe('initTagInput', () => {
     expect(getTagsForSave()).toEqual(['hello']);
   });
 
-  it('handles null/undefined input', () => {
+  it('handles null input', () => {
     initTagInput(null);
     expect(getTagsForSave()).toEqual([]);
+  });
+
+  it('handles undefined input', () => {
     initTagInput(undefined);
     expect(getTagsForSave()).toEqual([]);
   });
-});
 
-describe('getTagsForSave', () => {
-  it('flushes uncommitted input text before returning', () => {
+  it('creates an "Add Tag" button in edit mode', () => {
     initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    input.value = 'newTag';
-    const tags = getTagsForSave();
-    expect(tags).toContain('newtag');
-    expect(input.value).toBe('');
+    expect(document.getElementById('add-tag-btn')).not.toBeNull();
   });
 
-  it('ignores whitespace-only input', () => {
-    initTagInput(['existing']);
-    const input = document.getElementById('tag-input-ed');
-    input.value = '   ';
-    const tags = getTagsForSave();
-    expect(tags).toEqual(['existing']);
-  });
-});
-
-describe('tag pill interactions', () => {
-  it('removes a tag when the remove button is clicked', () => {
-    initTagInput(['alpha', 'beta']);
-    expect(getTagsForSave()).toEqual(['alpha', 'beta']);
-    const removeBtn = document.querySelector('.tag-remove[data-tag="alpha"]');
-    removeBtn.click();
-    expect(getTagsForSave()).toEqual(['beta']);
+  it('does not duplicate the Add Tag button on re-init', () => {
+    initTagInput([]);
+    initTagInput(['new']);
+    expect(document.querySelectorAll('#add-tag-btn').length).toBe(1);
   });
 
-  it('does not render pills when tag-field-ed is missing', () => {
+  it('does not render pills or button when tag-field-ed is missing', () => {
     document.body.innerHTML = '';
-    initTagInput(['test']);
-    // Should not throw, tags are still tracked internally
+    expect(() => initTagInput(['test'])).not.toThrow();
     expect(getTagsForSave()).toEqual(['test']);
   });
 });
 
-describe('keyboard interactions', () => {
-  it('adds a tag on Enter key (no suggestion highlighted)', () => {
+// ─── getTagsForSave ──────────────────────────────────────────────────────────
+
+describe('getTagsForSave', () => {
+  it('returns current tags array', () => {
+    initTagInput(['alpha', 'beta']);
+    expect(getTagsForSave().sort()).toEqual(['alpha', 'beta']);
+  });
+
+  it('returns empty array when no tags', () => {
     initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    input.value = 'spicy';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(getTagsForSave()).toContain('spicy');
-    expect(input.value).toBe('');
-  });
-
-  it('comma key does NOT add a tag', () => {
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    input.value = 'sweet';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: ',', bubbles: true }));
-    // comma is no longer a trigger — input value should be unchanged
-    expect(input.value).toBe('sweet');
-    // No pill rendered means the tag was not immediately added to _tags
-    expect(document.querySelectorAll('.tag-pill').length).toBe(0);
-  });
-
-  it('removes last tag on Backspace with empty input', () => {
-    initTagInput(['alpha', 'beta', 'gamma']);
-    const input = document.getElementById('tag-input-ed');
-    input.value = '';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
-    // Removes last sorted tag
-    const tags = getTagsForSave();
-    expect(tags).not.toContain('gamma');
-    expect(tags).toContain('alpha');
-    expect(tags).toContain('beta');
-  });
-
-  it('does not remove tags on Backspace when input has text', () => {
-    initTagInput(['alpha']);
-    const input = document.getElementById('tag-input-ed');
-    input.value = 'ab';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true }));
-    expect(getTagsForSave()).toContain('alpha');
-  });
-
-  it('ignores tags longer than 50 characters', () => {
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    input.value = 'a'.repeat(51);
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(getTagsForSave()).toEqual([]);
-  });
-
-  it('ignores empty tag on Enter', () => {
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    input.value = '';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    expect(getTagsForSave()).toEqual([]);
-  });
-
-  it('Escape clears input and hides dropdown without adding a tag', () => {
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'test';
-    list.hidden = false;
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(input.value).toBe('');
-    expect(list.hidden).toBe(true);
     expect(getTagsForSave()).toEqual([]);
   });
 });
 
-describe('arrow key navigation', () => {
+// ─── tag pill interactions ───────────────────────────────────────────────────
+
+describe('tag pill interactions', () => {
+  it('renders remove buttons with data-tag attribute', () => {
+    initTagInput(['alpha']);
+    const btn = document.querySelector('.tag-remove[data-tag="alpha"]');
+    expect(btn).not.toBeNull();
+  });
+
+  it('removes a tag when the remove button is clicked', () => {
+    initTagInput(['alpha', 'beta']);
+    document.querySelector('.tag-remove[data-tag="alpha"]').click();
+    expect(getTagsForSave()).not.toContain('alpha');
+    expect(getTagsForSave()).toContain('beta');
+  });
+
+  it('re-renders pills after removal', () => {
+    initTagInput(['alpha', 'beta']);
+    document.querySelector('.tag-remove[data-tag="alpha"]').click();
+    expect(document.querySelectorAll('.tag-pill').length).toBe(1);
+  });
+});
+
+// ─── Add Tag button ──────────────────────────────────────────────────────────
+
+describe('Add Tag button', () => {
+  it('opens a modal when clicked', () => {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    expect(document.getElementById('tag-modal-overlay')).not.toBeNull();
+  });
+
+  it('modal contains input, confirm, and cancel buttons', () => {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    expect(document.getElementById('tag-modal-input')).not.toBeNull();
+    expect(document.getElementById('tag-modal-confirm')).not.toBeNull();
+    expect(document.getElementById('tag-modal-cancel')).not.toBeNull();
+  });
+
+  it('modal has correct aria attributes', () => {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    const overlay = document.getElementById('tag-modal-overlay');
+    expect(overlay.getAttribute('role')).toBe('dialog');
+    expect(overlay.getAttribute('aria-modal')).toBe('true');
+  });
+});
+
+// ─── modal cancel / close ────────────────────────────────────────────────────
+
+describe('modal cancel and close', () => {
+  function openModal() {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+  }
+
+  it('Cancel button closes modal without adding a tag', () => {
+    openModal();
+    const input = document.getElementById('tag-modal-input');
+    input.value = 'sometag';
+    document.getElementById('tag-modal-cancel').click();
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+    expect(getTagsForSave()).toEqual([]);
+  });
+
+  it('Escape key closes modal without adding a tag', () => {
+    openModal();
+    const input = document.getElementById('tag-modal-input');
+    input.value = 'sometag';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+    expect(getTagsForSave()).toEqual([]);
+  });
+
+  it('clicking the overlay backdrop closes modal', () => {
+    openModal();
+    const overlay = document.getElementById('tag-modal-overlay');
+    overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('clicking inside the modal does not close it', () => {
+    openModal();
+    document.getElementById('tag-modal-input').dispatchEvent(
+      new MouseEvent('click', { bubbles: true })
+    );
+    expect(document.getElementById('tag-modal-overlay')).not.toBeNull();
+  });
+});
+
+// ─── modal confirm / add tag ─────────────────────────────────────────────────
+
+describe('modal confirm', () => {
+  function openModal() {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+  }
+
+  it('Confirm button adds typed tag and closes modal', () => {
+    openModal();
+    document.getElementById('tag-modal-input').value = 'spicy';
+    document.getElementById('tag-modal-confirm').click();
+    expect(getTagsForSave()).toContain('spicy');
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('Enter key adds typed tag and closes modal', () => {
+    openModal();
+    const input = document.getElementById('tag-modal-input');
+    input.value = 'crunchy';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(getTagsForSave()).toContain('crunchy');
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('Confirm with empty input closes modal without adding tag', () => {
+    openModal();
+    document.getElementById('tag-modal-input').value = '';
+    document.getElementById('tag-modal-confirm').click();
+    expect(getTagsForSave()).toEqual([]);
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('trims and lowercases tag on confirm', () => {
+    openModal();
+    document.getElementById('tag-modal-input').value = '  SALTY  ';
+    document.getElementById('tag-modal-confirm').click();
+    expect(getTagsForSave()).toContain('salty');
+  });
+
+  it('ignores tags longer than 50 characters', () => {
+    openModal();
+    document.getElementById('tag-modal-input').value = 'a'.repeat(51);
+    document.getElementById('tag-modal-confirm').click();
+    expect(getTagsForSave()).toEqual([]);
+  });
+
+  it('ignores duplicate tags', () => {
+    initTagInput(['existing']);
+    document.getElementById('add-tag-btn').click();
+    document.getElementById('tag-modal-input').value = 'existing';
+    document.getElementById('tag-modal-confirm').click();
+    expect(getTagsForSave()).toEqual(['existing']);
+  });
+});
+
+// ─── modal suggestion list ───────────────────────────────────────────────────
+
+describe('modal suggestions', () => {
+  async function openModalWithSuggestions(suggestions) {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(suggestions),
+    });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    // Initial fetch on open (empty query)
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+  }
+
+  it('fetches suggestions on modal open with empty query', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(['salty', 'savory']),
+    });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync();
+    expect(global.fetch).toHaveBeenCalledWith('/api/products/tags/suggestions?q=');
+    expect(document.getElementById('tag-modal-suggestions').hidden).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('fetches suggestions as user types in modal', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(['salty', 'savory']),
+    });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync(); // clear initial fetch
+
+    const input = document.getElementById('tag-modal-input');
+    input.value = 'sa';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    await vi.runAllTimersAsync();
+    expect(global.fetch).toHaveBeenCalledWith('/api/products/tags/suggestions?q=sa');
+    vi.useRealTimers();
+  });
+
+  it('hides suggestions when fetch returns empty', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync();
+    expect(document.getElementById('tag-modal-suggestions').hidden).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('hides suggestions on fetch error', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockRejectedValue(new Error('network'));
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync();
+    expect(document.getElementById('tag-modal-suggestions').hidden).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('does not show already-selected tags in suggestions', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(['salty', 'savory']),
+    });
+    initTagInput(['salty']);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync();
+    const items = document.querySelectorAll('#tag-modal-suggestions li');
+    expect(items.length).toBe(1);
+    expect(items[0].textContent).toBe('savory');
+    vi.useRealTimers();
+  });
+
+  it('clicking a suggestion adds tag and closes modal', async () => {
+    await openModalWithSuggestions(['salty', 'savory']);
+    const li = document.querySelector('#tag-modal-suggestions li');
+    li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(getTagsForSave()).toContain('salty');
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('fetches with empty query when input is cleared', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync(); // initial fetch
+
+    const input = document.getElementById('tag-modal-input');
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await vi.runAllTimersAsync();
+    expect(global.fetch).toHaveBeenLastCalledWith('/api/products/tags/suggestions?q=');
+    vi.useRealTimers();
+  });
+
+  it('clicking a suggestion after typing adds tag and closes modal', async () => {
+    vi.useFakeTimers();
+    global.fetch = vi.fn().mockResolvedValue({
+      json: () => Promise.resolve(['salty']),
+    });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    await vi.runAllTimersAsync(); // initial fetch
+
+    const input = document.getElementById('tag-modal-input');
+    input.value = 'sa';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    vi.advanceTimersByTime(250);
+    await vi.runAllTimersAsync();
+    vi.useRealTimers();
+
+    const li = document.querySelector('#tag-modal-suggestions li');
+    li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+    expect(getTagsForSave()).toContain('salty');
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+});
+
+// ─── modal arrow key navigation ──────────────────────────────────────────────
+
+describe('modal arrow key navigation', () => {
   async function setupWithSuggestions(suggestions) {
     vi.useFakeTimers();
     global.fetch = vi.fn().mockResolvedValue({
       json: () => Promise.resolve(suggestions),
     });
     initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'sa';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
+    document.getElementById('add-tag-btn').click();
     await vi.runAllTimersAsync();
     vi.useRealTimers();
-    return { input, list };
+    return {
+      input: document.getElementById('tag-modal-input'),
+      list: document.getElementById('tag-modal-suggestions'),
+    };
   }
 
-  it('ArrowDown highlights the first li', async () => {
+  it('ArrowDown highlights the first item', async () => {
     const { input, list } = await setupWithSuggestions(['salty', 'savory']);
-    expect(list.hidden).toBe(false);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     const items = list.querySelectorAll('li');
     expect(items[0].classList.contains('highlighted')).toBe(true);
@@ -184,217 +385,58 @@ describe('arrow key navigation', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     const items = list.querySelectorAll('li');
-    expect(items[0].classList.contains('highlighted')).toBe(false);
     expect(items[1].classList.contains('highlighted')).toBe(true);
+  });
+
+  it('ArrowDown does not go past last item', async () => {
+    const { input, list } = await setupWithSuggestions(['salty']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    const items = list.querySelectorAll('li');
+    expect(items[0].classList.contains('highlighted')).toBe(true);
   });
 
   it('ArrowUp moves highlight back', async () => {
     const { input, list } = await setupWithSuggestions(['salty', 'savory']);
-    // Go down twice, then up once
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     const items = list.querySelectorAll('li');
     expect(items[0].classList.contains('highlighted')).toBe(true);
-    expect(items[1].classList.contains('highlighted')).toBe(false);
   });
 
-  it('Enter with highlighted item adds that tag', async () => {
+  it('ArrowUp with no highlight selects last item', async () => {
+    const { input, list } = await setupWithSuggestions(['salty', 'savory']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    const items = list.querySelectorAll('li');
+    expect(items[items.length - 1].classList.contains('highlighted')).toBe(true);
+  });
+
+  it('ArrowUp does not go past first item', async () => {
+    const { input, list } = await setupWithSuggestions(['salty']);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    const items = list.querySelectorAll('li');
+    expect(items[0].classList.contains('highlighted')).toBe(true);
+  });
+
+  it('ArrowDown does nothing when list is hidden', async () => {
+    const { input, list } = await setupWithSuggestions([]);
+    expect(list.hidden).toBe(true);
+    expect(() =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    ).not.toThrow();
+  });
+
+  it('Enter with highlighted suggestion adds that tag', async () => {
     const { input, list } = await setupWithSuggestions(['salty', 'savory']);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-    // Second item is now highlighted
-    const items = list.querySelectorAll('li');
-    expect(items[1].classList.contains('highlighted')).toBe(true);
+    // second item highlighted
+    expect(list.querySelectorAll('li')[1].classList.contains('highlighted')).toBe(true);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(getTagsForSave()).toContain('savory');
-    expect(getTagsForSave()).not.toContain('salty');
-    expect(list.hidden).toBe(true);
-  });
-});
-
-describe('suggestion list', () => {
-  it('hides suggestions on empty input', () => {
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    list.hidden = false;
-    input.value = '';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(list.hidden).toBe(true);
-  });
-
-  it('hides suggestions on blur after delay', () => {
-    vi.useFakeTimers();
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    list.hidden = false;
-    input.dispatchEvent(new Event('blur', { bubbles: true }));
-    vi.advanceTimersByTime(200);
-    expect(list.hidden).toBe(true);
-    vi.useRealTimers();
-  });
-
-  it('focus event triggers fetch with q= and shows dropdown', async () => {
-    vi.useFakeTimers();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(['salty', 'savory']),
-    });
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.dispatchEvent(new Event('focus', { bubbles: true }));
-    await vi.runAllTimersAsync();
-    expect(global.fetch).toHaveBeenCalledWith('/api/products/tags/suggestions?q=');
-    expect(list.hidden).toBe(false);
-    expect(list.querySelectorAll('li').length).toBe(2);
-    vi.useRealTimers();
-  });
-
-  it('fetches and displays suggestions on input', async () => {
-    vi.useFakeTimers();
-    const mockSuggestions = ['salty', 'savory'];
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(mockSuggestions),
-    });
-
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'sal';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
-    await vi.runAllTimersAsync();
-
-    expect(global.fetch).toHaveBeenCalledWith('/api/products/tags/suggestions?q=sal');
-    expect(list.hidden).toBe(false);
-    expect(list.querySelectorAll('li').length).toBe(2);
-    vi.useRealTimers();
-  });
-
-  it('hides suggestions when fetch returns empty', async () => {
-    vi.useFakeTimers();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
-
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'xyz';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
-    await vi.runAllTimersAsync();
-
-    expect(list.hidden).toBe(true);
-    vi.useRealTimers();
-  });
-
-  it('hides suggestions on fetch error', async () => {
-    vi.useFakeTimers();
-    global.fetch = vi.fn().mockRejectedValue(new Error('network'));
-
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'test';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
-    await vi.runAllTimersAsync();
-
-    expect(list.hidden).toBe(true);
-    vi.useRealTimers();
-  });
-
-  it('adds suggestion on mousedown and clears input', async () => {
-    vi.useFakeTimers();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(['salty']),
-    });
-
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'sal';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
-    await vi.runAllTimersAsync();
-
-    const li = list.querySelector('li');
-    li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-    expect(getTagsForSave()).toContain('salty');
-    expect(input.value).toBe('');
-    expect(list.hidden).toBe(true);
-    vi.useRealTimers();
-  });
-
-  it('dropdown does not show already-selected tags', async () => {
-    vi.useFakeTimers();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(['salty', 'savory']),
-    });
-
-    initTagInput(['salty']);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'sa';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
-    await vi.runAllTimersAsync();
-
-    const items = list.querySelectorAll('li');
-    expect(items.length).toBe(1);
-    expect(items[0].textContent).toBe('savory');
-    vi.useRealTimers();
-  });
-
-  it('Tab completes first visible suggestion', async () => {
-    vi.useFakeTimers();
-    global.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve(['salty', 'savory']),
-    });
-
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    input.value = 'sa';
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    vi.advanceTimersByTime(250);
-    await vi.runAllTimersAsync();
-
-    expect(list.hidden).toBe(false);
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
-    expect(getTagsForSave()).toContain('salty');
-    vi.useRealTimers();
-  });
-
-  it('Tab does nothing when suggestions are hidden', () => {
-    initTagInput([]);
-    const input = document.getElementById('tag-input-ed');
-    const list = document.getElementById('tag-suggestions-ed');
-    list.hidden = true;
-    input.value = '';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
-    // Should not add any tag from suggestion
-    expect(getTagsForSave()).toEqual([]);
-  });
-});
-
-describe('field click', () => {
-  it('focuses input when clicking on the tag field', () => {
-    initTagInput([]);
-    const field = document.getElementById('tag-field-ed');
-    const input = document.getElementById('tag-input-ed');
-    const focusSpy = vi.spyOn(input, 'focus');
-    field.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(focusSpy).toHaveBeenCalled();
-  });
-});
-
-describe('no input or list elements', () => {
-  it('handles missing input element gracefully', () => {
-    document.body.innerHTML = '<div id="tag-field-ed"></div>';
-    expect(() => initTagInput(['test'])).not.toThrow();
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
   });
 });
