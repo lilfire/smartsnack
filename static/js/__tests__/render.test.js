@@ -430,7 +430,7 @@ describe('renderResults - event delegation', () => {
     expect(window.removeProductImage).toHaveBeenCalledWith(1);
   });
 
-  it('handles trigger-image action via delegation', () => {
+  it('handles change-image action via delegation (no image)', () => {
     state.expandedId = 1;
     state.editingId = null;
     const products = [{
@@ -439,7 +439,7 @@ describe('renderResults - event delegation', () => {
       sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
     }];
     renderResults(products, '');
-    const imgArea = document.querySelector('[data-action="trigger-image"]');
+    const imgArea = document.querySelector('[data-action="change-image"]');
     imgArea.click();
     expect(window.triggerImageUpload).toHaveBeenCalledWith(1);
   });

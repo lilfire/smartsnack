@@ -42,24 +42,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 4px;
-  padding: 5px 28px 5px 9px;
+  padding: 5px 9px;
   border-radius: 7px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   cursor: text;
   min-height: 36px;
   position: relative;
-}
-
-.tag-field::after {
-  content: '▾';
-  position: absolute;
-  right: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: rgba(180, 210, 240, 0.5);
-  font-size: 12px;
-  pointer-events: none;
 }
 
 .tag-field:focus-within {
@@ -76,35 +65,6 @@
   font-family: 'DM Sans', sans-serif;
   outline: none;
   padding: 2px 0;
-}
-
-/* Legacy selectors kept for backward compatibility */
-.tag-input-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 4px;
-  min-height: 24px;
-}
-
-.tag-input {
-  width: 100%;
-  padding: 7px 9px;
-  border-radius: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: #e8e6e3;
-  font-size: 13px;
-  font-family: 'DM Sans', sans-serif;
-  outline: none;
-}
-
-.tag-input:focus {
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.tag-autocomplete-wrapper {
-  position: relative;
 }
 
 .tag-suggestions {
@@ -128,6 +88,7 @@
   cursor: pointer;
   font-size: 13px;
   color: #e8e6e3;
+  list-style: none;
 }
 
 .tag-suggestions li:hover {

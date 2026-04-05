@@ -1,20 +1,24 @@
-let _tags = new Set();
+// tags.js — Tag input widget with modal + chips UI.
+// Internal state: Map<number, string> (id -> label).
+let _tags = new Map();
 
 export function initTagInput(existingTags) {
-  _tags = new Set((existingTags || []).map(t => t.trim().toLowerCase()));
+  _tags = new Map();
+  for (const t of (existingTags || [])) {
+    if (t && t.id != null && t.label != null) {
+      _tags.set(Number(t.id), String(t.label));
+    }
+  }
   _renderPills();
   _setupAddTagButton();
 }
 
 export function getTagsForSave() {
-  return Array.from(_tags);
+  return Array.from(_tags.keys());
 }
 
-function _addTag(value) {
-  const tag = value.trim().toLowerCase();
-  if (!tag || tag.length > 50 || _tags.has(tag)) return;
-  _tags.add(tag);
-  _renderPills();
+function _sortedEntries() {
+  return Array.from(_tags.entries()).sort((a, b) => a[1].localeCompare(b[1]));
 }
 
 function _renderPills() {
@@ -22,18 +26,18 @@ function _renderPills() {
   if (!field) return;
   field.querySelectorAll('.tag-pill').forEach(el => el.remove());
   const btn = field.querySelector('#add-tag-btn');
-  for (const tag of [..._tags].sort()) {
+  for (const [id, label] of _sortedEntries()) {
     const span = document.createElement('span');
     span.className = 'tag-pill';
-    span.appendChild(document.createTextNode(tag));
+    span.dataset.tagId = id;
+    span.appendChild(document.createTextNode(label));
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'tag-remove';
-    removeBtn.setAttribute('data-tag', tag);
+    removeBtn.setAttribute('aria-label', 'Remove tag ' + label);
     removeBtn.textContent = '\u00D7';
-    removeBtn.setAttribute('aria-label', 'Remove tag ' + tag);
     removeBtn.addEventListener('click', () => {
-      _tags.delete(tag);
+      _tags.delete(id);
       _renderPills();
     });
     span.appendChild(removeBtn);
@@ -55,27 +59,42 @@ function _setupAddTagButton() {
   field.appendChild(btn);
 }
 
-function _fetchSuggestions(q, list, input, onSelect) {
-  return fetch(`/api/products/tags/suggestions?q=${encodeURIComponent(q)}`)
-    .then(res => res.json())
-    .then(suggestions => {
-      const filtered = suggestions.filter(s => !_tags.has(s.trim().toLowerCase()));
-      list.innerHTML = '';
-      if (!filtered.length) { list.hidden = true; return; }
-      for (const s of filtered) {
-        const li = document.createElement('li');
-        li.textContent = s;
-        li.addEventListener('mousedown', e => {
-          e.preventDefault();
-          onSelect(s);
-          input.value = '';
-          list.hidden = true;
-        });
-        list.appendChild(li);
-      }
-      list.hidden = false;
-    })
-    .catch(() => { list.hidden = true; });
+async function _fetchSuggestions(q, list, input, onSelect) {
+  try {
+    const res = await fetch('/api/tags?q=' + encodeURIComponent(q));
+    const suggestions = await res.json();
+    const filtered = suggestions.filter(s => !_tags.has(Number(s.id)));
+    list.innerHTML = '';
+    if (!filtered.length) { list.hidden = true; return; }
+    for (const s of filtered) {
+      const li = document.createElement('li');
+      li.dataset.tagId = s.id;
+      li.dataset.tagLabel = s.label;
+      li.textContent = s.label;
+      li.addEventListener('mousedown', e => {
+        e.preventDefault();
+        onSelect(s);
+      });
+      list.appendChild(li);
+    }
+    list.hidden = false;
+  } catch (_) {
+    list.hidden = true;
+  }
+}
+
+async function _createTag(label) {
+  try {
+    const res = await fetch('/api/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'SmartSnack' },
+      body: JSON.stringify({ label }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (_) {
+    return null;
+  }
 }
 
 function _getHighlighted(list) {
@@ -134,7 +153,7 @@ function _openModal() {
 
   _bindModal(overlay, input, list, confirmBtn, cancelBtn);
   input.focus();
-  _fetchSuggestions('', list, input, tag => { _addTag(tag); _closeModal(); });
+  _fetchSuggestions('', list, input, s => { _addTagObj(s); _closeModal(); });
 }
 
 function _closeModal() {
@@ -142,18 +161,34 @@ function _closeModal() {
   if (overlay) overlay.remove();
 }
 
+function _addTagObj(s) {
+  _tags.set(Number(s.id), s.label);
+  _renderPills();
+}
+
 function _bindModal(overlay, input, list, confirmBtn, cancelBtn) {
   let _debounce = null;
 
-  function _onSelect(tag) {
-    _addTag(tag);
+  function _onSelect(s) {
+    _addTagObj(s);
     _closeModal();
   }
 
-  function _confirmAdd() {
+  async function _confirmAdd() {
     const highlighted = _getHighlighted(list);
-    const value = highlighted ? highlighted.textContent : input.value;
-    if (value.trim()) _addTag(value);
+    if (highlighted) {
+      _tags.set(Number(highlighted.dataset.tagId), highlighted.dataset.tagLabel);
+      _renderPills();
+      _closeModal();
+      return;
+    }
+    const label = input.value.trim();
+    if (!label) { _closeModal(); return; }
+    const tag = await _createTag(label);
+    if (tag) {
+      _tags.set(Number(tag.id), tag.label);
+      _renderPills();
+    }
     _closeModal();
   }
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('../state.js', () => {
   const _state = {
@@ -44,7 +44,7 @@ vi.mock('../filters.js', async (importOriginal) => {
   };
 });
 
-import { loadProductImage, resizeImage, removeProductImage, triggerImageUpload } from '../images.js';
+import { loadProductImage, resizeImage, removeProductImage, triggerImageUpload, viewProductImage } from '../images.js';
 import { state, api, showConfirmModal, showToast } from '../state.js';
 import { rerender } from '../filters.js';
 
@@ -304,6 +304,69 @@ describe('triggerImageUpload', () => {
     document.createElement.mockRestore?.();
     global.FileReader = origFileReader;
     global.Image = origImage;
+  });
+});
+
+describe('viewProductImage', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  afterEach(() => {
+    // Close any open modal to remove stale keydown listeners
+    const bg = document.querySelector('.img-viewer-bg');
+    if (bg) bg.click();
+  });
+
+  it('opens modal with cached image', async () => {
+    state.imageCache[1] = 'data:image/png;base64,cached';
+    await viewProductImage(1);
+    const bg = document.querySelector('.img-viewer-bg');
+    expect(bg).toBeTruthy();
+    expect(bg.querySelector('img').src).toContain('cached');
+  });
+
+  it('loads image via API on cache miss', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ image: 'data:image/png;base64,loaded' }),
+    });
+    await viewProductImage(2);
+    const bg = document.querySelector('.img-viewer-bg');
+    expect(bg).toBeTruthy();
+    expect(bg.querySelector('img').src).toContain('loaded');
+  });
+
+  it('does nothing when no image available', async () => {
+    state.imageCache[3] = null;
+    await viewProductImage(3);
+    expect(document.querySelector('.img-viewer-bg')).toBeNull();
+  });
+
+  it('closes modal on Escape key', async () => {
+    state.imageCache[1] = 'data:image/png;base64,abc';
+    await viewProductImage(1);
+    expect(document.querySelector('.img-viewer-bg')).toBeTruthy();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    expect(document.querySelector('.img-viewer-bg')).toBeNull();
+  });
+
+  it('closes modal on backdrop click', async () => {
+    state.imageCache[1] = 'data:image/png;base64,abc';
+    await viewProductImage(1);
+    const bg = document.querySelector('.img-viewer-bg');
+    expect(bg).toBeTruthy();
+    bg.click();
+    expect(document.querySelector('.img-viewer-bg')).toBeNull();
+  });
+
+  it('does not close modal when clicking image', async () => {
+    state.imageCache[1] = 'data:image/png;base64,abc';
+    await viewProductImage(1);
+    const img = document.querySelector('.img-viewer-bg img');
+    expect(img).toBeTruthy();
+    img.click();
+    expect(document.querySelector('.img-viewer-bg')).toBeTruthy();
   });
 });
 

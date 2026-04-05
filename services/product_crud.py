@@ -14,7 +14,7 @@ from config import (
     COMPUTED_FIELDS,
     DEFAULT_PAGE_SIZE,
 )
-from services import flag_service
+from services import flag_service, tag_service
 from helpers import _num, _safe_float
 from services.product_scoring import (
     _load_weight_config,
@@ -41,47 +41,6 @@ def _get_product_flags(cur, product_ids: list) -> dict:
     for r in rows:
         result.setdefault(r["product_id"], []).append(r["flag"])
     return result
-
-
-def _get_product_tags(cur, product_ids: list) -> dict:
-    """Batch-fetch tags for a list of product IDs. Returns {pid: [tag, ...]}."""
-    if not product_ids:
-        return {}
-    placeholders = ",".join("?" for _ in product_ids)
-    cur.execute(
-        f"SELECT product_id, tag FROM product_tags"
-        f" WHERE product_id IN ({placeholders})"
-        f" ORDER BY tag COLLATE NOCASE",
-        product_ids,
-    )
-    result: dict[int, list[str]] = {}
-    for pid, tag in cur.fetchall():
-        result.setdefault(pid, []).append(tag)
-    return result
-
-
-def _set_tags(conn, pid: int, tags: list) -> None:
-    """Replace all tags for product `pid` with the given list."""
-    cur = conn.cursor()
-    cur.execute("DELETE FROM product_tags WHERE product_id = ?", (pid,))
-    for tag in set(t.strip().lower() for t in tags if t.strip() and len(t.strip()) <= 50):
-        cur.execute(
-            "INSERT OR IGNORE INTO product_tags (product_id, tag) VALUES (?, ?)",
-            (pid, tag),
-        )
-
-
-def get_tag_suggestions(prefix: str) -> list:
-    """Return up to 10 existing tags that start with `prefix` (case-insensitive)."""
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT DISTINCT tag FROM product_tags"
-        " WHERE tag LIKE ? COLLATE NOCASE"
-        " ORDER BY tag COLLATE NOCASE LIMIT 10",
-        (prefix.strip() + "%",),
-    )
-    return [row[0] for row in cur.fetchall()]
 
 
 def _set_user_flags(conn, pid: int, flags: list) -> None:
@@ -251,7 +210,7 @@ def list_products(
     # in post-filter when OR groups mix SQL and computed fields.
     pids = [p["id"] for p in results]
     flags_map = _get_product_flags(cur, pids)
-    tags_map = _get_product_tags(cur, pids)
+    tags_map = tag_service.get_tags_for_products(pids)
     for p in results:
         p["flags"] = flags_map.get(p["id"], [])
         p["tags"] = tags_map.get(p["id"], [])
@@ -370,6 +329,11 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         _set_user_flags(conn, new_id, data["flags"])
     if data.get("from_off"):
         set_system_flag(new_id, "is_synced_with_off", True)
+        if ean:
+            conn.execute(
+                "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
+                (new_id, ean),
+            )
     conn.commit()
     from services.product_scoring import invalidate_scoring_cache
     invalidate_scoring_cache()
@@ -378,9 +342,10 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
 
 def update_product(pid: int, data: dict) -> None:
     """Update a product's fields by ID."""
-    # Extract flags and tags before field validation loop
+    # Extract flags, tagIds, and from_off before field validation loop
     incoming_flags = data.pop("flags", None)
-    incoming_tags = data.pop("tags", None)
+    incoming_tag_ids = data.pop("tagIds", None)
+    data.pop("tags", None)  # ignore legacy tags field if present
     from_off = data.pop("from_off", False)
 
     updates, vals = [], []
@@ -406,7 +371,7 @@ def update_product(pid: int, data: dict) -> None:
                     v = _safe_float(v, f)
             updates.append(f"{f} = ?")
             vals.append(v)
-    if not updates and incoming_flags is None and incoming_tags is None:
+    if not updates and incoming_flags is None and incoming_tag_ids is None:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data and data["type"]:
@@ -432,13 +397,20 @@ def update_product(pid: int, data: dict) -> None:
         _sync_primary_ean(conn, pid, new_ean)
     if incoming_flags is not None and isinstance(incoming_flags, list):
         _set_user_flags(conn, pid, incoming_flags)
-    if incoming_tags is not None and isinstance(incoming_tags, list):
-        _set_tags(conn, pid, incoming_tags)
+    if incoming_tag_ids is not None and isinstance(incoming_tag_ids, list):
+        tag_service.set_tags_for_product(pid, incoming_tag_ids)
     conn.commit()
     from services.product_scoring import invalidate_scoring_cache
     invalidate_scoring_cache()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
+        ean_val = (data.get("ean") or "").strip()
+        if ean_val:
+            conn.execute(
+                "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
+                (pid, ean_val),
+            )
+            conn.commit()
 
 
 def delete_product(pid: int) -> bool:
@@ -450,100 +422,3 @@ def delete_product(pid: int) -> bool:
     invalidate_scoring_cache()
     return cur.rowcount > 0
 
-
-# ── EAN CRUD ──────────────────────────────────────────────────────────────────
-
-
-def list_eans(pid: int) -> list:
-    """List all EANs for a product."""
-    conn = get_db()
-    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
-    if not exists:
-        raise LookupError("Product not found")
-    rows = conn.execute(
-        "SELECT id, ean, is_primary FROM product_eans WHERE product_id = ? ORDER BY is_primary DESC, id ASC",
-        (pid,),
-    ).fetchall()
-    return [{"id": r["id"], "ean": r["ean"], "is_primary": bool(r["is_primary"])} for r in rows]
-
-
-def add_ean(pid: int, ean: str) -> dict:
-    """Add a new EAN to a product."""
-    ean = ean.strip()
-    if not re.fullmatch(r"\d{8,13}", ean):
-        raise ValueError("EAN must be 8-13 digits")
-    conn = get_db()
-    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
-    if not exists:
-        raise LookupError("Product not found")
-    count = conn.execute(
-        "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
-    ).fetchone()[0]
-    is_primary = 1 if count == 0 else 0
-    try:
-        cur = conn.execute(
-            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, ?)",
-            (pid, ean, is_primary),
-        )
-    except sqlite3.IntegrityError:
-        raise ValueError("ean_already_exists")
-    new_id = cur.lastrowid
-    if is_primary:
-        conn.execute("UPDATE products SET ean = ? WHERE id = ?", (ean, pid))
-    conn.commit()
-    return {"id": new_id, "ean": ean, "is_primary": bool(is_primary)}
-
-
-def delete_ean(pid: int, ean_id: int) -> None:
-    """Delete an EAN from a product."""
-    conn = get_db()
-    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
-    if not exists:
-        raise LookupError("Product not found")
-    row = conn.execute(
-        "SELECT id, ean, is_primary FROM product_eans WHERE id = ? AND product_id = ?",
-        (ean_id, pid),
-    ).fetchone()
-    if not row:
-        raise LookupError("EAN not found")
-    count = conn.execute(
-        "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
-    ).fetchone()[0]
-    if count == 1:
-        raise ValueError("cannot_remove_only_ean")
-    conn.execute("DELETE FROM product_eans WHERE id = ?", (ean_id,))
-    if row["is_primary"]:
-        next_row = conn.execute(
-            "SELECT id, ean FROM product_eans WHERE product_id = ? ORDER BY id ASC LIMIT 1",
-            (pid,),
-        ).fetchone()
-        if next_row:
-            conn.execute(
-                "UPDATE product_eans SET is_primary = 1 WHERE id = ?", (next_row["id"],)
-            )
-            conn.execute(
-                "UPDATE products SET ean = ? WHERE id = ?", (next_row["ean"], pid)
-            )
-    conn.commit()
-
-
-def set_primary_ean(pid: int, ean_id: int) -> None:
-    """Set an EAN as primary for a product."""
-    conn = get_db()
-    exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
-    if not exists:
-        raise LookupError("Product not found")
-    row = conn.execute(
-        "SELECT id, ean FROM product_eans WHERE id = ? AND product_id = ?",
-        (ean_id, pid),
-    ).fetchone()
-    if not row:
-        raise LookupError("EAN not found")
-    conn.execute(
-        "UPDATE product_eans SET is_primary = 0 WHERE product_id = ?", (pid,)
-    )
-    conn.execute(
-        "UPDATE product_eans SET is_primary = 1 WHERE id = ?", (ean_id,)
-    )
-    conn.execute("UPDATE products SET ean = ? WHERE id = ?", (row["ean"], pid))
-    conn.commit()
