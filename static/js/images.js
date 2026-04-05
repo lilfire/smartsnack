@@ -64,6 +64,47 @@ export function resizeImage(dataUri, maxSize) {
   });
 }
 
+export async function viewProductImage(id) {
+  let src = state.imageCache[id];
+  if (src === undefined) src = await loadProductImage(id);
+  if (!src) return;
+
+  const bg = document.createElement('div');
+  bg.className = 'img-viewer-bg';
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
+  bg.setAttribute('aria-label', t('view_image_label'));
+
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = '';
+  img.addEventListener('click', (e) => e.stopPropagation());
+
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'img-viewer-close';
+  closeBtn.textContent = '\u00D7';
+  closeBtn.setAttribute('aria-label', t('btn_close'));
+
+  bg.appendChild(img);
+  bg.appendChild(closeBtn);
+  document.body.appendChild(bg);
+
+  function close() {
+    if (bg.parentNode) bg.parentNode.removeChild(bg);
+    document.removeEventListener('keydown', onKey);
+  }
+
+  function onKey(e) {
+    if (e.key === 'Escape') close();
+  }
+
+  bg.addEventListener('click', close);
+  closeBtn.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+  document.addEventListener('keydown', onKey);
+}
+
+window.viewProductImage = viewProductImage;
+
 export async function removeProductImage(id) {
   if (!await showConfirmModal('\u{1F4F7}', t('remove_image_title'), t('remove_image_confirm'), t('btn_delete'), t('btn_cancel'))) return;
   try {
