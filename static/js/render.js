@@ -413,7 +413,7 @@ export function renderResults(results, search) {
   }
 
   // Initialize tag input after edit form HTML is in DOM
-  if (state.editingId && document.getElementById('tag-container-ed')) {
+  if (state.editingId && document.getElementById('tag-field-ed')) {
     const tagProduct = state.cachedResults && state.cachedResults.find(p => p.id === state.editingId);
     const existingTags = tagProduct ? (tagProduct.tags || []) : [];
     import('./tags.js').then(mod => mod.initTagInput(existingTags));
