@@ -83,6 +83,11 @@
   overflow-y: auto;
 }
 
+.tag-modal .tag-suggestions {
+  position: static;
+  margin: 0;
+}
+
 .tag-suggestions li {
   padding: 6px 10px;
   cursor: pointer;
