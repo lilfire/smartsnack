@@ -694,6 +694,28 @@ describe('renderResults - event delegation', () => {
     expect(container.innerHTML).toContain('Processed');
   });
 
+  it('renders product tag badges using tag.label, not [object Object]', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {},
+      flags: [],
+      tags: [
+        { id: 1, label: 'salty' },
+        { id: 2, label: 'sweet' },
+        { id: 3, label: 'crunchy' },
+      ],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('tag-badge');
+    expect(container.innerHTML).toContain('salty');
+    expect(container.innerHTML).toContain('sweet');
+    expect(container.innerHTML).toContain('crunchy');
+    expect(container.innerHTML).not.toContain('[object Object]');
+  });
+
   it('renders edit form with user flag checkboxes', async () => {
     const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
     global.fetch = vi.fn().mockResolvedValue({

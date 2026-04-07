@@ -233,7 +233,7 @@ export function renderResults(results, search) {
       if (p.tags && p.tags.length > 0) {
         h += '<div class="product-tags">';
         for (const tag of p.tags) {
-          h += '<span class="tag-badge">' + esc(tag) + '</span>';
+          h += '<span class="tag-badge">' + esc(tag.label) + '</span>';
         }
         h += '</div>';
       }
