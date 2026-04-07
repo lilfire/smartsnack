@@ -10,7 +10,7 @@ import { showDuplicateMergeModal } from './off-duplicates.js';
 import { showOffAddReview } from './off-review.js';
 import { initTagInput, getTagsForSave } from './tags.js';
 import { loadEanManager } from './ean-manager.js';
-export { loadEanManager, addEan, deleteEan, setEanPrimary } from './ean-manager.js';
+export { loadEanManager, addEan, deleteEan, setEanPrimary, unsyncEan } from './ean-manager.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -66,7 +66,17 @@ export function startEdit(id) {
 
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
-  if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
+  if (window._pendingOFFSync) {
+    data.from_off = true;
+    window._pendingOFFSync = null;
+    // If the OFF fetch targeted a specific (possibly non-primary) EAN, pass
+    // it through so the backend marks THAT row as synced without swapping
+    // which EAN is primary.
+    if (window._pendingOFFEan) {
+      data.from_off_ean = window._pendingOFFEan;
+      window._pendingOFFEan = null;
+    }
+  }
   const offAppliedFields = window._offAppliedFields; window._offAppliedFields = null;
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }

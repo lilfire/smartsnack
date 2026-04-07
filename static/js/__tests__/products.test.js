@@ -223,6 +223,40 @@ describe('saveProduct', () => {
     await saveProduct(1);
     expect(api).toHaveBeenCalled();
   });
+
+  it('forwards from_off and from_off_ean when a per-row OFF fetch targeted a secondary', async () => {
+    // Simulate state left behind by ean-manager._fetchEanOff: hidden #ed-ean
+    // remains on the primary, while the targeted EAN is stashed on window.
+    document.getElementById('ed-ean').value = '1111111111111'; // primary
+    window._pendingOFFSync = true;
+    window._pendingOFFEan = '2222222222222'; // the fetched secondary
+    api.mockResolvedValueOnce({});
+
+    await saveProduct(1);
+
+    const putCall = api.mock.calls.find((c) => c[0] === '/api/products/1');
+    expect(putCall).toBeDefined();
+    const body = JSON.parse(putCall[1].body);
+    expect(body.ean).toBe('1111111111111');
+    expect(body.from_off).toBe(true);
+    expect(body.from_off_ean).toBe('2222222222222');
+    expect(window._pendingOFFSync).toBeNull();
+    expect(window._pendingOFFEan).toBeNull();
+  });
+
+  it('omits from_off_ean when no per-row fetch targeted a specific EAN', async () => {
+    document.getElementById('ed-ean').value = '1111111111111';
+    window._pendingOFFSync = true;
+    window._pendingOFFEan = null;
+    api.mockResolvedValueOnce({});
+
+    await saveProduct(1);
+
+    const putCall = api.mock.calls.find((c) => c[0] === '/api/products/1');
+    const body = JSON.parse(putCall[1].body);
+    expect(body.from_off).toBe(true);
+    expect('from_off_ean' in body).toBe(false);
+  });
 });
 
 describe('deleteProduct', () => {

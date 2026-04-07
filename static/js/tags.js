@@ -1,4 +1,6 @@
 // tags.js — Tag input widget with modal + chips UI.
+import { t } from './i18n.js';
+
 // Internal state: Map<number, string> (id -> label).
 let _tags = new Map();
 
@@ -34,7 +36,7 @@ function _renderPills() {
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'tag-remove';
-    removeBtn.setAttribute('aria-label', 'Remove tag ' + label);
+    removeBtn.setAttribute('aria-label', t('tag_remove_aria_label', { label }));
     removeBtn.textContent = '\u00D7';
     removeBtn.addEventListener('click', () => {
       _tags.delete(id);
@@ -53,7 +55,7 @@ function _setupAddTagButton() {
   btn.type = 'button';
   btn.id = 'add-tag-btn';
   btn.className = 'tag-add-btn';
-  btn.textContent = '+ Add Tag';
+  btn.textContent = t('tag_add_btn');
   btn.setAttribute('aria-haspopup', 'dialog');
   btn.addEventListener('click', _openModal);
   field.appendChild(btn);
@@ -111,7 +113,7 @@ function _openModal() {
   overlay.className = 'tag-modal-overlay';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Add tag');
+  overlay.setAttribute('aria-label', t('tag_modal_aria_label'));
 
   const modal = document.createElement('div');
   modal.className = 'tag-modal';
@@ -120,7 +122,7 @@ function _openModal() {
   input.type = 'text';
   input.id = 'tag-modal-input';
   input.className = 'tag-modal-input';
-  input.setAttribute('placeholder', 'Type to search or add tag\u2026');
+  input.setAttribute('placeholder', t('tag_modal_search_placeholder'));
   input.setAttribute('autocomplete', 'off');
 
   const list = document.createElement('ul');
@@ -135,13 +137,13 @@ function _openModal() {
   confirmBtn.type = 'button';
   confirmBtn.id = 'tag-modal-confirm';
   confirmBtn.className = 'tag-modal-confirm';
-  confirmBtn.textContent = 'Add';
+  confirmBtn.textContent = t('tag_modal_confirm');
 
   const cancelBtn = document.createElement('button');
   cancelBtn.type = 'button';
   cancelBtn.id = 'tag-modal-cancel';
   cancelBtn.className = 'tag-modal-cancel';
-  cancelBtn.textContent = 'Cancel';
+  cancelBtn.textContent = t('tag_modal_cancel');
 
   actions.appendChild(confirmBtn);
   actions.appendChild(cancelBtn);

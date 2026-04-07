@@ -1,4 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+vi.mock('../i18n.js', () => ({
+  t: vi.fn((key, params) => {
+    if (!params) return key;
+    return key + Object.entries(params).map(([k, v]) => `:${k}=${v}`).join('');
+  }),
+}));
+
 import { initTagInput, getTagsForSave } from '../tags.js';
 
 function mockFetchGet(suggestions) {
@@ -65,7 +73,7 @@ describe('initTagInput', () => {
     const pill = document.querySelector('.tag-pill');
     expect(pill.dataset.tagId).toBe('5');
     const btn = pill.querySelector('.tag-remove');
-    expect(btn.getAttribute('aria-label')).toBe('Remove tag crunchy');
+    expect(btn.getAttribute('aria-label')).toBe('tag_remove_aria_label:label=crunchy');
   });
 
   it('skips entries missing id or label', () => {

@@ -14,10 +14,19 @@ def list_eans(pid: int) -> list:
     if not exists:
         raise LookupError("Product not found")
     rows = conn.execute(
-        "SELECT id, ean, is_primary FROM product_eans WHERE product_id = ? ORDER BY is_primary DESC, id ASC",
+        "SELECT id, ean, is_primary, synced_with_off FROM product_eans "
+        "WHERE product_id = ? ORDER BY is_primary DESC, id ASC",
         (pid,),
     ).fetchall()
-    return [{"id": r["id"], "ean": r["ean"], "is_primary": bool(r["is_primary"])} for r in rows]
+    return [
+        {
+            "id": r["id"],
+            "ean": r["ean"],
+            "is_primary": bool(r["is_primary"]),
+            "synced_with_off": bool(r["synced_with_off"]),
+        }
+        for r in rows
+    ]
 
 
 def add_ean(pid: int, ean: str) -> dict:
@@ -54,11 +63,13 @@ def delete_ean(pid: int, ean_id: int) -> None:
     if not exists:
         raise LookupError("Product not found")
     row = conn.execute(
-        "SELECT id, ean, is_primary FROM product_eans WHERE id = ? AND product_id = ?",
+        "SELECT id, ean, is_primary, synced_with_off FROM product_eans WHERE id = ? AND product_id = ?",
         (ean_id, pid),
     ).fetchone()
     if not row:
         raise LookupError("EAN not found")
+    if row["synced_with_off"]:
+        raise ValueError("cannot_delete_synced_ean")
     count = conn.execute(
         "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
     ).fetchone()[0]
@@ -80,6 +91,32 @@ def delete_ean(pid: int, ean_id: int) -> None:
     # Check if any remaining EANs are still synced with OFF
     synced_count = conn.execute(
         "SELECT COUNT(*) FROM product_eans WHERE product_id = ? AND synced_with_off = 1",
+        (pid,),
+    ).fetchone()[0]
+    if synced_count == 0:
+        set_system_flag(pid, "is_synced_with_off", False)
+    conn.commit()
+
+
+def unsync_ean(pid: int, ean_id: int) -> None:
+    """Clear the synced_with_off flag for a single EAN.
+
+    If no synced EANs remain on the product after this, also clears the
+    product-level is_synced_with_off system flag.
+    """
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id FROM product_eans WHERE id = ? AND product_id = ?",
+        (ean_id, pid),
+    ).fetchone()
+    if not row:
+        raise LookupError("EAN not found")
+    conn.execute(
+        "UPDATE product_eans SET synced_with_off = 0 WHERE id = ?", (ean_id,)
+    )
+    synced_count = conn.execute(
+        "SELECT COUNT(*) FROM product_eans "
+        "WHERE product_id = ? AND synced_with_off = 1",
         (pid,),
     ).fetchone()[0]
     if synced_count == 0:

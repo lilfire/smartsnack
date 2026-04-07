@@ -246,19 +246,14 @@ export function renderResults(results, search) {
         const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
-          + (() => {
-              const isSynced = (p.flags || []).includes('is_synced_with_off');
-              return '<div class="edit-grid-2">'
-                + '<label>' + t('label_eans') + '</label>'
-                + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
-                + '<div id="ean-manager-' + p.id + '" class="ean-manager" data-locked="' + (isSynced ? '1' : '0') + '"><div class="ean-manager-loading">\u2026</div></div>'
-                + '<div class="ean-row" style="margin-top:6px">'
-                + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
-                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
-                + '<button class="btn-off" id="ed-off-btn" ' + (!(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button>'
-                + '</div>'
-                + '</div>';
-            })()
+          + '<div class="edit-grid-2">'
+            + '<label>' + t('label_eans') + '</label>'
+            + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
+            + '<div id="ean-manager-' + p.id + '" class="ean-manager"><div class="ean-manager-loading">\u2026</div></div>'
+            + '<div class="ean-row" style="margin-top:6px">'
+            + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
+            + '</div>'
+            + '</div>'
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
@@ -378,17 +373,9 @@ export function renderResults(results, search) {
         e.stopPropagation();
         window.deleteProduct(id);
         break;
-      case 'unlock-ean':
-        e.stopPropagation();
-        window.unlockEan(id);
-        break;
       case 'open-scanner':
         e.stopPropagation();
         window.openScanner('ed', id);
-        break;
-      case 'lookup-off':
-        e.stopPropagation();
-        window.lookupOFF('ed', id);
         break;
       case 'estimate-protein':
         e.stopPropagation();
@@ -407,8 +394,7 @@ export function renderResults(results, search) {
   if (state.editingId) {
     const eanMgr = document.getElementById('ean-manager-' + state.editingId);
     if (eanMgr && window.loadEanManager) {
-      const locked = eanMgr.dataset.locked === '1';
-      window.loadEanManager(state.editingId, locked);
+      window.loadEanManager(state.editingId);
     }
   }
 

@@ -141,3 +141,12 @@ def set_primary_ean(pid, ean_id):
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     return jsonify({"ok": True, "message": "Primary EAN updated"})
+
+
+@bp.route("/api/products/<int:pid>/eans/<int:ean_id>/unsync", methods=["POST"])
+def unsync_ean(pid, ean_id):
+    try:
+        product_service.unsync_ean(pid, ean_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify({"ok": True, "message": "EAN unsynced"})

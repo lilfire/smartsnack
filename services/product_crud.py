@@ -222,6 +222,9 @@ def list_products(
 
 
 def add_product(data: dict, on_duplicate: str | None = None) -> dict:
+    # from_off_ean is only meaningful on update (per-row fetch on an existing
+    # product). On add there's only ever one EAN, so just drop it.
+    data.pop("from_off_ean", None)
     if not data.get("name", "").strip():
         raise ValueError("name is required")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
@@ -347,6 +350,10 @@ def update_product(pid: int, data: dict) -> None:
     incoming_tag_ids = data.pop("tagIds", None)
     data.pop("tags", None)  # ignore legacy tags field if present
     from_off = data.pop("from_off", False)
+    # from_off_ean names the specific EAN that was fetched from OFF, so the
+    # caller can target a non-primary row without causing a primary swap via
+    # data["ean"]. If absent, fall back to data["ean"] (the primary).
+    from_off_ean = data.pop("from_off_ean", None)
 
     updates, vals = [], []
     for f in data:
@@ -404,7 +411,9 @@ def update_product(pid: int, data: dict) -> None:
     invalidate_scoring_cache()
     if from_off:
         set_system_flag(pid, "is_synced_with_off", True)
-        ean_val = (data.get("ean") or "").strip()
+        # Prefer the explicitly targeted EAN (from per-row fetch in the UI);
+        # fall back to the primary EAN on the form.
+        ean_val = (from_off_ean or data.get("ean") or "").strip()
         if ean_val:
             conn.execute(
                 "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",

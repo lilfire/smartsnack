@@ -22,6 +22,7 @@ from services.product_eans import (
     add_ean,
     delete_ean,
     set_primary_ean,
+    unsync_ean,
 )
 from services.product_scoring import (
     _load_weight_config,
@@ -56,6 +57,7 @@ __all__ = [
     "add_ean",
     "delete_ean",
     "set_primary_ean",
+    "unsync_ean",
     "_load_weight_config",
     "_compute_category_ranges",
     "_score_product",

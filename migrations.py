@@ -150,6 +150,37 @@ MIGRATIONS = [
         "009_tag_system_reimplementation",
         _migrate_008_tag_system,
     ),
+    (
+        "010_backfill_product_eans_from_products_ean",
+        [
+            # Repair products that have a non-empty products.ean but no
+            # corresponding product_eans row. This drift can occur after
+            # restoring a backup created before product_eans existed in the
+            # backup format: restore_backup() does DELETE FROM products which
+            # cascades-deletes product_eans, then re-inserts only into
+            # products. Idempotent: NOT EXISTS ensures we only touch missing
+            # rows.
+            """INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
+               SELECT id, ean, 1
+               FROM products p
+               WHERE p.ean IS NOT NULL AND p.ean != ''
+                 AND NOT EXISTS (
+                   SELECT 1 FROM product_eans pe WHERE pe.product_id = p.id
+                 )""",
+            # Mark backfilled rows as synced_with_off=1 if the product has the
+            # is_synced_with_off flag, so they behave the same as products
+            # that were freshly added via OFF.
+            """UPDATE product_eans
+               SET synced_with_off = 1
+               WHERE is_primary = 1
+                 AND synced_with_off = 0
+                 AND EXISTS (
+                   SELECT 1 FROM product_flags pf
+                   WHERE pf.product_id = product_eans.product_id
+                     AND pf.flag = 'is_synced_with_off'
+                 )""",
+        ],
+    ),
 ]
 
 
