@@ -1,5 +1,5 @@
 // ── Settings: OpenFoodFacts Credentials and Bulk Refresh ──
-import { api, showToast } from './state.js';
+import { api, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { loadData } from './products.js';
 
@@ -302,6 +302,14 @@ function _showRefreshOffModal() {
 let _offLangPriority = [];
 let _offAllLangs = [];
 
+/** Map language code to a human-readable name via Intl API, fallback to code. */
+function _langName(code) {
+  try {
+    const dn = new Intl.DisplayNames(['en'], { type: 'language' });
+    return dn.of(code) || code;
+  } catch { return code; }
+}
+
 function _renderOffLangPriority() {
   const list = document.getElementById('off-lang-priority-list');
   const addSelect = document.getElementById('off-lang-add-select');
@@ -317,9 +325,14 @@ function _renderOffLangPriority() {
     label.textContent = code;
     item.appendChild(label);
 
+    const name = document.createElement('span');
+    name.className = 'off-lang-name';
+    name.textContent = _langName(code);
+    item.appendChild(name);
+
     const upBtn = document.createElement('button');
     upBtn.type = 'button';
-    upBtn.className = 'btn-sm';
+    upBtn.className = 'btn-sm btn-outline';
     upBtn.textContent = '↑';
     upBtn.setAttribute('aria-label', t('off_lang_move_up'));
     upBtn.disabled = idx === 0;
@@ -332,7 +345,7 @@ function _renderOffLangPriority() {
 
     const downBtn = document.createElement('button');
     downBtn.type = 'button';
-    downBtn.className = 'btn-sm';
+    downBtn.className = 'btn-sm btn-outline';
     downBtn.textContent = '↓';
     downBtn.setAttribute('aria-label', t('off_lang_move_down'));
     downBtn.disabled = idx === _offLangPriority.length - 1;
@@ -364,11 +377,12 @@ function _renderOffLangPriority() {
     available.forEach((l) => {
       const opt = document.createElement('option');
       opt.value = l;
-      opt.textContent = l;
+      opt.textContent = `${_langName(l)} (${l})`;
       addSelect.appendChild(opt);
     });
     const addBtn = document.getElementById('off-lang-add-btn');
     if (addBtn) addBtn.disabled = available.length === 0;
+    upgradeSelect(addSelect);
   }
 }
 
