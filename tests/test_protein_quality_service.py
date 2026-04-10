@@ -314,6 +314,36 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_rod_paprika_recognized(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Vann, eddik, salt, vegetabilske fibre, aromaer, stabilisator (xantangummi), rød paprika, surhetsregulerende middel (sitronsyre)"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
+    def test_sennepsfro_recognized_as_mustard(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Vann, modifisert maisstivelse, chili, sennep (vann, sennepsfrø, eddik, krydder), salt"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
+    def test_kakaopulver_recognized_as_cocoa(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Vann, fettredusert kakaopulver, fortykningsmiddel (xanthangummi, aroma, sitrusfiber)"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_dates_recognized(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
 
