@@ -204,6 +204,46 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_oksestek_recognized_as_meat(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Oksestek, GLUTENFRI SOYASAU (vann, soyaproteinhydrolysat, salt), sukkersirup, hvitløk, svart pepper, habanero chili."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
+    def test_elgkjott_recognized_as_meat(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Elgkjøtt (Alces Alces) (90 %), havsalt, hvitvinseddik, stabilisator: sitruspektin, krydderblanding, sort pepper (1,17 %)."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
+    def test_melkeprotein_and_kollagen_recognized(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Melkeprotein, Søtningsstoffer (maltitol, xylitol, sukralose), fyllmiddel (polydexstrose), kollagenhydrolysat, fuktighetbevarende middel (glyserol), kakaosmør, helmelkspulver, soyaolje, kakaomasse, aromaer, emulgator (soyalecitin), salt, solsikkeolje, fargestoff (betakaroten)."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
+    def test_ost_and_kumelk_recognized(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Ost 100 % (pasteurisert kumelk, bordsalt, mesofile og termofile melkesyrebakterier, mikrobiell løpe)."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_position_weighting(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
         from translations import _set_translation_key

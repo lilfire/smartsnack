@@ -181,6 +181,13 @@ MIGRATIONS = [
                  )""",
         ],
     ),
+    (
+        "011_add_collagen_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('collagen', 0.08, 0.09)",
+        ],
+    ),
 ]
 
 
