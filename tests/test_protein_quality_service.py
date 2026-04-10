@@ -204,6 +204,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_oksestek_recognized_as_meat(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Oksestek, GLUTENFRI SOYASAU (vann, soyaproteinhydrolysat, salt), sukkersirup, hvitløk, svart pepper, habanero chili."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_position_weighting(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
         from translations import _set_translation_key
