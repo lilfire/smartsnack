@@ -166,6 +166,7 @@ PQ_SEED = [
     ("potato", 0.85, 0.87),
     ("spirulina", 0.99, 0.74),
     ("tofu_tempeh", 0.91, 0.84),
+    ("dates", 0.30, 0.25),
     ("collagen", 0.08, 0.09),
 ]
 

@@ -195,6 +195,13 @@ MIGRATIONS = [
             "VALUES ('pistachio', 0.73, 0.65)",
         ],
     ),
+    (
+        "013_add_dates_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('dates', 0.30, 0.25)",
+        ],
+    ),
 ]
 
 
