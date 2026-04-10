@@ -157,6 +157,7 @@ PQ_SEED = [
     ("peanut", 0.52, 0.45),
     ("almond", 0.33, 0.40),
     ("cashew", 0.73, 0.69),
+    ("pistachio", 0.73, 0.65),
     ("sunflower", 0.60, 0.53),
     ("pumpkin_seed", 0.60, 0.51),
     ("hemp", 0.63, 0.66),
