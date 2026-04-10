@@ -360,11 +360,11 @@ function _renderOffLangPriority() {
 
   if (addSelect) {
     addSelect.innerHTML = '';
-    const available = _offAllLangs.filter((l) => !_offLangPriority.includes(l.code));
+    const available = _offAllLangs.filter((l) => !_offLangPriority.includes(l));
     available.forEach((l) => {
       const opt = document.createElement('option');
-      opt.value = l.code;
-      opt.textContent = l.name || l.code;
+      opt.value = l;
+      opt.textContent = l;
       addSelect.appendChild(opt);
     });
     const addBtn = document.getElementById('off-lang-add-btn');
@@ -376,7 +376,7 @@ async function _saveOffLangPriority() {
   try {
     await api('/api/settings/off-language-priority', {
       method: 'PUT',
-      body: JSON.stringify({ languages: _offLangPriority }),
+      body: JSON.stringify({ priority: _offLangPriority }),
     });
     showToast(t('toast_off_lang_priority_saved'), 'success');
   } catch(e) {
@@ -392,7 +392,7 @@ export async function loadOffLanguagePriority() {
       api('/api/settings/off-language-priority'),
       api('/api/settings/off-languages'),
     ]);
-    _offLangPriority = priority.languages || [];
+    _offLangPriority = priority.priority || [];
     _offAllLangs = langs.languages || [];
     _renderOffLangPriority();
 
