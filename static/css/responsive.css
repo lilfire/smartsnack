@@ -168,6 +168,10 @@
     max-width: 100%;
   }
 
+  .off-modal {
+    max-width: 720px;
+  }
+
   .settings-desktop-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
@@ -183,6 +187,10 @@
 @media (min-width: 1200px) {
   main {
     max-width: 1400px;
+  }
+
+  .off-modal {
+    max-width: 820px;
   }
 }
 
