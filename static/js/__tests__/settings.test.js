@@ -52,15 +52,19 @@ vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn(), getFlagConfig: vi.fn((
 import {
   SCORE_COLORS, SCORE_CFG_MAP, weightData,
   toggleWeightConfig, removeWeight, addWeightFromDropdown,
-  toggleSettingsSection, downloadBackup, saveOffCredentials,
-  loadCategories, updateCategoryLabel, updateCategoryEmoji, addCategory, deleteCategory,
-  loadPq, addPq, deletePq, saveWeights, renderWeightItems,
-  loadFlags, addFlag, deleteFlag, updateFlagLabel,
-  savePqField, handleRestore, handleImport, estimateAllPq,
+  saveWeights, renderWeightItems,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
-  autosavePq, renderPqTable, checkRefreshStatus, loadSettings,
-  refreshAllFromOff,
-} from '../settings.js';
+  loadSettings,
+} from '../settings-weights.js';
+import {
+  loadCategories, updateCategoryLabel, updateCategoryEmoji, addCategory, deleteCategory,
+} from '../settings-categories.js';
+import { loadPq, addPq, deletePq, savePqField, autosavePq, renderPqTable } from '../settings-pq.js';
+import { loadFlags, addFlag, deleteFlag, updateFlagLabel } from '../settings-flags.js';
+import {
+  toggleSettingsSection, downloadBackup, handleRestore, handleImport, estimateAllPq,
+} from '../settings-backup.js';
+import { saveOffCredentials, checkRefreshStatus, refreshAllFromOff } from '../settings-off.js';
 import { state, api, showToast, fetchStats, showConfirmModal } from '../state.js';
 
 beforeEach(() => {
@@ -443,7 +447,7 @@ describe('renderWeightItems with mixed enabled/disabled', () => {
 
 describe('initRestoreDragDrop', () => {
   it('creates drag-and-drop zone', () => {
-    const { initRestoreDragDrop } = require('../settings.js');
+    const { initRestoreDragDrop } = require('../settings-backup.js');
     const drop = document.createElement('div');
     drop.id = 'restore-drop';
     document.body.appendChild(drop);
@@ -2012,13 +2016,13 @@ describe('showImportDuplicateDialog edge cases', () => {
 
 describe('initRestoreDragDrop missing element', () => {
   it('returns early when restore-drop element is missing', () => {
-    const { initRestoreDragDrop } = require('../settings.js');
+    const { initRestoreDragDrop } = require('../settings-backup.js');
     // No DOM element created — should return early without error
     expect(() => initRestoreDragDrop()).not.toThrow();
   });
 
   it('handles drop event with no files', () => {
-    const { initRestoreDragDrop } = require('../settings.js');
+    const { initRestoreDragDrop } = require('../settings-backup.js');
     const drop = document.createElement('div');
     drop.id = 'restore-drop';
     document.body.appendChild(drop);
@@ -2032,7 +2036,7 @@ describe('initRestoreDragDrop missing element', () => {
   });
 
   it('handles drop event with files and calls handleRestore', () => {
-    const { initRestoreDragDrop } = require('../settings.js');
+    const { initRestoreDragDrop } = require('../settings-backup.js');
     const drop = document.createElement('div');
     drop.id = 'restore-drop';
     document.body.appendChild(drop);
@@ -2048,7 +2052,7 @@ describe('initRestoreDragDrop missing element', () => {
   });
 
   it('handles dragleave event', () => {
-    const { initRestoreDragDrop } = require('../settings.js');
+    const { initRestoreDragDrop } = require('../settings-backup.js');
     const drop = document.createElement('div');
     drop.id = 'restore-drop';
     document.body.appendChild(drop);

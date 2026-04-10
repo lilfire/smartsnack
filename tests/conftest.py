@@ -25,12 +25,22 @@ def _patch_db_path(monkeypatch, db_file):
 
 
 @pytest.fixture(autouse=True)
+def _reset_scoring_caches():
+    """Reset module-level scoring caches between tests to prevent cross-test pollution."""
+    import services.product_scoring as ps
+    ps.invalidate_scoring_cache()
+    yield
+    ps.invalidate_scoring_cache()
+
+
+@pytest.fixture(autouse=True)
 def _env_setup(request, tmp_path, monkeypatch):
     """Set up environment for every test: temp DB path and secret key.
 
     Skipped for e2e tests, which manage their own server and database.
     """
-    if "e2e" in str(request.fspath):
+    import pathlib
+    if "e2e" in pathlib.Path(str(request.fspath)).parts:
         return
     db_file = str(tmp_path / "test.sqlite")
     monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "test-secret-key-for-unit-tests")
@@ -50,10 +60,47 @@ def app(tmp_path, monkeypatch):
     yield application
 
 
+class _CsrfTestClient:
+    """Wraps Flask test client to automatically include CSRF header."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def _inject(self, kwargs):
+        headers = dict(kwargs.pop("headers", None) or {})
+        headers.setdefault("X-Requested-With", "SmartSnack")
+        kwargs["headers"] = headers
+        return kwargs
+
+    def get(self, *a, **kw):
+        return self._inner.get(*a, **kw)
+
+    def head(self, *a, **kw):
+        return self._inner.head(*a, **kw)
+
+    def options(self, *a, **kw):
+        return self._inner.options(*a, **kw)
+
+    def post(self, *a, **kw):
+        return self._inner.post(*a, **self._inject(kw))
+
+    def put(self, *a, **kw):
+        return self._inner.put(*a, **self._inject(kw))
+
+    def patch(self, *a, **kw):
+        return self._inner.patch(*a, **self._inject(kw))
+
+    def delete(self, *a, **kw):
+        return self._inner.delete(*a, **self._inject(kw))
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
 @pytest.fixture()
 def client(app):
-    """Flask test client."""
-    return app.test_client()
+    """Flask test client with automatic CSRF header."""
+    return _CsrfTestClient(app.test_client())
 
 
 @pytest.fixture()
@@ -93,7 +140,8 @@ def translations_dir(request, tmp_path, monkeypatch):
 
     Skipped for e2e tests, which manage their own setup.
     """
-    if "e2e" in str(request.fspath):
+    import pathlib
+    if "e2e" in pathlib.Path(str(request.fspath)).parts:
         return None
     import config
 

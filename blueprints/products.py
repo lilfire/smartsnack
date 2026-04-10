@@ -4,6 +4,7 @@ from flask import Blueprint, request, jsonify
 
 from helpers import _require_json
 from services import product_service
+from config import DEFAULT_PAGE_SIZE
 
 bp = Blueprint("products", __name__)
 
@@ -14,10 +15,15 @@ def get_products():
     type_filter = request.args.get("type")
     advanced_filters = request.args.get("filters", "").strip() or None
     try:
-        results = product_service.list_products(search, type_filter, advanced_filters)
+        limit = int(request.args.get("limit", DEFAULT_PAGE_SIZE))
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        return jsonify({"error": "limit and offset must be integers"}), 400
+    try:
+        result = product_service.list_products(search, type_filter, advanced_filters, limit, offset)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify(results)
+    return jsonify(result)
 
 
 @bp.route("/api/products", methods=["POST"])
@@ -90,3 +96,57 @@ def delete_product(pid):
     if not found:
         return jsonify({"error": "Product not found"}), 404
     return jsonify({"ok": True, "message": "Deleted"})
+
+
+@bp.route("/api/products/<int:pid>/eans")
+def list_eans(pid):
+    try:
+        eans = product_service.list_eans(pid)
+    except LookupError:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(eans)
+
+
+@bp.route("/api/products/<int:pid>/eans", methods=["POST"])
+def add_ean(pid):
+    try:
+        data = _require_json()
+        ean = data.get("ean", "")
+        result = product_service.add_ean(pid, ean)
+    except LookupError:
+        return jsonify({"error": "Product not found"}), 404
+    except ValueError as e:
+        err = str(e)
+        if err == "ean_already_exists":
+            return jsonify({"error": err}), 409
+        return jsonify({"error": err}), 400
+    return jsonify(result), 201
+
+
+@bp.route("/api/products/<int:pid>/eans/<int:ean_id>", methods=["DELETE"])
+def delete_ean(pid, ean_id):
+    try:
+        product_service.delete_ean(pid, ean_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True, "message": "EAN deleted"})
+
+
+@bp.route("/api/products/<int:pid>/eans/<int:ean_id>/set-primary", methods=["PATCH"])
+def set_primary_ean(pid, ean_id):
+    try:
+        product_service.set_primary_ean(pid, ean_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify({"ok": True, "message": "Primary EAN updated"})
+
+
+@bp.route("/api/products/<int:pid>/eans/<int:ean_id>/unsync", methods=["POST"])
+def unsync_ean(pid, ean_id):
+    try:
+        product_service.unsync_ean(pid, ean_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify({"ok": True, "message": "EAN unsynced"})

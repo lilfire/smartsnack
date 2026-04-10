@@ -50,19 +50,19 @@ vi.mock('../images.js', () => ({
   loadProductImage: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock('../settings.js', () => ({
+vi.mock('../settings-weights.js', () => ({
   SCORE_COLORS: { kcal: '#aa66ff', protein: '#00d4ff' },
   SCORE_CFG_MAP: { kcal: { label: 'Kcal' }, protein: { label: 'Protein' } },
   weightData: [],
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
 }));
 
 import { renderNutriTable, fmtCell, getActiveCols, getGridTemplate, renderResults, getFlagConfig, loadFlagConfig } from '../render.js';
 import { state } from '../state.js';
-import { weightData } from '../settings.js';
+import { weightData } from '../settings-weights.js';
 
 beforeEach(() => {
   state.expandedId = null;
@@ -430,7 +430,7 @@ describe('renderResults - event delegation', () => {
     expect(window.removeProductImage).toHaveBeenCalledWith(1);
   });
 
-  it('handles trigger-image action via delegation', () => {
+  it('handles change-image action via delegation (no image)', () => {
     state.expandedId = 1;
     state.editingId = null;
     const products = [{
@@ -439,7 +439,7 @@ describe('renderResults - event delegation', () => {
       sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
     }];
     renderResults(products, '');
-    const imgArea = document.querySelector('[data-action="trigger-image"]');
+    const imgArea = document.querySelector('[data-action="change-image"]');
     imgArea.click();
     expect(window.triggerImageUpload).toHaveBeenCalledWith(1);
   });
@@ -495,23 +495,6 @@ describe('renderResults - event delegation', () => {
     expect(window.openScanner).toHaveBeenCalledWith('ed', 1);
   });
 
-  it('handles lookup-off action via delegation', () => {
-    state.expandedId = 1;
-    state.editingId = 1;
-    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
-    const products = [{
-      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
-      ean: '1234567890123', brand: '', stores: '', ingredients: '',
-      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
-      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {},
-      taste_score: 4, taste_note: '', flags: [],
-    }];
-    renderResults(products, '');
-    const offBtn = document.querySelector('[data-action="lookup-off"]');
-    offBtn.click();
-    expect(window.lookupOFF).toHaveBeenCalledWith('ed', 1);
-  });
-
   it('handles estimate-protein action via delegation', () => {
     state.expandedId = 1;
     state.editingId = 1;
@@ -545,10 +528,7 @@ describe('renderResults - event delegation', () => {
     const edName = document.getElementById('ed-name');
     edName.dispatchEvent(new Event('input'));
     expect(window.validateOffBtn).toHaveBeenCalledWith('ed');
-
-    const edEan = document.getElementById('ed-ean');
-    edEan.dispatchEvent(new Event('input'));
-    expect(window.validateOffBtn).toHaveBeenCalledTimes(2);
+    expect(window.validateOffBtn).toHaveBeenCalledTimes(1);
 
     const edIngredients = document.getElementById('ed-ingredients');
     edIngredients.dispatchEvent(new Event('input'));
@@ -695,6 +675,28 @@ describe('renderResults - event delegation', () => {
     expect(container.innerHTML).toContain('flag-badge');
     expect(container.innerHTML).toContain('Vegan');
     expect(container.innerHTML).toContain('Processed');
+  });
+
+  it('renders product tag badges using tag.label, not [object Object]', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {},
+      flags: [],
+      tags: [
+        { id: 1, label: 'salty' },
+        { id: 2, label: 'sweet' },
+        { id: 3, label: 'crunchy' },
+      ],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('tag-badge');
+    expect(container.innerHTML).toContain('salty');
+    expect(container.innerHTML).toContain('sweet');
+    expect(container.innerHTML).toContain('crunchy');
+    expect(container.innerHTML).not.toContain('[object Object]');
   });
 
   it('renders edit form with user flag checkboxes', async () => {
@@ -1205,21 +1207,20 @@ describe('renderResults - additional branch coverage', () => {
     expect(document.getElementById('ed-volume').querySelector('option[value="3"]').hasAttribute('selected')).toBe(true);
   });
 
-  it('renders edit form with ean that disables OFF button when no ean and no name', () => {
+  it('edit form no longer renders a global #ed-off-btn (per-row fetch lives on each EAN row)', () => {
     state.expandedId = 1;
     state.editingId = 1;
     state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
     const products = [{
-      id: 1, name: '   ', type: 'dairy', total_score: 85, has_image: 0,
-      ean: '', brand: '', stores: '', ingredients: '',
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      ean: '1234567890123', brand: '', stores: '', ingredients: '',
       kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
       sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {},
       taste_score: 4, taste_note: '', flags: [],
     }];
     renderResults(products, '');
-    const offBtn = document.getElementById('ed-off-btn');
-    // Both isValidEan('') is false and '   '.trim() is '', so button should be disabled
-    expect(offBtn.hasAttribute('disabled')).toBe(true);
+    expect(document.getElementById('ed-off-btn')).toBeNull();
+    expect(document.querySelector('[data-action="lookup-off"]')).toBeNull();
   });
 });
 
@@ -1237,6 +1238,68 @@ describe('getFlagConfig', () => {
     const cfg = getFlagConfig();
     expect(cfg).toBeTypeOf('object');
     expect(cfg).not.toBeNull();
+  });
+});
+
+describe('renderResults - EAN display in product list', () => {
+  beforeEach(() => {
+    const count = document.createElement('div');
+    count.id = 'result-count';
+    document.body.appendChild(count);
+    const container = document.createElement('div');
+    container.id = 'results-container';
+    document.body.appendChild(container);
+  });
+
+  it('shows EAN with no suffix for a product with one EAN', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', ean_count: 1, has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010069307');
+    expect(container.innerHTML).not.toContain('(+');
+  });
+
+  it('shows EAN with (+2) suffix for a product with three EANs', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', ean_count: 3, has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010069307');
+    const suffix = container.querySelector('.ean-count-suffix');
+    expect(suffix).not.toBeNull();
+    expect(suffix.textContent).toContain('(+2)');
+  });
+
+  it('shows EAN with (+1) suffix for a product with two EANs', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', ean_count: 2, has_image: 0 },
+    ];
+    renderResults(products, '');
+    const suffix = document.querySelector('.ean-count-suffix');
+    expect(suffix).not.toBeNull();
+    expect(suffix.textContent).toContain('(+1)');
+  });
+
+  it('shows no suffix when ean_count is not provided (defaults to 1)', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '7038010069307', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.innerHTML).toContain('EAN: 7038010069307');
+    expect(container.querySelector('.ean-count-suffix')).toBeNull();
+  });
+
+  it('shows no EAN HTML when product has no EAN', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    expect(container.querySelector('.prod-ean')).toBeNull();
   });
 });
 

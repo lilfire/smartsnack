@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+  showScrollLoader: vi.fn(),
+  hideScrollLoader: vi.fn(),
+}));
+
 vi.mock('../state.js', () => {
   const _state = {
     currentView: 'search',
@@ -16,6 +23,7 @@ vi.mock('../state.js', () => {
     sortDir: 'desc',
     categories: [],
     imageCache: {},
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -27,6 +35,7 @@ vi.mock('../state.js', () => {
     showToast: vi.fn(),
     upgradeSelect: vi.fn(),
     announceStatus: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
   };
 });
 
@@ -49,23 +58,32 @@ vi.mock('../render.js', () => ({
   getFlagConfig: vi.fn(() => ({})),
 }));
 
-vi.mock('../settings.js', () => ({
+vi.mock('../settings-weights.js', () => ({
   loadSettings: vi.fn(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
   validateOffBtn: vi.fn(),
-  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-conflicts.js', () => ({
   showMergeConflictModal: vi.fn(),
   showEditDuplicateModal: vi.fn(),
+}));
+vi.mock('../off-duplicates.js', () => ({
+  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
+  showOffAddReview: vi.fn(),
+  closeOffAddReview: vi.fn(),
+  submitToOff: vi.fn(),
 }));
 
 import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
 import { rerender } from '../filters.js';
 import { renderResults, getFlagConfig } from '../render.js';
-import { showDuplicateMergeModal } from '../openfoodfacts.js';
+import { showDuplicateMergeModal } from '../off-duplicates.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -74,6 +92,7 @@ beforeEach(() => {
   state.currentFilter = [];
   state.expandedId = null;
   state.editingId = null;
+  state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
   state.cachedResults = [
     { id: 1, name: 'Milk', type: 'dairy' },
     { id: 2, name: 'Bread', type: 'bakery' },
@@ -99,6 +118,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.clearAllTimers();
   vi.useRealTimers();
   document.body.innerHTML = '';
 });
@@ -108,6 +128,36 @@ describe('startEdit', () => {
     startEdit(42);
     expect(state.editingId).toBe(42);
     expect(rerender).toHaveBeenCalled();
+  });
+
+  it('scrolls edit form into view and focuses first input after rerender', () => {
+    const form = document.createElement('div');
+    form.className = 'edit-form';
+    const input = document.createElement('input');
+    input.id = 'ed-name';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    const scrollIntoViewMock = vi.fn();
+    form.scrollIntoView = scrollIntoViewMock;
+    const focusMock = vi.fn();
+    input.focus = focusMock;
+
+    startEdit(99);
+    vi.runAllTicks();
+    // flush requestAnimationFrame
+    vi.runAllTimers();
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(focusMock).toHaveBeenCalled();
+  });
+
+  it('does not throw if edit form is absent after rerender', () => {
+    // No .edit-form in DOM
+    expect(() => {
+      startEdit(7);
+      vi.runAllTimers();
+    }).not.toThrow();
   });
 });
 
@@ -173,28 +223,73 @@ describe('saveProduct', () => {
     await saveProduct(1);
     expect(api).toHaveBeenCalled();
   });
+
+  it('forwards from_off and from_off_ean when a per-row OFF fetch targeted a secondary', async () => {
+    // Simulate state left behind by ean-manager._fetchEanOff: hidden #ed-ean
+    // remains on the primary, while the targeted EAN is stashed on window.
+    document.getElementById('ed-ean').value = '1111111111111'; // primary
+    window._pendingOFFSync = true;
+    window._pendingOFFEan = '2222222222222'; // the fetched secondary
+    api.mockResolvedValueOnce({});
+
+    await saveProduct(1);
+
+    const putCall = api.mock.calls.find((c) => c[0] === '/api/products/1');
+    expect(putCall).toBeDefined();
+    const body = JSON.parse(putCall[1].body);
+    expect(body.ean).toBe('1111111111111');
+    expect(body.from_off).toBe(true);
+    expect(body.from_off_ean).toBe('2222222222222');
+    expect(window._pendingOFFSync).toBeNull();
+    expect(window._pendingOFFEan).toBeNull();
+  });
+
+  it('omits from_off_ean when no per-row fetch targeted a specific EAN', async () => {
+    document.getElementById('ed-ean').value = '1111111111111';
+    window._pendingOFFSync = true;
+    window._pendingOFFEan = null;
+    api.mockResolvedValueOnce({});
+
+    await saveProduct(1);
+
+    const putCall = api.mock.calls.find((c) => c[0] === '/api/products/1');
+    const body = JSON.parse(putCall[1].body);
+    expect(body.from_off).toBe(true);
+    expect('from_off_ean' in body).toBe(false);
+  });
 });
 
 describe('deleteProduct', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
   it('deletes product after confirmation', async () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(showConfirmModal).toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_deleted'), 'success', expect.objectContaining({ onUndo: expect.any(Function) }));
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(api).toHaveBeenCalledWith('/api/products/1', { method: 'DELETE' });
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_deleted'), 'success');
   });
 
   it('does nothing when confirmation cancelled', async () => {
     showConfirmModal.mockResolvedValue(false);
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(api).not.toHaveBeenCalled();
   });
 
   it('looks up name from cachedResults when not provided', async () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1);
+    const promise = deleteProduct(1);
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(showConfirmModal).toHaveBeenCalledWith(expect.any(String), 'Milk', expect.any(String), expect.any(String), expect.any(String), true);
   });
 
@@ -202,10 +297,28 @@ describe('deleteProduct', () => {
     state.imageCache[1] = 'data:image/png;base64,abc';
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(state.imageCache[1]).toBeUndefined();
     expect(state.expandedId).toBeNull();
     expect(state.editingId).toBeNull();
+  });
+
+  it('shows network error on API failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    showConfirmModal.mockResolvedValue(true);
+    api.mockReset();
+    api.mockImplementation(() => Promise.reject(new Error('network fail')));
+    showToast.mockClear();
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+    await vi.runAllTimersAsync();
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    api.mockReset();
+    api.mockResolvedValue({});
+    console.error.mockRestore();
   });
 });
 
@@ -438,17 +551,6 @@ describe('loadData', () => {
     fetchStats.mockRejectedValueOnce(new Error('network fail'));
     await loadData();
     expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
-    console.error.mockRestore();
-  });
-});
-
-describe('deleteProduct error path', () => {
-  it('shows network error on API failure', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    showConfirmModal.mockResolvedValue(true);
-    api.mockRejectedValueOnce(new Error('network fail'));
-    await deleteProduct(1, 'Milk');
-    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
     console.error.mockRestore();
   });
 });

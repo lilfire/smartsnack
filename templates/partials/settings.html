@@ -3,12 +3,12 @@
   <div class="form-wrap">
     <h2 class="form-title mono"><span data-i18n="settings_title_1">Inn</span><span class="accent" data-i18n="settings_title_2">stillinger</span></h2>
     <p class="form-sub" data-i18n="settings_sub">Score weighting, categories and database</p>
-    <div id="settings-loading" class="loading"><span class="spinner"></span><span data-i18n="loading">Loading...</span></div>
+    <div id="settings-loading" class="loading" role="status" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span data-i18n="loading">Loading...</span></div>
     <div id="settings-content" style="display:none">
       <div class="settings-desktop-grid">
         <!-- Weights -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_weights_title">Score-weighting</span>
             <span id="weights-saved-indicator" class="saved-indicator" data-i18n="saved">Saved</span>
             <span class="settings-chevron">&#9660;</span>
@@ -22,7 +22,7 @@
         </div>
         <!-- Categories -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_categories_title">Categories</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>
@@ -49,7 +49,7 @@
         </div>
         <!-- Product Flags -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_flags_title">Product Flags</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>
@@ -71,7 +71,7 @@
         </div>
         <!-- Protein Quality -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_pq_title">Protein quality</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>
@@ -101,12 +101,12 @@
             <button type="button" class="btn-register" style="margin-top:12px" onclick="addPq()" data-i18n="btn_add_protein_source">+ Add protein source</button>
             <hr class="settings-divider">
             <button type="button" class="btn-register" id="btn-estimate-all-pq" onclick="estimateAllPq()" data-i18n="btn_estimate_all_pq">&#9881; Estimate PQ for all products</button>
-            <p id="estimate-pq-status" class="form-sub" style="display:none"></p>
+            <p id="estimate-pq-status" class="form-sub" role="status" aria-live="polite" style="display:none"></p>
           </div>
         </div>
         <!-- Language -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_language">Language</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>
@@ -119,7 +119,7 @@
         </div>
         <!-- Open Food Facts -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_off_title">Open Food Facts</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>
@@ -138,17 +138,57 @@
             </div>
             <hr class="settings-divider">
             <button type="button" class="btn-register" id="btn-refresh-all-off" onclick="refreshAllFromOff()" data-i18n="btn_refresh_all_off">&#128260; Refresh all products from OFF</button>
-            <div id="refresh-off-progress" style="display:none;margin-top:10px">
-              <div class="progress-bar-track">
+            <div id="refresh-off-progress" role="status" aria-live="polite" style="display:none;margin-top:10px">
+              <div class="progress-bar-track" aria-hidden="true">
                 <div class="progress-bar-fill" id="refresh-off-bar"></div>
               </div>
               <p id="refresh-off-status" class="form-sub" style="margin-top:6px"></p>
+            </div>
+            <hr class="settings-divider">
+            <div>
+              <p class="field-label" data-i18n="off_lang_priority_title">OFF Language Priority</p>
+              <p class="form-sub" data-i18n="off_lang_priority_desc">Choose which languages to use when fetching data from Open Food Facts, in preferred priority order.</p>
+              <div id="off-lang-priority-list" role="list" aria-live="polite" style="margin:8px 0"></div>
+              <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+                <select class="field-select" id="off-lang-add-select" style="flex:1"></select>
+                <button type="button" class="btn-register" id="off-lang-add-btn" data-i18n="off_lang_add">Add language</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- OCR -->
+        <div>
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
+            <span data-i18n="settings_ocr_title">OCR</span>
+            <span class="settings-chevron">&#9660;</span>
+          </h3>
+          <div class="settings-section-body" style="display:none">
+            <p class="form-sub" data-i18n="settings_ocr_desc">Velg OCR-leverandør for bildegjenkjenning</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div>
+                <label class="field-label" for="ocr-provider-select" data-i18n="settings_ocr_provider_label">OCR-leverandør</label>
+                <select class="field-select" id="ocr-provider-select">
+                  <option value="tesseract">Tesseract OCR</option>
+                </select>
+              </div>
+              <div id="ocr-model-row" style="display:none">
+                <label class="field-label" for="ocr-model-select" data-i18n="ocr_model_label">Model</label>
+                <select class="field-select" id="ocr-model-select"></select>
+                <input class="field-input" id="ocr-model-input" type="text" style="display:none" placeholder="e.g. google/gemini-2.0-flash-001">
+              </div>
+              <div id="ocr-fallback-wrapper" aria-live="polite">
+                <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="ocr-fallback-checkbox">
+                  <span data-i18n="settings_ocr_fallback_label">Bruk Tesseract OCR som reserve</span>
+                </label>
+              </div>
+              <button type="button" class="btn-register" style="margin-top:4px" onclick="saveOcrSettings()" data-i18n="btn_save_ocr_settings">&#128190; Lagre OCR-innstillinger</button>
             </div>
           </div>
         </div>
         <!-- Database -->
         <div>
-          <h3 class="mono settings-col-title settings-toggle" onclick="toggleSettingsSection(this)" aria-expanded="false">
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
             <span data-i18n="settings_database_title">Database</span>
             <span class="settings-chevron">&#9660;</span>
           </h3>

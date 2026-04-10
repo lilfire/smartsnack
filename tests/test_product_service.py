@@ -166,34 +166,36 @@ class TestListProducts:
         from services.product_service import list_products
 
         result = list_products(None, None)
-        assert len(result) >= 1
-        assert "total_score" in result[0]
-        assert "scores" in result[0]
+        products = result["products"]
+        assert len(products) >= 1
+        assert "total_score" in products[0]
+        assert "scores" in products[0]
 
     def test_search_filter(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products("Popcorn", None)
-        assert len(result) >= 1
-        assert "Popcorn" in result[0]["name"]
+        products = result["products"]
+        assert len(products) >= 1
+        assert "Popcorn" in products[0]["name"]
 
     def test_search_no_match(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products("ZZZZNOTFOUND", None)
-        assert result == []
+        assert result["products"] == []
 
     def test_type_filter(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products(None, "Snacks")
-        assert all(p["type"] == "Snacks" for p in result)
+        assert all(p["type"] == "Snacks" for p in result["products"])
 
     def test_multi_type_filter(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products(None, "Snacks,NonExistent")
-        assert all(p["type"] == "Snacks" for p in result)
+        assert all(p["type"] == "Snacks" for p in result["products"])
 
 
 class TestAddProduct:

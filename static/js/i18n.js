@@ -54,7 +54,7 @@ export function applyStaticTranslations() {
     el.textContent = t(key, hasParams ? params : undefined);
   });
   document.querySelectorAll('[data-i18n-html]').forEach((el) => {
-    el.innerHTML = t(el.getAttribute('data-i18n-html'));
+    el.textContent = t(el.getAttribute('data-i18n-html'));
   });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
     el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
@@ -89,7 +89,7 @@ export async function changeLanguage(lang) {
   }
   // Reload dynamic content — use lazy imports to avoid circular deps
   if (state.currentView === 'settings') {
-    const { loadSettings } = await import('./settings.js');
+    const { loadSettings } = await import('./settings-weights.js');
     await loadSettings();
   } else {
     const { loadData } = await import('./products.js');

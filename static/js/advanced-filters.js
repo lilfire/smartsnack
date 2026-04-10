@@ -41,6 +41,7 @@ const NUMERIC_FIELDS = [
 
 const TEXT_OPS = [
   ['contains', 'adv_op_contains'],
+  ['!contains', 'adv_op_not_contains'],
   ['=', 'adv_op_eq'],
   ['!=', 'adv_op_neq'],
   ['is_not_set', 'adv_op_is_not_set'],
@@ -303,6 +304,7 @@ function _addRow(container) {
   _syncValInput(valInput, fieldSel.value, opSel.value);
 
   // Upgrade to custom styled selects
+  fieldSel.setAttribute('data-searchable', 'true');
   upgradeSelect(fieldSel, (val) => {
     _updateOps(opSel, val);
     upgradeSelect(opSel);
@@ -564,6 +566,7 @@ let _reloadTimer = null;
 function _triggerReload() {
   clearTimeout(_reloadTimer);
   _reloadTimer = setTimeout(() => {
+    state.cachedResults = [];
     // Use dynamic import to avoid circular dependency
     import('./products.js').then(mod => { mod.loadData(); }).catch(e => { console.error('Failed to load products module:', e); });
   }, 100);

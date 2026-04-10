@@ -29,6 +29,7 @@ vi.mock('../state.js', () => {
     fetchStats: vi.fn().mockResolvedValue({}),
     showConfirmModal: vi.fn().mockResolvedValue(true),
     upgradeSelect: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
   };
 });
 
@@ -55,10 +56,12 @@ vi.mock('../products.js', () => ({
   loadData: vi.fn().mockResolvedValue(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   validateOffBtn: vi.fn(),
-  lookupOFF: vi.fn(),
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
+}));
+vi.mock('../off-api.js', () => ({
+  lookupOFF: vi.fn(),
 }));
 
 vi.mock('../render.js', () => ({
@@ -78,12 +81,18 @@ import { loadProductImage } from '../images.js';
 import { renderResults } from '../render.js';
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   document.body.innerHTML = '';
   document.body.style.overflow = '';
   // Clean up any scanner UI
   const scanBg = document.getElementById('scanner-bg');
   if (scanBg) scanBg.remove();
+});
+
+afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
 });
 
 describe('openScanner', () => {
@@ -786,10 +795,11 @@ describe('onSearchScanDetected when product is not found', () => {
     navigator.vibrate = vi.fn();
 
     state.currentView = 'search';
-    // Return products that do NOT match the scanned EAN
-    fetchProducts.mockResolvedValue([
+    // First call (all products): none match the scanned EAN by primary EAN
+    // Second call (secondary EAN search): no results either
+    fetchProducts.mockResolvedValueOnce([
       { id: 1, name: 'Other', type: 'dairy', ean: '0000000000000' },
-    ]);
+    ]).mockResolvedValueOnce([]);
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -1389,5 +1399,127 @@ describe('scanPickerSearch brand vs no brand products', () => {
     const noBrandResult = results[1];
     const brandDiv = noBrandResult.querySelector('.off-result-brand');
     expect(brandDiv.textContent).not.toContain('\u00B7');
+  });
+});
+
+describe('onSearchScanDetected secondary EAN match', () => {
+  it('identifies product when scanned barcode matches a secondary EAN in eans array', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    document.body.appendChild(searchInput);
+    const searchClear = document.createElement('div');
+    searchClear.id = 'search-clear';
+    searchClear.classList.add('visible');
+    document.body.appendChild(searchClear);
+    const filterRow = document.createElement('div');
+    filterRow.id = 'filter-row';
+    document.body.appendChild(filterRow);
+    const filterToggle = document.createElement('div');
+    filterToggle.id = 'filter-toggle';
+    document.body.appendChild(filterToggle);
+
+    state.currentView = 'search';
+    // Product has primary EAN '7038010069307' but also a secondary EAN '5000000000001'
+    const product = {
+      id: 10, name: 'TestProduct', type: 'dairy',
+      ean: '7038010069307',
+      eans: ['7038010069307', '5000000000001'],
+    };
+    // First fetchProducts call returns all products (includes the one with eans array)
+    fetchProducts.mockResolvedValueOnce([product]);
+    // Second call for filtered results
+    fetchProducts.mockResolvedValueOnce([product]);
+
+    openSearchScanner();
+    await vi.waitFor(() => {
+      expect(capturedOnSuccess).toBeDefined();
+    });
+
+    // Scan a SECONDARY EAN — not the primary one
+    capturedOnSuccess('5000000000001');
+    await vi.waitFor(() => {
+      expect(buildFilters).toHaveBeenCalled();
+    });
+
+    // The product should be found via the eans array match
+    expect(state.currentFilter).toEqual(['dairy']);
+    expect(renderResults).toHaveBeenCalled();
+
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('falls back to backend search when secondary EAN is not in local eans array', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    document.body.appendChild(searchInput);
+    const searchClear = document.createElement('div');
+    searchClear.id = 'search-clear';
+    searchClear.classList.add('visible');
+    document.body.appendChild(searchClear);
+    const filterRow = document.createElement('div');
+    filterRow.id = 'filter-row';
+    document.body.appendChild(filterRow);
+    const filterToggle = document.createElement('div');
+    filterToggle.id = 'filter-toggle';
+    document.body.appendChild(filterToggle);
+
+    state.currentView = 'search';
+    // Product has no eans array — only primary EAN
+    const product = {
+      id: 10, name: 'TestProduct', type: 'dairy',
+      ean: '7038010069307',
+    };
+    // First call: all products (no local match for the scanned code)
+    fetchProducts.mockResolvedValueOnce([product]);
+    // Second call: backend search finds the product via secondary EAN
+    fetchProducts.mockResolvedValueOnce([product]);
+    // Third call: filtered results for rendering
+    fetchProducts.mockResolvedValueOnce([product]);
+
+    openSearchScanner();
+    await vi.waitFor(() => {
+      expect(capturedOnSuccess).toBeDefined();
+    });
+
+    // Scan a secondary EAN that is not in the local eans array
+    capturedOnSuccess('5000000000001');
+    await vi.waitFor(() => {
+      expect(buildFilters).toHaveBeenCalled();
+    });
+
+    // fetchProducts should be called with the scanned code for backend search
+    expect(fetchProducts).toHaveBeenCalledWith('5000000000001', []);
+
+    fetchProducts.mockResolvedValue([]);
   });
 });

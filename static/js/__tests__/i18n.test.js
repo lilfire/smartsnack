@@ -39,7 +39,7 @@ vi.mock('../state.js', () => {
 
 // Mock dynamic imports used by changeLanguage()
 vi.mock('../products.js', () => ({ loadData: vi.fn() }));
-vi.mock('../settings.js', () => ({ loadSettings: vi.fn() }));
+vi.mock('../settings-weights.js', () => ({ loadSettings: vi.fn() }));
 vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn() }));
 vi.mock('../advanced-filters.js', () => ({ rebuildAdvancedFilters: vi.fn() }));
 
@@ -133,7 +133,7 @@ describe('applyStaticTranslations', () => {
     expect(el.textContent).toBe('Hello');
   });
 
-  it('sets innerHTML for data-i18n-html elements', async () => {
+  it('sets textContent for data-i18n-html elements', async () => {
     api.mockResolvedValueOnce({ language: 'en' })
        .mockResolvedValueOnce({ bold: '<b>Bold</b>' });
     await initLanguage();
@@ -141,7 +141,7 @@ describe('applyStaticTranslations', () => {
     el.setAttribute('data-i18n-html', 'bold');
     document.body.appendChild(el);
     applyStaticTranslations();
-    expect(el.innerHTML).toBe('<b>Bold</b>');
+    expect(el.textContent).toBe('<b>Bold</b>');
   });
 
   it('sets placeholder for data-i18n-placeholder elements', async () => {

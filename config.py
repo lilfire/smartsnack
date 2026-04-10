@@ -2,9 +2,61 @@
 
 import os
 
-APP_VERSION = "0.13"
+APP_VERSION = "0.14"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
+
+# OCR backend: "tesseract" (default), "claude_vision", "gemini", "openai", "groq", "llm" (alias for claude_vision)
+OCR_BACKEND = os.environ.get("OCR_BACKEND", "tesseract")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+
+
+# ── OCR backend configuration (user-settings-driven) ──
+OCR_BACKENDS = {
+    "tesseract": {"name": "Tesseract (Local)", "env_key": None, "models": []},
+    "claude_vision": {
+        "name": "Claude Vision",
+        "env_key": "ANTHROPIC_API_KEY",
+        "models": [
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-5",
+            "claude-haiku-4-5-20251001",
+        ],
+    },
+    "gemini": {
+        "name": "Gemini Vision",
+        "env_key": "GEMINI_API_KEY",
+        "models": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-1.5-pro"],
+    },
+    "openai": {
+        "name": "GPT-4 Vision",
+        "env_key": "OPENAI_API_KEY",
+        "models": ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"],
+    },
+    "openrouter": {
+        "name": "OpenRouter Vision",
+        "env_key": "OPENROUTER_API_KEY",
+        "models": [],  # free-text; no fixed list
+    },
+    "groq": {
+        "name": "Groq Vision",
+        "env_key": "GROQ_API_KEY",
+        "models": [
+            "meta-llama/llama-4-scout-17b-16e-instruct",
+            "meta-llama/llama-4-maverick-17b-128e-instruct",
+        ],
+    },
+}
+DEFAULT_OCR_BACKEND = "tesseract"
+
+DEFAULT_PAGE_SIZE = 50
+
+TAG_LABEL_MAX_LEN = 50
+
+
 TRANSLATIONS_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "translations"
 )
@@ -16,6 +68,16 @@ try:
     )
 except OSError:
     SUPPORTED_LANGUAGES = [DEFAULT_LANGUAGE]
+
+# ISO 639-1 language codes that Open Food Facts supports well
+OFF_SUPPORTED_LANGUAGES = [
+    "af", "ar", "az", "be", "bg", "bn", "ca", "cs", "cy", "da",
+    "de", "el", "en", "es", "et", "fa", "fi", "fr", "gu", "he",
+    "hi", "hr", "hu", "hy", "id", "it", "ja", "ka", "kn", "ko",
+    "lt", "lv", "mk", "ml", "mn", "mr", "ms", "nl", "no", "pa",
+    "pl", "pt", "ro", "ru", "sk", "sl", "sq", "sr", "sv", "sw",
+    "ta", "te", "th", "tl", "tr", "uk", "ur", "vi", "zh",
+]
 
 # ── All product numeric fields (excluding type, name, ean, image) ─────
 NUTRITION_FIELDS = (
@@ -274,6 +336,7 @@ ADVANCED_FILTER_OPS = {
     "<=": "<=",
     ">=": ">=",
     "contains": "LIKE",
+    "!contains": "NOT_LIKE",
     "is_not_set": "IS_NOT_SET",
     "is_set": "IS_SET",
 }

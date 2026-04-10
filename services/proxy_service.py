@@ -10,7 +10,23 @@ from urllib.parse import urlparse, urlencode
 from config import OFF_NUTRITION_COMPARE_MAP, SUPPORTED_LANGUAGES
 from translations import _category_label
 
+# Base fields always requested from OFF search (language-specific fields added dynamically)
+_OFF_SEARCH_BASE_FIELDS = (
+    "code,product_name,brands,stores,stores_tags,"
+    "nutriments,image_front_small_url,image_front_url,image_url,"
+    "serving_size,product_quantity,ingredients_text,completeness,lang"
+)
+
 logger = logging.getLogger(__name__)
+
+# Magic bytes for allowed image formats
+_IMAGE_MAGIC_BYTES = (
+    b"\xff\xd8\xff",          # JPEG
+    b"\x89PNG\r\n\x1a\n",    # PNG
+    b"GIF87a",                # GIF87a
+    b"GIF89a",                # GIF89a
+    b"RIFF",                  # WebP (RIFF container)
+)
 
 
 class _NoRedirectHandler(urllib.request.HTTPRedirectHandler):
@@ -46,6 +62,9 @@ def proxy_image(url: str) -> tuple[bytes, str]:
             data = resp.read(max_size + 1)
             if len(data) > max_size:
                 raise ValueError("Image too large")
+            # S8: Validate magic bytes to ensure actual image content
+            if not any(data.startswith(magic) for magic in _IMAGE_MAGIC_BYTES):
+                raise ValueError("Response is not a valid image (bad magic bytes)")
             return data, ct
     except (ValueError, PermissionError):
         raise
@@ -57,12 +76,23 @@ def proxy_image(url: str) -> tuple[bytes, str]:
 _OFF_API_BASE = "https://world.openfoodfacts.org/api/v2"
 _OFF_SEARCH_BASE = "https://world.openfoodfacts.org/cgi/search.pl"
 _OFF_SEARCH_A_LICIOUS = "https://search.openfoodfacts.org/search"
-_OFF_SEARCH_FIELDS = (
-    "code,product_name,product_name_no,brands,stores,stores_tags,"
-    "nutriments,image_front_small_url,image_front_url,image_url,"
-    "serving_size,product_quantity,ingredients_text,"
-    "ingredients_text_no,ingredients_text_en,completeness,lang"
-)
+
+
+def _pick_by_priority(product: dict, field_prefix: str, priority: list) -> str:
+    """Return the first non-empty language-keyed variant of a field in priority order."""
+    for lang in priority:
+        val = product.get(f"{field_prefix}_{lang}", "")
+        if val and val.strip():
+            return val.strip()
+    return product.get(field_prefix, "") or ""
+
+
+def _build_search_fields(priority: list) -> str:
+    """Build the OFF search fields string including all priority language variants."""
+    lang_fields = ",".join(
+        f"product_name_{l},ingredients_text_{l}" for l in priority
+    )
+    return f"{_OFF_SEARCH_BASE_FIELDS},{lang_fields}"
 
 
 def _normalize_text(s: str) -> str:
@@ -233,10 +263,19 @@ def off_search(query: str, nutrition: dict | None = None, category: str = "") ->
     Queries both search-a-licious (Elasticsearch) and classic search.pl,
     then combines and deduplicates results sorted by completeness.
     Optionally accepts local nutrition data and category to improve certainty scoring.
+    Language priority is loaded from user settings and applied to field selection.
     """
     if not query or len(query.strip()) < 2:
         raise ValueError("Query too short")
     cleaned = _clean_search_query(query)
+
+    # Load priority once at request start; fall back to defaults outside app context
+    try:
+        from services.settings_service import get_off_language_priority
+        priority = get_off_language_priority()
+    except RuntimeError:
+        priority = ["no", "en"]
+    search_fields = _build_search_fields(priority)
 
     products_a: list[dict] = []
     products_c: list[dict] = []
@@ -250,7 +289,7 @@ def off_search(query: str, nutrition: dict | None = None, category: str = "") ->
 
     # Classic search.pl
     try:
-        data = _off_search_classic(cleaned)
+        data = _off_search_classic(cleaned, search_fields)
         products_c = data.get("products") or []
     except Exception:
         logger.info("search.pl unavailable")
@@ -272,6 +311,11 @@ def off_search(query: str, nutrition: dict | None = None, category: str = "") ->
         if key not in seen:
             seen.add(key)
             combined.append(p)
+
+    # Apply language priority to product_name and ingredients_text
+    for p in combined:
+        p["product_name"] = _pick_by_priority(p, "product_name", priority)
+        p["ingredients_text"] = _pick_by_priority(p, "ingredients_text", priority)
 
     # Compute certainty score for each product and sort by it
     for p in combined:
@@ -316,8 +360,10 @@ def _off_search_a_licious(query: str) -> dict:
     return data
 
 
-def _off_search_classic(query: str) -> dict:
+def _off_search_classic(query: str, fields: str | None = None) -> dict:
     """Search via the classic search.pl CGI endpoint."""
+    if fields is None:
+        fields = _build_search_fields(["no", "en"])
     params = urlencode(
         {
             "search_terms": query,
@@ -325,7 +371,7 @@ def _off_search_classic(query: str) -> dict:
             "action": "process",
             "json": "1",
             "page_size": "20",
-            "fields": _OFF_SEARCH_FIELDS,
+            "fields": fields,
         }
     )
     url = f"{_OFF_SEARCH_BASE}?{params}"

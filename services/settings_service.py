@@ -4,25 +4,53 @@ import base64
 import hashlib
 import logging
 import os
+import secrets
 
 from cryptography.fernet import Fernet, InvalidToken
 
 from db import get_db
-from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
+import json
+
+from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, OCR_BACKENDS, DEFAULT_OCR_BACKEND
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_secret_key() -> str:
+    """Return the encryption secret, generating a persistent random key if not set."""
+    secret = os.environ.get("SMARTSNACK_SECRET_KEY", "")
+    if secret:
+        return secret
+    # Generate a persistent key in the data directory so it survives restarts
+    data_dir = os.path.dirname(os.environ.get("DB_PATH", "/data/smartsnack.sqlite"))
+    key_file = os.path.join(data_dir, ".smartsnack_secret_key")
+    try:
+        if os.path.exists(key_file):
+            secret = open(key_file).read().strip()
+            if secret:
+                return secret
+        secret = secrets.token_hex(32)
+        os.makedirs(data_dir, exist_ok=True)
+        with open(key_file, "w") as f:
+            f.write(secret)
+        logger.warning(
+            "SMARTSNACK_SECRET_KEY not set. Generated random key at %s. "
+            "Set the environment variable for production use.",
+            key_file,
+        )
+        return secret
+    except OSError:
+        raise RuntimeError(
+            "SMARTSNACK_SECRET_KEY environment variable is required "
+            "for credential encryption. Set it before starting the app."
+        )
 
 _FERNET_PREFIX = "fernet:"
 
 
 def _get_fernet() -> Fernet:
     """Return a Fernet instance using a key derived from the environment secret."""
-    secret = os.environ.get("SMARTSNACK_SECRET_KEY", "")
-    if not secret:
-        raise RuntimeError(
-            "SMARTSNACK_SECRET_KEY environment variable is required "
-            "for credential encryption. Set it before starting the app."
-        )
+    secret = _resolve_secret_key()
     key = base64.urlsafe_b64encode(hashlib.sha256(secret.encode()).digest())
     return Fernet(key)
 
@@ -122,5 +150,59 @@ def set_off_credentials(user_id: str, password: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('off_password', ?)",
         (encrypted_password,),
+    )
+    conn.commit()
+
+
+def get_ocr_backend() -> str:
+    """Return the currently selected OCR backend ID, defaulting to tesseract."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT value FROM user_settings WHERE key='ocr_provider'"
+    ).fetchone()
+    return row["value"] if row else DEFAULT_OCR_BACKEND
+
+
+def set_ocr_backend(backend_id: str) -> str:
+    """Store the selected OCR backend. Raises ValueError if unrecognized."""
+    backend_id = backend_id.strip()
+    if backend_id not in OCR_BACKENDS:
+        raise ValueError(
+            f"Unrecognized OCR backend '{backend_id}'. "
+            f"Valid: {', '.join(OCR_BACKENDS.keys())}"
+        )
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_provider', ?)",
+        (backend_id,),
+    )
+    conn.commit()
+    return backend_id
+
+
+_OFF_LANGUAGE_PRIORITY_KEY = "off_language_priority"
+
+
+def get_off_language_priority() -> list:
+    """Return the OFF language priority list, defaulting to [current_language]."""
+    conn = get_db()
+    row = conn.execute(
+        "SELECT value FROM user_settings WHERE key = ?",
+        (_OFF_LANGUAGE_PRIORITY_KEY,),
+    ).fetchone()
+    if row:
+        try:
+            return json.loads(row["value"])
+        except Exception:
+            pass
+    return [get_language()]
+
+
+def set_off_language_priority(priority: list) -> None:
+    """Save the OFF language priority list as JSON."""
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
+        (_OFF_LANGUAGE_PRIORITY_KEY, json.dumps(priority)),
     )
     conn.commit()

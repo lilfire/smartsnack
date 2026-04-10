@@ -37,6 +37,11 @@
   color: #fff;
 }
 
+.toast.warning {
+  background: #f59e0b;
+  color: #0a0a0c;
+}
+
 .toast.info {
   background: #3b82f6;
   color: #fff;
@@ -47,6 +52,43 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+}
+
+.toast-content {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.toast-title {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.toast-message {
+  font-weight: 400;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.toast-undo {
+  background: none;
+  border: 1px solid currentColor;
+  color: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 10px;
+  border-radius: 4px;
+  margin-left: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+
+.toast-undo:hover {
+  opacity: 1;
 }
 
 .toast-close {
@@ -68,6 +110,12 @@
 .loading {
   text-align: center;
   padding: 30px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.scroll-loader {
+  text-align: center;
+  padding: 16px;
   color: rgba(255, 255, 255, 0.3);
 }
 
@@ -106,6 +154,18 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

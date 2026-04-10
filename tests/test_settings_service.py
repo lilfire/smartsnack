@@ -2,6 +2,8 @@
 
 import pytest
 
+from db import get_db
+
 
 class TestGetSetLanguage:
     def test_get_default_language(self, app_ctx):
@@ -47,12 +49,13 @@ class TestEncryptDecrypt:
         # Fernet uses random IV so they should differ
         assert enc1 != enc2
 
-    def test_no_secret_key_raises(self, app_ctx, monkeypatch):
+    def test_no_secret_key_generates_random(self, app_ctx, monkeypatch):
         monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "")
         from services.settings_service import _encrypt
 
-        with pytest.raises(RuntimeError, match="SMARTSNACK_SECRET_KEY"):
-            _encrypt("test")
+        # Should not raise — generates a random key when env var is empty
+        result = _encrypt("test")
+        assert result.startswith("fernet:")
 
 
 class TestOffCredentials:
@@ -84,3 +87,41 @@ class TestOffCredentials:
         )
         assert row["value"].startswith("fernet:")
         assert "mypassword" not in row["value"]
+
+
+class TestOcrBackendKeyAlignment:
+    """Fix 1: get/set_ocr_backend must use 'ocr_provider' DB key to match
+    what ocr_settings_service.save_ocr_settings() writes."""
+
+    def test_get_ocr_backend_reads_ocr_provider_key(self, app_ctx):
+        """get_ocr_backend() should read the 'ocr_provider' key from DB."""
+        from services.settings_service import get_ocr_backend
+
+        conn = get_db()
+        conn.execute(
+            "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_provider', 'gemini')"
+        )
+        conn.commit()
+
+        assert get_ocr_backend() == "gemini"
+
+    def test_set_ocr_backend_writes_ocr_provider_key(self, app_ctx):
+        """set_ocr_backend() should write to the 'ocr_provider' key in DB."""
+        from services.settings_service import set_ocr_backend
+
+        set_ocr_backend("claude_vision")
+
+        conn = get_db()
+        row = conn.execute(
+            "SELECT value FROM user_settings WHERE key='ocr_provider'"
+        ).fetchone()
+        assert row is not None
+        assert row["value"] == "claude_vision"
+
+    def test_roundtrip_with_ocr_settings_service(self, app_ctx):
+        """Value written by ocr_settings_service should be readable by get_ocr_backend()."""
+        from services.ocr_settings_service import save_ocr_settings
+        from services.settings_service import get_ocr_backend
+
+        save_ocr_settings("openai", fallback_to_tesseract=True)
+        assert get_ocr_backend() == "openai"

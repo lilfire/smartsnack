@@ -3,8 +3,8 @@ import { state, esc, safeDataUri, catEmoji, catLabel, upgradeSelect } from './st
 import { t } from './i18n.js';
 import { applySorting, sortIndicator } from './filters.js';
 import { loadProductImage } from './images.js';
-import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings.js';
-import { isValidEan } from './openfoodfacts.js';
+import { SCORE_COLORS, SCORE_CFG_MAP, weightData } from './settings-weights.js';
+import { isValidEan } from './off-utils.js';
 
 let _resultsAbort = null;
 const _VOLUME_LABELS = { 1: 'volume_low', 2: 'volume_medium', 3: 'volume_high' };
@@ -111,6 +111,9 @@ export function renderResults(results, search) {
     : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
   const container = document.getElementById('results-container');
   if (!results.length) {
+    // Clean up any existing delegation listener — prevents ghost handlers when
+    // transitioning from results state to empty state.
+    if (_resultsAbort) { _resultsAbort.abort(); _resultsAbort = null; }
     container.innerHTML = '<div class="empty"><div class="empty-icon">\u{1F50D}</div><p>' + t('no_products_found') + '</p>'
       + (search ? '<button class="btn-create-from-search" data-action="create-from-search">' + t('create_product') + '</button>' : '')
       + '</div>';
@@ -132,15 +135,17 @@ export function renderResults(results, search) {
   const sorted = applySorting(results);
   const cols = getActiveCols();
   const gridTpl = getGridTemplate(cols);
-  let h = '<div class="table-wrap"><div class="table-head" style="grid-template-columns:' + gridTpl + '">';
+  let h = '<div class="table-wrap" role="table"><div class="table-head" role="row" style="grid-template-columns:' + gridTpl + '">';
   cols.forEach((c, i) => {
-    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" data-action="sort" data-col="' + esc(c.key) + '"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
+    h += '<span class="th-sort' + (state.sortCol === c.key ? ' th-active' : '') + '" data-action="sort" data-col="' + esc(c.key) + '" tabindex="0" role="columnheader" aria-sort="' + (state.sortCol === c.key ? (state.sortDir === 'asc' ? 'ascending' : 'descending') : 'none') + '"' + (i > 0 ? ' style="text-align:right"' : '') + '>' + esc(c.label) + ' ' + sortIndicator(c.key) + '</span>';
   });
   h += '</div>';
   sorted.forEach((p) => {
     const hasImg = p.has_image;
-    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="">' : '') + '</div>';
-    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + '</span>' : '';
+    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="' + esc(p.name) + '">' : '') + '</div>';
+    const eanCount = p.ean_count || 1;
+    const eanSuffix = eanCount > 1 ? '<span class="ean-count-suffix"> (+' + (eanCount - 1) + ')</span>' : '';
+    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + eanSuffix + '</span>' : '';
     const brandHtml = p.brand ? '<span class="prod-brand">' + esc(p.brand) + '</span>' : '';
     let prodName;
     if (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase())) {
@@ -149,7 +154,7 @@ export function renderResults(results, search) {
       prodName = p.name;
     }
     const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
-    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand">'
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="row" aria-label="' + esc(p.name) + '">'
       + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
       + '<div class="prod-meta">' + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
@@ -166,9 +171,16 @@ export function renderResults(results, search) {
     h += '</div>';
     if (state.expandedId === p.id) {
       h += '<div class="expanded"><div class="expanded-top">'
-        + '<div class="expanded-img-area" data-action="trigger-image" data-id="' + p.id + '">'
-        + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
-        + '<div class="expanded-img-overlay">' + (hasImg ? t('expanded_change_image') : t('expanded_upload_image')) + '</div></div>'
+        + '<div class="expanded-img-section">'
+        + '<div class="expanded-img-area" data-action="' + (hasImg ? 'view-image' : 'change-image') + '" data-id="' + p.id + '">'
+        + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" alt="' + esc(p.name) + '" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
+        + (hasImg ? '' : '<div class="expanded-img-overlay">' + t('expanded_upload_image') + '</div>') + '</div>'
+        + '<div class="expanded-img-controls">'
+        + (hasImg
+          ? '<button class="btn-sm btn-outline" data-action="change-image" data-id="' + p.id + '">' + t('btn_change_image') + '</button>'
+            + '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>'
+          : '<button class="btn-sm btn-outline" data-action="change-image" data-id="' + p.id + '">' + t('btn_upload_image') + '</button>')
+        + '</div></div>'
         + '<div class="expanded-right">';
       h += '<p class="expanded-title">' + t('expanded_score_breakdown') + '</p><div class="score-grid">';
       const sc = p.scores || {};
@@ -218,6 +230,13 @@ export function renderResults(results, search) {
         });
         h += '</div>';
       }
+      if (p.tags && p.tags.length > 0) {
+        h += '<div class="product-tags">';
+        for (const tag of p.tags) {
+          h += '<span class="tag-badge">' + esc(tag.label) + '</span>';
+        }
+        h += '</div>';
+      }
       h += '</div></div>';
 
       if (state.editingId === p.id) {
@@ -227,12 +246,14 @@ export function renderResults(results, search) {
         const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
-          + (() => {
-              const isSynced = (p.flags || []).includes('is_synced_with_off');
-              return '<div><label>' + t('edit_label_ean') + '</label><div class="ean-row"><div><input id="ed-ean" value="' + esc(p.ean || '') + '"' + (isSynced ? ' disabled' : '') + '></div>'
-                + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
-                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '"' + (isSynced ? ' disabled' : '') + '>&#128247;</button><button class="btn-off" id="ed-off-btn" ' + (isSynced || !(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button></div></div>';
-            })()
+          + '<div class="edit-grid-2">'
+            + '<label>' + t('label_eans') + '</label>'
+            + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
+            + '<div id="ean-manager-' + p.id + '" class="ean-manager"><div class="ean-manager-loading">\u2026</div></div>'
+            + '<div class="ean-row" style="margin-top:6px">'
+            + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
+            + '</div>'
+            + '</div>'
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
@@ -281,15 +302,18 @@ export function renderResults(results, search) {
               return badges;
             })())
           + '</div>'
+          + '<div class="form-group">'
+          + '<label data-i18n="tags">' + t('tags') + '</label>'
+          + '<div class="tag-field" id="tag-field-ed"></div>'
+          + '</div>'
           + '<div style="display:flex;gap:8px">'
           + '<button class="btn-sm btn-green" data-action="save-product" data-id="' + p.id + '">' + t('btn_save') + '</button>'
           + '<button class="btn-sm btn-outline" data-action="cancel-edit">' + t('btn_cancel') + '</button>'
           + '</div></div>';
       } else {
         h += '<div class="expanded-actions">'
-          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>';
-        if (hasImg) h += '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>';
-        h += '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
+          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>'
+          + '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
           + '</div>';
       }
       h += '</div>';
@@ -320,9 +344,13 @@ export function renderResults(results, search) {
         window.toggleExpand(rowId);
       }
         break;
-      case 'trigger-image':
+      case 'change-image':
         e.stopPropagation();
         window.triggerImageUpload(id);
+        break;
+      case 'view-image':
+        e.stopPropagation();
+        window.viewProductImage(id);
         break;
       case 'save-product':
         e.stopPropagation();
@@ -345,17 +373,9 @@ export function renderResults(results, search) {
         e.stopPropagation();
         window.deleteProduct(id);
         break;
-      case 'unlock-ean':
-        e.stopPropagation();
-        window.unlockEan(id);
-        break;
       case 'open-scanner':
         e.stopPropagation();
         window.openScanner('ed', id);
-        break;
-      case 'lookup-off':
-        e.stopPropagation();
-        window.lookupOFF('ed', id);
         break;
       case 'estimate-protein':
         e.stopPropagation();
@@ -366,11 +386,24 @@ export function renderResults(results, search) {
 
   // Attach input handlers for validation
   const edName = document.getElementById('ed-name');
-  const edEan = document.getElementById('ed-ean');
   const edIngredients = document.getElementById('ed-ingredients');
   if (edName) edName.addEventListener('input', () => window.validateOffBtn('ed'));
-  if (edEan) edEan.addEventListener('input', () => window.validateOffBtn('ed'));
   if (edIngredients) edIngredients.addEventListener('input', () => window.updateEstimateBtn('ed'));
+
+  // Load EAN manager asynchronously after edit form renders
+  if (state.editingId) {
+    const eanMgr = document.getElementById('ean-manager-' + state.editingId);
+    if (eanMgr && window.loadEanManager) {
+      window.loadEanManager(state.editingId);
+    }
+  }
+
+  // Initialize tag input after edit form HTML is in DOM
+  if (state.editingId && document.getElementById('tag-field-ed')) {
+    const tagProduct = state.cachedResults && state.cachedResults.find(p => p.id === state.editingId);
+    const existingTags = tagProduct ? (tagProduct.tags || []) : [];
+    import('./tags.js').then(mod => mod.initTagInput(existingTags));
+  }
 
   const edType = document.getElementById('ed-type');
   if (edType) upgradeSelect(edType);
@@ -384,6 +417,51 @@ export function renderResults(results, search) {
         if (thumb) thumb.src = dataUri;
         const full = document.getElementById('prod-img-' + p.id);
         if (full) full.src = dataUri;
+      });
+    }
+  });
+}
+
+export function appendResults(newProducts) {
+  const tableWrap = document.querySelector('#results-container .table-wrap');
+  if (!tableWrap) return;
+  const cols = getActiveCols();
+  const gridTpl = getGridTemplate(cols);
+  const sorted = applySorting(newProducts);
+  let h = '';
+  sorted.forEach((p) => {
+    const hasImg = p.has_image;
+    const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="' + esc(p.name) + '">' : '') + '</div>';
+    const eanCount = p.ean_count || 1;
+    const eanSuffix = eanCount > 1 ? '<span class="ean-count-suffix"> (+' + (eanCount - 1) + ')</span>' : '';
+    const eanHtml = p.ean ? '<span class="prod-ean">EAN: ' + esc(p.ean) + eanSuffix + '</span>' : '';
+    const brandHtml = p.brand ? '<span class="prod-brand">' + esc(p.brand) + '</span>' : '';
+    const prodName = (p.brand && p.name.toLowerCase().startsWith(p.brand.toLowerCase()))
+      ? p.name.substring(p.brand.length).replace(/^\s+/, '') : p.name;
+    const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="row" aria-label="' + esc(p.name) + '">'
+      + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
+      + '<div class="prod-meta">' + eanHtml
+      + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
+      + '</div></div></div></div>';
+    for (let ci = 1; ci < cols.length; ci++) {
+      const c = cols[ci];
+      if (c.key === 'total_score') {
+        const scoreDisplay = (p.total_score != null) ? Number(p.total_score).toFixed(1) : '-';
+        h += '<span class="cell-score">' + scoreDisplay + (p.has_missing_scores ? '<span style="color:#f5a623;margin-left:1px" title="Score based on incomplete data \u2014 some values are 0 or missing">*</span>' : '') + '</span>';
+      } else {
+        h += '<span class="cell-right">' + fmtCell(c.key, p[c.key]) + '</span>';
+      }
+    }
+    h += '</div>';
+  });
+  tableWrap.insertAdjacentHTML('beforeend', h);
+  sorted.forEach((p) => {
+    if (p.has_image) {
+      loadProductImage(p.id).then((dataUri) => {
+        if (!dataUri) return;
+        const thumb = document.getElementById('thumb-' + p.id);
+        if (thumb) thumb.src = dataUri;
       });
     }
   });

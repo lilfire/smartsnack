@@ -20,8 +20,10 @@
 }
 
 .btn-ocr:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: wait;
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.25);
 }
 
 .ocr-spin {
@@ -194,7 +196,7 @@
 
 .form-sub {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.55);
   margin-bottom: 20px;
 }
 
@@ -213,6 +215,12 @@ label.field-label {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-family: 'Space Mono', monospace;
+}
+
+label.field-label.field-required::after {
+  content: ' *';
+  color: #E8B84B;
+  font-weight: 700;
 }
 
 .field-input,
@@ -365,6 +373,26 @@ label.field-label {
   .custom-select-wrap select {
     display: none;
   }
+  .custom-select-search {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 10px;
+    background: rgba(255, 255, 255, 0.06);
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #e8e6e3;
+    font-size: 13px;
+    outline: none;
+    border-radius: 0;
+  }
+  .custom-select-search::placeholder {
+    color: rgba(232, 230, 227, 0.4);
+  }
+  .custom-select-search:focus {
+    background: rgba(255, 255, 255, 0.09);
+    border-bottom-color: rgba(232, 184, 75, 0.4);
+  }
 }
 
 .grid-2,
@@ -417,9 +445,13 @@ label.field-label {
 }
 
 .btn-register:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
   transform: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 /* ── EAN / OFF Button ───────────────────────────── */
@@ -479,8 +511,10 @@ label.field-label {
 }
 
 .btn-off:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
+  border-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .field-hint {
@@ -488,6 +522,23 @@ label.field-label {
   color: rgba(255, 255, 255, 0.3);
   margin-top: 2px;
   display: block;
+}
+
+.field-error {
+  font-size: 11px;
+  color: #ff6666;
+  margin-top: 4px;
+  display: block;
+}
+
+.field-input[aria-invalid="true"],
+.field-select[aria-invalid="true"] {
+  border-color: rgba(255, 68, 68, 0.5);
+}
+
+.field-input[aria-invalid="true"]:focus,
+.field-select[aria-invalid="true"]:focus {
+  border-color: rgba(255, 68, 68, 0.7);
 }
 
 .btn-off.loading {
@@ -510,4 +561,183 @@ label.field-label {
 
 .btn-off.loading .off-label {
   display: none;
+}
+
+/* ── EAN Manager ──────────────────────────────────── */
+.ean-manager {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ean-manager-loading {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 4px 0;
+}
+
+.ean-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ean-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ean-item:last-child {
+  border-bottom: none;
+}
+
+.ean-value {
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  color: rgba(255, 255, 255, 0.75);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ean-badge-primary {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(78, 205, 196, 0.1);
+  color: #4ecdc4;
+  border: 1px solid rgba(78, 205, 196, 0.2);
+  white-space: nowrap;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.btn-ean-action {
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-ean-action:hover {
+  background: rgba(232, 184, 75, 0.1);
+  border-color: rgba(232, 184, 75, 0.25);
+  color: #E8B84B;
+}
+
+.btn-ean-delete {
+  padding: 3px 7px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.btn-ean-delete:hover {
+  background: rgba(255, 80, 80, 0.1);
+  border-color: rgba(255, 80, 80, 0.25);
+  color: #ff6666;
+}
+
+.ean-add-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.ean-add-input {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #e8e6e3;
+  font-size: 12px;
+  font-family: 'Space Mono', monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ean-add-input:focus {
+  border-color: rgba(232, 184, 75, 0.3);
+}
+
+.btn-ean-add {
+  padding: 6px 11px;
+  border-radius: 7px;
+  border: 1px solid rgba(232, 184, 75, 0.25);
+  background: rgba(232, 184, 75, 0.08);
+  color: #E8B84B;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-ean-add:hover {
+  background: rgba(232, 184, 75, 0.15);
+  border-color: rgba(232, 184, 75, 0.4);
+}
+
+.ean-count-suffix {
+  font-size: 9px;
+  color: rgba(78, 205, 196, 0.7);
+  font-family: 'Space Mono', monospace;
+}
+
+.ean-badge-off {
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  white-space: nowrap;
+  font-family: 'Space Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: default;
+}
+
+.btn-ean-off {
+  padding: 3px 7px;
+  border-radius: 6px;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: rgba(59, 130, 246, 0.08);
+  color: #60a5fa;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-ean-off:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.ean-lock-notice {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 4px 2px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }

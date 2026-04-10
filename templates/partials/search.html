@@ -3,11 +3,11 @@
   <h2 class="sr-only" data-i18n="search_heading">Search products</h2>
   <div class="search-row">
     <div class="search-wrap" id="search-box">
-      <span class="search-icon">&#128270;</span>
+      <label for="search-input" class="search-icon" data-i18n-title="search_placeholder" title="Search for product or EAN">&#128270;</label>
       <input class="search-input" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Search for product or EAN..." oninput="onSearchInput()" aria-label="Search for product or EAN">
       <button type="button" class="search-clear" id="search-clear" onclick="clearSearch()" aria-label="Clear search">&times;</button>
     </div>
-    <button type="button" class="btn-scan-search" onclick="openSearchScanner()" data-i18n-title="search_scan_title" title="Scan barcode to find product" aria-label="Scan barcode to find product">&#128247;</button>
+    <button type="button" class="btn-scan-search" onclick="openSearchScanner()" data-i18n-aria-label="search_scan_title" aria-label="Scan barcode to find product">&#128247;</button>
   </div>
   <div class="filter-wrap" id="filter-wrap">
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -21,9 +21,12 @@
   <div id="advanced-filters" class="adv-filters"></div>
   <div class="result-count" id="result-count"></div>
   <div id="results-container" role="region" aria-label="Search results">
-    <div class="loading">
-      <span class="spinner"></span>
+    <div class="loading" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span>
       <span data-i18n="loading_products">Loading products...</span>
     </div>
+  </div>
+  <div id="scroll-loader" class="scroll-loader" role="status" aria-live="polite" aria-label="Loading more products" style="display:none">
+    <span class="spinner" aria-hidden="true"></span>
   </div>
 </div>
