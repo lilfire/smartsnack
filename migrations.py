@@ -223,6 +223,13 @@ MIGRATIONS = [
             "VALUES ('tomato', 0.48, 0.42)",
         ],
     ),
+    (
+        "017_add_bell_pepper_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('bell_pepper', 0.45, 0.38)",
+        ],
+    ),
 ]
 
 
