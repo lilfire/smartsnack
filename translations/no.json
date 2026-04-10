@@ -748,5 +748,9 @@
   "off_lang_remove": "Fjern",
   "off_lang_move_up": "Flytt opp",
   "off_lang_move_down": "Flytt ned",
-  "toast_off_lang_priority_saved": "Språkprioritet lagret"
+  "toast_off_lang_priority_saved": "Språkprioritet lagret",
+  "label_product_image": "Produktbilde",
+  "btn_capture_image": "Foto",
+  "btn_capture_image_title": "Ta bilde eller last opp",
+  "btn_remove_image_title": "Fjern bilde"
 }

@@ -4,7 +4,7 @@
 import { state, api, upgradeSelect, initAllFieldSelects } from './state.js';
 import { initLanguage, changeLanguage, t } from './i18n.js';
 import { toggleFilters, setSort, rerender } from './filters.js';
-import { triggerImageUpload, removeProductImage } from './images.js';
+import { triggerImageUpload, removeProductImage, captureProductImage, clearPendingImage } from './images.js';
 import { renderResults, loadFlagConfig } from './render.js';
 import {
   showToast, startEdit, saveProduct, deleteProduct, unlockEan,
@@ -47,7 +47,7 @@ Object.assign(window, {
   // filters
   toggleFilters, setSort, toggleAdvancedFilters,
   // images
-  triggerImageUpload, removeProductImage,
+  triggerImageUpload, removeProductImage, captureProductImage, clearPendingImage,
   // products
   showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   switchView, setFilter, toggleExpand,

@@ -165,6 +165,19 @@
         <input type="hidden" id="f-est_diaas" value="">
       </div>
 
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <label class="field-label" data-i18n="label_product_image">Product image</label>
+          <button type="button" class="btn-ocr" id="f-image-btn" onclick="captureProductImage('f')" data-i18n-title="btn_capture_image_title" title="Take a photo or upload an image">
+            &#128247; <span data-i18n="btn_capture_image">Photo</span>
+          </button>
+          <button type="button" class="btn-ocr" id="f-image-remove" style="display:none" onclick="clearPendingImage('f')" data-i18n-title="btn_remove_image_title" title="Remove image">
+            &#10005;
+          </button>
+        </div>
+        <img id="f-image-preview" class="register-image-preview" style="display:none" alt="">
+      </div>
+
       <button type="button" class="btn-register" id="btn-submit" onclick="registerProduct()" data-i18n="btn_register_product">+ Register product</button>
     </div>
   </div>

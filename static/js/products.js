@@ -10,6 +10,7 @@ import { showDuplicateMergeModal } from './off-duplicates.js';
 import { showOffAddReview } from './off-review.js';
 import { initTagInput, getTagsForSave } from './tags.js';
 import { loadEanManager } from './ean-manager.js';
+import { clearPendingImage } from './images.js';
 export { loadEanManager, addEan, deleteEan, setEanPrimary, unsyncEan } from './ean-manager.js';
 
 // Re-export showToast so existing importers continue to work
@@ -471,6 +472,7 @@ export async function registerProduct() {
     if (pqw) pqw.style.display = 'none';
     const pqr = document.getElementById('f-pq-result');
     if (pqr) pqr.style.display = 'none';
+    clearPendingImage('f');
     // Lazy import to avoid circular dep
     import('./off-utils.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
     NUTRI_IDS.forEach((id) => { document.getElementById('f-' + id).value = ''; });

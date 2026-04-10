@@ -748,5 +748,9 @@
   "off_lang_remove": "Remove",
   "off_lang_move_up": "Move up",
   "off_lang_move_down": "Move down",
-  "toast_off_lang_priority_saved": "Language priority saved"
+  "toast_off_lang_priority_saved": "Language priority saved",
+  "label_product_image": "Product image",
+  "btn_capture_image": "Photo",
+  "btn_capture_image_title": "Take a photo or upload an image",
+  "btn_remove_image_title": "Remove image"
 }
