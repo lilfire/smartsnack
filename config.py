@@ -171,6 +171,7 @@ PQ_SEED = [
     ("plantain", 0.35, 0.30),
     ("tomato", 0.48, 0.42),
     ("bell_pepper", 0.45, 0.38),
+    ("mustard", 0.75, 0.70),
     ("collagen", 0.08, 0.09),
 ]
 
