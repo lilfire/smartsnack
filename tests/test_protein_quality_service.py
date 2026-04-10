@@ -334,6 +334,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_kakaopulver_recognized_as_cocoa(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Vann, fettredusert kakaopulver, fortykningsmiddel (xanthangummi, aroma, sitrusfiber)"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_dates_recognized(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
 

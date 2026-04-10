@@ -237,6 +237,13 @@ MIGRATIONS = [
             "VALUES ('mustard', 0.75, 0.70)",
         ],
     ),
+    (
+        "019_add_cocoa_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('cocoa', 0.55, 0.48)",
+        ],
+    ),
 ]
 
 
