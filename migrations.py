@@ -209,7 +209,16 @@ MIGRATIONS = [
             "VALUES ('jackfruit', 0.45, 0.40)",
         ],
     ),
+    (
+        "015_add_plantain_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('plantain', 0.35, 0.30)",
+        ],
+    ),
 ]
+
+
 def run_migrations(cur):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS schema_migrations (

@@ -294,6 +294,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_kokebanan_recognized_as_plantain(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Grønn kokebanan (Musa paradisiaca AAB), vegetabilsk olje (palmeolje), salt."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_dates_recognized(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
 

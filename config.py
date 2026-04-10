@@ -168,6 +168,7 @@ PQ_SEED = [
     ("tofu_tempeh", 0.91, 0.84),
     ("dates", 0.30, 0.25),
     ("jackfruit", 0.45, 0.40),
+    ("plantain", 0.35, 0.30),
     ("collagen", 0.08, 0.09),
 ]
 
