@@ -214,6 +214,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_elgkjott_recognized_as_meat(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Elgkjøtt (Alces Alces) (90 %), havsalt, hvitvinseddik, stabilisator: sitruspektin, krydderblanding, sort pepper (1,17 %)."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_position_weighting(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
         from translations import _set_translation_key
