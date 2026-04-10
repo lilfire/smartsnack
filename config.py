@@ -167,6 +167,7 @@ PQ_SEED = [
     ("spirulina", 0.99, 0.74),
     ("tofu_tempeh", 0.91, 0.84),
     ("dates", 0.30, 0.25),
+    ("jackfruit", 0.45, 0.40),
     ("collagen", 0.08, 0.09),
 ]
 
