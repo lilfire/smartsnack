@@ -202,6 +202,27 @@ MIGRATIONS = [
             "VALUES ('dates', 0.30, 0.25)",
         ],
     ),
+    (
+        "014_add_jackfruit_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('jackfruit', 0.45, 0.40)",
+        ],
+    ),
+    (
+        "015_add_plantain_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('plantain', 0.35, 0.30)",
+        ],
+    ),
+    (
+        "016_add_tomato_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('tomato', 0.48, 0.42)",
+        ],
+    ),
 ]
 
 
