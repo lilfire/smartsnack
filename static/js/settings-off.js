@@ -1,5 +1,5 @@
 // ── Settings: OpenFoodFacts Credentials and Bulk Refresh ──
-import { api, showToast } from './state.js';
+import { api, showToast, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 import { loadData } from './products.js';
 
@@ -382,6 +382,7 @@ function _renderOffLangPriority() {
     });
     const addBtn = document.getElementById('off-lang-add-btn');
     if (addBtn) addBtn.disabled = available.length === 0;
+    upgradeSelect(addSelect);
   }
 }
 

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../state.js', () => ({
   api: vi.fn().mockResolvedValue({}),
   showToast: vi.fn(),
+  upgradeSelect: vi.fn(),
 }));
 
 vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
