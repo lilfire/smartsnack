@@ -284,6 +284,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_kikertmel_recognized_as_chickpeas(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Kikertmel* 85 %, rapsolje*, spansk salviefrø*, hvitløk* 3,2 %, havsalt, løk*, persille*, krydderblanding, gjærekstrakt, vill hvitløk* 0,1 %"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_dates_recognized(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
 
