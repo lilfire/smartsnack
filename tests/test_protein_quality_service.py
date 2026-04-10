@@ -224,6 +224,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_melkeprotein_and_kollagen_recognized(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Melkeprotein, Søtningsstoffer (maltitol, xylitol, sukralose), fyllmiddel (polydexstrose), kollagenhydrolysat, fuktighetbevarende middel (glyserol), kakaosmør, helmelkspulver, soyaolje, kakaomasse, aromaer, emulgator (soyalecitin), salt, solsikkeolje, fargestoff (betakaroten)."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_position_weighting(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
         from translations import _set_translation_key
