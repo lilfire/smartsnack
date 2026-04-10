@@ -78,6 +78,18 @@ def set_system_flag(pid: int, flag_name: str, value: bool) -> None:
     conn.commit()
 
 
+def mark_product_synced_with_off(pid: int, ean: str | None = None) -> None:
+    """Mark an existing local product as synced with Open Food Facts."""
+    set_system_flag(pid, "is_synced_with_off", True)
+    if ean:
+        conn = get_db()
+        conn.execute(
+            "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
+            (pid, ean),
+        )
+        conn.commit()
+
+
 def _sync_primary_ean(conn, pid: int, new_ean: str) -> None:
     """Sync product_eans primary row when products.ean changes."""
     if new_ean:
@@ -330,14 +342,9 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         )
     if "flags" in data and isinstance(data["flags"], list):
         _set_user_flags(conn, new_id, data["flags"])
-    if data.get("from_off"):
-        set_system_flag(new_id, "is_synced_with_off", True)
-        if ean:
-            conn.execute(
-                "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
-                (new_id, ean),
-            )
     conn.commit()
+    if data.get("from_off"):
+        mark_product_synced_with_off(new_id, ean)
     from services.product_scoring import invalidate_scoring_cache
     invalidate_scoring_cache()
     return {"id": new_id, "message": "Product added"}
@@ -410,16 +417,10 @@ def update_product(pid: int, data: dict) -> None:
     from services.product_scoring import invalidate_scoring_cache
     invalidate_scoring_cache()
     if from_off:
-        set_system_flag(pid, "is_synced_with_off", True)
         # Prefer the explicitly targeted EAN (from per-row fetch in the UI);
         # fall back to the primary EAN on the form.
-        ean_val = (from_off_ean or data.get("ean") or "").strip()
-        if ean_val:
-            conn.execute(
-                "UPDATE product_eans SET synced_with_off = 1 WHERE product_id = ? AND ean = ?",
-                (pid, ean_val),
-            )
-            conn.commit()
+        ean_val = (from_off_ean or data.get("ean") or "").strip() or None
+        mark_product_synced_with_off(pid, ean_val)
 
 
 def delete_product(pid: int) -> bool:

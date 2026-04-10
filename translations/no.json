@@ -199,6 +199,7 @@
   "off_review_empty": "Manglende felt",
   "off_submit_btn": "Legg til på OFF",
   "toast_off_product_added": "Produktet ble lagt til på Open Food Facts!",
+  "toast_off_image_upload_failed": "Produktet ble lagt til på OFF, men bildeopplasting feilet",
   "toast_off_fetched": "Hentet fra OFF: {fields}",
   "toast_ingredients_missing": "Ingredienser mangler",
   "off_err_no_credentials": "OFF-pålogging er ikke konfigurert. Sett opp i Innstillinger.",

@@ -1,8 +1,10 @@
 // ── OFF Review: add-to-OFF product review and submission ─
-import { api, esc, showToast, trapFocus } from './state.js';
+import { api, esc, showToast, state, trapFocus } from './state.js';
 import { t } from './i18n.js';
 import { offState } from './off-utils.js';
 import { closeOffPicker } from './off-picker.js';
+
+let _pendingOffProductId = null;
 
 const _offReviewFields = [
   { key: 'name', offKey: 'product_name', label: 'label_product_name', required: true },
@@ -22,9 +24,10 @@ const _offReviewFields = [
   { key: 'portion', offKey: 'serving_size', label: 'label_portion' },
 ];
 
-export function showOffAddReview(ean, prefixOverride) {
+export function showOffAddReview(ean, prefixOverride, productId) {
   if (offState.reviewResolve) offState.reviewResolve();
   const prefix = prefixOverride || offState.ctx.prefix;
+  _pendingOffProductId = productId != null ? productId : null;
   const reviewPromise = new Promise((resolve) => { offState.reviewResolve = resolve; });
   const filled = [];
   const empty = [];
@@ -147,14 +150,25 @@ export async function submitToOff(ean, prefixOverride) {
   if (body.quantity) body.quantity = body.quantity + ' g';
   if (body.serving_size) body.serving_size = body.serving_size + ' g';
 
+  const productId = _pendingOffProductId;
+  if (productId != null) body.product_id = productId;
+
   try {
-    await api('/api/off/add-product', {
+    const resp = await api('/api/off/add-product', {
       method: 'POST',
       body: JSON.stringify(body)
     });
     closeOffAddReview();
     closeOffPicker();
     showToast(t('toast_off_product_added'), 'success');
+    if (resp && resp.image_warning) {
+      showToast(t('toast_off_image_upload_failed'), 'warning');
+    }
+    if (resp && resp.synced_flag_set && productId != null && state.cachedResults) {
+      const cached = state.cachedResults.find((x) => x.id === productId);
+      if (cached) cached.is_synced_with_off = 1;
+    }
+    _pendingOffProductId = null;
   } catch(e) {
     const msg = e.message && t(e.message) !== e.message ? t(e.message) : (e.message || t('toast_network_error'));
     showToast(msg, 'error');

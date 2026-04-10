@@ -199,6 +199,7 @@
   "off_review_empty": "Missing fields",
   "off_submit_btn": "Add to OFF",
   "toast_off_product_added": "Product added to Open Food Facts!",
+  "toast_off_image_upload_failed": "Product added to OFF, but image upload failed",
   "toast_off_fetched": "Fetched from OFF: {fields}",
   "toast_ingredients_missing": "Ingredients missing",
   "off_err_no_credentials": "OFF credentials not configured. Set them in Settings.",
