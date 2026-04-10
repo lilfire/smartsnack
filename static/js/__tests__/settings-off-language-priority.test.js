@@ -6,7 +6,7 @@ vi.mock('../state.js', () => ({
   upgradeSelect: vi.fn(),
 }));
 
-vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
+vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k), getCurrentLang: vi.fn(() => 'no') }));
 
 vi.mock('../products.js', () => ({
   loadData: vi.fn(),
