@@ -234,6 +234,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_ost_and_kumelk_recognized(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "Ost 100 % (pasteurisert kumelk, bordsalt, mesofile og termofile melkesyrebakterier, mikrobiell løpe)."
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_position_weighting(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
         from translations import _set_translation_key
