@@ -4,6 +4,37 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.14.0] - 2026-04-10
+
+### Added
+
+- Tag system with shared tag entities, CRUD API, chips UI with autocomplete/suggestions, and per-product assignment
+- Multi-backend OCR: 6 providers (Tesseract, Claude Vision, Gemini, GPT-4 Vision, OpenRouter, Groq) with per-provider model selection
+- OCR settings UI for choosing provider, model, and fallback preference
+- Per-EAN management: products can have multiple EANs, each with independent OFF sync tracking, add/delete, set-primary, and per-EAN OFF fetch/unlock
+- Pagination with limit/offset on product list API and infinite scroll on frontend
+- OFF language priority: configurable language preference order for Open Food Facts data fetching
+- Flashlight/torch toggle button for barcode scanner on mobile
+- Structured OCR error responses with categorized error types (token limit, quota, timeout, invalid image, no text)
+- Rate limiting via Flask-Limiter (200/min global, 10/min on OCR endpoint)
+- GitHub Actions CI: pytest + coverage, vitest + coverage, Docker build, smoke test, and branch name enforcement
+- `.env.example` with all supported environment variables
+- Tag and EAN data included in backup/restore with legacy fallback support
+- 50+ new translation keys for tags, OCR, EAN management, and OFF language settings
+
+### Changed
+
+- Product list API now returns `{products, total}` instead of a flat array
+- Tag schema reimplemented from text-based tags to integer FK schema (tags + product_tags tables)
+- OCR service redesigned with provider registry and automatic fallback to Tesseract
+
+### Refactored
+
+- Product service split into focused modules: product_crud, product_eans, product_scoring, product_filters, product_duplicate
+- Backup service split into backup_core and import_service
+- `openfoodfacts.js` split into 6 modules: off-api, off-conflicts, off-duplicates, off-picker, off-review, off-utils
+- `settings.js` split into 7 modules: settings-backup, settings-categories, settings-flags, settings-ocr, settings-off, settings-pq, settings-weights
+
 ## [0.13.0] - 2026-03-23
 
 ### Changed
