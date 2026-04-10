@@ -1,6 +1,6 @@
 // ── Settings: OpenFoodFacts Credentials and Bulk Refresh ──
 import { api, showToast, upgradeSelect } from './state.js';
-import { t } from './i18n.js';
+import { t, getCurrentLang } from './i18n.js';
 import { loadData } from './products.js';
 
 export async function loadOffCredentials() {
@@ -302,10 +302,10 @@ function _showRefreshOffModal() {
 let _offLangPriority = [];
 let _offAllLangs = [];
 
-/** Map language code to a human-readable name via Intl API, fallback to code. */
+/** Map language code to a human-readable name via Intl API, translated to current UI language. */
 function _langName(code) {
   try {
-    const dn = new Intl.DisplayNames(['en'], { type: 'language' });
+    const dn = new Intl.DisplayNames([getCurrentLang()], { type: 'language' });
     return dn.of(code) || code;
   } catch { return code; }
 }
