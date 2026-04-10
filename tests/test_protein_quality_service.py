@@ -304,6 +304,16 @@ class TestEstimate:
         assert result["est_pdcaas"] > 0
         assert len(result["sources"]) >= 1
 
+    def test_tomatpure_recognized_as_tomato(self, app_ctx, translations_dir):
+        from services.protein_quality_service import estimate
+
+        result = estimate(
+            "vann, vineddik, salt, sitrusfiber, tomatpuré, fortykningsmiddel (xantangummi), aroma, urter, krydder"
+        )
+        assert result["est_pdcaas"] is not None
+        assert result["est_pdcaas"] > 0
+        assert len(result["sources"]) >= 1
+
     def test_dates_recognized(self, app_ctx, translations_dir):
         from services.protein_quality_service import estimate
 

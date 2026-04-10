@@ -169,6 +169,7 @@ PQ_SEED = [
     ("dates", 0.30, 0.25),
     ("jackfruit", 0.45, 0.40),
     ("plantain", 0.35, 0.30),
+    ("tomato", 0.48, 0.42),
     ("collagen", 0.08, 0.09),
 ]
 

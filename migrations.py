@@ -216,6 +216,13 @@ MIGRATIONS = [
             "VALUES ('plantain', 0.35, 0.30)",
         ],
     ),
+    (
+        "016_add_tomato_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('tomato', 0.48, 0.42)",
+        ],
+    ),
 ]
 
 
