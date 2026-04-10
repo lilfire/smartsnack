@@ -105,6 +105,43 @@ export async function viewProductImage(id) {
 
 window.viewProductImage = viewProductImage;
 
+export function captureProductImage(prefix) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/png,image/jpeg,image/gif,image/webp';
+  inp.setAttribute('capture', 'environment');
+  inp.onchange = async () => {
+    if (!inp.files.length) return;
+    const file = inp.files[0];
+    if (file.size > 10 * 1024 * 1024) { showToast(t('toast_image_too_large'), 'error'); return; }
+    const reader = new FileReader();
+    reader.onerror = () => { showToast(t('toast_image_upload_error'), 'error'); };
+    reader.onload = async (e) => {
+      try {
+        const resized = await resizeImage(e.target.result, 400);
+        window._pendingImage = resized;
+        const preview = document.getElementById(prefix + '-image-preview');
+        if (preview) {
+          preview.src = resized;
+          preview.style.display = 'block';
+        }
+        const removeBtn = document.getElementById(prefix + '-image-remove');
+        if (removeBtn) removeBtn.style.display = 'inline-flex';
+      } catch(err) { showToast(t('toast_image_upload_error'), 'error'); }
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+
+export function clearPendingImage(prefix) {
+  window._pendingImage = null;
+  const preview = document.getElementById(prefix + '-image-preview');
+  if (preview) { preview.src = ''; preview.style.display = 'none'; }
+  const removeBtn = document.getElementById(prefix + '-image-remove');
+  if (removeBtn) removeBtn.style.display = 'none';
+}
+
 export async function removeProductImage(id) {
   if (!await showConfirmModal('\u{1F4F7}', t('remove_image_title'), t('remove_image_confirm'), t('btn_delete'), t('btn_cancel'))) return;
   try {

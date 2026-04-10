@@ -53,6 +53,8 @@ vi.mock('../filters.js', async (importOriginal) => {
 vi.mock('../images.js', () => ({
   triggerImageUpload: vi.fn(),
   removeProductImage: vi.fn(),
+  captureProductImage: vi.fn(),
+  clearPendingImage: vi.fn(),
 }));
 
 vi.mock('../render.js', () => ({

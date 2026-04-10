@@ -79,6 +79,16 @@ vi.mock('../off-review.js', () => ({
   submitToOff: vi.fn(),
 }));
 
+vi.mock('../images.js', () => ({
+  clearPendingImage: vi.fn(),
+  triggerImageUpload: vi.fn(),
+  removeProductImage: vi.fn(),
+  captureProductImage: vi.fn(),
+  resizeImage: vi.fn(),
+  loadProductImage: vi.fn(),
+  viewProductImage: vi.fn(),
+}));
+
 import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
 import { rerender } from '../filters.js';

@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../state.js', () => ({
   api: vi.fn().mockResolvedValue({}),
   showToast: vi.fn(),
+  upgradeSelect: vi.fn(),
 }));
 
-vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
+vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k), getCurrentLang: vi.fn(() => 'no') }));
 
 vi.mock('../products.js', () => ({
   loadData: vi.fn(),
@@ -16,17 +17,11 @@ import { api, showToast } from '../state.js';
 
 /** Return fresh mock data each call to prevent mutation leakage. */
 function mockPriority(codes) {
-  return { languages: [...(codes || ['no', 'en', 'sv'])] };
+  return { priority: [...(codes || ['no', 'en', 'sv'])] };
 }
 function mockAllLangs() {
   return {
-    languages: [
-      { code: 'no', name: 'Norwegian' },
-      { code: 'en', name: 'English' },
-      { code: 'sv', name: 'Swedish' },
-      { code: 'de', name: 'German' },
-      { code: 'fr', name: 'French' },
-    ],
+    languages: ['no', 'en', 'sv', 'de', 'fr'],
   };
 }
 
@@ -155,7 +150,7 @@ describe('Reorder', () => {
 
     expect(api).toHaveBeenCalledWith('/api/settings/off-language-priority', {
       method: 'PUT',
-      body: JSON.stringify({ languages: ['en', 'no', 'sv'] }),
+      body: JSON.stringify({ priority:['en', 'no', 'sv'] }),
     });
   });
 });
@@ -202,7 +197,7 @@ describe('Add', () => {
 
     expect(api).toHaveBeenCalledWith('/api/settings/off-language-priority', {
       method: 'PUT',
-      body: JSON.stringify({ languages: ['no', 'en', 'sv', 'fr'] }),
+      body: JSON.stringify({ priority:['no', 'en', 'sv', 'fr'] }),
     });
   });
 
@@ -249,7 +244,7 @@ describe('Remove', () => {
 
     expect(api).toHaveBeenCalledWith('/api/settings/off-language-priority', {
       method: 'PUT',
-      body: JSON.stringify({ languages: ['no', 'en'] }),
+      body: JSON.stringify({ priority:['no', 'en'] }),
     });
   });
 });

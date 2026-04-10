@@ -4,6 +4,27 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.15.0] - 2026-04-10
+
+### Added
+
+- Product image capture and preview on the registration form
+- Collagen as a recognized protein source
+- 20+ new protein source keywords: pistachio, dates, jackfruit, plantain, tomato, bell pepper, mustard, cocoa, and expanded Norwegian compound keywords for meat, dairy, wheat, milk, and chickpea ingredients
+
+### Changed
+
+- Self-hosted fonts and vendor JavaScript to remove all external CDN dependencies
+- OFF language dropdown is now searchable with language names translated to current UI language
+- OFF language priority now applies to product name and ingredients sync
+
+### Fixed
+
+- OFF language priority dropdown not aligned with backend API contract
+- OFF language dropdown missing CSS styling and language names
+- Empty OFF language dropdown after dynamic population
+- Cramped OFF refresh report modal layout on desktop
+
 ## [0.14.0] - 2026-04-10
 
 ### Added

@@ -181,6 +181,69 @@ MIGRATIONS = [
                  )""",
         ],
     ),
+    (
+        "011_add_collagen_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('collagen', 0.08, 0.09)",
+        ],
+    ),
+    (
+        "012_add_pistachio_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('pistachio', 0.73, 0.65)",
+        ],
+    ),
+    (
+        "013_add_dates_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('dates', 0.30, 0.25)",
+        ],
+    ),
+    (
+        "014_add_jackfruit_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('jackfruit', 0.45, 0.40)",
+        ],
+    ),
+    (
+        "015_add_plantain_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('plantain', 0.35, 0.30)",
+        ],
+    ),
+    (
+        "016_add_tomato_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('tomato', 0.48, 0.42)",
+        ],
+    ),
+    (
+        "017_add_bell_pepper_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('bell_pepper', 0.45, 0.38)",
+        ],
+    ),
+    (
+        "018_add_mustard_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('mustard', 0.75, 0.70)",
+        ],
+    ),
+    (
+        "019_add_cocoa_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('cocoa', 0.55, 0.48)",
+        ],
+    ),
 ]
 
 
