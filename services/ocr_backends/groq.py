@@ -4,8 +4,12 @@ from . import _get_api_key, _INGREDIENT_PROMPT
 _DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
-def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None):
-    """Use Groq Vision API to extract ingredient text from an image."""
+def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None, prompt=None):
+    """Use Groq Vision API to extract text from an image.
+
+    The `prompt` kwarg selects the extraction task (ingredients vs. nutrition);
+    defaults to _INGREDIENT_PROMPT for backward compatibility.
+    """
     api_key = _get_api_key("GROQ_API_KEY")
 
     from groq import Groq
@@ -26,7 +30,7 @@ def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None):
                     },
                     {
                         "type": "text",
-                        "text": _INGREDIENT_PROMPT,
+                        "text": prompt or _INGREDIENT_PROMPT,
                     },
                 ],
             }
