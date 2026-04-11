@@ -56,7 +56,12 @@
         <textarea class="field-input" id="f-ingredients" data-i18n-placeholder="ph_ingredients" placeholder="e.g. Lentils, sunflower oil, paprika..." rows="2" style="resize:vertical;min-height:60px" oninput="updateEstimateBtn('f')"></textarea>
       </div>
 
-      <h3 class="form-section" data-i18n="section_nutrition">N&aelig;ringsverdier per 100g</h3>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <h3 class="form-section" data-i18n="section_nutrition" style="margin:0">N&aelig;ringsverdier per 100g</h3>
+        <button type="button" class="btn-ocr" id="f-ocr-nutri-btn" onclick="scanNutrition('f')" data-i18n-title="btn_ocr_nutrition_title" title="Scan nutrition label">
+          <span class="ocr-spin"></span><span class="ocr-label">&#128247;</span>
+        </button>
+      </div>
 
       <div class="grid-4">
         <div>

@@ -457,7 +457,7 @@ export async function registerProduct() {
         t('btn_yes'), t('btn_no')
       );
       if (wantsOff) {
-        await showOffAddReview(ean, 'f');
+        await showOffAddReview(ean, 'f', newProductId);
       }
     }
     document.getElementById('f-name').value = '';

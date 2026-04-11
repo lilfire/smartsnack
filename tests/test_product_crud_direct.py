@@ -156,6 +156,44 @@ class TestDeleteProduct:
         assert delete_product(99999) is False
 
 
+class TestMarkProductSyncedWithOff:
+    def test_sets_flag_without_ean(self, db):
+        from services.product_crud import mark_product_synced_with_off
+        pid = _add("No EAN product")["id"]
+        mark_product_synced_with_off(pid)
+        row = db.execute(
+            "SELECT flag FROM product_flags WHERE product_id=? AND flag=?",
+            (pid, "is_synced_with_off"),
+        ).fetchone()
+        assert row is not None
+
+    def test_sets_flag_and_updates_product_eans(self, db):
+        from services.product_crud import mark_product_synced_with_off
+        pid = _add("With EAN product", ean="12345678")["id"]
+        mark_product_synced_with_off(pid, "12345678")
+        flag_row = db.execute(
+            "SELECT flag FROM product_flags WHERE product_id=? AND flag=?",
+            (pid, "is_synced_with_off"),
+        ).fetchone()
+        assert flag_row is not None
+        ean_row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id=? AND ean=?",
+            (pid, "12345678"),
+        ).fetchone()
+        assert ean_row["synced_with_off"] == 1
+
+    def test_idempotent(self, db):
+        from services.product_crud import mark_product_synced_with_off
+        pid = _add("Idempotent", ean="12345678")["id"]
+        mark_product_synced_with_off(pid, "12345678")
+        mark_product_synced_with_off(pid, "12345678")
+        count = db.execute(
+            "SELECT COUNT(*) AS c FROM product_flags WHERE product_id=? AND flag=?",
+            (pid, "is_synced_with_off"),
+        ).fetchone()["c"]
+        assert count == 1
+
+
 # ── EAN functions ─────────────────────────────────────────────────────────────
 
 

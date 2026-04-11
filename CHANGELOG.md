@@ -4,6 +4,13 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.0] - 2026-04-11
+
+### Added
+
+- OCR nutrition autofill: scan a nutrition label to auto-populate per-100g fields on the product registration form
+- Product image upload to Open Food Facts when submitting a new product, with local record marked as synced
+
 ## [0.15.0] - 2026-04-10
 
 ### Added
