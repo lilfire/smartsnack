@@ -4,8 +4,12 @@ from . import _get_api_key, _INGREDIENT_PROMPT
 _DEFAULT_MODEL = "gpt-4o"
 
 
-def _extract_openai(image_bytes, image_b64, mime_type="image/png", model=None):
-    """Use OpenAI Vision API to extract ingredient text from an image."""
+def _extract_openai(image_bytes, image_b64, mime_type="image/png", model=None, prompt=None):
+    """Use OpenAI Vision API to extract text from an image.
+
+    The `prompt` kwarg selects the extraction task (ingredients vs. nutrition);
+    defaults to _INGREDIENT_PROMPT for backward compatibility.
+    """
     api_key = _get_api_key("OPENAI_API_KEY")
 
     import openai
@@ -26,7 +30,7 @@ def _extract_openai(image_bytes, image_b64, mime_type="image/png", model=None):
                     },
                     {
                         "type": "text",
-                        "text": _INGREDIENT_PROMPT,
+                        "text": prompt or _INGREDIENT_PROMPT,
                     },
                 ],
             }
