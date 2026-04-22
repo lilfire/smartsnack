@@ -171,9 +171,16 @@ export function renderResults(results, search) {
     h += '</div>';
     if (state.expandedId === p.id) {
       h += '<div class="expanded"><div class="expanded-top">'
-        + '<div class="expanded-img-area" data-action="trigger-image" data-id="' + p.id + '">'
+        + '<div class="expanded-img-section">'
+        + '<div class="expanded-img-area" data-action="' + (hasImg ? 'view-image' : 'change-image') + '" data-id="' + p.id + '">'
         + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" alt="' + esc(p.name) + '" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
-        + '<div class="expanded-img-overlay">' + (hasImg ? t('expanded_change_image') : t('expanded_upload_image')) + '</div></div>'
+        + (hasImg ? '' : '<div class="expanded-img-overlay">' + t('expanded_upload_image') + '</div>') + '</div>'
+        + '<div class="expanded-img-controls">'
+        + (hasImg
+          ? '<button class="btn-sm btn-outline" data-action="change-image" data-id="' + p.id + '">' + t('btn_change_image') + '</button>'
+            + '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>'
+          : '<button class="btn-sm btn-outline" data-action="change-image" data-id="' + p.id + '">' + t('btn_upload_image') + '</button>')
+        + '</div></div>'
         + '<div class="expanded-right">';
       h += '<p class="expanded-title">' + t('expanded_score_breakdown') + '</p><div class="score-grid">';
       const sc = p.scores || {};
@@ -226,7 +233,7 @@ export function renderResults(results, search) {
       if (p.tags && p.tags.length > 0) {
         h += '<div class="product-tags">';
         for (const tag of p.tags) {
-          h += '<span class="tag-badge">' + esc(tag) + '</span>';
+          h += '<span class="tag-badge">' + esc(tag.label) + '</span>';
         }
         h += '</div>';
       }
@@ -239,23 +246,19 @@ export function renderResults(results, search) {
         const ev = (v) => v == null ? '' : v;
         h += '<div class="edit-form"><div class="edit-grid">'
           + '<div class="edit-grid-2"><label>' + t('label_name') + '</label><input id="ed-name" value="' + esc(p.name) + '"></div>'
-          + (() => {
-              const isSynced = (p.flags || []).includes('is_synced_with_off');
-              return '<div class="edit-grid-2">'
-                + '<label>' + t('label_eans') + '</label>'
-                + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
-                + '<div id="ean-manager-' + p.id + '" class="ean-manager" data-locked="' + (isSynced ? '1' : '0') + '"><div class="ean-manager-loading">\u2026</div></div>'
-                + '<div class="ean-row" style="margin-top:6px">'
-                + (isSynced ? '<button class="btn-ean-unlock" data-action="unlock-ean" data-id="' + p.id + '" title="' + t('btn_unlock_ean_title') + '">&#128275;</button>' : '')
-                + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
-                + '<button class="btn-off" id="ed-off-btn" ' + (!(isValidEan(p.ean) || p.name.trim()) ? 'disabled' : '') + ' data-action="lookup-off" data-id="' + p.id + '"><span class="off-spin"></span><span class="off-label">' + t('btn_fetch') + '</span></button>'
-                + '</div>'
-                + '</div>';
-            })()
+          + '<div class="edit-grid-2">'
+            + '<label>' + t('label_eans') + '</label>'
+            + '<input type="hidden" id="ed-ean" value="' + esc(p.ean || '') + '">'
+            + '<div id="ean-manager-' + p.id + '" class="ean-manager"><div class="ean-manager-loading">\u2026</div></div>'
+            + '<div class="ean-row" style="margin-top:6px">'
+            + '<button class="btn-scan" data-action="open-scanner" data-id="' + p.id + '" title="' + t('btn_scan_title') + '">&#128247;</button>'
+            + '</div>'
+            + '</div>'
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
           + '<div class="edit-grid-2"><div style="display:flex;align-items:center;justify-content:space-between"><label>' + t('label_ingredients') + '</label><button type="button" class="btn-ocr" id="ed-ocr-btn" onclick="scanIngredients(\'ed\')" title="' + esc(t('btn_ocr_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
+          + '<div class="edit-grid-2" style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span class="field-label" style="margin:0">' + t('section_nutrition') + '</span><button type="button" class="btn-ocr" id="ed-ocr-nutri-btn" onclick="scanNutrition(\'ed\')" title="' + esc(t('btn_ocr_nutrition_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div>'
         h += '<div><label>' + t('label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
           + '<div><label>' + t('label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
@@ -302,10 +305,7 @@ export function renderResults(results, search) {
           + '</div>'
           + '<div class="form-group">'
           + '<label data-i18n="tags">' + t('tags') + '</label>'
-          + '<div class="tag-field" id="tag-field-ed">'
-          + '<input type="text" id="tag-input-ed" class="tag-inline-input" placeholder="' + (t('tag_input_placeholder') || 'Add tag\u2026') + '" autocomplete="off" />'
-          + '<ul id="tag-suggestions-ed" class="tag-suggestions" hidden></ul>'
-          + '</div>'
+          + '<div class="tag-field" id="tag-field-ed"></div>'
           + '</div>'
           + '<div style="display:flex;gap:8px">'
           + '<button class="btn-sm btn-green" data-action="save-product" data-id="' + p.id + '">' + t('btn_save') + '</button>'
@@ -313,9 +313,8 @@ export function renderResults(results, search) {
           + '</div></div>';
       } else {
         h += '<div class="expanded-actions">'
-          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>';
-        if (hasImg) h += '<button class="btn-sm btn-outline" data-action="remove-image" data-id="' + p.id + '">' + t('btn_remove_image') + '</button>';
-        h += '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
+          + '<button class="btn-sm btn-outline" data-action="start-edit" data-id="' + p.id + '">' + t('btn_edit') + '</button>'
+          + '<button class="btn-sm btn-red" data-action="delete" data-id="' + p.id + '">' + t('btn_delete') + '</button>'
           + '</div>';
       }
       h += '</div>';
@@ -346,9 +345,13 @@ export function renderResults(results, search) {
         window.toggleExpand(rowId);
       }
         break;
-      case 'trigger-image':
+      case 'change-image':
         e.stopPropagation();
         window.triggerImageUpload(id);
+        break;
+      case 'view-image':
+        e.stopPropagation();
+        window.viewProductImage(id);
         break;
       case 'save-product':
         e.stopPropagation();
@@ -371,17 +374,9 @@ export function renderResults(results, search) {
         e.stopPropagation();
         window.deleteProduct(id);
         break;
-      case 'unlock-ean':
-        e.stopPropagation();
-        window.unlockEan(id);
-        break;
       case 'open-scanner':
         e.stopPropagation();
         window.openScanner('ed', id);
-        break;
-      case 'lookup-off':
-        e.stopPropagation();
-        window.lookupOFF('ed', id);
         break;
       case 'estimate-protein':
         e.stopPropagation();
@@ -400,9 +395,15 @@ export function renderResults(results, search) {
   if (state.editingId) {
     const eanMgr = document.getElementById('ean-manager-' + state.editingId);
     if (eanMgr && window.loadEanManager) {
-      const locked = eanMgr.dataset.locked === '1';
-      window.loadEanManager(state.editingId, locked);
+      window.loadEanManager(state.editingId);
     }
+  }
+
+  // Initialize tag input after edit form HTML is in DOM
+  if (state.editingId && document.getElementById('tag-field-ed')) {
+    const tagProduct = state.cachedResults && state.cachedResults.find(p => p.id === state.editingId);
+    const existingTags = tagProduct ? (tagProduct.tags || []) : [];
+    import('./tags.js').then(mod => mod.initTagInput(existingTags));
   }
 
   const edType = document.getElementById('ed-type');

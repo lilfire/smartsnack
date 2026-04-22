@@ -356,7 +356,7 @@ class TestI18nKeysPresent:
             os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
             "translations",
         )
-        with open(os.path.join(translations_dir, f"{lang}.json")) as f:
+        with open(os.path.join(translations_dir, f"{lang}.json"), encoding="utf-8") as f:
             data = json.load(f)
         for key in self.REQUIRED_KEYS:
             assert key in data, f"Missing i18n key '{key}' in {lang}.json"

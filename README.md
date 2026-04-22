@@ -7,14 +7,16 @@ A mobile-first web app for tracking and scoring food products. Search by name or
 
 ## Features
 
-- **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera. Detected codes auto-lookup product data from OpenFoodFacts.
+- **Barcode Scanner** — Scan EAN-13/8 and UPC-A/E barcodes using the device camera with flashlight/torch control. Detected codes auto-lookup product data from OpenFoodFacts.
 - **OCR Ingredient Scanning** — Use the device camera to scan ingredient lists via OCR. Multiple backend providers supported: Tesseract (local), Claude Vision, Gemini Vision, GPT-4 Vision (OpenAI), OpenRouter Vision, and Groq Vision. Includes duplicate detection and quota/rate-limit error handling (429 toast notifications).
 - **Protein Quality** — Protein quality scoring based on amino acid completeness, integrated into the configurable scoring system.
 - **OpenFoodFacts Integration** — Fetch nutrition info, product names, brand, and images by barcode or text search.
 - **Configurable Scoring** — 17 weight fields (kcal, sugar, protein, fiber, fat, price, taste, macro %kcal, etc.) each with toggleable enable, weight slider (0–100), direction (lower/higher is better), and formula (MinMax normalization or Direct mapping). Total score is a weighted average from 1–100.
 - **Categories** — Create custom categories with built-in emoji picker. Change emoji on existing categories. Auto-create categories when importing products with unknown types. Multi-select filtering on the product list.
 - **Advanced Filters** — Filter products by flags, category, and other fields with a dedicated advanced filter panel.
-- **EAN Unlock** — Unlock EAN codes for synced products, with direct links to OpenFoodFacts product pages.
+- **EAN Management** — Manage multiple EAN codes per product (add, remove, set primary). Unlock EAN codes for synced products with direct links to OpenFoodFacts product pages. Per-EAN sync state tracking.
+- **Tags** — Create and assign shared tags to products for flexible grouping and filtering.
+- **Custom Flags** — Define custom boolean flags (e.g., "discontinued") and toggle them per product.
 - **Backup & Restore** — Full JSON export/import of the database (products, weights, categories).
 - **Responsive UI** — Dark theme with custom styled modals and toast notifications, three-tab layout (Search, Register, Settings). Single-column on mobile, multi-column on tablet/desktop.
 - **Multi-language** — Norwegian, English, and Swedish UI translations.
@@ -50,8 +52,11 @@ That's it. Everything else (Python 3.12, Flask, Gunicorn, OpenSSL) is handled in
 ```bash
 git clone https://github.com/lilfire/smartsnack.git
 cd smartsnack
+cp .env.example .env          # edit .env and set SMARTSNACK_SECRET_KEY
 docker compose up -d --build
 ```
+
+> `SMARTSNACK_SECRET_KEY` is required. See `.env.example` for all available environment variables.
 
 The app will be available at:
 
@@ -108,6 +113,7 @@ environment:
 │   ├── product_service.py      # Product facade (delegates to sub-modules)
 │   ├── product_crud.py         # Product create/read/update/delete
 │   ├── product_duplicate.py    # Duplicate detection logic
+│   ├── product_eans.py          # EAN/barcode management
 │   ├── product_filters.py      # Product filtering/search
 │   ├── product_scoring.py      # Scoring computation
 │   ├── ocr_core.py             # OCR orchestration
@@ -131,14 +137,15 @@ environment:
 │   ├── proxy_service.py
 │   ├── settings_service.py
 │   ├── stats_service.py
+│   ├── tag_service.py              # Tag management
 │   ├── translation_service.py
 │   └── weight_service.py
 ├── templates/              # Jinja2 templates with partials
 ├── static/
-│   ├── js/                 # Modular vanilla JS frontend (~26 ES modules)
+│   ├── js/                 # Modular vanilla JS frontend (~29 ES modules)
 │   │   ├── app.js, state.js, render.js, i18n.js
-│   │   ├── products.js, images.js, filters.js, scanner.js, ocr.js
-│   │   ├── advanced-filters.js, tags.js
+│   │   ├── products.js, images.js, filters.js, scanner.js, ocr.js, scroll.js
+│   │   ├── advanced-filters.js, tags.js, ean-manager.js, scanner-torch.js
 │   │   ├── emoji-data.js, emoji-picker.js
 │   │   ├── off-api.js, off-conflicts.js, off-duplicates.js
 │   │   ├── off-picker.js, off-review.js, off-utils.js

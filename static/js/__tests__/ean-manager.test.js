@@ -252,6 +252,20 @@ describe('Add EAN', () => {
     expect(errorEl.style.display).toBe('');
   });
 
+  it('handles idempotent 200 response without showing an error', async () => {
+    await setupRenderedManager();
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '7038010069307'; // Same EAN already on this product
+    // API returns 200 (idempotent success — same-product duplicate)
+    api.mockResolvedValueOnce({ id: 1, ean: '7038010069307', is_primary: true });
+    api.mockResolvedValueOnce(MOCK_EANS_ONE);
+    await addEan(PRODUCT_ID);
+    const errorEl = document.getElementById('ean-error-' + PRODUCT_ID);
+    expect(errorEl.style.display).toBe('none');
+    expect(showToast).toHaveBeenCalledWith('toast_ean_added', 'success');
+    expect(showToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
   it('does nothing when input is empty', async () => {
     await setupRenderedManager();
 
@@ -401,5 +415,90 @@ describe('Set primary', () => {
     await setEanPrimary(PRODUCT_ID, 2);
 
     expect(document.getElementById('ed-ean').value).toBe('5000000000001');
+  });
+
+  it('shows toast on API error', async () => {
+    await setupRenderedManager();
+
+    const error = new Error('Server Error');
+    api.mockRejectedValueOnce(error);
+
+    await setEanPrimary(PRODUCT_ID, 2);
+
+    expect(showToast).toHaveBeenCalledWith('Server Error', 'error');
+  });
+
+  it('shows generic toast when error has no message', async () => {
+    await setupRenderedManager();
+
+    api.mockRejectedValueOnce(new Error(''));
+
+    await setEanPrimary(PRODUCT_ID, 2);
+
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+});
+
+// ── Load EAN Manager error handling ─────────────────
+
+describe('loadEanManager error handling', () => {
+  it('shows error HTML in container when API throws', async () => {
+    api.mockRejectedValueOnce(new Error('Network error'));
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await loadEanManager(PRODUCT_ID);
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    expect(container.innerHTML).toContain('field-error');
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('does nothing when container element does not exist', async () => {
+    document.body.innerHTML = '';
+    await loadEanManager(PRODUCT_ID);
+    // Should not throw or make API calls
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+// ── addEan fallback toast when no errorEl ────────────
+
+describe('addEan fallback toast when errorEl is missing', () => {
+  it('shows toast instead of inline error when ean-error element is absent', async () => {
+    // Render without the error element
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+    await loadEanManager(PRODUCT_ID);
+    api.mockClear();
+
+    // Remove the error element from the DOM
+    const errorEl = document.getElementById('ean-error-' + PRODUCT_ID);
+    if (errorEl) errorEl.remove();
+
+    // Set up input with valid EAN
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '7038010069307';
+
+    const error = new Error('Conflict');
+    error.data = { error: 'error_ean_already_exists' };
+    api.mockRejectedValueOnce(error);
+
+    await addEan(PRODUCT_ID);
+
+    expect(showToast).toHaveBeenCalledWith('error_ean_already_exists', 'error');
+  });
+
+  it('returns early when input element does not exist', async () => {
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+    await loadEanManager(PRODUCT_ID);
+    api.mockClear();
+
+    // Remove the add input from DOM
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    if (input) input.remove();
+
+    await addEan(PRODUCT_ID);
+
+    expect(api).not.toHaveBeenCalled();
   });
 });

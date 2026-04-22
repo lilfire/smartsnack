@@ -85,6 +85,42 @@ def _restore_product(cur, p, valid_flags=None):
                 "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
                 (new_id, flag),
             )
+    # Restore product_eans rows. Prefer the explicit `eans` list from new
+    # backups; fall back to the legacy single `products.ean` field for
+    # backups that predate the per-EAN format. Without this, restored
+    # products would have an empty product_eans table even though
+    # products.ean is set, breaking the EAN editor in the UI.
+    backup_eans = p.get("eans")
+    if backup_eans:
+        for e in backup_eans:
+            ean_val = (e.get("ean") or "").strip()
+            if not ean_val:
+                continue
+            cur.execute(
+                "INSERT OR IGNORE INTO product_eans "
+                "(product_id, ean, is_primary, synced_with_off) "
+                "VALUES (?, ?, ?, ?)",
+                (
+                    new_id,
+                    ean_val,
+                    1 if e.get("is_primary") else 0,
+                    1 if e.get("synced_with_off") else 0,
+                ),
+            )
+    else:
+        legacy_ean = (p.get("ean") or "").strip()
+        if legacy_ean:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_eans "
+                "(product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (new_id, legacy_ean),
+            )
+            if "is_synced_with_off" in (p.get("flags") or []):
+                cur.execute(
+                    "UPDATE product_eans SET synced_with_off = 1 "
+                    "WHERE product_id = ? AND ean = ?",
+                    (new_id, legacy_ean),
+                )
 
 
 def create_backup(include_images: bool = True):
@@ -126,6 +162,23 @@ def create_backup(include_images: bool = True):
         flags_map.setdefault(r["product_id"], []).append(r["flag"])
     for p in products:
         p["flags"] = flags_map.get(p["id"], [])
+
+    # Attach product_eans rows to products. Without this, secondary EANs and
+    # per-row synced_with_off flags are silently lost on every backup→restore
+    # cycle.
+    ean_rows = conn.execute(
+        "SELECT product_id, ean, is_primary, synced_with_off "
+        "FROM product_eans ORDER BY product_id, is_primary DESC, id"
+    ).fetchall()
+    eans_map: dict[int, list[dict]] = {}
+    for r in ean_rows:
+        eans_map.setdefault(r["product_id"], []).append({
+            "ean": r["ean"],
+            "is_primary": bool(r["is_primary"]),
+            "synced_with_off": bool(r["synced_with_off"]),
+        })
+    for p in products:
+        p["eans"] = eans_map.get(p["id"], [])
 
     cat_rows = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     categories = []
