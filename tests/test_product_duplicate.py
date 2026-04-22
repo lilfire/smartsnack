@@ -205,3 +205,61 @@ class TestMergeProducts:
         target = _insert_product(db, "Target", "")
         with pytest.raises(LookupError):
             merge_products(target, 99999)
+
+    def test_source_eans_transferred_to_target(self, db):
+        from services.product_duplicate import merge_products
+        target = _insert_product(db, "Target", "1111111111")
+        source = _insert_product(db, "Source", "2222222222")
+        merge_products(target, source)
+        eans = {r["ean"] for r in db.execute(
+            "SELECT ean FROM product_eans WHERE product_id=?", (target,)
+        ).fetchall()}
+        assert "2222222222" in eans
+
+    def test_ean_transfer_no_duplicates_when_same_ean(self, db):
+        from services.product_duplicate import merge_products
+        target = _insert_product(db, "Target", "1111111111")
+        source = _insert_product(db, "Source", "1111111111")
+        merge_products(target, source)
+        count = db.execute(
+            "SELECT COUNT(*) FROM product_eans WHERE product_id=? AND ean=?",
+            (target, "1111111111"),
+        ).fetchone()[0]
+        assert count == 1
+
+    def test_both_eans_present_on_target_after_merge(self, db):
+        from services.product_duplicate import merge_products
+        target = _insert_product(db, "Target", "1111111111")
+        source = _insert_product(db, "Source", "2222222222")
+        merge_products(target, source)
+        eans = {r["ean"] for r in db.execute(
+            "SELECT ean FROM product_eans WHERE product_id=?", (target,)
+        ).fetchall()}
+        assert "1111111111" in eans
+        assert "2222222222" in eans
+
+    def test_multiple_source_eans_all_transferred(self, db):
+        from services.product_duplicate import merge_products
+        target = _insert_product(db, "Target", "1111111111")
+        source = _insert_product(db, "Source", "2222222222")
+        db.execute(
+            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 0)",
+            (source, "3333333333"),
+        )
+        db.commit()
+        merge_products(target, source)
+        eans = {r["ean"] for r in db.execute(
+            "SELECT ean FROM product_eans WHERE product_id=?", (target,)
+        ).fetchall()}
+        assert "2222222222" in eans
+        assert "3333333333" in eans
+
+    def test_source_eans_not_in_product_eans_after_delete(self, db):
+        from services.product_duplicate import merge_products
+        target = _insert_product(db, "Target", "1111111111")
+        source = _insert_product(db, "Source", "2222222222")
+        merge_products(target, source)
+        rows = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id=?", (source,)
+        ).fetchall()
+        assert rows == []

@@ -133,5 +133,15 @@ def merge_products(target_id: int, source_id: int, choices: dict | None = None) 
             (target_id, row["flag"]),
         )
 
+    # Transfer EANs from source to target
+    source_eans = cur.execute(
+        "SELECT ean FROM product_eans WHERE product_id = ?", (source_id,)
+    ).fetchall()
+    for row in source_eans:
+        cur.execute(
+            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 0)",
+            (target_id, row["ean"]),
+        )
+
     cur.execute("DELETE FROM products WHERE id = ?", (source_id,))
     conn.commit()
