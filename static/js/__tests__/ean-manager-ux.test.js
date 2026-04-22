@@ -526,26 +526,17 @@ describe('EAN manager event delegation', () => {
     });
   });
 
-  it('clicking fetch-ean-off button triggers setEanPrimary then lookupOFF', async () => {
+  it('clicking fetch-ean-off button triggers lookupOFF with the EAN value', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
     await loadEanManager(PRODUCT_ID, false);
     api.mockClear();
-
-    api.mockResolvedValueOnce({});
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
 
     const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
     expect(offBtn).not.toBeNull();
     offBtn.click();
 
     await vi.waitFor(() => {
-      expect(api).toHaveBeenCalledWith(
-        '/api/products/' + PRODUCT_ID + '/eans/2/set-primary',
-        { method: 'PATCH' }
-      );
-    });
-    await vi.waitFor(() => {
-      expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID);
+      expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID, { ean: offBtn.dataset.eanValue });
     });
   });
 
@@ -581,6 +572,10 @@ describe('EAN manager event delegation', () => {
         { method: 'POST', body: JSON.stringify({ ean: '5000000000001' }) }
       );
     });
+    // Wait for addEan's full async chain (loadEanManager reload + showToast)
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('pressing non-Enter key in add input does not trigger addEan', async () => {
@@ -589,6 +584,7 @@ describe('EAN manager event delegation', () => {
     api.mockClear();
 
     const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
     addInput.value = '5000000000001';
 
     const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
