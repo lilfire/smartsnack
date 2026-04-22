@@ -446,6 +446,45 @@ class TestSearchByEan:
         names = [p["name"] for p in results]
         assert "SecondarySearch" in names
 
+    def test_search_by_primary_ean_with_multiple_secondaries(self, client):
+        """Primary EAN is still findable when product has many secondary EANs."""
+        pid = _add_product(client, name="ManyEans", ean="88880001")
+        for ean in ["88880002", "88880003", "88880004", "88880005"]:
+            client.post(f"/api/products/{pid}/eans", json={"ean": ean})
+        resp = client.get("/api/products?search=88880001")
+        assert resp.status_code == 200
+        names = [p["name"] for p in resp.get_json()["products"]]
+        assert "ManyEans" in names
+
+    def test_search_returns_product_for_any_secondary_ean(self, client):
+        """Product is found when searching by any of its secondary EANs."""
+        pid = _add_product(client, name="AnySecondary", ean="99990001")
+        for ean in ["99990002", "99990003"]:
+            client.post(f"/api/products/{pid}/eans", json={"ean": ean})
+        for ean in ["99990002", "99990003"]:
+            resp = client.get(f"/api/products?search={ean}")
+            assert resp.status_code == 200
+            names = [p["name"] for p in resp.get_json()["products"]]
+            assert "AnySecondary" in names, f"Not found via secondary EAN {ean}"
+
+    def test_search_no_match_returns_empty_list(self, client):
+        """Search for non-existent EAN returns empty product list, not an error."""
+        resp = client.get("/api/products?search=zzzNoMatchAtAll999")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["products"] == []
+        assert data["total"] == 0
+
+    def test_search_by_brand_returns_product(self, client):
+        """Search matches product brand name, not just EAN or product name."""
+        client.post("/api/products", json={
+            "type": "Snacks", "name": "BrandTest", "brand": "SuperBrand",
+        })
+        resp = client.get("/api/products?search=SuperBrand")
+        assert resp.status_code == 200
+        names = [p["name"] for p in resp.get_json()["products"]]
+        assert "BrandTest" in names
+
 
 # ── Product create ─────────────────────────────────────────────────────────────
 

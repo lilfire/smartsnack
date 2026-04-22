@@ -520,3 +520,63 @@ describe('missing DOM elements', () => {
     expect(getTagsForSave()).toEqual([4]);
   });
 });
+
+// ── Tag edge cases ────────────────────────────────────────────────────────────
+
+describe('tag edge cases', () => {
+  it('does not add duplicate tag (same id)', async () => {
+    initTagInput([{ id: 1, label: 'alpha' }]);
+    mockFetchPost({ id: 1, label: 'alpha' });
+    document.getElementById('add-tag-btn').click();
+    document.getElementById('tag-modal-input').value = 'alpha';
+    document.getElementById('tag-modal-confirm').click();
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await vi.waitFor(() => expect(document.getElementById('tag-modal-overlay')).toBeNull());
+    expect(getTagsForSave()).toEqual([1]);
+  });
+
+  it('handles tag with special characters safely in text content', async () => {
+    mockFetchPost({ id: 20, label: '<b>bold</b>' });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    document.getElementById('tag-modal-input').value = '<b>bold</b>';
+    document.getElementById('tag-modal-confirm').click();
+    await vi.waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await vi.waitFor(() => expect(getTagsForSave()).toContain(20));
+    const pills = document.querySelectorAll('.tag-pill');
+    expect(pills.length).toBe(1);
+    expect(pills[0].textContent).toContain('<b>bold</b>');
+  });
+
+  it('trims whitespace from tag input before POST', async () => {
+    mockFetchPost({ id: 30, label: 'trimmed' });
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    document.getElementById('tag-modal-input').value = '  trimmed  ';
+    document.getElementById('tag-modal-confirm').click();
+    await vi.waitFor(() => {
+      const postCall = global.fetch.mock.calls.find(c => c[1] && c[1].method === 'POST');
+      expect(postCall).toBeTruthy();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.label).toBe('trimmed');
+    });
+  });
+
+  it('empty input after trim closes modal without POST', () => {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    document.getElementById('tag-modal-input').value = '   ';
+    document.getElementById('tag-modal-confirm').click();
+    expect(global.fetch).not.toHaveBeenCalledWith('/api/tags', expect.anything());
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('removes all tags one by one', () => {
+    initTagInput([{ id: 1, label: 'a' }, { id: 2, label: 'b' }, { id: 3, label: 'c' }]);
+    while (document.querySelectorAll('.tag-remove').length > 0) {
+      document.querySelectorAll('.tag-remove')[0].click();
+    }
+    expect(getTagsForSave()).toEqual([]);
+    expect(document.querySelectorAll('.tag-pill').length).toBe(0);
+  });
+});
