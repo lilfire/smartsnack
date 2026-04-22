@@ -301,7 +301,7 @@ def import_products(
             existing_id = None
             if match_criteria in ("ean", "both") and ean:
                 row = cur.execute(
-                    "SELECT id FROM products WHERE ean = ?", (ean,)
+                    "SELECT product_id as id FROM product_eans WHERE ean = ? LIMIT 1", (ean,)
                 ).fetchone()
                 if row:
                     existing_id = row["id"]

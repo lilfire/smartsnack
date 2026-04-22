@@ -220,11 +220,17 @@ class TestOverwriteProduct:
 
         db.execute(
             INSERT_WITH_IMAGE_SQL,
-            (cat, name, ean, "", "", "", "", None, None, None, None, None,
+            (cat, name, "", "", "", "", None, None, None, None, None,
              None, None, None, None, None, None, None, None, None, None, None, ""),
         )
+        pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if ean:
+            db.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (pid, ean),
+            )
         db.commit()
-        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return pid
 
     def test_overwrite_all_fields(self, app_ctx, db, seed_category):
         """Lines 112-148: overwrite replaces all fields including flags."""
@@ -267,10 +273,15 @@ class TestMergeProduct:
 
         db.execute(
             INSERT_WITH_IMAGE_SQL,
-            (cat, name, ean, brand, "", "", "", None, None, None, None, None,
+            (cat, name, brand, "", "", "", None, None, None, None, None,
              None, None, None, None, None, None, None, None, None, None, None, ""),
         )
         pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if ean:
+            db.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (pid, ean),
+            )
         if synced:
             db.execute(
                 "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, 'is_synced_with_off')",

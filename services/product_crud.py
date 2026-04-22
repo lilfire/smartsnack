@@ -119,59 +119,6 @@ def set_system_flag(pid: int, flag_name: str, value: bool) -> None:
     conn.commit()
 
 
-def _sync_primary_ean(conn, pid: int, new_ean: str) -> None:
-    """Sync product_eans primary row when products.ean changes."""
-    if new_ean:
-        existing_primary = conn.execute(
-            "SELECT id, ean FROM product_eans WHERE product_id = ? AND is_primary = 1",
-            (pid,),
-        ).fetchone()
-        if existing_primary:
-            if existing_primary["ean"] != new_ean:
-                # Check if the new ean already exists as a non-primary row
-                existing_row = conn.execute(
-                    "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
-                    (pid, new_ean),
-                ).fetchone()
-                if existing_row:
-                    # Demote old primary, promote the existing row
-                    conn.execute(
-                        "UPDATE product_eans SET is_primary = 0 WHERE id = ?",
-                        (existing_primary["id"],),
-                    )
-                    conn.execute(
-                        "UPDATE product_eans SET is_primary = 1 WHERE id = ?",
-                        (existing_row["id"],),
-                    )
-                else:
-                    # Update primary row's ean value
-                    conn.execute(
-                        "UPDATE product_eans SET ean = ? WHERE id = ?",
-                        (new_ean, existing_primary["id"]),
-                    )
-        else:
-            # No primary row — insert or promote existing matching row
-            existing_row = conn.execute(
-                "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
-                (pid, new_ean),
-            ).fetchone()
-            if existing_row:
-                conn.execute(
-                    "UPDATE product_eans SET is_primary = 1 WHERE id = ?",
-                    (existing_row["id"],),
-                )
-            else:
-                conn.execute(
-                    "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
-                    (pid, new_ean),
-                )
-    else:
-        # EAN cleared — demote primary designation
-        conn.execute(
-            "UPDATE product_eans SET is_primary = 0 WHERE product_id = ? AND is_primary = 1",
-            (pid,),
-        )
-
 
 def list_products(
     search: str | None,
@@ -337,7 +284,6 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         (
             data.get("type", "").strip(),
             data["name"].strip(),
-            data.get("ean", "").strip(),
             data.get("brand", "").strip(),
             data.get("stores", "").strip(),
             data.get("ingredients", "").strip(),
@@ -385,7 +331,7 @@ def update_product(pid: int, data: dict) -> None:
 
     updates, vals = [], []
     for f in data:
-        if f in ("id", "image"):
+        if f in ("id", "image", "ean"):
             continue
         if f not in _VALID_COLUMNS:
             raise ValueError("Invalid field")
@@ -406,7 +352,7 @@ def update_product(pid: int, data: dict) -> None:
                     v = _safe_float(v, f)
             updates.append(f"{f} = ?")
             vals.append(v)
-    if not updates and incoming_flags is None and incoming_tags is None:
+    if not updates and incoming_flags is None and incoming_tags is None and "ean" not in data:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data and data["type"]:
@@ -423,13 +369,34 @@ def update_product(pid: int, data: dict) -> None:
         if cur.rowcount == 0:
             raise LookupError("Product not found")
     else:
-        # Only flags/tags are being updated — verify product exists
+        # Only flags/tags/ean are being updated — verify product exists
         exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
         if not exists:
             raise LookupError("Product not found")
     if "ean" in data:
         new_ean = (data["ean"] or "").strip()
-        _sync_primary_ean(conn, pid, new_ean)
+        if new_ean:
+            existing_row = conn.execute(
+                "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?", (pid, new_ean)
+            ).fetchone()
+            if existing_row:
+                conn.execute("UPDATE product_eans SET is_primary = 0 WHERE product_id = ?", (pid,))
+                conn.execute("UPDATE product_eans SET is_primary = 1 WHERE id = ?", (existing_row["id"],))
+            else:
+                primary_row = conn.execute(
+                    "SELECT id FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+                ).fetchone()
+                if primary_row:
+                    conn.execute("UPDATE product_eans SET ean = ? WHERE id = ?", (new_ean, primary_row["id"]))
+                else:
+                    conn.execute(
+                        "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                        (pid, new_ean),
+                    )
+        else:
+            conn.execute(
+                "UPDATE product_eans SET is_primary = 0 WHERE product_id = ? AND is_primary = 1", (pid,)
+            )
     if incoming_flags is not None and isinstance(incoming_flags, list):
         _set_user_flags(conn, pid, incoming_flags)
     if incoming_tags is not None and isinstance(incoming_tags, list):
@@ -488,8 +455,6 @@ def add_ean(pid: int, ean: str) -> dict:
     except sqlite3.IntegrityError:
         raise ValueError("ean_already_exists")
     new_id = cur.lastrowid
-    if is_primary:
-        conn.execute("UPDATE products SET ean = ? WHERE id = ?", (ean, pid))
     conn.commit()
     return {"id": new_id, "ean": ean, "is_primary": bool(is_primary)}
 
@@ -521,9 +486,6 @@ def delete_ean(pid: int, ean_id: int) -> None:
             conn.execute(
                 "UPDATE product_eans SET is_primary = 1 WHERE id = ?", (next_row["id"],)
             )
-            conn.execute(
-                "UPDATE products SET ean = ? WHERE id = ?", (next_row["ean"], pid)
-            )
     conn.commit()
 
 
@@ -545,5 +507,4 @@ def set_primary_ean(pid: int, ean_id: int) -> None:
     conn.execute(
         "UPDATE product_eans SET is_primary = 1 WHERE id = ?", (ean_id,)
     )
-    conn.execute("UPDATE products SET ean = ? WHERE id = ?", (row["ean"], pid))
     conn.commit()

@@ -201,9 +201,15 @@ class TestImportDuplicateControl:
 
         db.execute(
             INSERT_WITH_IMAGE_SQL,
-            (cat, name, ean, "", "", "", "", None, None, None, None, None,
+            (cat, name, "", "", "", "", None, None, None, None, None,
              None, None, None, None, None, None, None, None, None, None, None, ""),
         )
+        pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if ean:
+            db.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (pid, ean),
+            )
         db.commit()
 
     def test_default_skips_ean_duplicate(self, app_ctx, seed_category, translations_dir):
@@ -255,7 +261,8 @@ class TestImportDuplicateControl:
         self._insert_product(get_db(), "Overwrite Me", ean="2222222222222")
         # Give the existing product a brand value
         get_db().execute(
-            "UPDATE products SET brand = 'OldBrand' WHERE ean = '2222222222222'"
+            "UPDATE products SET brand = 'OldBrand' WHERE id IN "
+            "(SELECT product_id FROM product_eans WHERE ean = '2222222222222')"
         )
         get_db().commit()
         msg = import_products(
@@ -264,7 +271,8 @@ class TestImportDuplicateControl:
         )
         assert "1 overwritten" in msg
         row = get_db().execute(
-            "SELECT brand FROM products WHERE ean = '2222222222222'"
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '2222222222222'"
         ).fetchone()
         assert row["brand"] == "NewBrand"
 
@@ -275,7 +283,8 @@ class TestImportDuplicateControl:
 
         self._insert_product(get_db(), "Full Product", ean="2222222222223")
         get_db().execute(
-            "UPDATE products SET brand = 'ExistingBrand' WHERE ean = '2222222222223'"
+            "UPDATE products SET brand = 'ExistingBrand' WHERE id IN "
+            "(SELECT product_id FROM product_eans WHERE ean = '2222222222223')"
         )
         get_db().commit()
         # Import without brand — should clear the existing brand
@@ -285,7 +294,8 @@ class TestImportDuplicateControl:
         )
         assert "1 overwritten" in msg
         row = get_db().execute(
-            "SELECT brand FROM products WHERE ean = '2222222222223'"
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '2222222222223'"
         ).fetchone()
         assert row["brand"] == ""
 
@@ -324,10 +334,15 @@ class TestImportMerge:
 
         db.execute(
             INSERT_WITH_IMAGE_SQL,
-            (cat, name, ean, brand, "", "", "", None, None, None, None, None,
+            (cat, name, brand, "", "", "", None, None, None, None, None,
              None, None, None, None, None, None, None, None, None, None, None, ""),
         )
         pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if ean:
+            db.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (pid, ean),
+            )
         if synced:
             db.execute(
                 "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, 'is_synced_with_off')",
@@ -347,7 +362,10 @@ class TestImportMerge:
             on_duplicate="merge",
         )
         assert "1 merged" in msg
-        row = get_db().execute("SELECT brand FROM products WHERE ean = '1000000000001'").fetchone()
+        row = get_db().execute(
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '1000000000001'"
+        ).fetchone()
         assert row["brand"] == "NewBrand"
 
     def test_merge_existing_synced_keeps_existing(self, app_ctx, seed_category, translations_dir):
@@ -360,7 +378,10 @@ class TestImportMerge:
             {"products": [{"type": "Snacks", "name": "Synced P", "ean": "2000000000002", "brand": "ImportBrand"}]},
             on_duplicate="merge",
         )
-        row = get_db().execute("SELECT brand FROM products WHERE ean = '2000000000002'").fetchone()
+        row = get_db().execute(
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '2000000000002'"
+        ).fetchone()
         assert row["brand"] == "OldBrand"
 
     def test_merge_imported_synced_overwrites(self, app_ctx, seed_category, translations_dir):
@@ -376,7 +397,10 @@ class TestImportMerge:
             }]},
             on_duplicate="merge",
         )
-        row = get_db().execute("SELECT brand FROM products WHERE ean = '3000000000003'").fetchone()
+        row = get_db().execute(
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '3000000000003'"
+        ).fetchone()
         assert row["brand"] == "ImportBrand"
 
     def test_merge_both_synced_imported_wins(self, app_ctx, seed_category, translations_dir):
@@ -392,7 +416,10 @@ class TestImportMerge:
             }]},
             on_duplicate="merge",
         )
-        row = get_db().execute("SELECT brand FROM products WHERE ean = '4000000000004'").fetchone()
+        row = get_db().execute(
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '4000000000004'"
+        ).fetchone()
         assert row["brand"] == "ImportBrand"
 
     def test_merge_neither_synced_keep_existing(self, app_ctx, seed_category, translations_dir):
@@ -406,7 +433,10 @@ class TestImportMerge:
             on_duplicate="merge",
             merge_priority="keep_existing",
         )
-        row = get_db().execute("SELECT brand FROM products WHERE ean = '5000000000005'").fetchone()
+        row = get_db().execute(
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '5000000000005'"
+        ).fetchone()
         assert row["brand"] == "OldBrand"
 
     def test_merge_neither_synced_use_imported(self, app_ctx, seed_category, translations_dir):
@@ -420,7 +450,10 @@ class TestImportMerge:
             on_duplicate="merge",
             merge_priority="use_imported",
         )
-        row = get_db().execute("SELECT brand FROM products WHERE ean = '6000000000006'").fetchone()
+        row = get_db().execute(
+            "SELECT p.brand FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id WHERE pe.ean = '6000000000006'"
+        ).fetchone()
         assert row["brand"] == "ImportBrand"
 
 
