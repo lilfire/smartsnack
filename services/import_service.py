@@ -111,12 +111,23 @@ def _overwrite_product(cur, existing_id, p, valid_flags=None):
         cur.execute(
             f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
         )
-    # Keep product_eans in sync with the (possibly new) products.ean value.
-    # Without this, importing an overwrite for a product whose EAN changed
-    # would leave product_eans pointing at the old EAN (or empty), breaking
-    # the EAN editor in the UI.
-    from services.product_crud import _sync_primary_ean
-    _sync_primary_ean(cur, existing_id, (p.get("ean") or "").strip())
+    # Sync EAN to product_eans table
+    ean = (p.get("ean") or "").strip()
+    if ean:
+        primary_row = cur.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND is_primary = 1",
+            (existing_id,),
+        ).fetchone()
+        if primary_row:
+            cur.execute(
+                "UPDATE product_eans SET ean = ? WHERE id = ?",
+                (ean, primary_row["id"]),
+            )
+        else:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (existing_id, ean),
+            )
     # Replace flags: remove existing, then insert imported
     cur.execute(
         "DELETE FROM product_flags WHERE product_id = ?", (existing_id,)
@@ -205,14 +216,6 @@ def _merge_product(cur, existing_id, p, merge_priority, valid_flags=None):
         cur.execute(
             f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
         )
-        # Keep product_eans in sync if products.ean was actually updated by
-        # this merge (i.e. the imported value won and the EAN field is in
-        # `updates`). Without this, the merged product would either keep its
-        # old product_eans row pointing at a stale EAN, or have no row at all
-        # if the existing product was never backfilled.
-        if any(u.startswith("ean = ") for u in updates):
-            from services.product_crud import _sync_primary_ean
-            _sync_primary_ean(cur, existing_id, (p.get("ean") or "").strip())
 
     # Merge flags (additive)
     if valid_flags is None:

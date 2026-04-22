@@ -328,7 +328,7 @@ def update_product(pid: int, data: dict) -> None:
                     v = _safe_float(v, f)
             updates.append(f"{f} = ?")
             vals.append(v)
-    if not updates and incoming_flags is None and incoming_tag_ids is None:
+    if not updates and incoming_flags is None and incoming_tag_ids is None and "ean" not in data:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data and data["type"]:

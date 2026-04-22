@@ -813,12 +813,6 @@ class TestEanSyncedWithOff:
         assert rows["10000000"] == (True, False), "primary must stay primary and unsynced"
         assert rows["20000000"] == (False, True), "secondary must be marked synced"
 
-        # products.ean (the legacy scalar) must still reflect the primary, not the swap
-        prod_ean = db.execute(
-            "SELECT ean FROM products WHERE id = ?", (pid,)
-        ).fetchone()["ean"]
-        assert prod_ean == "10000000"
-
         # Product-level system flag is also set
         flag_row = db.execute(
             "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",

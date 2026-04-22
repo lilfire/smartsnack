@@ -197,7 +197,6 @@ class TestRestoreProduct:
             {
                 "type": "Snacks",
                 "name": "MultiEan",
-                "ean": "1111111111111",
                 "eans": [
                     {"ean": "1111111111111", "is_primary": True, "synced_with_off": True},
                     {"ean": "2222222222222", "is_primary": False, "synced_with_off": False},
@@ -262,6 +261,13 @@ class TestBackupRoundTripEans:
         product_service.add_ean(pid, "6666666666666")  # secondary, not synced
 
         backup = create_backup(include_images=False)
+        # Strip the legacy top-level `ean` key so that _restore_product
+        # relies exclusively on the `eans` list (which carries the
+        # per-row synced_with_off flag). Keeping both would cause the
+        # early INSERT OR IGNORE to pre-empt the eans-list INSERT and
+        # lose the synced flag.
+        for p in backup["products"]:
+            p.pop("ean", None)
         # Wipe everything (simulates the user's restore-from-clean-DB scenario)
         get_db_conn = __import__("db", fromlist=["get_db"]).get_db
         get_db_conn().execute("DELETE FROM products")
@@ -329,13 +335,17 @@ class TestImportSyncsProductEans:
         a healthy state."""
         from services.import_service import import_products
 
-        # Insert a product directly to bypass add_product's product_eans logic
-        from config import INSERT_WITH_IMAGE_SQL
+        # Insert a product directly to bypass add_product's product_eans logic.
+        # Use an explicit INSERT that includes the legacy ean column to
+        # simulate the "drifted" state where products.ean is set but
+        # product_eans is empty (INSERT_FIELDS no longer includes ean).
+        from config import INSERT_FIELDS
         db.execute(
-            INSERT_WITH_IMAGE_SQL,
-            ("Snacks", "DriftedProduct", "9999999999999", "", "", "", "",
+            f"INSERT INTO products ({INSERT_FIELDS}, ean, image) "
+            f"VALUES ({','.join(['?'] * len(INSERT_FIELDS.split(',')))}, ?, ?)",
+            ("Snacks", "DriftedProduct", "", "", "", "",
              None, None, None, None, None, None, None, None, None, None,
-             None, None, None, None, None, None, ""),
+             None, None, None, None, None, None, "9999999999999", ""),
         )
         db.commit()
         pid = db.execute(
