@@ -1,6 +1,6 @@
 // ── Settings: OpenFoodFacts Credentials and Bulk Refresh ──
-import { api, showToast } from './state.js';
-import { t } from './i18n.js';
+import { api, showToast, upgradeSelect } from './state.js';
+import { t, getCurrentLang } from './i18n.js';
 import { loadData } from './products.js';
 
 export async function loadOffCredentials() {
@@ -302,6 +302,14 @@ function _showRefreshOffModal() {
 let _offLangPriority = [];
 let _offAllLangs = [];
 
+/** Map language code to a human-readable name via Intl API, translated to current UI language. */
+function _langName(code) {
+  try {
+    const dn = new Intl.DisplayNames([getCurrentLang()], { type: 'language' });
+    return dn.of(code) || code;
+  } catch { return code; }
+}
+
 function _renderOffLangPriority() {
   const list = document.getElementById('off-lang-priority-list');
   const addSelect = document.getElementById('off-lang-add-select');
@@ -317,9 +325,14 @@ function _renderOffLangPriority() {
     label.textContent = code;
     item.appendChild(label);
 
+    const name = document.createElement('span');
+    name.className = 'off-lang-name';
+    name.textContent = _langName(code);
+    item.appendChild(name);
+
     const upBtn = document.createElement('button');
     upBtn.type = 'button';
-    upBtn.className = 'btn-sm';
+    upBtn.className = 'btn-sm btn-outline';
     upBtn.textContent = '↑';
     upBtn.setAttribute('aria-label', t('off_lang_move_up'));
     upBtn.disabled = idx === 0;
@@ -332,7 +345,7 @@ function _renderOffLangPriority() {
 
     const downBtn = document.createElement('button');
     downBtn.type = 'button';
-    downBtn.className = 'btn-sm';
+    downBtn.className = 'btn-sm btn-outline';
     downBtn.textContent = '↓';
     downBtn.setAttribute('aria-label', t('off_lang_move_down'));
     downBtn.disabled = idx === _offLangPriority.length - 1;
@@ -360,15 +373,16 @@ function _renderOffLangPriority() {
 
   if (addSelect) {
     addSelect.innerHTML = '';
-    const available = _offAllLangs.filter((l) => !_offLangPriority.includes(l.code));
+    const available = _offAllLangs.filter((l) => !_offLangPriority.includes(l));
     available.forEach((l) => {
       const opt = document.createElement('option');
-      opt.value = l.code;
-      opt.textContent = l.name || l.code;
+      opt.value = l;
+      opt.textContent = `${_langName(l)} (${l})`;
       addSelect.appendChild(opt);
     });
     const addBtn = document.getElementById('off-lang-add-btn');
     if (addBtn) addBtn.disabled = available.length === 0;
+    upgradeSelect(addSelect);
   }
 }
 
@@ -376,7 +390,7 @@ async function _saveOffLangPriority() {
   try {
     await api('/api/settings/off-language-priority', {
       method: 'PUT',
-      body: JSON.stringify({ languages: _offLangPriority }),
+      body: JSON.stringify({ priority: _offLangPriority }),
     });
     showToast(t('toast_off_lang_priority_saved'), 'success');
   } catch(e) {
@@ -392,7 +406,7 @@ export async function loadOffLanguagePriority() {
       api('/api/settings/off-language-priority'),
       api('/api/settings/off-languages'),
     ]);
-    _offLangPriority = priority.languages || [];
+    _offLangPriority = priority.priority || [];
     _offAllLangs = langs.languages || [];
     _renderOffLangPriority();
 

@@ -76,8 +76,12 @@ def _convert_for_gemini(image_bytes):
 _DEFAULT_MODEL = "gemini-2.0-flash"
 
 
-def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None):
-    """Use Google Gemini API to extract ingredient text from an image."""
+def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None, prompt=None):
+    """Use Google Gemini API to extract text from an image.
+
+    The `prompt` kwarg selects the extraction task (ingredients vs. nutrition);
+    defaults to _INGREDIENT_PROMPT for backward compatibility.
+    """
     api_key = _get_api_key("GEMINI_API_KEY")
 
     image_bytes, mime_type = _convert_for_gemini(image_bytes)
@@ -96,7 +100,7 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None):
                             "data": image_bytes,
                         }
                     },
-                    {"text": _INGREDIENT_PROMPT},
+                    {"text": prompt or _INGREDIENT_PROMPT},
                 ]
             }
         ],

@@ -14,7 +14,7 @@ export default defineConfig({
     },
     coverage: {
       provider: 'istanbul',
-      exclude: ['coverage/**', '__tests__/**', '**/static/js/static/**'],
+      exclude: ['coverage/**', '__tests__/**', '**/static/js/static/**', 'vendor/**'],
       thresholds: {
         lines: 80,
         functions: 80,

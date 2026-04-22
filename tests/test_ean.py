@@ -84,6 +84,7 @@ class TestListEans:
         assert "id" in ean
         assert ean["ean"] == "12345678"
         assert ean["is_primary"] is True
+        assert ean["synced_with_off"] is False
 
     def test_raises_for_unknown_product(self, app_ctx):
         from services import product_service
@@ -97,6 +98,20 @@ class TestListEans:
         pid = product_service.add_product({"type": "Snacks", "name": "NoEan"})["id"]
         eans = product_service.list_eans(pid)
         assert eans == []
+
+    def test_synced_with_off_reflects_db_state(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "SyncedList", "ean": "12345678", "from_off": True}
+        )["id"]
+        product_service.add_ean(pid, "87654321")  # non-synced secondary
+        eans = product_service.list_eans(pid)
+        assert len(eans) == 2
+        synced = next(e for e in eans if e["ean"] == "12345678")
+        unsynced = next(e for e in eans if e["ean"] == "87654321")
+        assert synced["synced_with_off"] is True
+        assert unsynced["synced_with_off"] is False
 
 
 # ── Service: add_ean ───────────────────────────────────────────────────────────
@@ -140,12 +155,13 @@ class TestAddEan:
         with pytest.raises(ValueError):
             product_service.add_ean(pid, "12345678901234")  # 14 digits — too long
 
-    def test_duplicate_ean_raises_value_error(self, app_ctx):
+    def test_duplicate_ean_on_same_product_is_idempotent(self, app_ctx):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "DupEan", "ean": "12345678"})["id"]
-        with pytest.raises(ValueError, match="ean_already_exists"):
-            product_service.add_ean(pid, "12345678")
+        result = product_service.add_ean(pid, "12345678")
+        assert result["ean"] == "12345678"
+        assert result.get("already_exists") is True
 
     def test_raises_for_unknown_product(self, app_ctx):
         from services import product_service
@@ -241,6 +257,90 @@ class TestDeleteEan:
         pid = product_service.add_product({"type": "Snacks", "name": "UnknownEanId", "ean": "12345678"})["id"]
         with pytest.raises(LookupError):
             product_service.delete_ean(pid, 99999)
+
+    def test_cannot_delete_synced_ean(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "DelSynced", "ean": "11111111", "from_off": True}
+        )["id"]
+        product_service.add_ean(pid, "22222222")  # secondary so count check wouldn't also trip
+        synced_row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        with pytest.raises(ValueError, match="cannot_delete_synced_ean"):
+            product_service.delete_ean(pid, synced_row["id"])
+
+
+# ── Service: unsync_ean ────────────────────────────────────────────────────────
+
+
+class TestUnsyncEanService:
+    def test_unsync_clears_synced_with_off_on_row(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "UnsyncRow", "ean": "11111111", "from_off": True}
+        )["id"]
+        row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        product_service.unsync_ean(pid, row["id"])
+        after = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE id = ?", (row["id"],)
+        ).fetchone()
+        assert after["synced_with_off"] == 0
+
+    def test_unsync_last_synced_ean_clears_product_flag(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "UnsyncLast", "ean": "11111111", "from_off": True}
+        )["id"]
+        row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        product_service.unsync_ean(pid, row["id"])
+        flag = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag is None
+
+    def test_unsync_preserves_flag_when_other_synced_ean_remains(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "UnsyncKeep", "ean": "11111111", "from_off": True}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "22222222")
+        # Mark the secondary EAN as also synced with OFF
+        db.execute(
+            "UPDATE product_eans SET synced_with_off = 1 WHERE id = ?", (ean_b["id"],)
+        )
+        db.commit()
+        row_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        product_service.unsync_ean(pid, row_a["id"])
+        flag = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag is not None
+
+    def test_unsync_raises_for_unknown_ean(self, app_ctx):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "UnsyncUnknown", "ean": "11111111"}
+        )["id"]
+        with pytest.raises(LookupError):
+            product_service.unsync_ean(pid, 99999)
 
 
 # ── Service: set_primary_ean ───────────────────────────────────────────────────
@@ -451,15 +551,39 @@ class TestAddEanBlueprint:
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "abc"})
         assert resp.status_code == 400
 
-    def test_duplicate_ean_returns_409(self, client):
+    def test_duplicate_ean_on_same_product_returns_200(self, client):
         pid = _add_product(client, name="BPDupEan", ean="12345678")
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "12345678"})
-        assert resp.status_code == 409
-        assert resp.get_json()["error"] == "ean_already_exists"
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ean"] == "12345678"
+        assert data.get("already_exists") is True
 
     def test_unknown_product_returns_404(self, client):
         resp = client.post("/api/products/99999/eans", json={"ean": "12345678"})
         assert resp.status_code == 404
+
+    def test_adds_ean_returns_201_when_product_has_is_synced_with_off(self, client, db):
+        """POST /api/products/<pid>/eans returns 201 even when the product is synced with OFF."""
+        pid = _add_product(client, name="SyncedProduct", ean="11111111")
+        # Set is_synced_with_off system flag on the product
+        db.execute(
+            "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, 'is_synced_with_off')",
+            (pid,),
+        )
+        db.commit()
+        # Verify the flag is set
+        row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert row is not None, "is_synced_with_off flag should be set"
+        # Adding a secondary EAN should still succeed with 201
+        resp = client.post(f"/api/products/{pid}/eans", json={"ean": "22222222"})
+        assert resp.status_code == 201
+        data = resp.get_json()
+        assert data["ean"] == "22222222"
+        assert data["is_primary"] is False
 
 
 # ── Blueprint: DELETE /api/products/<pid>/eans/<ean_id> ───────────────────────
@@ -494,6 +618,21 @@ class TestDeleteEanBlueprint:
         pid = _add_product(client, name="BPUnknownEan", ean="11111111")
         resp = client.delete(f"/api/products/{pid}/eans/99999")
         assert resp.status_code == 404
+
+    def test_synced_ean_returns_400_cannot_delete_synced_ean(self, client, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "BPDelSynced", "ean": "11111111", "from_off": True}
+        )["id"]
+        client.post(f"/api/products/{pid}/eans", json={"ean": "22222222"})
+        synced_row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        resp = client.delete(f"/api/products/{pid}/eans/{synced_row['id']}")
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "cannot_delete_synced_ean"
 
     def test_deleting_primary_promotes_next_and_syncs_products_ean(self, client):
         pid = _add_product(client, name="BPPromotion", ean="11111111")
@@ -549,3 +688,245 @@ class TestSetPrimaryEanBlueprint:
         pid = _add_product(client, name="BPUnknownSetPrimary", ean="11111111")
         resp = client.patch(f"/api/products/{pid}/eans/99999/set-primary")
         assert resp.status_code == 404
+
+
+# ── Blueprint: POST /api/products/<pid>/eans/<ean_id>/unsync ──────────────────
+
+
+class TestUnsyncEanBlueprint:
+    def test_unsync_returns_200(self, client, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "BPUnsync", "ean": "11111111", "from_off": True}
+        )["id"]
+        row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        resp = client.post(f"/api/products/{pid}/eans/{row['id']}/unsync")
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+    def test_unsync_clears_row_flag(self, client, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "BPUnsyncRow", "ean": "11111111", "from_off": True}
+        )["id"]
+        row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        client.post(f"/api/products/{pid}/eans/{row['id']}/unsync")
+        after = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE id = ?", (row["id"],)
+        ).fetchone()
+        assert after["synced_with_off"] == 0
+
+    def test_unsync_clears_product_flag_when_last(self, client, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "BPUnsyncProdFlag", "ean": "11111111", "from_off": True}
+        )["id"]
+        row = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        client.post(f"/api/products/{pid}/eans/{row['id']}/unsync")
+        flag = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag is None
+
+    def test_unsync_unknown_ean_returns_404(self, client):
+        pid = _add_product(client, name="BPUnsyncUnknown", ean="11111111")
+        resp = client.post(f"/api/products/{pid}/eans/99999/unsync")
+        assert resp.status_code == 404
+
+
+# ── EAN-scoped OFF sync flag ────────────────────────────────────────────────────
+
+
+class TestEanSyncedWithOff:
+    def test_add_product_from_off_marks_ean_as_synced(self, app_ctx, db):
+        from services import product_service
+
+        result = product_service.add_product(
+            {"type": "Snacks", "name": "FromOffAdd", "ean": "11111111", "from_off": True}
+        )
+        pid = result["id"]
+        row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "11111111"),
+        ).fetchone()
+        assert row is not None
+        assert row["synced_with_off"] == 1
+
+    def test_update_product_from_off_marks_ean_as_synced(self, app_ctx, db):
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "FromOffUpdate", "ean": "22222222"}
+        )["id"]
+        product_service.update_product(pid, {"ean": "22222222", "from_off": True})
+        row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "22222222"),
+        ).fetchone()
+        assert row is not None
+        assert row["synced_with_off"] == 1
+
+    def test_from_off_ean_targets_secondary_without_swapping_primary(self, app_ctx, db):
+        """Fetching OFF for a secondary EAN must mark THAT row as synced and
+        leave the primary designation untouched. The UI sends the primary EAN
+        in `ean` and the fetched EAN in `from_off_ean`."""
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "FromOffSecondary", "ean": "10000000"}
+        )["id"]
+        product_service.add_ean(pid, "20000000")
+
+        product_service.update_product(
+            pid,
+            {"ean": "10000000", "from_off": True, "from_off_ean": "20000000"},
+        )
+
+        # Only the targeted (secondary) EAN is marked synced
+        rows = {
+            r["ean"]: (bool(r["is_primary"]), bool(r["synced_with_off"]))
+            for r in db.execute(
+                "SELECT ean, is_primary, synced_with_off FROM product_eans "
+                "WHERE product_id = ?",
+                (pid,),
+            ).fetchall()
+        }
+        assert rows["10000000"] == (True, False), "primary must stay primary and unsynced"
+        assert rows["20000000"] == (False, True), "secondary must be marked synced"
+
+        # products.ean (the legacy scalar) must still reflect the primary, not the swap
+        prod_ean = db.execute(
+            "SELECT ean FROM products WHERE id = ?", (pid,)
+        ).fetchone()["ean"]
+        assert prod_ean == "10000000"
+
+        # Product-level system flag is also set
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is not None
+
+    def test_from_off_ean_falls_back_to_data_ean_when_absent(self, app_ctx, db):
+        """When from_off_ean is not provided, from_off still marks data.ean."""
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "FromOffFallback", "ean": "30000000"}
+        )["id"]
+        product_service.update_product(
+            pid, {"ean": "30000000", "from_off": True}
+        )
+        row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "30000000"),
+        ).fetchone()
+        assert row["synced_with_off"] == 1
+
+    def test_delete_ean_rejects_synced_ean_and_preserves_flag(self, app_ctx, db):
+        """Deleting a synced EAN is rejected; the product-level flag stays."""
+        from services import product_service
+
+        # Create product with EAN A synced from OFF, plus a non-synced EAN B
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "ClearFlag", "ean": "33333333", "from_off": True}
+        )["id"]
+        product_service.add_ean(pid, "44444444")
+
+        ean_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "33333333"),
+        ).fetchone()
+
+        # Delete of synced EAN A is rejected
+        with pytest.raises(ValueError, match="cannot_delete_synced_ean"):
+            product_service.delete_ean(pid, ean_a["id"])
+
+        # Product flag remains intact since nothing was deleted
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is not None
+
+    def test_delete_ean_rejects_synced_ean_when_another_synced_ean_exists(self, app_ctx, db):
+        """Rejection also applies when the product has multiple synced EANs."""
+        from services import product_service
+
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "KeepFlag", "ean": "55555555", "from_off": True}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "66666666")
+        db.execute(
+            "UPDATE product_eans SET synced_with_off = 1 WHERE id = ?", (ean_b["id"],)
+        )
+        db.commit()
+
+        ean_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "55555555"),
+        ).fetchone()
+
+        with pytest.raises(ValueError, match="cannot_delete_synced_ean"):
+            product_service.delete_ean(pid, ean_a["id"])
+
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is not None
+
+    def test_delete_ean_does_not_clear_off_flag_when_deleted_ean_was_not_synced(self, app_ctx, db):
+        from services import product_service
+
+        # Create product with EAN A synced, EAN B not synced
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "DeleteNotSynced", "ean": "77777777", "from_off": True}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "88888888")
+        # EAN B is NOT synced (synced_with_off = 0 by default)
+
+        # Delete the non-synced EAN B
+        product_service.delete_ean(pid, ean_b["id"])
+
+        # Flag should remain since EAN A is still synced
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is not None
+
+    def test_delete_ean_no_flag_set_when_no_off_eans(self, app_ctx, db):
+        from services import product_service
+
+        # Create product with 2 EANs, neither synced
+        pid = product_service.add_product(
+            {"type": "Snacks", "name": "NoFlagNoSync", "ean": "12312312"}
+        )["id"]
+        ean_b = product_service.add_ean(pid, "32132132")
+
+        # Delete one EAN — flag should still be absent
+        ean_a = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = ?",
+            (pid, "12312312"),
+        ).fetchone()
+        product_service.delete_ean(pid, ean_a["id"])
+
+        flag_row = db.execute(
+            "SELECT 1 FROM product_flags WHERE product_id = ? AND flag = 'is_synced_with_off'",
+            (pid,),
+        ).fetchone()
+        assert flag_row is None

@@ -2,7 +2,7 @@
 
 import os
 
-APP_VERSION = "0.13"
+APP_VERSION = "0.16"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 
@@ -53,6 +53,8 @@ OCR_BACKENDS = {
 DEFAULT_OCR_BACKEND = "tesseract"
 
 DEFAULT_PAGE_SIZE = 50
+
+TAG_LABEL_MAX_LEN = 50
 
 
 TRANSLATIONS_DIR = os.path.join(
@@ -155,6 +157,7 @@ PQ_SEED = [
     ("peanut", 0.52, 0.45),
     ("almond", 0.33, 0.40),
     ("cashew", 0.73, 0.69),
+    ("pistachio", 0.73, 0.65),
     ("sunflower", 0.60, 0.53),
     ("pumpkin_seed", 0.60, 0.51),
     ("hemp", 0.63, 0.66),
@@ -163,6 +166,14 @@ PQ_SEED = [
     ("potato", 0.85, 0.87),
     ("spirulina", 0.99, 0.74),
     ("tofu_tempeh", 0.91, 0.84),
+    ("dates", 0.30, 0.25),
+    ("jackfruit", 0.45, 0.40),
+    ("plantain", 0.35, 0.30),
+    ("tomato", 0.48, 0.42),
+    ("bell_pepper", 0.45, 0.38),
+    ("mustard", 0.75, 0.70),
+    ("cocoa", 0.55, 0.48),
+    ("collagen", 0.08, 0.09),
 ]
 
 

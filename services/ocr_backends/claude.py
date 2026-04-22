@@ -4,8 +4,12 @@ from . import _get_api_key, _INGREDIENT_PROMPT
 _DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
 
-def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=None):
-    """Use Claude Vision API to extract ingredient text from an image."""
+def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=None, prompt=None):
+    """Use Claude Vision API to extract text from an image.
+
+    The `prompt` kwarg selects the extraction task (ingredients vs. nutrition);
+    defaults to _INGREDIENT_PROMPT for backward compatibility.
+    """
     api_key = _get_api_key("ANTHROPIC_API_KEY")
 
     import anthropic
@@ -28,7 +32,7 @@ def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=
                     },
                     {
                         "type": "text",
-                        "text": _INGREDIENT_PROMPT,
+                        "text": prompt or _INGREDIENT_PROMPT,
                     },
                 ],
             }
