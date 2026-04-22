@@ -89,11 +89,12 @@ vi.mock('../images.js', () => ({
   viewProductImage: vi.fn(),
 }));
 
-import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
+import { startEdit, saveProduct, deleteProduct, unlockEan, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
 import { rerender } from '../filters.js';
 import { renderResults, getFlagConfig } from '../render.js';
 import { showDuplicateMergeModal } from '../off-duplicates.js';
+import { initInfiniteScroll } from '../scroll.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -330,6 +331,30 @@ describe('deleteProduct', () => {
     api.mockResolvedValue({});
     console.error.mockRestore();
   });
+
+  it('executes onUndo callback to restore deleted product', async () => {
+    state.cachedResults = [{ id: 1, name: 'Milk' }];
+    showConfirmModal.mockResolvedValue(true);
+
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+
+    // Grab the onUndo callback from the showToast mock
+    const toastCall = showToast.mock.calls.find((c) => c[1] === 'success' && c[2] && c[2].onUndo);
+    expect(toastCall).toBeTruthy();
+    const { onUndo } = toastCall[2];
+
+    // Product should be removed from cachedResults before undo
+    expect(state.cachedResults.find((p) => p.id === 1)).toBeUndefined();
+
+    // Invoke the undo
+    onUndo();
+
+    // Product should be restored
+    expect(state.cachedResults.find((p) => p.id === 1)).toBeTruthy();
+    expect(showToast).toHaveBeenCalledWith('toast_delete_undone', 'info');
+  });
 });
 
 describe('setFilter', () => {
@@ -562,6 +587,42 @@ describe('loadData', () => {
     await loadData();
     expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
     console.error.mockRestore();
+  });
+
+  it('passes a search getter to initInfiniteScroll when more results may exist', async () => {
+    fetchProducts.mockResolvedValue({ products: [{ id: 1 }], total: 100 });
+    state.currentView = 'search';
+
+    // Add a search input so the getter can read it
+    if (!document.getElementById('search-input')) {
+      const si = document.createElement('input');
+      si.id = 'search-input';
+      si.value = 'oat';
+      document.body.appendChild(si);
+    } else {
+      document.getElementById('search-input').value = 'oat';
+    }
+
+    await loadData();
+
+    // initInfiniteScroll should have been called with a function
+    expect(initInfiniteScroll).toHaveBeenCalledWith(expect.any(Function));
+
+    // Invoke the callback to cover lines 258-259
+    const getSearch = initInfiniteScroll.mock.calls[initInfiniteScroll.mock.calls.length - 1][0];
+    const result = getSearch();
+    expect(result).toBe('oat');
+  });
+
+  it('search getter returns empty string when view is not search', async () => {
+    fetchProducts.mockResolvedValue({ products: [{ id: 1 }], total: 100 });
+    state.currentView = 'register'; // not search view
+
+    await loadData();
+
+    const getSearch = initInfiniteScroll.mock.calls[initInfiniteScroll.mock.calls.length - 1][0];
+    const result = getSearch();
+    expect(result).toBe('');
   });
 });
 
@@ -1034,5 +1095,152 @@ describe('collectFormFields with flags', () => {
     expect(body.flags).toContain('vegan');
     expect(body.flags).not.toContain('organic');
     expect(body.flags).not.toContain('computed_flag');
+  });
+});
+
+describe('unlockEan', () => {
+  beforeEach(() => {
+    state.cachedResults = [{ id: 1, name: 'Milk', flags: ['is_synced_with_off'] }];
+    state.imageCache = {};
+  });
+
+  it('calls unsync API and shows success toast', async () => {
+    api.mockResolvedValueOnce({});
+    await unlockEan(1);
+    expect(api).toHaveBeenCalledWith('/api/products/1/unsync', { method: 'POST' });
+    expect(showToast).toHaveBeenCalledWith('toast_ean_unlocked', 'success');
+  });
+
+  it('removes is_synced_with_off flag from cached product', async () => {
+    api.mockResolvedValueOnce({});
+    await unlockEan(1);
+    expect(state.cachedResults[0].flags).not.toContain('is_synced_with_off');
+  });
+
+  it('handles product not in cachedResults gracefully', async () => {
+    api.mockResolvedValueOnce({});
+    await unlockEan(999); // ID not in cachedResults
+    expect(showToast).toHaveBeenCalledWith('toast_ean_unlocked', 'success');
+  });
+
+  it('shows error toast on API failure', async () => {
+    api.mockRejectedValueOnce(new Error('network error'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await unlockEan(1);
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    console.error.mockRestore();
+  });
+
+  it('handles product with no flags array', async () => {
+    state.cachedResults = [{ id: 1, name: 'Milk' }]; // no flags property
+    api.mockResolvedValueOnce({});
+    await unlockEan(1);
+    expect(showToast).toHaveBeenCalledWith('toast_ean_unlocked', 'success');
+  });
+});
+
+describe('registerProduct - OFF prompt branches', () => {
+  let showOffAddReview;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    const offReview = await import('../off-review.js');
+    showOffAddReview = offReview.showOffAddReview;
+
+    const fields = [
+      { tag: 'input', id: 'f-name', value: 'Product With EAN' },
+      { tag: 'select', id: 'f-type', value: 'dairy' },
+      { tag: 'input', id: 'f-ean', value: '1234567890123' },
+      { tag: 'input', id: 'f-brand', value: '' },
+      { tag: 'input', id: 'f-stores', value: '' },
+      { tag: 'textarea', id: 'f-ingredients', value: '' },
+      { tag: 'input', id: 'f-taste_note', value: '' },
+      { tag: 'input', id: 'f-smak', value: '3' },
+      { tag: 'input', id: 'f-kcal', value: '' },
+      { tag: 'input', id: 'f-energy_kj', value: '' },
+      { tag: 'input', id: 'f-fat', value: '' },
+      { tag: 'input', id: 'f-saturated_fat', value: '' },
+      { tag: 'input', id: 'f-carbs', value: '' },
+      { tag: 'input', id: 'f-sugar', value: '' },
+      { tag: 'input', id: 'f-protein', value: '' },
+      { tag: 'input', id: 'f-fiber', value: '' },
+      { tag: 'input', id: 'f-salt', value: '' },
+      { tag: 'input', id: 'f-weight', value: '' },
+      { tag: 'input', id: 'f-portion', value: '' },
+      { tag: 'select', id: 'f-volume', value: '' },
+      { tag: 'input', id: 'f-price', value: '' },
+      { tag: 'input', id: 'f-est_pdcaas', value: '' },
+      { tag: 'input', id: 'f-est_diaas', value: '' },
+      { tag: 'button', id: 'btn-submit', value: '' },
+      { tag: 'span', id: 'smak-val', value: '' },
+      { tag: 'input', id: 'search-input', value: '' },
+      { tag: 'span', id: 'search-clear', value: '' },
+    ];
+    fields.forEach(({ tag, id, value }) => {
+      if (!document.getElementById(id)) {
+        const el = document.createElement(tag);
+        el.id = id;
+        el.value = value;
+        if (tag === 'span') el.textContent = value;
+        document.body.appendChild(el);
+      }
+    });
+    ['search', 'register', 'settings'].forEach((v) => {
+      if (!document.querySelector(`.nav-tab[data-view="${v}"]`)) {
+        const tab = document.createElement('div');
+        tab.className = 'nav-tab';
+        tab.dataset.view = v;
+        document.body.appendChild(tab);
+      }
+    });
+    window._pendingOFFSync = false;
+    window._pendingImage = null;
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    window._pendingOFFSync = false;
+    window._pendingImage = null;
+  });
+
+  it('asks about OFF when EAN present and not from_off, user accepts', async () => {
+    api.mockResolvedValueOnce({ id: 42 });
+    showConfirmModal.mockResolvedValueOnce(true); // wantsOff = true
+    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+
+    const p = registerProduct();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+
+    expect(showOffAddReview).toHaveBeenCalledWith('1234567890123', 'f');
+  });
+
+  it('does not call showOffAddReview when user declines OFF prompt', async () => {
+    api.mockResolvedValueOnce({ id: 42 });
+    showConfirmModal.mockResolvedValueOnce(false); // wantsOff = false
+    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+
+    const p = registerProduct();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+
+    expect(showOffAddReview).not.toHaveBeenCalled();
+  });
+
+  it('does not show OFF prompt when registered from_off', async () => {
+    window._pendingOFFSync = true;
+    api.mockResolvedValueOnce({ id: 42 });
+    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+
+    const p = registerProduct();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+
+    // showConfirmModal may be called for other reasons but showOffAddReview should not
+    expect(showOffAddReview).not.toHaveBeenCalled();
   });
 });
