@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../state.js', () => ({
   api: vi.fn().mockResolvedValue({}),
   showToast: vi.fn(),
+  upgradeSelect: vi.fn(),
 }));
 
-vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
+vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k), getCurrentLang: vi.fn(() => 'en') }));
 
 vi.mock('../products.js', () => ({
   loadData: vi.fn(),
@@ -196,8 +197,8 @@ describe('loadOffLanguagePriority', () => {
 
   it('loads language priority and renders items', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }, { code: 'se', name: 'Swedish' }] });
+    api.mockResolvedValueOnce({ priority: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: ['no', 'en', 'se'] });
 
     await loadOffLanguagePriority();
 
@@ -214,8 +215,8 @@ describe('loadOffLanguagePriority', () => {
 
   it('binds the add button to push a new language', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    api.mockResolvedValueOnce({ priority: ['no'] });
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
 
     await loadOffLanguagePriority();
 
@@ -241,13 +242,13 @@ describe('loadOffLanguagePriority', () => {
 
   it('does not bind add button twice on re-call', async () => {
     setupLangDOM();
+    api.mockResolvedValueOnce({ priority: ['no'] });
     api.mockResolvedValueOnce({ languages: ['no'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }] });
     await loadOffLanguagePriority();
 
     // Second call - button already bound
+    api.mockResolvedValueOnce({ priority: ['no'] });
     api.mockResolvedValueOnce({ languages: ['no'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }] });
     await loadOffLanguagePriority();
 
     const addBtn = document.getElementById('off-lang-add-btn');
@@ -262,13 +263,8 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
       <div id="off-lang-priority-list"></div>
       <select id="off-lang-add-select"></select>
       <button id="off-lang-add-btn"></button>`;
-    api.mockResolvedValueOnce({ languages: priority });
-    api.mockResolvedValueOnce({ languages: [
-      { code: 'no', name: 'Norwegian' },
-      { code: 'en', name: 'English' },
-      { code: 'se', name: 'Swedish' },
-      { code: 'fi', name: 'Finnish' },
-    ]});
+    api.mockResolvedValueOnce({ priority: priority });
+    api.mockResolvedValueOnce({ languages: ['no', 'en', 'se', 'fi'] });
     await loadOffLanguagePriority();
   }
 
@@ -362,8 +358,8 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
       <div id="off-lang-priority-list"></div>
       <select id="off-lang-add-select"></select>
       <button id="off-lang-add-btn"></button>`;
+    api.mockResolvedValueOnce({ priority: ['no', 'en'] });
     api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
     await loadOffLanguagePriority();
 
     const addBtn = document.getElementById('off-lang-add-btn');

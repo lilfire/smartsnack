@@ -1214,7 +1214,7 @@ describe('registerProduct - OFF prompt branches', () => {
     await vi.advanceTimersByTimeAsync(0);
     await p;
 
-    expect(showOffAddReview).toHaveBeenCalledWith('1234567890123', 'f');
+    expect(showOffAddReview).toHaveBeenCalledWith('1234567890123', 'f', 42);
   });
 
   it('does not call showOffAddReview when user declines OFF prompt', async () => {
