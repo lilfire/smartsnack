@@ -649,6 +649,35 @@
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ── Settings: OFF Language Priority ────────────── */
+.off-lang-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.off-lang-item + .off-lang-item {
+  margin-top: 4px;
+}
+
+.off-lang-code {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e6e3;
+  min-width: 28px;
+  font-family: 'Space Mono', monospace;
+}
+
+.off-lang-name {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
 /* ── OCR fallback transition ────────────────────── */
 #ocr-fallback-wrapper {
   overflow: hidden;

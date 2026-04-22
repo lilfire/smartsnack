@@ -4,6 +4,65 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.16.0] - 2026-04-11
+
+### Added
+
+- OCR nutrition autofill: scan a nutrition label to auto-populate per-100g fields on the product registration form
+- Product image upload to Open Food Facts when submitting a new product, with local record marked as synced
+
+## [0.15.0] - 2026-04-10
+
+### Added
+
+- Product image capture and preview on the registration form
+- Collagen as a recognized protein source
+- 20+ new protein source keywords: pistachio, dates, jackfruit, plantain, tomato, bell pepper, mustard, cocoa, and expanded Norwegian compound keywords for meat, dairy, wheat, milk, and chickpea ingredients
+
+### Changed
+
+- Self-hosted fonts and vendor JavaScript to remove all external CDN dependencies
+- OFF language dropdown is now searchable with language names translated to current UI language
+- OFF language priority now applies to product name and ingredients sync
+
+### Fixed
+
+- OFF language priority dropdown not aligned with backend API contract
+- OFF language dropdown missing CSS styling and language names
+- Empty OFF language dropdown after dynamic population
+- Cramped OFF refresh report modal layout on desktop
+
+## [0.14.0] - 2026-04-10
+
+### Added
+
+- Tag system with shared tag entities, CRUD API, chips UI with autocomplete/suggestions, and per-product assignment
+- Multi-backend OCR: 6 providers (Tesseract, Claude Vision, Gemini, GPT-4 Vision, OpenRouter, Groq) with per-provider model selection
+- OCR settings UI for choosing provider, model, and fallback preference
+- Per-EAN management: products can have multiple EANs, each with independent OFF sync tracking, add/delete, set-primary, and per-EAN OFF fetch/unlock
+- Pagination with limit/offset on product list API and infinite scroll on frontend
+- OFF language priority: configurable language preference order for Open Food Facts data fetching
+- Flashlight/torch toggle button for barcode scanner on mobile
+- Structured OCR error responses with categorized error types (token limit, quota, timeout, invalid image, no text)
+- Rate limiting via Flask-Limiter (200/min global, 10/min on OCR endpoint)
+- GitHub Actions CI: pytest + coverage, vitest + coverage, Docker build, smoke test, and branch name enforcement
+- `.env.example` with all supported environment variables
+- Tag and EAN data included in backup/restore with legacy fallback support
+- 50+ new translation keys for tags, OCR, EAN management, and OFF language settings
+
+### Changed
+
+- Product list API now returns `{products, total}` instead of a flat array
+- Tag schema reimplemented from text-based tags to integer FK schema (tags + product_tags tables)
+- OCR service redesigned with provider registry and automatic fallback to Tesseract
+
+### Refactored
+
+- Product service split into focused modules: product_crud, product_eans, product_scoring, product_filters, product_duplicate
+- Backup service split into backup_core and import_service
+- `openfoodfacts.js` split into 6 modules: off-api, off-conflicts, off-duplicates, off-picker, off-review, off-utils
+- `settings.js` split into 7 modules: settings-backup, settings-categories, settings-flags, settings-ocr, settings-off, settings-pq, settings-weights
+
 ## [0.13.0] - 2026-03-23
 
 ### Changed

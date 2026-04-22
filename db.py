@@ -162,6 +162,40 @@ def _init_schema(cur, conn):
         )
     """)
 
+    # ── EAN sync triggers ─────────────────────────────────
+    # Keep products.ean in sync with the primary row in product_eans.
+    cur.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_ean_insert_sync
+        AFTER INSERT ON product_eans
+        FOR EACH ROW
+        WHEN NEW.is_primary = 1
+        BEGIN
+            UPDATE products SET ean = NEW.ean WHERE id = NEW.product_id;
+        END
+    """)
+    cur.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_ean_update_sync
+        AFTER UPDATE ON product_eans
+        FOR EACH ROW
+        BEGIN
+            UPDATE products SET ean = COALESCE(
+                (SELECT ean FROM product_eans WHERE product_id = NEW.product_id AND is_primary = 1),
+                ''
+            ) WHERE id = NEW.product_id;
+        END
+    """)
+    cur.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_ean_delete_sync
+        AFTER DELETE ON product_eans
+        FOR EACH ROW
+        BEGIN
+            UPDATE products SET ean = COALESCE(
+                (SELECT ean FROM product_eans WHERE product_id = OLD.product_id AND is_primary = 1),
+                ''
+            ) WHERE id = OLD.product_id;
+        END
+    """)
+
     # ── User settings (key-value store) ──────────────────
     cur.execute("""
         CREATE TABLE IF NOT EXISTS user_settings (
@@ -177,18 +211,30 @@ def _init_schema(cur, conn):
         )
 
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS product_tags (
-            product_id INTEGER NOT NULL,
-            tag        TEXT    NOT NULL COLLATE NOCASE,
-            PRIMARY KEY (product_id, tag),
-            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS tags (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT    NOT NULL UNIQUE COLLATE NOCASE
         )
     """)
-    cur.execute(
-        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag ON product_tags(tag COLLATE NOCASE)"
-    )
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS product_tags (
+            product_id INTEGER NOT NULL,
+            tag_id     INTEGER NOT NULL,
+            PRIMARY KEY (product_id, tag_id),
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id)     REFERENCES tags(id)     ON DELETE CASCADE
+        )
+    """)
+    # NOTE: Indexes on product_tags(tag_id) and tags(label) are created by
+    # migration 009_tag_system_reimplementation, which also handles schema
+    # migration for existing databases with the old product_tags(tag TEXT) schema.
+    # Do NOT create idx_product_tags_tag_id here — that column may not exist yet
+    # on existing databases and would cause an OperationalError before migrations run.
 
     run_migrations(cur)
+
+    _repair_ean_mismatches(cur)
 
     cur.execute("SELECT COUNT(*) FROM products")
     if cur.fetchone()[0] == 0:
@@ -244,3 +290,22 @@ def seed_products(cur):
         INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
         SELECT id, ean, 1 FROM products WHERE ean != ''
     """)
+
+
+def _repair_ean_mismatches(cur):
+    """Detect and fix any rows where products.ean differs from the primary product_eans entry.
+
+    Returns the number of rows corrected. Called once at startup after migrations run.
+    """
+    cur.execute("""
+        UPDATE products
+        SET ean = COALESCE(
+            (SELECT ean FROM product_eans WHERE product_id = products.id AND is_primary = 1),
+            ''
+        )
+        WHERE ean != COALESCE(
+            (SELECT ean FROM product_eans WHERE product_id = products.id AND is_primary = 1),
+            ''
+        )
+    """)
+    return cur.rowcount

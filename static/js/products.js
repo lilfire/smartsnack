@@ -9,7 +9,9 @@ import { showEditDuplicateModal, showMergeConflictModal } from './off-conflicts.
 import { showDuplicateMergeModal } from './off-duplicates.js';
 import { showOffAddReview } from './off-review.js';
 import { initTagInput, getTagsForSave } from './tags.js';
-export { loadEanManager, addEan, deleteEan, setEanPrimary } from './ean-manager.js';
+import { loadEanManager } from './ean-manager.js';
+import { clearPendingImage } from './images.js';
+export { loadEanManager, addEan, deleteEan, setEanPrimary, unsyncEan } from './ean-manager.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -46,7 +48,7 @@ function collectFormFields(prefix) {
       if (cb && cb.checked) acc.push(f);
       return acc;
     }, []),
-    ...(prefix === 'ed' ? { tags: getTagsForSave() } : {}),
+    ...(prefix === 'ed' ? { tagIds: getTagsForSave() } : {}),
   };
 }
 
@@ -60,14 +62,22 @@ export function startEdit(id) {
       const firstInput = form.querySelector('#ed-name');
       if (firstInput) firstInput.focus();
     }
-    const product = state.cachedResults && state.cachedResults.find(p => p.id === id);
-    initTagInput(product ? (product.tags || []) : []);
   });
 }
 
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
-  if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
+  if (window._pendingOFFSync) {
+    data.from_off = true;
+    window._pendingOFFSync = null;
+    // If the OFF fetch targeted a specific (possibly non-primary) EAN, pass
+    // it through so the backend marks THAT row as synced without swapping
+    // which EAN is primary.
+    if (window._pendingOFFEan) {
+      data.from_off_ean = window._pendingOFFEan;
+      window._pendingOFFEan = null;
+    }
+  }
   const offAppliedFields = window._offAppliedFields; window._offAppliedFields = null;
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
@@ -156,10 +166,13 @@ export async function saveProduct(id) {
 export async function unlockEan(id) {
   try {
     await api('/api/products/' + id + '/unsync', { method: 'POST' });
-    // Update cached product to remove the flag
     const p = state.cachedResults.find(x => x.id === id);
     if (p) p.flags = (p.flags || []).filter(f => f !== 'is_synced_with_off');
-    rerender();
+    const mgr = document.getElementById('ean-manager-' + id);
+    if (mgr) mgr.dataset.locked = '0';
+    const unlockBtn = document.querySelector('[data-action="unlock-ean"][data-id="' + id + '"]');
+    if (unlockBtn) unlockBtn.style.display = 'none';
+    await loadEanManager(id, false);
     showToast(t('toast_ean_unlocked'), 'success');
   } catch (e) {
     console.error(e);
@@ -444,7 +457,7 @@ export async function registerProduct() {
         t('btn_yes'), t('btn_no')
       );
       if (wantsOff) {
-        await showOffAddReview(ean, 'f');
+        await showOffAddReview(ean, 'f', newProductId);
       }
     }
     document.getElementById('f-name').value = '';
@@ -459,6 +472,7 @@ export async function registerProduct() {
     if (pqw) pqw.style.display = 'none';
     const pqr = document.getElementById('f-pq-result');
     if (pqr) pqr.style.display = 'none';
+    clearPendingImage('f');
     // Lazy import to avoid circular dep
     import('./off-utils.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
     NUTRI_IDS.forEach((id) => { document.getElementById('f-' + id).value = ''; });

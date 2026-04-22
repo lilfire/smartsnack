@@ -100,11 +100,7 @@ def _get_products(live_url: str) -> list:
         method="GET",
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read())
-    # Handle paginated response format {products: [...], total: N}
-    if isinstance(data, dict) and "products" in data:
-        return data["products"]
-    return data
+        return json.loads(resp.read())["products"]
 
 
 def _reload_and_wait(page) -> None:

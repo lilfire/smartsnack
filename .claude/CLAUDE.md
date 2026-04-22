@@ -31,6 +31,9 @@ All new code must maintain a minimum **80% test coverage** for both backend and 
 - `config.py` — All constants: nutrition fields, valid columns, score config, text limits, SQL fragments
 - `db.py` — SQLite connection (`get_db()`/`close_db()`), schema init with seed data
 - `helpers.py` — Request parsing and validation (`_require_json`, `_num`, `_validate_keywords`)
+- `extensions.py` — Flask extensions (rate limiter)
+- `exceptions.py` — Custom exception types (`ConflictError`)
+- `migrations.py` — Idempotent schema migrations tracked in `schema_migrations` table
 - `translations.py` — i18n system, reads/writes JSON files in `translations/`
 - `blueprints/` — Route handlers, one file per domain. Each exports a `bp` Blueprint, registered in `blueprints/__init__.py` via `register_blueprints()`
 - `services/` — Business logic, one file per domain. Blueprints call service functions; services call `get_db()`
@@ -46,7 +49,7 @@ All new code must maintain a minimum **80% test coverage** for both backend and 
 - **New blueprints**: Define `bp = Blueprint("name", __name__)`, then import and register in `blueprints/__init__.py`.
 - **API responses**: All routes return JSON via `jsonify()`. Errors return `{"error": "message"}` with appropriate HTTP status.
 - **Database**: Use `get_db()` from `db.py`. Parameterized queries only — never string-interpolate user values. Dynamic column names must be validated against `config.py` constants. No ORM.
-- **No migrations**: Schema is in `init_db()` in `db.py` using `CREATE TABLE IF NOT EXISTS`. New columns need `ALTER TABLE` logic there.
+- **Migrations**: Initial schema is in `init_db()` in `db.py` using `CREATE TABLE IF NOT EXISTS`. Ongoing schema changes go in `migrations.py` as named, idempotent migration entries tracked in a `schema_migrations` table.
 - **Config-driven**: Nutrition fields, valid columns, text limits, and score config are centralized in `config.py`. Do not hardcode elsewhere.
 - **Naming**: Internal helpers use leading underscore (`_require_json`, `_num`). Public service functions do not.
 - **Frontend**: Vanilla JavaScript, no frameworks, no bundler. Modular files in `static/js/`.
@@ -55,7 +58,7 @@ All new code must maintain a minimum **80% test coverage** for both backend and 
 
 ## Scoring Formula
 
-The total score formula in `_score_product` (`services/product_service.py`) is intentional — **do not change it**.
+The total score formula in `_score_product` (`services/product_scoring.py`) is intentional — **do not change it**.
 
 - Each field's score `s` is 0–100 (normalized via minmax or direct formula).
 - `scores[field] = s * weight / 100` — the field's weighted contribution.

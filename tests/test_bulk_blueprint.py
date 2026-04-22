@@ -404,24 +404,37 @@ class TestMapOffProduct:
         updates = _map_off_product(product, self._local())
         assert updates.get("name") == "Norsk navn"
 
-    def test_falls_back_to_product_name_when_no_norwegian(self):
+    def test_no_fallback_when_top_priority_missing(self):
+        """When the #1 priority language has no name, don't fall back."""
         from services.bulk_service import _map_off_product
 
         product = {"product_name": "English name", "nutriments": {}}
-        updates = _map_off_product(product, self._local())
+        updates = _map_off_product(product, self._local(), priority=["no"])
+        assert "name" not in updates
+
+    def test_uses_explicit_priority_language(self):
+        """When an explicit priority is given, use that language."""
+        from services.bulk_service import _map_off_product
+
+        product = {
+            "product_name_en": "English name",
+            "product_name_no": "Norsk navn",
+            "nutriments": {},
+        }
+        updates = _map_off_product(product, self._local(), priority=["en"])
         assert updates.get("name") == "English name"
 
     def test_name_is_stripped(self):
         from services.bulk_service import _map_off_product
 
-        product = {"product_name": "  Chips  ", "nutriments": {}}
+        product = {"product_name_no": "  Chips  ", "nutriments": {}}
         updates = _map_off_product(product, self._local())
         assert updates["name"] == "Chips"
 
     def test_empty_name_not_written(self):
         from services.bulk_service import _map_off_product
 
-        product = {"product_name": "", "nutriments": {}}
+        product = {"product_name_no": "", "nutriments": {}}
         updates = _map_off_product(product, self._local())
         assert "name" not in updates
 
@@ -487,19 +500,25 @@ class TestMapOffProduct:
         updates = _map_off_product(product, self._local())
         assert updates.get("ingredients") == "Mais, olje"
 
-    def test_falls_back_to_english_ingredients(self):
+    def test_ingredients_no_fallback_when_top_priority_missing(self):
+        """When the #1 priority language has no ingredients, don't fall back."""
         from services.bulk_service import _map_off_product
 
         product = {"ingredients_text_en": "Corn, oil", "nutriments": {}}
-        updates = _map_off_product(product, self._local())
-        assert updates.get("ingredients") == "Corn, oil"
+        updates = _map_off_product(product, self._local(), priority=["no"])
+        assert "ingredients" not in updates
 
-    def test_falls_back_to_generic_ingredients_text(self):
+    def test_ingredients_uses_explicit_priority_language(self):
+        """When an explicit priority is given, use that language for ingredients."""
         from services.bulk_service import _map_off_product
 
-        product = {"ingredients_text": "Generic ingredients", "nutriments": {}}
-        updates = _map_off_product(product, self._local())
-        assert updates.get("ingredients") == "Generic ingredients"
+        product = {
+            "ingredients_text_en": "Corn, oil",
+            "ingredients_text_no": "Mais, olje",
+            "nutriments": {},
+        }
+        updates = _map_off_product(product, self._local(), priority=["en"])
+        assert updates.get("ingredients") == "Corn, oil"
 
     # ── weight ────────────────────────────────────────────────────────────────
 
