@@ -94,3 +94,158 @@ class TestSeedProducts:
             "SELECT image FROM products WHERE name='Classic Popcorn'"
         ).fetchone()
         assert row["image"].startswith("data:image/png")
+
+
+class TestEanSyncTriggers:
+    """Verify that the SQLite triggers keep products.ean in sync with product_eans."""
+
+    def _insert_product(self, db, name, ean=""):
+        db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES ('Snacks', ?, ?, '')",
+            (name, ean),
+        )
+        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    def test_insert_primary_ean_syncs_products_ean(self, db):
+        pid = self._insert_product(db, "TriggerInsert")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '12345678', 1)",
+            (pid,),
+        )
+        db.commit()
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == "12345678"
+
+    def test_insert_non_primary_ean_does_not_change_products_ean(self, db):
+        pid = self._insert_product(db, "TriggerNonPrimary", "11111111")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '11111111', 1)",
+            (pid,),
+        )
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '22222222', 0)",
+            (pid,),
+        )
+        db.commit()
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == "11111111"
+
+    def test_update_primary_ean_value_syncs_products_ean(self, db):
+        pid = self._insert_product(db, "TriggerUpdateValue")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '11111111', 1)",
+            (pid,),
+        )
+        db.execute(
+            "UPDATE product_eans SET ean = '99999999' WHERE product_id = ? AND is_primary = 1",
+            (pid,),
+        )
+        db.commit()
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == "99999999"
+
+    def test_demote_primary_clears_products_ean(self, db):
+        pid = self._insert_product(db, "TriggerDemote")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '11111111', 1)",
+            (pid,),
+        )
+        db.execute(
+            "UPDATE product_eans SET is_primary = 0 WHERE product_id = ?", (pid,)
+        )
+        db.commit()
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == ""
+
+    def test_delete_primary_row_clears_products_ean(self, db):
+        pid = self._insert_product(db, "TriggerDeletePrimary")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '11111111', 1)",
+            (pid,),
+        )
+        db.execute("DELETE FROM product_eans WHERE product_id = ?", (pid,))
+        db.commit()
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == ""
+
+    def test_delete_secondary_row_does_not_change_products_ean(self, db):
+        pid = self._insert_product(db, "TriggerDeleteSecondary")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '11111111', 1)",
+            (pid,),
+        )
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '22222222', 0)",
+            (pid,),
+        )
+        sec_id = db.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND ean = '22222222'", (pid,)
+        ).fetchone()[0]
+        db.execute("DELETE FROM product_eans WHERE id = ?", (sec_id,))
+        db.commit()
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == "11111111"
+
+    def test_triggers_exist_in_schema(self, db):
+        triggers = {
+            r[0]
+            for r in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='trigger'"
+            ).fetchall()
+        }
+        assert "trg_ean_insert_sync" in triggers
+        assert "trg_ean_update_sync" in triggers
+        assert "trg_ean_delete_sync" in triggers
+
+
+class TestRepairEanMismatches:
+    """Verify startup repair of pre-existing products.ean mismatches."""
+
+    def _insert_product(self, db, name, ean=""):
+        db.execute(
+            "INSERT INTO products (type, name, ean, image) VALUES ('Snacks', ?, ?, '')",
+            (name, ean),
+        )
+        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+
+    def test_repairs_mismatch(self, db):
+        from db import _repair_ean_mismatches
+
+        pid = self._insert_product(db, "RepairTest")
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, '12345678', 1)",
+            (pid,),
+        )
+        # Artificially introduce mismatch by directly updating products.ean
+        db.execute("UPDATE products SET ean = 'wrongean' WHERE id = ?", (pid,))
+        db.commit()
+
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == "wrongean"
+
+        count = _repair_ean_mismatches(db.cursor())
+        db.commit()
+
+        assert count >= 1
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == "12345678"
+
+    def test_no_mismatches_returns_zero(self, db):
+        from db import _repair_ean_mismatches
+
+        count = _repair_ean_mismatches(db.cursor())
+        assert count == 0
+
+    def test_clears_ean_when_no_primary_row_exists(self, db):
+        from db import _repair_ean_mismatches
+
+        pid = self._insert_product(db, "OrphanEan", "orphanvalue")
+        # No product_eans row — products.ean should be cleared
+        db.commit()
+
+        count = _repair_ean_mismatches(db.cursor())
+        db.commit()
+
+        assert count >= 1
+        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        assert row["ean"] == ""
