@@ -1402,6 +1402,64 @@ describe('scanPickerSearch brand vs no brand products', () => {
   });
 });
 
+describe('onSearchScanDetected first-pass checks both ean and eans', () => {
+  function makeScanner(captureRef) {
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      captureRef.fn = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = { EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3 };
+    navigator.vibrate = vi.fn();
+  }
+
+  function setupSearchDom() {
+    ['search-input', 'search-clear', 'filter-row', 'filter-toggle'].forEach((id) => {
+      const el = document.createElement(id === 'search-input' ? 'input' : 'div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+  }
+
+  it('finds product via legacy ean field when eans array is empty', async () => {
+    const ref = {};
+    makeScanner(ref);
+    setupSearchDom();
+    state.currentView = 'search';
+    // product.eans is an empty array — legacy ean must still match
+    const product = { id: 20, name: 'LegacyProduct', type: 'dairy', ean: '7038010055720', eans: [] };
+    fetchProducts.mockResolvedValueOnce([product]);
+    fetchProducts.mockResolvedValueOnce([product]);
+    openSearchScanner();
+    await vi.waitFor(() => { expect(ref.fn).toBeDefined(); });
+    ref.fn('7038010055720');
+    await vi.waitFor(() => { expect(buildFilters).toHaveBeenCalled(); });
+    expect(state.currentFilter).toEqual(['dairy']);
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('finds product via legacy ean field when eans array exists but does not contain the scanned code', async () => {
+    const ref = {};
+    makeScanner(ref);
+    setupSearchDom();
+    state.currentView = 'search';
+    // eans only has a secondary EAN; primary is in ean field only
+    const product = { id: 21, name: 'MixedProduct', type: 'snack', ean: '7038010069307', eans: ['5000000000001'] };
+    fetchProducts.mockResolvedValueOnce([product]);
+    fetchProducts.mockResolvedValueOnce([product]);
+    openSearchScanner();
+    await vi.waitFor(() => { expect(ref.fn).toBeDefined(); });
+    ref.fn('7038010069307');
+    await vi.waitFor(() => { expect(buildFilters).toHaveBeenCalled(); });
+    expect(state.currentFilter).toEqual(['snack']);
+    fetchProducts.mockResolvedValue([]);
+  });
+});
+
 describe('onSearchScanDetected secondary EAN match', () => {
   it('identifies product when scanned barcode matches a secondary EAN in eans array', async () => {
     let capturedOnSuccess;
