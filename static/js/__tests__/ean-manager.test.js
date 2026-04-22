@@ -547,15 +547,13 @@ describe('EAN manager event delegation', () => {
 
   it('triggers fetch-ean-off when OFF button is clicked', async () => {
     await renderList(MOCK_EANS_TWO);
-    api.mockResolvedValueOnce({}); // set-primary PATCH
-    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload after set-primary
     const { lookupOFF } = await import('../off-api.js');
 
     const btn = document.querySelector('[data-ean-action="fetch-ean-off"]');
     expect(btn).not.toBeNull();
     btn.click();
     await vi.runAllTimersAsync();
-    expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID);
+    expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID, { ean: '7038010069307' });
   });
 
   it('triggers addEan when add-ean button is clicked', async () => {
@@ -611,6 +609,5 @@ describe('EAN manager event delegation', () => {
     await vi.runAllTimersAsync();
     // No api calls beyond the initial loadEanManager
     expect(api).not.toHaveBeenCalled();
-  });
   });
 });
