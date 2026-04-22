@@ -202,13 +202,15 @@ class TestDeleteEan:
         assert len(eans) == 1
         assert eans[0]["ean"] == "12345678"
 
-    def test_products_ean_unchanged_after_deleting_secondary(self, app_ctx, db):
+    def test_primary_ean_unchanged_after_deleting_secondary(self, app_ctx, db):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "UnchangedEan", "ean": "12345678"})["id"]
         sec = product_service.add_ean(pid, "87654321")
         product_service.delete_ean(pid, sec["id"])
-        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        row = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+        ).fetchone()
         assert row["ean"] == "12345678"
 
     def test_deleting_primary_promotes_lowest_id(self, app_ctx, db):
@@ -229,7 +231,7 @@ class TestDeleteEan:
         lowest_remaining_id = min(e["id"] for e in eans)
         assert new_primary["id"] == lowest_remaining_id
 
-    def test_deleting_primary_syncs_products_ean(self, app_ctx, db):
+    def test_deleting_primary_promotes_new_primary_in_product_eans(self, app_ctx, db):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "SyncEan", "ean": "11111111"})["id"]
@@ -240,7 +242,9 @@ class TestDeleteEan:
         ).fetchone()
         product_service.delete_ean(pid, primary_row["id"])
 
-        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        row = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+        ).fetchone()
         assert row["ean"] == "22222222"
 
     def test_cannot_remove_only_ean(self, app_ctx):
@@ -371,14 +375,16 @@ class TestSetPrimaryEan:
         old = next(e for e in eans if e["id"] == old_primary_id)
         assert old["is_primary"] is False
 
-    def test_syncs_products_ean(self, app_ctx, db):
+    def test_set_primary_updates_product_eans(self, app_ctx, db):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "SyncPrimary", "ean": "11111111"})["id"]
         sec = product_service.add_ean(pid, "22222222")
         product_service.set_primary_ean(pid, sec["id"])
 
-        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        row = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+        ).fetchone()
         assert row["ean"] == "22222222"
 
     def test_raises_for_unknown_ean_id(self, app_ctx):
@@ -598,7 +604,7 @@ class TestDeleteEanBlueprint:
         assert resp.status_code == 200
         assert resp.get_json()["ok"] is True
 
-    def test_products_ean_unchanged_after_deleting_secondary(self, client):
+    def test_primary_ean_unchanged_after_deleting_secondary(self, client):
         pid = _add_product(client, name="BPUnchanged", ean="11111111")
         add_resp = client.post(f"/api/products/{pid}/eans", json={"ean": "22222222"})
         ean_id = add_resp.get_json()["id"]
@@ -806,12 +812,6 @@ class TestEanSyncedWithOff:
         }
         assert rows["10000000"] == (True, False), "primary must stay primary and unsynced"
         assert rows["20000000"] == (False, True), "secondary must be marked synced"
-
-        # products.ean (the legacy scalar) must still reflect the primary, not the swap
-        prod_ean = db.execute(
-            "SELECT ean FROM products WHERE id = ?", (pid,)
-        ).fetchone()["ean"]
-        assert prod_ean == "10000000"
 
         # Product-level system flag is also set
         flag_row = db.execute(

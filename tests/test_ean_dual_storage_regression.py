@@ -27,11 +27,13 @@ class TestLegacyEanOnlyInProductsTable:
     def test_search_finds_product_after_backfill(self, client, db):
         """Simulate a legacy product missing its product_eans row, run the
         backfill migration SQL, and verify search finds it by EAN."""
-        # Create a product normally (creates both products.ean and product_eans)
+        # Create a product normally (creates product_eans row)
         pid = _add_product(client, name="LegacyEanProduct", ean="99887766")
 
-        # Remove the product_eans row to simulate pre-migration state
+        # Remove the product_eans row and set products.ean to simulate
+        # pre-migration state (legacy column populated, no product_eans row)
         db.execute("DELETE FROM product_eans WHERE product_id = ?", (pid,))
+        db.execute("UPDATE products SET ean = ? WHERE id = ?", ("99887766", pid))
         db.commit()
 
         # Verify the product_eans row is gone
@@ -68,8 +70,9 @@ class TestLegacyEanOnlyInProductsTable:
         """Backfilled product_eans row must have is_primary=1."""
         pid = _add_product(client, name="BackfillPrimary", ean="11223344")
 
-        # Remove the product_eans row
+        # Remove the product_eans row and set legacy products.ean
         db.execute("DELETE FROM product_eans WHERE product_id = ?", (pid,))
+        db.execute("UPDATE products SET ean = ? WHERE id = ?", ("11223344", pid))
         db.commit()
 
         # Backfill
@@ -122,8 +125,10 @@ class TestLegacyEanOnlyInProductsTable:
         """Running the backfill twice should not create duplicate rows."""
         pid = _add_product(client, name="IdempotentBackfill", ean="55667788")
 
-        # Remove and backfill
+        # Remove product_eans row and set legacy products.ean to simulate
+        # pre-migration state
         db.execute("DELETE FROM product_eans WHERE product_id = ?", (pid,))
+        db.execute("UPDATE products SET ean = ? WHERE id = ?", ("55667788", pid))
         db.commit()
 
         backfill_sql = """INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
