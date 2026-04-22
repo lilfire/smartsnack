@@ -72,8 +72,8 @@ vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn().mockResolvedValue({}),
 }));
 
-import { loadEanManager, addEan } from '../ean-manager.js';
-import { api } from '../state.js';
+import { loadEanManager, addEan, deleteEan, setEanPrimary } from '../ean-manager.js';
+import { api, showToast } from '../state.js';
 import { lookupOFF } from '../off-api.js';
 
 const PRODUCT_ID = 42;
@@ -479,5 +479,117 @@ describe('_fetchEanOff click behaviour', () => {
       { ean: '7038010069307' }
     );
     expect(window._pendingOFFEan).toBe('7038010069307');
+  });
+});
+
+// ── Event delegation in rendered EAN list ────────────
+
+describe('EAN manager event delegation', () => {
+  it('clicking set-primary button calls setEanPrimary', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({});
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    const btn = document.querySelector('[data-ean-action="set-primary"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/2/set-primary',
+        { method: 'PATCH' }
+      );
+    });
+  });
+
+  it('clicking delete button calls deleteEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({});
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+
+    // First delete button is for the primary EAN (id=1)
+    const btn = document.querySelector('[data-ean-action="delete-ean"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/1',
+        { method: 'DELETE' }
+      );
+    });
+  });
+
+  it('clicking fetch-ean-off button triggers lookupOFF with the EAN value', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    expect(offBtn).not.toBeNull();
+    offBtn.click();
+
+    await vi.waitFor(() => {
+      expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID, { ean: offBtn.dataset.eanValue });
+    });
+  });
+
+  it('clicking area without data-ean-action does nothing', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    container.click();
+
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('pressing Enter in add input triggers addEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
+    addInput.value = '5000000000001';
+
+    api.mockResolvedValueOnce({ id: 3, ean: '5000000000001', is_primary: false });
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    addInput.dispatchEvent(enterEvent);
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans',
+        { method: 'POST', body: JSON.stringify({ ean: '5000000000001' }) }
+      );
+    });
+    // Wait for addEan's full async chain (loadEanManager reload + showToast)
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('pressing non-Enter key in add input does not trigger addEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
+    addInput.value = '5000000000001';
+
+    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    addInput.dispatchEvent(tabEvent);
+
+    expect(api).not.toHaveBeenCalled();
   });
 });
