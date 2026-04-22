@@ -46,6 +46,17 @@ def _ensure_browsers():
 
 
 @pytest.fixture(scope="session")
+def browser(launch_browser):
+    """Launch browser, skipping all browser-based tests if unavailable."""
+    try:
+        b = launch_browser()
+    except Exception as exc:
+        pytest.skip(f"Browser unavailable in this environment: {exc}")
+    yield b
+    b.close()
+
+
+@pytest.fixture(scope="session")
 def app_server(tmp_path_factory):
     """Start a live Flask dev server in a background thread.
 

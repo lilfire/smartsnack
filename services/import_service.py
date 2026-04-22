@@ -313,7 +313,7 @@ def import_products(
                     existing_cats.add(cat)
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
-            ean = p.get("ean", "").strip()
+            ean = (p.get("ean") or "").strip()
             name = p.get("name", "").strip()
             existing_id = None
             if match_criteria in ("ean", "both") and ean:
