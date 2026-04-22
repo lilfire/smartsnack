@@ -252,6 +252,20 @@ describe('Add EAN', () => {
     expect(errorEl.style.display).toBe('');
   });
 
+  it('handles idempotent 200 response without showing an error', async () => {
+    await setupRenderedManager();
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '7038010069307'; // Same EAN already on this product
+    // API returns 200 (idempotent success — same-product duplicate)
+    api.mockResolvedValueOnce({ id: 1, ean: '7038010069307', is_primary: true });
+    api.mockResolvedValueOnce(MOCK_EANS_ONE);
+    await addEan(PRODUCT_ID);
+    const errorEl = document.getElementById('ean-error-' + PRODUCT_ID);
+    expect(errorEl.style.display).toBe('none');
+    expect(showToast).toHaveBeenCalledWith('toast_ean_added', 'success');
+    expect(showToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
   it('does nothing when input is empty', async () => {
     await setupRenderedManager();
 
