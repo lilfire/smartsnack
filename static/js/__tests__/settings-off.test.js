@@ -11,7 +11,13 @@ vi.mock('../products.js', () => ({
   loadData: vi.fn(),
 }));
 
-import { saveOffCredentials, checkRefreshStatus, refreshAllFromOff } from '../settings-off.js';
+import {
+  loadOffCredentials,
+  saveOffCredentials,
+  checkRefreshStatus,
+  refreshAllFromOff,
+  loadOffLanguagePriority,
+} from '../settings-off.js';
 import { api, showToast } from '../state.js';
 
 beforeEach(() => {
@@ -176,5 +182,174 @@ describe('refreshAllFromOff', () => {
     await p;
     // Should connect to stream
     expect(global.EventSource).toHaveBeenCalled();
+  });
+});
+
+// ── loadOffCredentials ───────────────────────────────
+
+describe('loadOffCredentials', () => {
+  function setupCredDOM() {
+    document.body.innerHTML = `
+      <input id="off-user-id">
+      <input id="off-password">`;
+  }
+
+  it('populates user id field on success', async () => {
+    setupCredDOM();
+    api.mockResolvedValueOnce({ off_user_id: 'myuser', has_password: false });
+    await loadOffCredentials();
+    expect(document.getElementById('off-user-id').value).toBe('myuser');
+  });
+
+  it('fills password field with placeholder when has_password is true', async () => {
+    setupCredDOM();
+    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: true });
+    await loadOffCredentials();
+    expect(document.getElementById('off-password').value).toBe('\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022');
+  });
+
+  it('leaves password blank when has_password is false', async () => {
+    setupCredDOM();
+    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: false });
+    await loadOffCredentials();
+    expect(document.getElementById('off-password').value).toBe('');
+  });
+
+  it('shows error toast on API failure', async () => {
+    setupCredDOM();
+    api.mockRejectedValueOnce(new Error('fail'));
+    await loadOffCredentials();
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it('does not crash when DOM elements are absent', async () => {
+    document.body.innerHTML = '';
+    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: false });
+    await expect(loadOffCredentials()).resolves.not.toThrow();
+  });
+});
+
+// ── loadOffLanguagePriority ──────────────────────────
+
+describe('loadOffLanguagePriority', () => {
+  function setupLangDOM() {
+    document.body.innerHTML = `
+      <div id="off-lang-priority-list"></div>
+      <select id="off-lang-add-select"></select>
+      <button id="off-lang-add-btn"></button>`;
+  }
+
+  it('does nothing when #off-lang-priority-list is absent', async () => {
+    document.body.innerHTML = '';
+    await expect(loadOffLanguagePriority()).resolves.not.toThrow();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('renders language priority items on success', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }, { code: 'se', name: 'Swedish' }] });
+    await loadOffLanguagePriority();
+    const items = document.querySelectorAll('.off-lang-item');
+    expect(items.length).toBe(2);
+  });
+
+  it('shows error toast on API failure', async () => {
+    setupLangDOM();
+    api.mockRejectedValueOnce(new Error('fail'));
+    await loadOffLanguagePriority();
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it('populates add-select with available (unprioritised) languages', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    await loadOffLanguagePriority();
+    const opts = document.querySelectorAll('#off-lang-add-select option');
+    expect(opts.length).toBe(1);
+    expect(opts[0].value).toBe('en');
+  });
+
+  it('disables add-btn when no languages available to add', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    await loadOffLanguagePriority();
+    const addBtn = document.getElementById('off-lang-add-btn');
+    expect(addBtn.disabled).toBe(true);
+  });
+
+  it('move-up button reorders and saves', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    await loadOffLanguagePriority();
+    api.mockResolvedValueOnce({}); // save
+
+    const items = document.querySelectorAll('.off-lang-item');
+    const upBtns = items[1].querySelectorAll('button');
+    upBtns[0].click(); // up button on second item
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      '/api/settings/off-language-priority',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('move-down button reorders and saves', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    await loadOffLanguagePriority();
+    api.mockResolvedValueOnce({}); // save
+
+    const items = document.querySelectorAll('.off-lang-item');
+    const downBtns = items[0].querySelectorAll('button');
+    downBtns[1].click(); // down button on first item
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      '/api/settings/off-language-priority',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+  });
+
+  it('remove button removes language and saves', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    await loadOffLanguagePriority();
+    api.mockResolvedValueOnce({}); // save
+
+    const items = document.querySelectorAll('.off-lang-item');
+    const removeBtn = items[0].querySelector('.btn-red');
+    removeBtn.click();
+    await Promise.resolve();
+
+    const remaining = document.querySelectorAll('.off-lang-item');
+    expect(remaining.length).toBe(1);
+  });
+
+  it('add-btn adds selected language and saves', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ languages: ['no'] });
+    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+    await loadOffLanguagePriority();
+    api.mockResolvedValueOnce({}); // save
+
+    const addSelect = document.getElementById('off-lang-add-select');
+    const addBtn = document.getElementById('off-lang-add-btn');
+    addSelect.value = 'en';
+    addBtn.click();
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      '/api/settings/off-language-priority',
+      expect.objectContaining({ method: 'PUT' }),
+    );
+    const items = document.querySelectorAll('.off-lang-item');
+    expect(items.length).toBe(2);
   });
 });
