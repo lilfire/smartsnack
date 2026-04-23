@@ -12,7 +12,13 @@ vi.mock('../products.js', () => ({
   loadData: vi.fn(),
 }));
 
-import { saveOffCredentials, checkRefreshStatus, refreshAllFromOff, loadOffLanguagePriority } from '../settings-off.js';
+import {
+  loadOffCredentials,
+  saveOffCredentials,
+  checkRefreshStatus,
+  refreshAllFromOff,
+  loadOffLanguagePriority,
+} from '../settings-off.js';
 import { api, showToast } from '../state.js';
 
 beforeEach(() => {
@@ -177,6 +183,50 @@ describe('refreshAllFromOff', () => {
     await p;
     // Should connect to stream
     expect(global.EventSource).toHaveBeenCalled();
+  });
+});
+
+// ── loadOffCredentials ───────────────────────────────
+
+describe('loadOffCredentials', () => {
+  function setupCredDOM() {
+    document.body.innerHTML = `
+      <input id="off-user-id">
+      <input id="off-password">`;
+  }
+
+  it('populates user id field on success', async () => {
+    setupCredDOM();
+    api.mockResolvedValueOnce({ off_user_id: 'myuser', has_password: false });
+    await loadOffCredentials();
+    expect(document.getElementById('off-user-id').value).toBe('myuser');
+  });
+
+  it('fills password field with placeholder when has_password is true', async () => {
+    setupCredDOM();
+    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: true });
+    await loadOffCredentials();
+    expect(document.getElementById('off-password').value).toBe('\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022');
+  });
+
+  it('leaves password blank when has_password is false', async () => {
+    setupCredDOM();
+    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: false });
+    await loadOffCredentials();
+    expect(document.getElementById('off-password').value).toBe('');
+  });
+
+  it('shows error toast on API failure', async () => {
+    setupCredDOM();
+    api.mockRejectedValueOnce(new Error('fail'));
+    await loadOffCredentials();
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it('does not crash when DOM elements are absent', async () => {
+    document.body.innerHTML = '';
+    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: false });
+    await expect(loadOffCredentials()).resolves.not.toThrow();
   });
 });
 
