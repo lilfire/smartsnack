@@ -697,8 +697,6 @@ describe('event delegation: fetch-ean-off click', () => {
     expect(offBtns.length).toBeGreaterThan(0);
 
     api.mockClear();
-    api.mockResolvedValueOnce({}); // setEanPrimary PATCH
-    api.mockResolvedValueOnce(MOCK_EANS_THREE); // reload after setEanPrimary
 
     offBtns[0].click();
     await Promise.resolve();
