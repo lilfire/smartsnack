@@ -76,17 +76,23 @@ def test_delete_product(page, api_create_product):
     delete_btn.click()
     page.wait_for_timeout(300)
 
-    # Click confirm in the custom modal
+    # Click confirm in the custom modal, then wait for the deferred DELETE
+    # request that deleteProduct() schedules ~5s after confirmation (undo window).
+    # We must wait for this request to complete *before* reloading, because
+    # reloading discards the pending timer and the server-side delete never fires.
     confirm_btn = page.locator(".confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
-    confirm_btn.click()
+    with page.expect_response(
+        lambda r: "/api/products/" in r.url and r.request.method == "DELETE",
+        timeout=10000,
+    ):
+        confirm_btn.click()
 
-    # Should show success toast
-    toast = page.locator(".toast")
-    expect(toast.first).to_be_visible(timeout=5000)
+        # Should show success toast (undo window)
+        toast = page.locator(".toast")
+        expect(toast.first).to_be_visible(timeout=5000)
 
-    # Product should eventually disappear after reload
-    page.wait_for_timeout(500)
+    # Product should be gone after reload
     page.reload()
     page.wait_for_function(
         "() => !document.querySelector('#results-container .loading')",

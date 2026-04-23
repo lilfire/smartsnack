@@ -72,18 +72,35 @@ vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn().mockResolvedValue({}),
 }));
 
-import { loadEanManager } from '../ean-manager.js';
-import { api } from '../state.js';
+import { loadEanManager, addEan, deleteEan, setEanPrimary } from '../ean-manager.js';
+import { api, showToast } from '../state.js';
+import { lookupOFF } from '../off-api.js';
 
 const PRODUCT_ID = 42;
+// Default fixtures: no EAN is synced with OFF
 const MOCK_EANS_TWO = [
-  { id: 1, ean: '7038010069307', is_primary: true },
-  { id: 2, ean: '5000000000001', is_primary: false },
+  { id: 1, ean: '7038010069307', is_primary: true, synced_with_off: false },
+  { id: 2, ean: '5000000000001', is_primary: false, synced_with_off: false },
 ];
 const MOCK_EANS_THREE = [
-  { id: 1, ean: '7038010069307', is_primary: true },
-  { id: 2, ean: '5000000000001', is_primary: false },
-  { id: 3, ean: '8901234567890', is_primary: false },
+  { id: 1, ean: '7038010069307', is_primary: true, synced_with_off: false },
+  { id: 2, ean: '5000000000001', is_primary: false, synced_with_off: false },
+  { id: 3, ean: '8901234567890', is_primary: false, synced_with_off: false },
+];
+// Primary EAN is OFF-synced; secondary is not
+const MOCK_EANS_PRIMARY_SYNCED = [
+  { id: 1, ean: '7038010069307', is_primary: true, synced_with_off: true },
+  { id: 2, ean: '5000000000001', is_primary: false, synced_with_off: false },
+];
+// Secondary EAN is OFF-synced; primary is not
+const MOCK_EANS_SECONDARY_SYNCED = [
+  { id: 1, ean: '7038010069307', is_primary: true, synced_with_off: false },
+  { id: 2, ean: '5000000000001', is_primary: false, synced_with_off: true },
+];
+// Both EANs synced
+const MOCK_EANS_BOTH_SYNCED = [
+  { id: 1, ean: '7038010069307', is_primary: true, synced_with_off: true },
+  { id: 2, ean: '5000000000001', is_primary: false, synced_with_off: true },
 ];
 
 function setupDom() {
@@ -108,145 +125,472 @@ afterEach(() => {
 // ── OFF Badge Rendering ─────────────────────────────
 
 describe('OFF badge rendering', () => {
-  it('primary EAN row renders .ean-badge-off badge when unlocked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
+  it('renders .ean-badge-off only on rows with synced_with_off=true', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
 
     const badges = document.querySelectorAll('.ean-badge-off');
     expect(badges.length).toBe(1);
     expect(badges[0].textContent).toBe('OFF');
-    const primaryItem = badges[0].closest('.ean-item');
-    expect(primaryItem.querySelector('.ean-badge-primary')).not.toBeNull();
+    const items = document.querySelectorAll('.ean-item');
+    expect(items[0].querySelector('.ean-badge-off')).not.toBeNull();
+    expect(items[1].querySelector('.ean-badge-off')).toBeNull();
   });
 
-  it('secondary EAN rows do NOT render .ean-badge-off', async () => {
+  it('does not render .ean-badge-off when no EAN is synced', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_THREE);
-    await loadEanManager(PRODUCT_ID, false);
+    await loadEanManager(PRODUCT_ID);
+
+    expect(document.querySelectorAll('.ean-badge-off').length).toBe(0);
+  });
+
+  it('renders badge on secondary EAN when only secondary is synced', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_SECONDARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
 
     const items = document.querySelectorAll('.ean-item');
-    expect(items[1].querySelector('.ean-badge-off')).toBeNull();
-    expect(items[2].querySelector('.ean-badge-off')).toBeNull();
-    expect(items[0].querySelector('.ean-badge-off')).not.toBeNull();
+    expect(items[0].querySelector('.ean-badge-off')).toBeNull();
+    expect(items[1].querySelector('.ean-badge-off')).not.toBeNull();
   });
 });
 
 // ── Per-EAN OFF Fetch Button ────────────────────────
 
 describe('Per-EAN OFF fetch button', () => {
-  it('secondary EAN rows render .btn-ean-off button when unlocked', async () => {
+  it('every non-synced EAN row renders .btn-ean-off (primary + secondaries)', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_THREE);
-    await loadEanManager(PRODUCT_ID, false);
+    await loadEanManager(PRODUCT_ID);
 
     const offBtns = document.querySelectorAll('.btn-ean-off');
-    expect(offBtns.length).toBe(2);
-    expect(offBtns[0].dataset.eanAction).toBe('fetch-ean-off');
-    expect(offBtns[1].dataset.eanAction).toBe('fetch-ean-off');
+    expect(offBtns.length).toBe(3);
+    offBtns.forEach((btn) => {
+      expect(btn.dataset.eanAction).toBe('fetch-ean-off');
+    });
   });
 
-  it('primary EAN row does NOT render .btn-ean-off', async () => {
+  it('primary EAN row renders .btn-ean-off when not synced', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
+    await loadEanManager(PRODUCT_ID);
+
+    const items = document.querySelectorAll('.ean-item');
+    expect(items[0].querySelector('.btn-ean-off')).not.toBeNull();
+    expect(items[1].querySelector('.btn-ean-off')).not.toBeNull();
+  });
+
+  it('synced primary EAN does NOT render .btn-ean-off (shows unlock instead)', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
 
     const items = document.querySelectorAll('.ean-item');
     expect(items[0].querySelector('.btn-ean-off')).toBeNull();
-    expect(items[1].querySelector('.btn-ean-off')).not.toBeNull();
+    expect(items[0].querySelector('[data-ean-action="unsync-ean"]')).not.toBeNull();
+  });
+
+  it('synced secondary EAN does NOT render .btn-ean-off', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_SECONDARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    const items = document.querySelectorAll('.ean-item');
+    expect(items[1].querySelector('.btn-ean-off')).toBeNull();
   });
 });
 
-// ── Locked State ────────────────────────────────────
+// ── Per-EAN sync state ──────────────────────────────
 
-describe('Locked state (is_synced_with_off present)', () => {
-  it('does not render add input when locked', async () => {
+describe('Per-EAN sync state', () => {
+  it('all EANs unsynced: every row has delete button (>1 EAN)', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, true);
-
-    expect(document.querySelector('.ean-add-input')).toBeNull();
-    expect(document.getElementById('ean-add-input-' + PRODUCT_ID)).toBeNull();
-  });
-
-  it('does not render delete buttons when locked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, true);
-
-    const deleteBtns = document.querySelectorAll('[data-ean-action="delete-ean"]');
-    expect(deleteBtns.length).toBe(0);
-  });
-
-  it('does not render set-primary buttons when locked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, true);
-
-    const setPrimaryBtns = document.querySelectorAll('[data-ean-action="set-primary"]');
-    expect(setPrimaryBtns.length).toBe(0);
-  });
-
-  it('does not render OFF fetch buttons when locked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, true);
-
-    const offBtns = document.querySelectorAll('.btn-ean-off');
-    expect(offBtns.length).toBe(0);
-  });
-
-  it('does not render OFF badge when locked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, true);
-
-    const offBadges = document.querySelectorAll('.ean-badge-off');
-    expect(offBadges.length).toBe(0);
-  });
-
-  it('renders .ean-lock-notice when locked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, true);
-
-    const lockNotice = document.querySelector('.ean-lock-notice');
-    expect(lockNotice).not.toBeNull();
-    expect(lockNotice.textContent).toContain('ean_locked_notice');
-  });
-});
-
-// ── Unlocked State ──────────────────────────────────
-
-describe('Unlocked state (is_synced_with_off absent)', () => {
-  it('renders add input when unlocked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
-
-    expect(document.querySelector('.ean-add-input')).not.toBeNull();
-  });
-
-  it('renders delete buttons when unlocked with multiple EANs', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
+    await loadEanManager(PRODUCT_ID);
 
     const deleteBtns = document.querySelectorAll('[data-ean-action="delete-ean"]');
     expect(deleteBtns.length).toBe(2);
   });
 
-  it('renders set-primary button on secondary EANs when unlocked', async () => {
+  it('all EANs unsynced: only secondaries get set-primary; every row gets fetch-OFF', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
+    await loadEanManager(PRODUCT_ID);
 
     const setPrimaryBtns = document.querySelectorAll('[data-ean-action="set-primary"]');
     expect(setPrimaryBtns.length).toBe(1);
     expect(setPrimaryBtns[0].dataset.eanId).toBe('2');
-  });
-
-  it('renders OFF fetch buttons on secondary EANs when unlocked', async () => {
-    api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
-
     const offBtns = document.querySelectorAll('.btn-ean-off');
-    expect(offBtns.length).toBe(1);
-    expect(offBtns[0].dataset.eanId).toBe('2');
+    expect(offBtns.length).toBe(2);
+    expect(Array.from(offBtns).map((b) => b.dataset.eanId).sort()).toEqual(['1', '2']);
   });
 
-  it('does not render .ean-lock-notice when unlocked', async () => {
+  it('all EANs unsynced: no per-row unlock buttons rendered', async () => {
     api.mockResolvedValueOnce(MOCK_EANS_TWO);
-    await loadEanManager(PRODUCT_ID, false);
+    await loadEanManager(PRODUCT_ID);
+
+    expect(document.querySelectorAll('[data-ean-action="unsync-ean"]').length).toBe(0);
+  });
+
+  it('synced row hides delete / set-primary / fetch-OFF and shows unlock', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    const items = document.querySelectorAll('.ean-item');
+    // Synced primary row: only the unlock button + OFF badge
+    expect(items[0].querySelector('[data-ean-action="delete-ean"]')).toBeNull();
+    expect(items[0].querySelector('[data-ean-action="set-primary"]')).toBeNull();
+    expect(items[0].querySelector('[data-ean-action="fetch-ean-off"]')).toBeNull();
+    expect(items[0].querySelector('[data-ean-action="unsync-ean"]')).not.toBeNull();
+    expect(items[0].querySelector('.ean-badge-off')).not.toBeNull();
+  });
+
+  it('non-synced secondary in a mixed product still has its normal buttons', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    const items = document.querySelectorAll('.ean-item');
+    // Secondary (non-synced) row: delete + set-primary + fetch-OFF
+    expect(items[1].querySelector('[data-ean-action="delete-ean"]')).not.toBeNull();
+    expect(items[1].querySelector('[data-ean-action="set-primary"]')).not.toBeNull();
+    expect(items[1].querySelector('[data-ean-action="fetch-ean-off"]')).not.toBeNull();
+    expect(items[1].querySelector('[data-ean-action="unsync-ean"]')).toBeNull();
+  });
+
+  it('non-synced primary in a mixed product has fetch-OFF (but no set-primary on itself)', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_SECONDARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    const items = document.querySelectorAll('.ean-item');
+    // Primary (non-synced) row: fetch-OFF + delete (len>1), but no set-primary on itself
+    expect(items[0].querySelector('[data-ean-action="fetch-ean-off"]')).not.toBeNull();
+    expect(items[0].querySelector('[data-ean-action="set-primary"]')).toBeNull();
+    expect(items[0].querySelector('[data-ean-action="delete-ean"]')).not.toBeNull();
+  });
+
+  it('all EANs synced: every row has only the unlock button', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_BOTH_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    expect(document.querySelectorAll('[data-ean-action="delete-ean"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-ean-action="set-primary"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-ean-action="fetch-ean-off"]').length).toBe(0);
+    expect(document.querySelectorAll('[data-ean-action="unsync-ean"]').length).toBe(2);
+  });
+
+  it('does not render .ean-lock-notice in any state', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_BOTH_SYNCED);
+    await loadEanManager(PRODUCT_ID);
 
     expect(document.querySelector('.ean-lock-notice')).toBeNull();
+  });
+
+  it('add-EAN input is always rendered, even when all EANs are synced', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_BOTH_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    expect(document.getElementById('ean-add-input-' + PRODUCT_ID)).not.toBeNull();
+  });
+
+  it('clicking add-EAN with a synced product still POSTs the new EAN', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '99887766554';
+
+    api.mockResolvedValueOnce({ id: 3, ean: '99887766554', is_primary: false });
+    api.mockResolvedValueOnce([
+      ...MOCK_EANS_PRIMARY_SYNCED,
+      { id: 3, ean: '99887766554', is_primary: false, synced_with_off: false },
+    ]);
+
+    document.querySelector('[data-ean-action="add-ean"]').click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans',
+        { method: 'POST', body: JSON.stringify({ ean: '99887766554' }) }
+      );
+    });
+  });
+
+  it('after add-EAN, the existing synced row stays locked (the original bug)', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '99887766554';
+
+    api.mockResolvedValueOnce({ id: 3, ean: '99887766554', is_primary: false });
+    api.mockResolvedValueOnce([
+      ...MOCK_EANS_PRIMARY_SYNCED,
+      { id: 3, ean: '99887766554', is_primary: false, synced_with_off: false },
+    ]);
+
+    document.querySelector('[data-ean-action="add-ean"]').click();
+
+    await vi.waitFor(() => {
+      const items = document.querySelectorAll('.ean-item');
+      expect(items.length).toBe(3);
+    });
+
+    const items = document.querySelectorAll('.ean-item');
+    // Synced primary stays locked: no delete button on its row
+    expect(items[0].querySelector('[data-ean-action="delete-ean"]')).toBeNull();
+    expect(items[0].querySelector('[data-ean-action="unsync-ean"]')).not.toBeNull();
+    // The newly added third row is freely editable
+    expect(items[2].querySelector('[data-ean-action="delete-ean"]')).not.toBeNull();
+  });
+});
+
+// ── Unsync EAN ──────────────────────────────────────
+
+describe('Unsync EAN', () => {
+  it('clicking unlock button calls POST .../eans/<id>/unsync', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({ ok: true });
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    document.querySelector('[data-ean-action="unsync-ean"]').click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/1/unsync',
+        { method: 'POST' }
+      );
+    });
+  });
+
+  it('after unsync, the row becomes editable in the rerender', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_PRIMARY_SYNCED);
+    await loadEanManager(PRODUCT_ID);
+
+    api.mockResolvedValueOnce({ ok: true });
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    document.querySelector('[data-ean-action="unsync-ean"]').click();
+
+    await vi.waitFor(() => {
+      const items = document.querySelectorAll('.ean-item');
+      expect(items[0].querySelector('[data-ean-action="unsync-ean"]')).toBeNull();
+      expect(items[0].querySelector('.ean-badge-off')).toBeNull();
+    });
+  });
+});
+
+// ── Error Handling ──────────────────────────────────
+
+describe('Error handling', () => {
+  it('loadEanManager shows error when API fails', async () => {
+    api.mockRejectedValueOnce(new Error('Network error'));
+    await loadEanManager(PRODUCT_ID);
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    expect(container.querySelector('.field-error')).not.toBeNull();
+  });
+
+  it('loadEanManager exits early when container is missing', async () => {
+    document.body.innerHTML = '';
+    await loadEanManager(PRODUCT_ID);
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+// ── _fetchEanOff click behaviour ─────────────────────
+
+describe('_fetchEanOff click behaviour', () => {
+  beforeEach(() => {
+    window._pendingOFFEan = null;
+    document.getElementById('ed-ean').value = '7038010069307'; // primary
+  });
+
+  it('does NOT promote secondary EAN to primary on fetch click', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID);
+    api.mockClear();
+
+    const offBtn = document.querySelector(
+      '[data-ean-action="fetch-ean-off"][data-ean-id="2"]'
+    );
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    const setPrimaryCall = api.mock.calls.find(c => c[0].includes('set-primary'));
+    expect(setPrimaryCall).toBeUndefined();
+  });
+
+  it('does NOT mutate #ed-ean when fetching OFF for a secondary', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID);
+
+    const offBtn = document.querySelector(
+      '[data-ean-action="fetch-ean-off"][data-ean-id="2"]'
+    );
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    // #ed-ean must still point at the primary so saveProduct does not swap it
+    expect(document.getElementById('ed-ean').value).toBe('7038010069307');
+  });
+
+  it('stashes the targeted EAN on window._pendingOFFEan for saveProduct', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID);
+
+    const offBtn = document.querySelector(
+      '[data-ean-action="fetch-ean-off"][data-ean-id="2"]'
+    );
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(window._pendingOFFEan).toBe('5000000000001');
+  });
+
+  it('calls lookupOFF with the secondary EAN in opts.ean', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID);
+    lookupOFF.mockClear();
+
+    const offBtn = document.querySelector(
+      '[data-ean-action="fetch-ean-off"][data-ean-id="2"]'
+    );
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(lookupOFF).toHaveBeenCalledTimes(1);
+    expect(lookupOFF).toHaveBeenCalledWith(
+      'ed',
+      PRODUCT_ID,
+      { ean: '5000000000001' }
+    );
+  });
+
+  it('calls lookupOFF with the primary EAN when fetching from the primary row', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID);
+    lookupOFF.mockClear();
+
+    const offBtn = document.querySelector(
+      '[data-ean-action="fetch-ean-off"][data-ean-id="1"]'
+    );
+    offBtn.click();
+    await Promise.resolve(); await Promise.resolve();
+
+    expect(lookupOFF).toHaveBeenCalledWith(
+      'ed',
+      PRODUCT_ID,
+      { ean: '7038010069307' }
+    );
+    expect(window._pendingOFFEan).toBe('7038010069307');
+  });
+});
+
+// ── Event delegation in rendered EAN list ────────────
+
+describe('EAN manager event delegation', () => {
+  it('clicking set-primary button calls setEanPrimary', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({});
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    const btn = document.querySelector('[data-ean-action="set-primary"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/2/set-primary',
+        { method: 'PATCH' }
+      );
+    });
+  });
+
+  it('clicking delete button calls deleteEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({});
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+
+    // First delete button is for the primary EAN (id=1)
+    const btn = document.querySelector('[data-ean-action="delete-ean"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/1',
+        { method: 'DELETE' }
+      );
+    });
+  });
+
+  it('clicking fetch-ean-off button triggers lookupOFF with the EAN value', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    expect(offBtn).not.toBeNull();
+    offBtn.click();
+
+    await vi.waitFor(() => {
+      expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID, { ean: offBtn.dataset.eanValue });
+    });
+  });
+
+  it('clicking area without data-ean-action does nothing', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    container.click();
+
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('pressing Enter in add input triggers addEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
+    addInput.value = '5000000000001';
+
+    api.mockResolvedValueOnce({ id: 3, ean: '5000000000001', is_primary: false });
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    addInput.dispatchEvent(enterEvent);
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans',
+        { method: 'POST', body: JSON.stringify({ ean: '5000000000001' }) }
+      );
+    });
+    // Wait for addEan's full async chain (loadEanManager reload + showToast)
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('pressing non-Enter key in add input does not trigger addEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
+    addInput.value = '5000000000001';
+
+    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    addInput.dispatchEvent(tabEvent);
+
+    expect(api).not.toHaveBeenCalled();
   });
 });
 

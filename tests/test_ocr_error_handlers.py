@@ -248,7 +248,7 @@ class TestTranslationKeys:
         data = {}
         for lang in ("no", "en", "se"):
             path = os.path.join(base, f"{lang}.json")
-            with open(path) as f:
+            with open(path, encoding="utf-8") as f:
                 data[lang] = json.load(f)
         return data
 

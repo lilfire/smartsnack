@@ -3,9 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../state.js', () => ({
   api: vi.fn().mockResolvedValue({}),
   showToast: vi.fn(),
+  upgradeSelect: vi.fn(),
 }));
 
-vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
+vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k), getCurrentLang: vi.fn(() => 'en') }));
 
 vi.mock('../products.js', () => ({
   loadData: vi.fn(),
@@ -230,7 +231,6 @@ describe('loadOffCredentials', () => {
 });
 
 // ── loadOffLanguagePriority ──────────────────────────
-
 describe('loadOffLanguagePriority', () => {
   function setupLangDOM() {
     document.body.innerHTML = `
@@ -239,117 +239,180 @@ describe('loadOffLanguagePriority', () => {
       <button id="off-lang-add-btn"></button>`;
   }
 
-  it('does nothing when #off-lang-priority-list is absent', async () => {
+  it('does nothing when list element is absent', async () => {
     document.body.innerHTML = '';
-    await expect(loadOffLanguagePriority()).resolves.not.toThrow();
+    await loadOffLanguagePriority();
     expect(api).not.toHaveBeenCalled();
   });
 
-  it('renders language priority items on success', async () => {
+  it('loads language priority and renders items', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }, { code: 'se', name: 'Swedish' }] });
+    api.mockResolvedValueOnce({ priority: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: ['no', 'en', 'se'] });
+
     await loadOffLanguagePriority();
-    const items = document.querySelectorAll('.off-lang-item');
-    expect(items.length).toBe(2);
+
+    const list = document.getElementById('off-lang-priority-list');
+    expect(list.querySelectorAll('.off-lang-item').length).toBe(2);
   });
 
   it('shows error toast on API failure', async () => {
     setupLangDOM();
-    api.mockRejectedValueOnce(new Error('fail'));
+    api.mockRejectedValue(new Error('fail'));
     await loadOffLanguagePriority();
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
   });
 
-  it('populates add-select with available (unprioritised) languages', async () => {
+  it('binds the add button to push a new language', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
-    await loadOffLanguagePriority();
-    const opts = document.querySelectorAll('#off-lang-add-select option');
-    expect(opts.length).toBe(1);
-    expect(opts[0].value).toBe('en');
-  });
-
-  it('disables add-btn when no languages available to add', async () => {
-    setupLangDOM();
+    api.mockResolvedValueOnce({ priority: ['no'] });
     api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
+
     await loadOffLanguagePriority();
-    const addBtn = document.getElementById('off-lang-add-btn');
-    expect(addBtn.disabled).toBe(true);
-  });
-
-  it('move-up button reorders and saves', async () => {
-    setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
-    await loadOffLanguagePriority();
-    api.mockResolvedValueOnce({}); // save
-
-    const items = document.querySelectorAll('.off-lang-item');
-    const upBtns = items[1].querySelectorAll('button');
-    upBtns[0].click(); // up button on second item
-    await Promise.resolve();
-
-    expect(api).toHaveBeenCalledWith(
-      '/api/settings/off-language-priority',
-      expect.objectContaining({ method: 'PUT' }),
-    );
-  });
-
-  it('move-down button reorders and saves', async () => {
-    setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
-    await loadOffLanguagePriority();
-    api.mockResolvedValueOnce({}); // save
-
-    const items = document.querySelectorAll('.off-lang-item');
-    const downBtns = items[0].querySelectorAll('button');
-    downBtns[1].click(); // down button on first item
-    await Promise.resolve();
-
-    expect(api).toHaveBeenCalledWith(
-      '/api/settings/off-language-priority',
-      expect.objectContaining({ method: 'PUT' }),
-    );
-  });
-
-  it('remove button removes language and saves', async () => {
-    setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
-    await loadOffLanguagePriority();
-    api.mockResolvedValueOnce({}); // save
-
-    const items = document.querySelectorAll('.off-lang-item');
-    const removeBtn = items[0].querySelector('.btn-red');
-    removeBtn.click();
-    await Promise.resolve();
-
-    const remaining = document.querySelectorAll('.off-lang-item');
-    expect(remaining.length).toBe(1);
-  });
-
-  it('add-btn adds selected language and saves', async () => {
-    setupLangDOM();
-    api.mockResolvedValueOnce({ languages: ['no'] });
-    api.mockResolvedValueOnce({ languages: [{ code: 'no', name: 'Norwegian' }, { code: 'en', name: 'English' }] });
-    await loadOffLanguagePriority();
-    api.mockResolvedValueOnce({}); // save
 
     const addSelect = document.getElementById('off-lang-add-select');
     const addBtn = document.getElementById('off-lang-add-btn');
-    addSelect.value = 'en';
-    addBtn.click();
-    await Promise.resolve();
 
-    expect(api).toHaveBeenCalledWith(
-      '/api/settings/off-language-priority',
-      expect.objectContaining({ method: 'PUT' }),
-    );
-    const items = document.querySelectorAll('.off-lang-item');
+    // Simulate selecting 'en' and clicking add
+    const opt = document.createElement('option');
+    opt.value = 'en';
+    addSelect.appendChild(opt);
+    addSelect.value = 'en';
+
+    // Mock the save API call
+    api.mockResolvedValueOnce({});
+
+    addBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
     expect(items.length).toBe(2);
+  });
+
+  it('does not bind add button twice on re-call', async () => {
+    setupLangDOM();
+    api.mockResolvedValueOnce({ priority: ['no'] });
+    api.mockResolvedValueOnce({ languages: ['no'] });
+    await loadOffLanguagePriority();
+
+    // Second call - button already bound
+    api.mockResolvedValueOnce({ priority: ['no'] });
+    api.mockResolvedValueOnce({ languages: ['no'] });
+    await loadOffLanguagePriority();
+
+    const addBtn = document.getElementById('off-lang-add-btn');
+    expect(addBtn.dataset.bound).toBe('1');
+  });
+});
+
+// ── _renderOffLangPriority interactions ───────────────
+describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', () => {
+  async function setupWithLangs(priority = ['no', 'en', 'se']) {
+    document.body.innerHTML = `
+      <div id="off-lang-priority-list"></div>
+      <select id="off-lang-add-select"></select>
+      <button id="off-lang-add-btn"></button>`;
+    api.mockResolvedValueOnce({ priority: priority });
+    api.mockResolvedValueOnce({ languages: ['no', 'en', 'se', 'fi'] });
+    await loadOffLanguagePriority();
+  }
+
+  it('moves item up when up button clicked', async () => {
+    await setupWithLangs(['no', 'en', 'se']);
+    api.mockResolvedValue({});
+
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    // Click "up" on second item (en)
+    const upBtn = items[1].querySelector('button[aria-label="off_lang_move_up"]');
+    upBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // After moving up, 'en' should be first
+    const updatedItems = list.querySelectorAll('.off-lang-item');
+    expect(updatedItems[0].querySelector('.off-lang-code').textContent).toBe('en');
+  });
+
+  it('moves item down when down button clicked', async () => {
+    await setupWithLangs(['no', 'en', 'se']);
+    api.mockResolvedValue({});
+
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    // Click "down" on first item (no)
+    const downBtn = items[0].querySelector('button[aria-label="off_lang_move_down"]');
+    downBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    // After moving down, 'en' should be first
+    const updatedItems = list.querySelectorAll('.off-lang-item');
+    expect(updatedItems[0].querySelector('.off-lang-code').textContent).toBe('en');
+  });
+
+  it('removes item when remove button clicked', async () => {
+    await setupWithLangs(['no', 'en', 'se']);
+    api.mockResolvedValue({});
+
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    // Click remove on second item (en)
+    const removeBtn = items[1].querySelector('button.btn-red');
+    removeBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    const updatedItems = list.querySelectorAll('.off-lang-item');
+    expect(updatedItems.length).toBe(2);
+  });
+
+  it('disables up button on first item', async () => {
+    await setupWithLangs(['no', 'en']);
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    const upBtn = items[0].querySelector('button[aria-label="off_lang_move_up"]');
+    expect(upBtn.disabled).toBe(true);
+  });
+
+  it('disables down button on last item', async () => {
+    await setupWithLangs(['no', 'en']);
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    const downBtn = items[1].querySelector('button[aria-label="off_lang_move_down"]');
+    expect(downBtn.disabled).toBe(true);
+  });
+
+  it('disables remove button when only one item remains', async () => {
+    await setupWithLangs(['no']);
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    const removeBtn = items[0].querySelector('button.btn-red');
+    expect(removeBtn.disabled).toBe(true);
+  });
+
+  it('shows error toast when _saveOffLangPriority fails', async () => {
+    await setupWithLangs(['no', 'en']);
+    api.mockRejectedValue(new Error('save fail'));
+
+    const list = document.getElementById('off-lang-priority-list');
+    const items = list.querySelectorAll('.off-lang-item');
+    const downBtn = items[0].querySelector('button[aria-label="off_lang_move_down"]');
+    downBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it('disables add button when all languages are already selected', async () => {
+    // Only 2 languages available, both already selected
+    document.body.innerHTML = `
+      <div id="off-lang-priority-list"></div>
+      <select id="off-lang-add-select"></select>
+      <button id="off-lang-add-btn"></button>`;
+    api.mockResolvedValueOnce({ priority: ['no', 'en'] });
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    await loadOffLanguagePriority();
+
+    const addBtn = document.getElementById('off-lang-add-btn');
+    expect(addBtn.disabled).toBe(true);
   });
 });

@@ -300,3 +300,174 @@ class TestRangeFilterIntegration:
         assert "LowFat" in names
         assert "LowKcal" in names
         assert "Neither" not in names
+
+
+# ── _parse_condition edge cases ───────────────────────────────────────────────
+
+
+class TestParseConditionEdgeCases:
+    def test_nonexistent_flag_field_raises_invalid_field(self, db):
+        from services.product_filters import _parse_advanced_filters
+        # A flag field not in the DB is rejected as "Invalid filter field"
+        # (it never enters flag_fields, so the "Unknown flag" branch is unreachable)
+        with pytest.raises(ValueError, match="Invalid filter field"):
+            _parse_advanced_filters(json.dumps(
+                {"logic": "and", "children": [{"field": "flag:nonexistent_flag_xyz", "op": "=", "value": "true"}]}
+            ))
+
+    def test_type_field_empty_value_with_eq_op_allowed(self, db):
+        from services.product_filters import _parse_advanced_filters
+        # Empty value for type field with = op is a special case (uncategorized products)
+        sql, params, post = _parse_advanced_filters(json.dumps(
+            {"logic": "and", "children": [{"field": "type", "op": "=", "value": ""}]}
+        ))
+        assert "type" in sql
+
+    def test_type_field_none_value_with_neq_op_allowed(self, db):
+        from services.product_filters import _parse_advanced_filters
+        sql, params, post = _parse_advanced_filters(json.dumps(
+            {"logic": "and", "children": [{"field": "type", "op": "!=", "value": ""}]}
+        ))
+        assert "type" in sql
+
+
+# ── _condition_to_sql edge cases ──────────────────────────────────────────────
+
+
+class TestConditionToSqlEdgeCases:
+    def test_non_finite_value_raises(self, db):
+        from services.product_filters import _parse_advanced_filters
+        # infinity is non-finite: should raise ValueError
+        with pytest.raises(ValueError):
+            _parse_advanced_filters(json.dumps(
+                {"logic": "and", "children": [{"field": "kcal", "op": ">=", "value": "inf"}]}
+            ))
+
+    def test_nan_value_raises(self, db):
+        from services.product_filters import _parse_advanced_filters
+        with pytest.raises(ValueError):
+            _parse_advanced_filters(json.dumps(
+                {"logic": "and", "children": [{"field": "kcal", "op": ">=", "value": "nan"}]}
+            ))
+
+
+# ── _process_node edge cases ──────────────────────────────────────────────────
+
+
+class TestProcessNodeEdgeCases:
+    def test_depth_limit_exceeded_raises(self, db):
+        from services.product_filters import _parse_advanced_filters
+        from config import MAX_FILTER_DEPTH
+        # Build nesting deeper than MAX_FILTER_DEPTH
+        node = {"field": "protein", "op": ">=", "value": "10"}
+        for _ in range(MAX_FILTER_DEPTH + 2):
+            node = {"logic": "and", "children": [node]}
+        with pytest.raises(ValueError, match="too deep"):
+            _parse_advanced_filters(json.dumps(node))
+
+    def test_invalid_logic_value_raises(self, db):
+        from services.product_filters import _parse_advanced_filters
+        with pytest.raises(ValueError, match="logic must be"):
+            _parse_advanced_filters(json.dumps(
+                {"logic": "xor", "children": [{"field": "protein", "op": ">=", "value": "10"}]}
+            ))
+
+    def test_empty_children_returns_no_sql(self, db):
+        from services.product_filters import _parse_advanced_filters
+        # Empty children list should produce empty SQL
+        sql, params, post = _parse_advanced_filters(json.dumps(
+            {"logic": "and", "children": []}
+        ))
+        assert sql == "" or sql is None or sql == ""
+        assert params == []
+
+    def test_non_dict_child_raises(self, db):
+        from services.product_filters import _parse_advanced_filters
+        with pytest.raises(ValueError, match="JSON object"):
+            _parse_advanced_filters(json.dumps(
+                {"logic": "and", "children": ["not_a_dict"]}
+            ))
+
+    def test_or_mixing_sql_and_post_query_fields_goes_to_post(self, db):
+        from services.product_filters import _parse_advanced_filters
+        # OR logic with one SQL field (protein) and one post-query field (total_score)
+        # forces everything to the post-filter
+        sql, params, post = _parse_advanced_filters(json.dumps(
+            {
+                "logic": "or",
+                "children": [
+                    {"field": "protein", "op": ">=", "value": "10"},
+                    {"field": "total_score", "op": ">=", "value": "0.5"},
+                ],
+            }
+        ))
+        # Since OR mixes SQL and post-query, everything moves to post-filter
+        assert sql == "" or sql is None or sql == ""
+        assert post is not None
+        assert post.get("logic") == "OR"
+
+
+# ── _node_to_post function ────────────────────────────────────────────────────
+
+
+class TestNodeToPost:
+    def test_leaf_node_to_post(self, db):
+        from services.product_filters import _node_to_post
+        node = {"field": "total_score", "op": ">=", "value": "0.5"}
+        result = _node_to_post(node)
+        assert result["field"] == "total_score"
+        assert result["op"] == ">="
+        assert result["val"] == pytest.approx(0.5)
+
+    def test_group_node_to_post(self, db):
+        from services.product_filters import _node_to_post
+        node = {
+            "logic": "and",
+            "children": [
+                {"field": "total_score", "op": ">=", "value": "0.3"},
+                {"field": "completeness", "op": "<=", "value": "100"},
+            ],
+        }
+        result = _node_to_post(node)
+        assert result["logic"] == "AND"
+        assert len(result["children"]) == 2
+
+
+# ── flag field in _evaluate_post_node ────────────────────────────────────────
+
+
+class TestEvaluatePostNodeFlagField:
+    def test_flag_true_product_has_flag(self):
+        from services.product_filters import _evaluate_post_node
+        node = {"field": "flag:is_synced_with_off", "op": "=", "val": "true"}
+        product = {"flags": ["is_synced_with_off"]}
+        assert _evaluate_post_node(node, product) is True
+
+    def test_flag_true_product_missing_flag(self):
+        from services.product_filters import _evaluate_post_node
+        node = {"field": "flag:is_synced_with_off", "op": "=", "val": "true"}
+        product = {"flags": []}
+        assert _evaluate_post_node(node, product) is False
+
+    def test_flag_false_product_has_flag(self):
+        from services.product_filters import _evaluate_post_node
+        node = {"field": "flag:is_synced_with_off", "op": "=", "val": "false"}
+        product = {"flags": ["is_synced_with_off"]}
+        assert _evaluate_post_node(node, product) is False
+
+    def test_flag_false_product_missing_flag(self):
+        from services.product_filters import _evaluate_post_node
+        node = {"field": "flag:is_synced_with_off", "op": "=", "val": "false"}
+        product = {"flags": []}
+        assert _evaluate_post_node(node, product) is True
+
+    def test_flag_no_flags_key_in_product(self):
+        from services.product_filters import _evaluate_post_node
+        node = {"field": "flag:is_synced_with_off", "op": "=", "val": "true"}
+        product = {}  # no "flags" key
+        assert _evaluate_post_node(node, product) is False
+
+    def test_empty_children_post_node_returns_true(self):
+        from services.product_filters import _evaluate_post_node
+        node = {"logic": "AND", "children": []}
+        assert _evaluate_post_node(node, {"total_score": 0.5}) is True

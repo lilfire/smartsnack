@@ -70,7 +70,11 @@ export function createLRUCache(maxSize) {
       return true;
     },
     deleteProperty(target, prop) {
-      return target._delete(prop);
+      target._delete(prop);
+      // Always return true: in strict mode, returning false causes
+      // `delete obj[key]` to throw a TypeError. Deleting a missing key
+      // should be a no-op, matching plain-object semantics.
+      return true;
     },
     has(target, prop) {
       return target._has(prop);

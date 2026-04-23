@@ -47,7 +47,6 @@ def _restore_product(cur, p, valid_flags=None):
         (
             p.get("type", ""),
             p.get("name", ""),
-            p.get("ean", ""),
             p.get("brand", ""),
             p.get("stores", ""),
             p.get("ingredients", ""),
@@ -72,6 +71,12 @@ def _restore_product(cur, p, valid_flags=None):
         ),
     )
     new_id = cur.lastrowid
+    ean = p.get("ean", "").strip()
+    if ean:
+        cur.execute(
+            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+            (new_id, ean),
+        )
     if valid_flags is None:
         valid_flags = flag_service.get_all_flag_names()
     for flag in p.get("flags", []):
@@ -80,6 +85,42 @@ def _restore_product(cur, p, valid_flags=None):
                 "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
                 (new_id, flag),
             )
+    # Restore product_eans rows. Prefer the explicit `eans` list from new
+    # backups; fall back to the legacy single `products.ean` field for
+    # backups that predate the per-EAN format. Without this, restored
+    # products would have an empty product_eans table even though
+    # products.ean is set, breaking the EAN editor in the UI.
+    backup_eans = p.get("eans")
+    if backup_eans:
+        for e in backup_eans:
+            ean_val = (e.get("ean") or "").strip()
+            if not ean_val:
+                continue
+            cur.execute(
+                "INSERT OR IGNORE INTO product_eans "
+                "(product_id, ean, is_primary, synced_with_off) "
+                "VALUES (?, ?, ?, ?)",
+                (
+                    new_id,
+                    ean_val,
+                    1 if e.get("is_primary") else 0,
+                    1 if e.get("synced_with_off") else 0,
+                ),
+            )
+    else:
+        legacy_ean = (p.get("ean") or "").strip()
+        if legacy_ean:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_eans "
+                "(product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (new_id, legacy_ean),
+            )
+            if "is_synced_with_off" in (p.get("flags") or []):
+                cur.execute(
+                    "UPDATE product_eans SET synced_with_off = 1 "
+                    "WHERE product_id = ? AND ean = ?",
+                    (new_id, legacy_ean),
+                )
 
 
 def create_backup(include_images: bool = True):
@@ -87,16 +128,25 @@ def create_backup(include_images: bool = True):
     from translations import _category_label, _flag_label, _pq_label, _pq_keywords
 
     conn = get_db()
+    _ean_subquery = (
+        "(SELECT pe.ean FROM product_eans pe "
+        "WHERE pe.product_id = products.id AND pe.is_primary = 1) AS ean"
+    )
     if include_images:
         products = [
             dict(r)
-            for r in conn.execute("SELECT * FROM products ORDER BY id").fetchall()
+            for r in conn.execute(
+                f"SELECT id, type, name, {_ean_subquery}, brand, stores, ingredients, taste_note, "
+                "taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, "
+                "protein, fiber, salt, volume, price, weight, portion, "
+                "est_pdcaas, est_diaas, image FROM products ORDER BY id"
+            ).fetchall()
         ]
     else:
         products = [
             dict(r)
             for r in conn.execute(
-                "SELECT id, type, name, ean, brand, stores, ingredients, taste_note, "
+                f"SELECT id, type, name, {_ean_subquery}, brand, stores, ingredients, taste_note, "
                 "taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, "
                 "protein, fiber, salt, volume, price, weight, portion, "
                 "est_pdcaas, est_diaas "
@@ -112,6 +162,23 @@ def create_backup(include_images: bool = True):
         flags_map.setdefault(r["product_id"], []).append(r["flag"])
     for p in products:
         p["flags"] = flags_map.get(p["id"], [])
+
+    # Attach product_eans rows to products. Without this, secondary EANs and
+    # per-row synced_with_off flags are silently lost on every backup→restore
+    # cycle.
+    ean_rows = conn.execute(
+        "SELECT product_id, ean, is_primary, synced_with_off "
+        "FROM product_eans ORDER BY product_id, is_primary DESC, id"
+    ).fetchall()
+    eans_map: dict[int, list[dict]] = {}
+    for r in ean_rows:
+        eans_map.setdefault(r["product_id"], []).append({
+            "ean": r["ean"],
+            "is_primary": bool(r["is_primary"]),
+            "synced_with_off": bool(r["synced_with_off"]),
+        })
+    for p in products:
+        p["eans"] = eans_map.get(p["id"], [])
 
     cat_rows = conn.execute("SELECT * FROM categories ORDER BY name").fetchall()
     categories = []
