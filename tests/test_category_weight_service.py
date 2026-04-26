@@ -322,3 +322,70 @@ class TestScoringWithCategoryOverrides:
         p = {"type": seed_category, "kcal": 100.0}
         _score_product(p, ["kcal"], enabled_weights, weight_config, {}, {})
         assert "kcal" in p["scores"]
+
+    def test_override_enabled_includes_field(self, app_ctx, seed_category):
+        """A field with category override enabled=1 is included in scoring."""
+        from services.product_scoring import _score_product
+
+        enabled_weights = {"kcal": 100.0}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        enabled_fields = ["kcal"]
+        category_overrides = {
+            (seed_category, "kcal"): {
+                "enabled": 1,
+                "weight": None,
+                "direction": None,
+                "formula": None,
+                "formula_min": None,
+                "formula_max": None,
+            }
+        }
+        p = {"type": seed_category, "kcal": 100.0}
+        _score_product(p, enabled_fields, enabled_weights, weight_config, {}, category_overrides)
+        assert "kcal" in p["scores"]
+        assert p["total_score"] > 0
+
+    def test_override_weight_uses_exact_value(self, app_ctx, seed_category):
+        """Category weight override value is used in score calculation."""
+        from services.product_scoring import _score_product
+
+        global_weight = 100.0
+        override_weight = 200.0
+        enabled_weights = {"kcal": global_weight}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        enabled_fields = ["kcal"]
+
+        # Score with global weight
+        p_global = {"type": seed_category, "kcal": 100.0}
+        _score_product(p_global, enabled_fields, enabled_weights, weight_config, {}, {})
+
+        # Score with category override weight
+        category_overrides = {
+            (seed_category, "kcal"): {
+                "enabled": 1,
+                "weight": override_weight,
+                "direction": None,
+                "formula": None,
+                "formula_min": None,
+                "formula_max": None,
+            }
+        }
+        p_override = {"type": seed_category, "kcal": 100.0}
+        _score_product(p_override, enabled_fields, enabled_weights, weight_config, {}, category_overrides)
+
+        # Override weight is 2x global, so the score should be 2x
+        assert p_override["scores"]["kcal"] == p_global["scores"]["kcal"] * 2

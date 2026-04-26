@@ -241,3 +241,29 @@ class TestRunMigrations:
         assert row["formula"] == "direct"
         assert row["formula_min"] == 1
         assert row["formula_max"] == 3
+
+    def test_008_category_score_weights_table_exists(self, db):
+        tables = [
+            r[0]
+            for r in db.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='category_score_weights'"
+            ).fetchall()
+        ]
+        assert "category_score_weights" in tables
+
+    def test_008_category_score_weights_has_correct_pk(self, db):
+        info = db.execute("PRAGMA table_info(category_score_weights)").fetchall()
+        pk_cols = [r["name"] for r in info if r["pk"] > 0]
+        assert "category" in pk_cols
+        assert "field" in pk_cols
+
+    def test_008_category_score_weights_idempotent(self, db):
+        from migrations import run_migrations
+
+        cur = db.cursor()
+        run_migrations(cur)
+        db.commit()
+        row = db.execute(
+            "SELECT COUNT(*) FROM schema_migrations WHERE name='008_category_score_weights'"
+        ).fetchone()
+        assert row[0] == 1
