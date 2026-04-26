@@ -21,6 +21,24 @@ _BASE_RULES = (
     "- Output nothing except the ingredient list text."
 )
 
+_NUTRITION_PROMPT = (
+    "Extract the per-100g nutrition values from this food label image. "
+    "Return ONLY valid JSON, no prose, no markdown fences. Use this exact "
+    "shape, omitting any field not present on the label. Values must be "
+    "plain numbers (no units, decimal point not comma) per 100 g:\n"
+    "{\n"
+    '  "kcal": number,\n'
+    '  "energy_kj": number,\n'
+    '  "fat": number,\n'
+    '  "saturated_fat": number,\n'
+    '  "carbs": number,\n'
+    '  "sugar": number,\n'
+    '  "fiber": number,\n'
+    '  "protein": number,\n'
+    '  "salt": number\n'
+    "}"
+)
+
 
 def build_ingredient_prompt(language: str | None = None) -> str:
     """Return the ingredient extraction prompt, optionally with a translation instruction."""

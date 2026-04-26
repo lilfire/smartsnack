@@ -40,14 +40,6 @@ def add_product():
     return jsonify(result), status
 
 
-@bp.route("/api/products/tags/suggestions", methods=["GET"])
-def tag_suggestions():
-    prefix = request.args.get("q", "").strip()
-    if not prefix:
-        return jsonify([])
-    return jsonify(product_service.get_tag_suggestions(prefix))
-
-
 @bp.route("/api/products/<int:pid>", methods=["PUT"])
 def update_product(pid):
     try:
@@ -128,7 +120,8 @@ def add_ean(pid):
         if err == "ean_already_exists":
             return jsonify({"error": err}), 409
         return jsonify({"error": err}), 400
-    return jsonify(result), 201
+    status = 200 if result.get("already_exists") else 201
+    return jsonify(result), status
 
 
 @bp.route("/api/products/<int:pid>/eans/<int:ean_id>", methods=["DELETE"])
@@ -149,3 +142,12 @@ def set_primary_ean(pid, ean_id):
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
     return jsonify({"ok": True, "message": "Primary EAN updated"})
+
+
+@bp.route("/api/products/<int:pid>/eans/<int:ean_id>/unsync", methods=["POST"])
+def unsync_ean(pid, ean_id):
+    try:
+        product_service.unsync_ean(pid, ean_id)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    return jsonify({"ok": True, "message": "EAN unsynced"})

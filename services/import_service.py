@@ -111,6 +111,23 @@ def _overwrite_product(cur, existing_id, p, valid_flags=None):
         cur.execute(
             f"UPDATE products SET {', '.join(updates)} WHERE id = ?", vals
         )
+    # Sync EAN to product_eans table
+    ean = (p.get("ean") or "").strip()
+    if ean:
+        primary_row = cur.execute(
+            "SELECT id FROM product_eans WHERE product_id = ? AND is_primary = 1",
+            (existing_id,),
+        ).fetchone()
+        if primary_row:
+            cur.execute(
+                "UPDATE product_eans SET ean = ? WHERE id = ?",
+                (ean, primary_row["id"]),
+            )
+        else:
+            cur.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (existing_id, ean),
+            )
     # Replace flags: remove existing, then insert imported
     cur.execute(
         "DELETE FROM product_flags WHERE product_id = ?", (existing_id,)
@@ -296,12 +313,12 @@ def import_products(
                     existing_cats.add(cat)
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
-            ean = p.get("ean", "").strip()
+            ean = (p.get("ean") or "").strip()
             name = p.get("name", "").strip()
             existing_id = None
             if match_criteria in ("ean", "both") and ean:
                 row = cur.execute(
-                    "SELECT id FROM products WHERE ean = ?", (ean,)
+                    "SELECT product_id as id FROM product_eans WHERE ean = ? LIMIT 1", (ean,)
                 ).fetchone()
                 if row:
                     existing_id = row["id"]

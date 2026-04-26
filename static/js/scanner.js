@@ -180,11 +180,12 @@ async function onSearchScanDetected(code) {
 
     const allProducts = await fetchProducts('', []);
 
-    // First pass: check primary EAN
+    // First pass: check both legacy ean field and eans array
     let found = null;
     for (let i = 0; i < allProducts.length; i++) {
-      const eans = allProducts[i].eans || [allProducts[i].ean];
-      if (eans.includes(code)) { found = allProducts[i]; break; }
+      const p = allProducts[i];
+      const eans = Array.isArray(p.eans) ? p.eans : [];
+      if (eans.includes(code) || p.ean === code) { found = p; break; }
     }
 
     // Second pass: if no primary match, search via backend (covers secondary EANs)

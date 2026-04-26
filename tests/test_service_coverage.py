@@ -395,6 +395,7 @@ class TestRefreshFromOff:
     def test_no_products_with_ean(self, app_ctx, db):
         from services.bulk_service import refresh_from_off
 
+        db.execute("DELETE FROM product_eans")
         db.execute("UPDATE products SET ean = ''")
         db.commit()
 
@@ -488,10 +489,16 @@ class TestRefreshFromOff:
     def test_image_updated(self, app_ctx, db):
         from services.bulk_service import refresh_from_off
 
+        db.execute("DELETE FROM product_eans")
         db.execute("UPDATE products SET ean = ''")
         db.execute(
             "INSERT INTO products (type, name, ean, image) VALUES (?, ?, ?, ?)",
             ("Snacks", "Image Product", "6666666666666", ""),
+        )
+        pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        db.execute(
+            "INSERT INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+            (pid, "6666666666666"),
         )
         db.commit()
 

@@ -11,6 +11,7 @@ import time
 from config import DB_PATH, _VALID_COLUMNS
 from db import get_db
 from services import proxy_service, protein_quality_service
+from services.settings_service import get_off_language_priority
 
 logger = logging.getLogger(__name__)
 
@@ -87,9 +88,16 @@ def _should_update(off_val, local_val):
     return True
 
 
-def _map_off_product(product, local_row):
-    """Map OFF product data to local DB fields. Returns dict of fields to update."""
+def _map_off_product(product, local_row, priority=None):
+    """Map OFF product data to local DB fields. Returns dict of fields to update.
+
+    ``priority`` is the user's OFF language priority list.  Only the **first**
+    (top) language is checked for name and ingredients – if the #1 language
+    has no data the field is left unchanged so we don't overwrite with a
+    less-preferred language.
+    """
     updates = {}
+    top_lang = (priority[0] if priority else "no")
     n = product.get("nutriments") or {}
 
     # Nutrition fields
@@ -114,10 +122,10 @@ def _map_off_product(product, local_row):
             else:
                 updates[local_field] = round(off_val, 1)
 
-    # Name
-    name = product.get("product_name_no") or product.get("product_name") or ""
-    if _should_update(name, local_row.get("name")):
-        updates["name"] = name.strip()
+    # Name – only use the #1 priority language
+    name = (product.get(f"product_name_{top_lang}") or "").strip()
+    if name and _should_update(name, local_row.get("name")):
+        updates["name"] = name
 
     # Brand
     brand = product.get("brands") or ""
@@ -133,15 +141,10 @@ def _map_off_product(product, local_row):
     if _should_update(stores, local_row.get("stores")):
         updates["stores"] = stores.strip()
 
-    # Ingredients
-    ing = (
-        product.get("ingredients_text_no")
-        or product.get("ingredients_text_en")
-        or product.get("ingredients_text")
-        or ""
-    )
-    if _should_update(ing, local_row.get("ingredients")):
-        updates["ingredients"] = ing.strip()
+    # Ingredients – only use the #1 priority language
+    ing = (product.get(f"ingredients_text_{top_lang}") or "").strip()
+    if ing and _should_update(ing, local_row.get("ingredients")):
+        updates["ingredients"] = ing
 
     # Weight (product_quantity)
     qty = product.get("product_quantity")
@@ -212,12 +215,17 @@ def _fetch_off_image(product):
 
 def refresh_from_off():
     """Refresh all products with EAN from OpenFoodFacts."""
+    try:
+        priority = get_off_language_priority()
+    except RuntimeError:
+        priority = ["no", "en"]
     conn = get_db()
     rows = conn.execute(
-        "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
-        "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-        "weight, portion, image "
-        "FROM products WHERE ean IS NOT NULL AND ean != ''"
+        "SELECT p.id, pe.ean, p.name, p.brand, p.stores, p.ingredients, p.kcal, p.energy_kj, "
+        "p.fat, p.saturated_fat, p.carbs, p.sugar, p.protein, p.fiber, p.salt, "
+        "p.weight, p.portion, p.image "
+        "FROM products p "
+        "INNER JOIN product_eans pe ON pe.product_id = p.id AND pe.is_primary = 1"
     ).fetchall()
 
     total = len(rows)
@@ -251,7 +259,7 @@ def refresh_from_off():
 
             product = data["product"]
             local = dict(row)
-            field_updates = _map_off_product(product, local)
+            field_updates = _map_off_product(product, local, priority)
 
             # Fetch image only if product doesn't already have one
             has_image = bool(row["image"])
@@ -331,16 +339,22 @@ def start_refresh_from_off(options=None):
 
 def _run_refresh(options=None):
     """Background thread that refreshes all products from OFF."""
+    try:
+        priority = get_off_language_priority()
+    except RuntimeError:
+        priority = ["no", "en"]
+
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA busy_timeout = 5000")
 
     try:
         rows = conn.execute(
-            "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
-            "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-            "weight, portion, image "
-            "FROM products WHERE ean IS NOT NULL AND ean != ''"
+            "SELECT p.id, pe.ean, p.name, p.brand, p.stores, p.ingredients, p.kcal, p.energy_kj, "
+            "p.fat, p.saturated_fat, p.carbs, p.sugar, p.protein, p.fiber, p.salt, "
+            "p.weight, p.portion, p.image "
+            "FROM products p "
+            "INNER JOIN product_eans pe ON pe.product_id = p.id AND pe.is_primary = 1"
         ).fetchall()
 
         total = len(rows)
@@ -414,7 +428,7 @@ def _run_refresh(options=None):
 
                 product = data["product"]
                 local = dict(row)
-                field_updates = _map_off_product(product, local)
+                field_updates = _map_off_product(product, local, priority)
                 image_uri = _fetch_off_image(product) if not has_image else None
 
                 if not field_updates and not image_uri:
@@ -481,11 +495,12 @@ def _run_refresh(options=None):
             min_completeness = options.get("min_completeness", 75)
 
             missing_rows = conn.execute(
-                "SELECT id, ean, name, brand, stores, ingredients, kcal, energy_kj, "
-                "fat, saturated_fat, carbs, sugar, protein, fiber, salt, "
-                "weight, portion, image "
-                "FROM products WHERE (ean IS NULL OR ean = '') "
-                "AND name IS NOT NULL AND name != ''"
+                "SELECT p.id, p.name, p.brand, p.stores, p.ingredients, p.kcal, p.energy_kj, "
+                "p.fat, p.saturated_fat, p.carbs, p.sugar, p.protein, p.fiber, p.salt, "
+                "p.weight, p.portion, p.image "
+                "FROM products p "
+                "WHERE NOT EXISTS (SELECT 1 FROM product_eans pe WHERE pe.product_id = p.id) "
+                "AND p.name IS NOT NULL AND p.name != ''"
             ).fetchall()
 
             phase2_total = len(missing_rows)
@@ -573,16 +588,14 @@ def _run_refresh(options=None):
                         continue
 
                     local = dict(row)
-                    field_updates = _map_off_product(best, local)
+                    field_updates = _map_off_product(best, local, priority)
                     has_image = bool(row["image"])
                     image_uri = _fetch_off_image(best) if not has_image else None
 
-                    # Store matched EAN for future lookups
+                    # Store matched EAN into product_eans (not products.ean)
                     matched_ean = best.get("code", "")
-                    if matched_ean:
-                        field_updates["ean"] = matched_ean
 
-                    if not field_updates and not image_uri:
+                    if not field_updates and not image_uri and not matched_ean:
                         skipped += 1
                         report.append(
                             {
@@ -605,6 +618,12 @@ def _run_refresh(options=None):
                             vals + [pid],
                         )
 
+                    if matched_ean:
+                        conn.execute(
+                            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                            (pid, matched_ean),
+                        )
+
                     if image_uri:
                         conn.execute(
                             "UPDATE products SET image = ? WHERE id = ?",
@@ -615,6 +634,8 @@ def _run_refresh(options=None):
                     updated += 1
                     _set_off_sync_flag(conn, pid)
                     updated_fields = list(field_updates.keys())
+                    if matched_ean:
+                        updated_fields.append("ean")
                     if image_uri:
                         updated_fields.append("image")
                     report.append(

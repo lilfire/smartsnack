@@ -2,7 +2,7 @@
 
 import os
 
-APP_VERSION = "0.13"
+APP_VERSION = "0.17"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 
@@ -54,6 +54,8 @@ DEFAULT_OCR_BACKEND = "tesseract"
 
 DEFAULT_PAGE_SIZE = 50
 
+TAG_LABEL_MAX_LEN = 50
+
 
 TRANSLATIONS_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "translations"
@@ -99,7 +101,6 @@ ALL_PRODUCT_FIELDS = (
     "est_diaas",
     "type",
     "name",
-    "ean",
     "brand",
     "stores",
     "ingredients",
@@ -113,7 +114,6 @@ _VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
 _TEXT_FIELD_LIMITS = {
     "type": 100,
     "name": 200,
-    "ean": 50,
     "brand": 200,
     "stores": 500,
     "ingredients": 10000,
@@ -155,6 +155,7 @@ PQ_SEED = [
     ("peanut", 0.52, 0.45),
     ("almond", 0.33, 0.40),
     ("cashew", 0.73, 0.69),
+    ("pistachio", 0.73, 0.65),
     ("sunflower", 0.60, 0.53),
     ("pumpkin_seed", 0.60, 0.51),
     ("hemp", 0.63, 0.66),
@@ -163,6 +164,14 @@ PQ_SEED = [
     ("potato", 0.85, 0.87),
     ("spirulina", 0.99, 0.74),
     ("tofu_tempeh", 0.91, 0.84),
+    ("dates", 0.30, 0.25),
+    ("jackfruit", 0.45, 0.40),
+    ("plantain", 0.35, 0.30),
+    ("tomato", 0.48, 0.42),
+    ("bell_pepper", 0.45, 0.38),
+    ("mustard", 0.75, 0.70),
+    ("cocoa", 0.55, 0.48),
+    ("collagen", 0.08, 0.09),
 ]
 
 
@@ -342,7 +351,7 @@ MAX_FILTER_DEPTH = 4
 MAX_FILTER_CONDITIONS = 20
 TEXT_FIELDS = frozenset(
     _TEXT_FIELD_LIMITS.keys()
-)  # type, name, ean, brand, stores, ingredients
+)  # type, name, brand, stores, ingredients
 NUMERIC_FIELDS = frozenset(
     NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas")
 )
@@ -350,7 +359,6 @@ POST_QUERY_FIELDS = frozenset(("total_score", "completeness"))
 
 # ── Completeness score ────────────────────────────────
 COMPLETENESS_FIELDS = (
-    "ean",
     "brand",
     "stores",
     "ingredients",
@@ -416,12 +424,14 @@ DEFAULT_WEIGHTS = {
 
 # ── SQL helpers ───────────────────────────────────────
 PRODUCT_COLS_NO_IMAGE = (
-    "id, type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "
+    "id, type, name, "
+    "(SELECT ean FROM product_eans WHERE product_id = products.id AND is_primary = 1) AS ean, "
+    "brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "
     "fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas, "
     "CASE WHEN image != '' THEN 1 ELSE 0 END AS has_image"
 )
 
-INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
+INSERT_FIELDS = "type, name, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
 INSERT_PLACEHOLDERS = ",".join(["?"] * len(INSERT_FIELDS.split(",")))
 INSERT_WITH_IMAGE_SQL = (
     f"INSERT INTO products ({INSERT_FIELDS}, image) VALUES ({INSERT_PLACEHOLDERS}, ?)"

@@ -118,6 +118,30 @@ class TestUpdateProduct:
         with pytest.raises(ValueError, match="Nothing to update"):
             update_product(pid, {})
 
+    def test_update_ean_to_empty_removes_primary_ean(self, db):
+        """Clearing the EAN field should clear primary designation in product_eans."""
+        from services.product_crud import update_product
+
+        pid = _add("ClearEan", ean="11110001")["id"]
+        update_product(pid, {"ean": ""})
+        row = db.execute(
+            "SELECT ean FROM products WHERE id = ?", (pid,)
+        ).fetchone()
+        assert row["ean"] == ""
+
+    def test_update_preserves_secondary_eans(self, db):
+        """Updating primary EAN should not delete secondary EANs."""
+        from services.product_crud import update_product
+        from services.product_eans import add_ean, list_eans
+
+        pid = _add("KeepSecondary", ean="22220001")["id"]
+        add_ean(pid, "22220002")
+        update_product(pid, {"ean": "22220003"})
+        eans = list_eans(pid)
+        ean_values = [e["ean"] for e in eans]
+        assert "22220002" in ean_values
+        assert "22220003" in ean_values
+
 
 # ── delete_product ────────────────────────────────────────────────────────────
 
@@ -137,8 +161,10 @@ class TestDeleteProduct:
 
     def test_related_tags_cascade_deleted(self, db):
         from services.product_crud import update_product, delete_product
+        from services import tag_service
         pid = _add("P")["id"]
-        update_product(pid, {"tags": ["healthy"]})
+        tag = tag_service.create_tag("healthy")
+        update_product(pid, {"tagIds": [tag["id"]]})
         delete_product(pid)
         assert db.execute("SELECT product_id FROM product_tags WHERE product_id=?", (pid,)).fetchone() is None
 
@@ -154,6 +180,44 @@ class TestDeleteProduct:
         assert delete_product(99999) is False
 
 
+class TestMarkProductSyncedWithOff:
+    def test_sets_flag_without_ean(self, db):
+        from services.product_crud import mark_product_synced_with_off
+        pid = _add("No EAN product")["id"]
+        mark_product_synced_with_off(pid)
+        row = db.execute(
+            "SELECT flag FROM product_flags WHERE product_id=? AND flag=?",
+            (pid, "is_synced_with_off"),
+        ).fetchone()
+        assert row is not None
+
+    def test_sets_flag_and_updates_product_eans(self, db):
+        from services.product_crud import mark_product_synced_with_off
+        pid = _add("With EAN product", ean="12345678")["id"]
+        mark_product_synced_with_off(pid, "12345678")
+        flag_row = db.execute(
+            "SELECT flag FROM product_flags WHERE product_id=? AND flag=?",
+            (pid, "is_synced_with_off"),
+        ).fetchone()
+        assert flag_row is not None
+        ean_row = db.execute(
+            "SELECT synced_with_off FROM product_eans WHERE product_id=? AND ean=?",
+            (pid, "12345678"),
+        ).fetchone()
+        assert ean_row["synced_with_off"] == 1
+
+    def test_idempotent(self, db):
+        from services.product_crud import mark_product_synced_with_off
+        pid = _add("Idempotent", ean="12345678")["id"]
+        mark_product_synced_with_off(pid, "12345678")
+        mark_product_synced_with_off(pid, "12345678")
+        count = db.execute(
+            "SELECT COUNT(*) AS c FROM product_flags WHERE product_id=? AND flag=?",
+            (pid, "is_synced_with_off"),
+        ).fetchone()["c"]
+        assert count == 1
+
+
 # ── EAN functions ─────────────────────────────────────────────────────────────
 
 
@@ -162,39 +226,39 @@ class TestEanFunctions:
         return _add("EAN Test")["id"]
 
     def test_add_ean_rejects_too_short(self, db):
-        from services.product_crud import add_ean
+        from services.product_eans import add_ean
         pid = self._create_product(db)
         with pytest.raises(ValueError, match="EAN"):
             add_ean(pid, "1234567")  # 7 digits
 
     def test_add_ean_rejects_too_long(self, db):
-        from services.product_crud import add_ean
+        from services.product_eans import add_ean
         pid = self._create_product(db)
         with pytest.raises(ValueError, match="EAN"):
             add_ean(pid, "12345678901234")  # 14 digits
 
     def test_add_first_ean_is_primary(self, db):
-        from services.product_crud import add_ean
+        from services.product_eans import add_ean
         pid = self._create_product(db)
         result = add_ean(pid, "12345678")
         assert result["is_primary"] is True
 
     def test_add_second_ean_not_primary(self, db):
-        from services.product_crud import add_ean
+        from services.product_eans import add_ean
         pid = self._create_product(db)
         add_ean(pid, "12345678")
         result = add_ean(pid, "87654321")
         assert result["is_primary"] is False
 
     def test_delete_ean_raises_when_only_ean(self, db):
-        from services.product_crud import add_ean, delete_ean
+        from services.product_eans import add_ean, delete_ean
         pid = self._create_product(db)
         ean = add_ean(pid, "12345678")
         with pytest.raises(ValueError, match="only"):
             delete_ean(pid, ean["id"])
 
     def test_delete_primary_ean_promotes_next(self, db):
-        from services.product_crud import add_ean, delete_ean, list_eans
+        from services.product_eans import add_ean, delete_ean, list_eans
         pid = self._create_product(db)
         primary = add_ean(pid, "12345678")
         add_ean(pid, "87654321")
@@ -204,7 +268,7 @@ class TestEanFunctions:
         assert eans[0]["is_primary"] is True
 
     def test_set_primary_ean_demotes_old_primary(self, db):
-        from services.product_crud import add_ean, set_primary_ean, list_eans
+        from services.product_eans import add_ean, set_primary_ean, list_eans
         pid = self._create_product(db)
         add_ean(pid, "12345678")
         second = add_ean(pid, "87654321")
@@ -215,7 +279,7 @@ class TestEanFunctions:
         assert primaries[0]["ean"] == "87654321"
 
     def test_list_eans_primary_first(self, db):
-        from services.product_crud import add_ean, set_primary_ean, list_eans
+        from services.product_eans import add_ean, set_primary_ean, list_eans
         pid = self._create_product(db)
         add_ean(pid, "12345678")
         second = add_ean(pid, "87654321")

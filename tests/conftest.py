@@ -39,7 +39,8 @@ def _env_setup(request, tmp_path, monkeypatch):
 
     Skipped for e2e tests, which manage their own server and database.
     """
-    if "e2e" in str(request.fspath):
+    import pathlib
+    if "e2e" in pathlib.Path(str(request.fspath)).parts:
         return
     db_file = str(tmp_path / "test.sqlite")
     monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "test-secret-key-for-unit-tests")
@@ -139,7 +140,8 @@ def translations_dir(request, tmp_path, monkeypatch):
 
     Skipped for e2e tests, which manage their own setup.
     """
-    if "e2e" in str(request.fspath):
+    import pathlib
+    if "e2e" in pathlib.Path(str(request.fspath)).parts:
         return None
     import config
 

@@ -258,10 +258,7 @@ describe('estimateProteinQuality', () => {
   });
 
   it('posts ingredients and updates DOM on success', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ est_pdcaas: 0.85, est_diaas: 0.92, sources: ['whey'] }),
-    });
+    api.mockResolvedValueOnce({ est_pdcaas: 0.85, est_diaas: 0.92, sources: ['whey'] });
     await estimateProteinQuality('ed');
     expect(document.getElementById('ed-pdcaas-val').textContent).toBe('0.85');
     expect(document.getElementById('ed-diaas-val').textContent).toBe('0.92');
@@ -277,25 +274,19 @@ describe('estimateProteinQuality', () => {
   });
 
   it('shows error on network failure', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false });
+    api.mockRejectedValueOnce(new Error('Request failed: 500'));
     await estimateProteinQuality('ed');
     expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
   });
 
   it('shows error when no sources found', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
-    });
+    api.mockResolvedValueOnce({ est_pdcaas: null, est_diaas: null, sources: [] });
     await estimateProteinQuality('ed');
     expect(showToast).toHaveBeenCalledWith('toast_no_protein_sources', 'error');
   });
 
   it('re-enables button after completion', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ est_pdcaas: 0.85, est_diaas: 0.92, sources: [] }),
-    });
+    api.mockResolvedValueOnce({ est_pdcaas: 0.85, est_diaas: 0.92, sources: [] });
     const btn = document.getElementById('ed-estimate-btn');
     await estimateProteinQuality('ed');
     expect(btn.disabled).toBe(false);
@@ -303,16 +294,13 @@ describe('estimateProteinQuality', () => {
   });
 
   it('shows error when API returns error field', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ error: 'Some error' }),
-    });
+    api.mockResolvedValueOnce({ error: 'Some error' });
     await estimateProteinQuality('ed');
     expect(showToast).toHaveBeenCalledWith('toast_error_prefix', 'error');
   });
 
   it('handles fetch exception', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network fail'));
+    api.mockRejectedValueOnce(new Error('Network fail'));
     await estimateProteinQuality('ed');
     expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
     const btn = document.getElementById('ed-estimate-btn');
@@ -320,10 +308,7 @@ describe('estimateProteinQuality', () => {
   });
 
   it('displays dash when pdcaas/diaas are null', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
-    });
+    api.mockResolvedValueOnce({ est_pdcaas: null, est_diaas: null, sources: [] });
     await estimateProteinQuality('ed');
     expect(document.getElementById('ed-pdcaas-val').textContent).toBe('\u2013');
     expect(document.getElementById('ed-diaas-val').textContent).toBe('\u2013');
