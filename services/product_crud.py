@@ -184,7 +184,7 @@ def list_products(
     conn = get_db()
     cur = conn.cursor()
 
-    enabled_weights, weight_config, enabled_fields = _load_weight_config(cur)
+    enabled_weights, weight_config, enabled_fields, category_overrides = _load_weight_config(cur)
     cat_ranges = _compute_category_ranges(cur, enabled_fields)
 
     conditions, params = [], []
@@ -243,6 +243,7 @@ def list_products(
             enabled_weights,
             weight_config,
             cat_ranges,
+            category_overrides,
         )
         p["completeness"] = _compute_completeness(p)
         results.append(p)
