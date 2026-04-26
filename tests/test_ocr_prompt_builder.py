@@ -91,6 +91,78 @@ class TestBuildIngredientPrompt:
             prompt = build_ingredient_prompt(lang)
             assert "empty string" in prompt
 
+    # --- Translation vs no-translation prompt content validation ---
+
+    def test_empty_string_language_returns_default_task(self):
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt("")
+        assert "Extract ONLY the ingredient list" in prompt
+        assert "translate" not in prompt.split("\n")[0].lower()
+
+    def test_empty_string_language_equals_no_arg_call(self):
+        from services.ocr_backends import build_ingredient_prompt
+        assert build_ingredient_prompt("") == build_ingredient_prompt()
+
+    @pytest.mark.parametrize("lang,expected_name", [
+        ("no", "Norwegian (Bokmål)"),
+        ("en", "English"),
+        ("se", "Swedish"),
+    ])
+    def test_translation_prompt_contains_translate_directive(self, lang, expected_name):
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert f"translate every ingredient into {expected_name}" in prompt.lower() or \
+               f"always output in {expected_name}" in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_prompt_task_header_does_not_say_extract_only(self, lang):
+        """When translating, the header should NOT say 'Extract ONLY' — that
+        implies verbatim extraction without translation."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        first_line = prompt.split("\n")[0]
+        assert "Extract ONLY" not in first_line
+
+    def test_no_translation_prompt_does_not_contain_language_names(self):
+        """The default (no-language) prompt must not mention any specific language."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt()
+        for name in ("Norwegian", "English", "Swedish"):
+            assert name not in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_prompt_would_catch_conflicting_instructions(self, lang):
+        """Regression: the original bug had both 'as it appears' (verbatim) and
+        'translate' in the same prompt, creating conflicting instructions.
+        When translation is requested, the prompt must contain translation
+        directives and must NOT say 'Extract ONLY' or 'as it appears'."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "translate" in prompt.lower()
+        assert "Extract ONLY" not in prompt
+        assert "exactly as it appears" not in prompt.lower()
+
+    def test_no_translation_prompt_uses_verbatim_rules(self):
+        """Without a language, the prompt must use verbatim extraction rules."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt()
+        assert "Extract ONLY the ingredient list" in prompt
+        assert "as it appears" in prompt.lower()
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_rules_contain_e_number_exception(self, lang):
+        """Translation rules should allow E-numbers to remain untranslated."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "E-number" in prompt or "E471" in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_rules_require_full_translation(self, lang):
+        """Translation rules should require all ingredients to be translated."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "Do NOT output any text in the original label language" in prompt
+
     def test_backward_compat_alias_is_set(self):
         import services.ocr_backends as mod
         assert hasattr(mod, "_INGREDIENT_PROMPT")
