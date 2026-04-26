@@ -178,23 +178,13 @@ async function onSearchScanDetected(code) {
   try {
     if (state.currentView !== 'search') switchView('search');
 
-    const allProducts = await fetchProducts('', []);
-
-    // First pass: check primary EAN
+    const raw = await fetchProducts(code, []);
+    const products = Array.isArray(raw) ? raw : (raw.products || []);
     let found = null;
-    for (let i = 0; i < allProducts.length; i++) {
-      const eans = allProducts[i].eans || [allProducts[i].ean];
-      if (eans.includes(code)) { found = allProducts[i]; break; }
-    }
-
-    // Second pass: if no primary match, search via backend (covers secondary EANs)
-    if (!found) {
-      const bySearch = await fetchProducts(code, []);
-      if (bySearch.length === 1) {
-        found = bySearch[0];
-      } else if (bySearch.length > 1) {
-        found = bySearch.find((p) => p.ean === code) || null;
-      }
+    if (products.length === 1) {
+      found = products[0];
+    } else if (products.length > 1) {
+      found = products.find((p) => p.ean === code) || null;
     }
 
     if (found) {

@@ -795,11 +795,8 @@ describe('onSearchScanDetected when product is not found', () => {
     navigator.vibrate = vi.fn();
 
     state.currentView = 'search';
-    // First call (all products): none match the scanned EAN by primary EAN
-    // Second call (secondary EAN search): no results either
-    fetchProducts.mockResolvedValueOnce([
-      { id: 1, name: 'Other', type: 'dairy', ean: '0000000000000' },
-    ]).mockResolvedValueOnce([]);
+    // Backend search returns no results for the scanned EAN
+    fetchProducts.mockResolvedValueOnce([]);
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -1399,6 +1396,105 @@ describe('scanPickerSearch brand vs no brand products', () => {
     const noBrandResult = results[1];
     const brandDiv = noBrandResult.querySelector('.off-result-brand');
     expect(brandDiv.textContent).not.toContain('\u00B7');
+  });
+});
+
+// ── Regression tests: fetchProducts response unwrapping (LSO-862) ────────────
+// The API returns {products: [...], total: N} not a plain array.
+// onSearchScanDetected must unwrap correctly in both formats.
+
+describe('onSearchScanDetected fetchProducts response unwrapping', () => {
+  function setupSearchScanner() {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = { EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3 };
+    navigator.vibrate = vi.fn();
+
+    ['search-input', 'search-clear', 'filter-row', 'filter-toggle'].forEach((id) => {
+      const el = document.createElement(id === 'search-input' ? 'input' : 'div');
+      el.id = id;
+      document.body.appendChild(el);
+    });
+
+    return () => capturedOnSuccess;
+  }
+
+  it('finds product when fetchProducts returns object format {products: [...], total: N}', async () => {
+    const getCaptured = setupSearchScanner();
+    state.currentView = 'search';
+    const product = { id: 5, name: 'Gouda', type: 'dairy', ean: '7038010055720' };
+    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce([product]); // filtered render call
+
+    openSearchScanner();
+    await vi.waitFor(() => expect(getCaptured()).toBeDefined());
+
+    getCaptured()('7038010055720');
+    await vi.waitFor(() => expect(buildFilters).toHaveBeenCalled());
+
+    expect(state.currentFilter).toEqual(['dairy']);
+    expect(renderResults).toHaveBeenCalled();
+    expect(document.getElementById('scan-modal-bg')).toBeNull();
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('shows not-found modal when fetchProducts returns empty object format {products: [], total: 0}', async () => {
+    const getCaptured = setupSearchScanner();
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValueOnce({ products: [], total: 0 });
+
+    openSearchScanner();
+    await vi.waitFor(() => expect(getCaptured()).toBeDefined());
+
+    getCaptured()('9876543210987');
+    await vi.waitFor(() => {
+      expect(document.getElementById('scan-modal-bg')).not.toBeNull();
+    });
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('finds correct product when fetchProducts returns object with multiple products', async () => {
+    const getCaptured = setupSearchScanner();
+    state.currentView = 'search';
+    const target = { id: 2, name: 'Target', type: 'snack', ean: '1234567890123' };
+    const other = { id: 3, name: 'Other', type: 'snack', ean: '9999999999999' };
+    fetchProducts.mockResolvedValueOnce({ products: [target, other], total: 2 });
+    fetchProducts.mockResolvedValueOnce([target]); // filtered render call
+
+    openSearchScanner();
+    await vi.waitFor(() => expect(getCaptured()).toBeDefined());
+
+    getCaptured()('1234567890123');
+    await vi.waitFor(() => expect(buildFilters).toHaveBeenCalled());
+
+    expect(state.currentFilter).toEqual(['snack']);
+    expect(document.getElementById('scan-modal-bg')).toBeNull();
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('shows not-found modal when multiple products returned but none match the EAN', async () => {
+    const getCaptured = setupSearchScanner();
+    state.currentView = 'search';
+    const p1 = { id: 1, name: 'P1', type: 'dairy', ean: '1111111111111' };
+    const p2 = { id: 2, name: 'P2', type: 'dairy', ean: '2222222222222' };
+    fetchProducts.mockResolvedValueOnce({ products: [p1, p2], total: 2 });
+
+    openSearchScanner();
+    await vi.waitFor(() => expect(getCaptured()).toBeDefined());
+
+    getCaptured()('9876543210987');
+    await vi.waitFor(() => {
+      expect(document.getElementById('scan-modal-bg')).not.toBeNull();
+    });
+    fetchProducts.mockResolvedValue([]);
   });
 });
 
