@@ -5,6 +5,11 @@ import json
 import pytest
 from unittest.mock import patch, MagicMock
 
+from tests.mock_shape_validator import (
+    validate_off_add_product_response,
+    validate_off_upload_image_response,
+)
+
 
 _PNG_1x1 = (
     b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
@@ -55,6 +60,7 @@ class TestAddProductToOff:
                     "brands": "TestBrand",
                 }
             )
+            validate_off_add_product_response(result)
             assert result["status"] == 1
 
     def test_api_error(self, app_ctx):
@@ -138,6 +144,7 @@ class TestUploadImageToOff:
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
             result = upload_image_to_off("12345678", _PNG_DATA_URI)
+            validate_off_upload_image_response(result)
             assert result["status"] == "status ok"
 
         assert "product_image_upload.pl" in captured["url"]
@@ -206,3 +213,33 @@ class TestUploadImageToOff:
         with patch("urllib.request.urlopen", return_value=mock_resp):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
+
+
+class TestOffApiMockShapes:
+    """Validate canonical dict forms of OFF API responses match documented shapes.
+
+    If the OFF API changes its response structure, update these dicts and the
+    validators in mock_shape_validator.py — these tests will fail to remind you.
+    """
+
+    def test_add_product_canonical_response(self):
+        validate_off_add_product_response({"status": 1})
+
+    def test_add_product_rejects_missing_status(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_off_add_product_response({"product_id": "abc"})
+
+    def test_add_product_rejects_string_status(self):
+        with pytest.raises(AssertionError, match="must be an int"):
+            validate_off_add_product_response({"status": "ok"})
+
+    def test_upload_image_canonical_response(self):
+        validate_off_upload_image_response({"status": "status ok", "imagefield": "front"})
+
+    def test_upload_image_rejects_missing_imagefield(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_off_upload_image_response({"status": "status ok"})
+
+    def test_upload_image_rejects_int_status(self):
+        with pytest.raises(AssertionError, match="must be a str"):
+            validate_off_upload_image_response({"status": 1, "imagefield": "front"})

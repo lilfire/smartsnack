@@ -123,3 +123,191 @@ def validate_add_product_response(data):
     assert isinstance(data, dict), f"Add product response must be a dict, got {type(data).__name__}"
     missing = ADD_PRODUCT_RESPONSE_REQUIRED_KEYS - set(data.keys())
     assert not missing, f"Add product response missing required keys: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# OCR dispatch result: {"text": str, "provider": str, "fallback": bool}
+# ---------------------------------------------------------------------------
+
+OCR_DISPATCH_RESULT_REQUIRED_KEYS = {"text", "provider", "fallback"}
+
+
+def validate_ocr_dispatch_result(data):
+    """Validate the dict returned by dispatch_ocr / dispatch_ocr_bytes."""
+    assert isinstance(data, dict), (
+        f"OCR dispatch result must be a dict, got {type(data).__name__}"
+    )
+    missing = OCR_DISPATCH_RESULT_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"OCR dispatch result missing keys: {missing}"
+    assert isinstance(data["text"], str), "'text' must be a str"
+    assert isinstance(data["provider"], str), "'provider' must be a str"
+    assert isinstance(data["fallback"], bool), "'fallback' must be a bool"
+
+
+# ---------------------------------------------------------------------------
+# OpenAI-compatible API response shapes
+# (used by OpenAI, Groq, OpenRouter backends)
+# ---------------------------------------------------------------------------
+
+# Dict form of the OpenAI chat completion response.
+# Real shape: {"choices": [{"message": {"content": str}, ...}], ...}
+OPENAI_RESPONSE_REQUIRED_KEYS = {"choices"}
+OPENAI_CHOICE_REQUIRED_KEYS = {"message"}
+OPENAI_MESSAGE_REQUIRED_KEYS = {"content"}
+
+
+def validate_openai_response_shape(data):
+    """Validate an OpenAI-compatible chat completion response dict.
+
+    If a test mock returns a dict representation, call this to confirm it
+    matches the documented OpenAI API shape.
+    """
+    assert isinstance(data, dict), (
+        f"OpenAI response must be a dict, got {type(data).__name__}"
+    )
+    missing = OPENAI_RESPONSE_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"OpenAI response missing keys: {missing}"
+    assert isinstance(data["choices"], list), "'choices' must be a list"
+    assert len(data["choices"]) > 0, "Non-empty 'choices' expected in non-error response"
+    choice = data["choices"][0]
+    assert isinstance(choice, dict), f"choice must be a dict, got {type(choice).__name__}"
+    missing_choice = OPENAI_CHOICE_REQUIRED_KEYS - set(choice.keys())
+    assert not missing_choice, f"OpenAI choice missing keys: {missing_choice}"
+    message = choice["message"]
+    assert isinstance(message, dict), f"message must be a dict, got {type(message).__name__}"
+    missing_msg = OPENAI_MESSAGE_REQUIRED_KEYS - set(message.keys())
+    assert not missing_msg, f"OpenAI message missing keys: {missing_msg}"
+    assert isinstance(message["content"], str), "'content' must be a str"
+
+
+# ---------------------------------------------------------------------------
+# Gemini (google.genai) API response shapes
+# Real shape: response.text (str attribute, not a dict key)
+# Canonical dict form for shape-validation purposes: {"text": str}
+# ---------------------------------------------------------------------------
+
+GEMINI_RESPONSE_REQUIRED_KEYS = {"text"}
+
+
+def validate_gemini_response_shape(data):
+    """Validate a Gemini response dict (canonical dict form).
+
+    The real Gemini SDK response is an object with a .text attribute.
+    For shape-validation purposes we use {"text": str} as the canonical dict.
+    """
+    assert isinstance(data, dict), (
+        f"Gemini response must be a dict, got {type(data).__name__}"
+    )
+    missing = GEMINI_RESPONSE_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"Gemini response missing keys: {missing}"
+    assert isinstance(data["text"], str), "'text' must be a str"
+
+
+# ---------------------------------------------------------------------------
+# Claude (anthropic) API response shapes
+# Real shape: message.content = [ContentBlock(text=str)]
+# Canonical dict form: {"content": [{"text": str}]}
+# ---------------------------------------------------------------------------
+
+CLAUDE_RESPONSE_REQUIRED_KEYS = {"content"}
+CLAUDE_CONTENT_BLOCK_REQUIRED_KEYS = {"text"}
+
+
+def validate_claude_response_shape(data):
+    """Validate a Claude messages.create response dict (canonical dict form).
+
+    Real SDK shape: message.content[0].text (object with attributes).
+    Canonical dict form: {"content": [{"text": str}]}.
+    """
+    assert isinstance(data, dict), (
+        f"Claude response must be a dict, got {type(data).__name__}"
+    )
+    missing = CLAUDE_RESPONSE_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"Claude response missing keys: {missing}"
+    assert isinstance(data["content"], list), "'content' must be a list"
+    assert len(data["content"]) > 0, "Non-empty 'content' expected in non-error response"
+    block = data["content"][0]
+    assert isinstance(block, dict), f"content block must be a dict, got {type(block).__name__}"
+    missing_block = CLAUDE_CONTENT_BLOCK_REQUIRED_KEYS - set(block.keys())
+    assert not missing_block, f"Claude content block missing keys: {missing_block}"
+    assert isinstance(block["text"], str), "'text' must be a str"
+
+
+# ---------------------------------------------------------------------------
+# OFF (Open Food Facts) API response shapes
+# ---------------------------------------------------------------------------
+
+OFF_ADD_PRODUCT_RESPONSE_REQUIRED_KEYS = {"status"}
+OFF_UPLOAD_IMAGE_RESPONSE_REQUIRED_KEYS = {"status", "imagefield"}
+
+
+def validate_off_add_product_response(data):
+    """Validate an OFF add-product API response dict."""
+    assert isinstance(data, dict), (
+        f"OFF add-product response must be a dict, got {type(data).__name__}"
+    )
+    missing = OFF_ADD_PRODUCT_RESPONSE_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"OFF add-product response missing keys: {missing}"
+    assert isinstance(data["status"], int), "'status' must be an int (1=ok)"
+
+
+def validate_off_upload_image_response(data):
+    """Validate an OFF upload-image API response dict."""
+    assert isinstance(data, dict), (
+        f"OFF upload-image response must be a dict, got {type(data).__name__}"
+    )
+    missing = OFF_UPLOAD_IMAGE_RESPONSE_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"OFF upload-image response missing keys: {missing}"
+    assert isinstance(data["status"], str), "'status' must be a str"
+    assert isinstance(data["imagefield"], str), "'imagefield' must be a str"
+
+
+# ---------------------------------------------------------------------------
+# Proxy service response shape: (bytes, content_type_str)
+# ---------------------------------------------------------------------------
+
+PROXY_ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+def validate_proxy_response(data, content_type):
+    """Validate the (bytes, content_type) tuple returned by proxy_image."""
+    assert isinstance(data, bytes), f"Proxy data must be bytes, got {type(data).__name__}"
+    assert len(data) > 0, "Proxy response must not be empty"
+    assert isinstance(content_type, str), (
+        f"Content-type must be a str, got {type(content_type).__name__}"
+    )
+    assert content_type in PROXY_ALLOWED_CONTENT_TYPES, (
+        f"Unexpected content-type '{content_type}', "
+        f"expected one of {PROXY_ALLOWED_CONTENT_TYPES}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Bulk service response shapes
+# ---------------------------------------------------------------------------
+
+REFRESH_STATUS_REQUIRED_KEYS = {"running", "done", "current", "total", "updated", "skipped", "errors"}
+PQ_ESTIMATION_REQUIRED_KEYS = {"total", "updated", "skipped"}
+
+
+def validate_refresh_status_response(data):
+    """Validate the dict returned by get_refresh_status."""
+    assert isinstance(data, dict), (
+        f"Refresh status must be a dict, got {type(data).__name__}"
+    )
+    missing = REFRESH_STATUS_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"Refresh status missing keys: {missing}"
+    assert isinstance(data["running"], bool), "'running' must be a bool"
+    assert isinstance(data["done"], bool), "'done' must be a bool"
+
+
+def validate_pq_estimation_response(data):
+    """Validate the dict returned by estimate_all_pq."""
+    assert isinstance(data, dict), (
+        f"PQ estimation result must be a dict, got {type(data).__name__}"
+    )
+    missing = PQ_ESTIMATION_REQUIRED_KEYS - set(data.keys())
+    assert not missing, f"PQ estimation result missing keys: {missing}"
+    assert isinstance(data["total"], int), "'total' must be an int"
+    assert isinstance(data["updated"], int), "'updated' must be an int"
+    assert isinstance(data["skipped"], int), "'skipped' must be an int"

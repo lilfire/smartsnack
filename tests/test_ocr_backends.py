@@ -6,6 +6,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
+from tests.mock_shape_validator import (
+    validate_openai_response_shape,
+    validate_gemini_response_shape,
+    validate_claude_response_shape,
+)
+
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -406,3 +412,67 @@ class TestTesseract:
         with patch("pytesseract.image_to_data", return_value=mock_data):
             result = _extract_tesseract(_tiny_png_bytes(), "b64")
         assert result == ""
+
+
+# ── Mock shape validation: canonical dict forms ────────────────────────────────
+
+
+class TestOcrApiMockShapes:
+    """Validate that the canonical dict forms of external API responses match their real shapes.
+
+    If the real API changes its response structure, update these canonical dicts
+    AND the corresponding validators in mock_shape_validator.py — these tests will
+    fail to remind you to keep them in sync.
+    """
+
+    def test_openai_canonical_response_shape(self):
+        canonical = {
+            "choices": [
+                {"message": {"role": "assistant", "content": "sugar, flour"}}
+            ]
+        }
+        validate_openai_response_shape(canonical)
+
+    def test_groq_canonical_response_shape(self):
+        """Groq uses the OpenAI-compatible API format."""
+        canonical = {
+            "choices": [
+                {"message": {"role": "assistant", "content": "ingredienser"}}
+            ]
+        }
+        validate_openai_response_shape(canonical)
+
+    def test_openrouter_canonical_response_shape(self):
+        """OpenRouter uses the OpenAI-compatible API format."""
+        canonical = {
+            "choices": [
+                {"message": {"role": "assistant", "content": "ingredients list"}}
+            ]
+        }
+        validate_openai_response_shape(canonical)
+
+    def test_gemini_canonical_response_shape(self):
+        canonical = {"text": "sukker, mel, vann"}
+        validate_gemini_response_shape(canonical)
+
+    def test_claude_canonical_response_shape(self):
+        canonical = {
+            "content": [{"type": "text", "text": "ingredienser"}]
+        }
+        validate_claude_response_shape(canonical)
+
+    def test_openai_rejects_missing_choices(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_openai_response_shape({"id": "chatcmpl-123"})
+
+    def test_openai_rejects_empty_choices(self):
+        with pytest.raises(AssertionError, match="Non-empty"):
+            validate_openai_response_shape({"choices": []})
+
+    def test_gemini_rejects_missing_text(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_gemini_response_shape({"candidates": []})
+
+    def test_claude_rejects_empty_content(self):
+        with pytest.raises(AssertionError, match="Non-empty"):
+            validate_claude_response_shape({"content": []})
