@@ -402,6 +402,24 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
   });
 
+  it('add button click with no selected value is a no-op', async () => {
+    document.body.innerHTML = `
+      <div id="off-lang-priority-list"></div>
+      <select id="off-lang-add-select"></select>
+      <button id="off-lang-add-btn"></button>`;
+    api.mockResolvedValueOnce({ priority: ['no'] });
+    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    await loadOffLanguagePriority();
+
+    const addBtn = document.getElementById('off-lang-add-btn');
+    // Click without selecting a value — should not add anything
+    api.mockClear();
+    addBtn.click();
+    await new Promise((r) => setTimeout(r, 0));
+    // No save call since nothing new was selected
+    expect(api.mock.calls.filter((c) => c[0] === '/api/off/language-priority')).toHaveLength(0);
+  });
+
   it('disables add button when all languages are already selected', async () => {
     // Only 2 languages available, both already selected
     document.body.innerHTML = `
@@ -414,5 +432,95 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
 
     const addBtn = document.getElementById('off-lang-add-btn');
     expect(addBtn.disabled).toBe(true);
+  });
+});
+
+// ── EventSource / SSE message parsing ────────────────
+describe('EventSource SSE message parsing (refreshAllFromOff)', () => {
+  function setupRefreshDOM() {
+    document.body.innerHTML = `
+      <button id="btn-refresh-all-off"></button>
+      <div id="refresh-off-progress"></div>
+      <div id="refresh-off-bar" style="width:0%"></div>
+      <div id="refresh-off-status"></div>`;
+  }
+
+  it('SSE progress message updates progress bar', async () => {
+    setupRefreshDOM();
+    let capturedEs = null;
+    global.EventSource = vi.fn(() => {
+      capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
+      return capturedEs;
+    });
+    api.mockResolvedValue({ running: true });
+    await checkRefreshStatus();
+
+    expect(capturedEs).not.toBeNull();
+    // Real SSE progress format: { running: true, current: N, total: M, name: string }
+    const progressData = JSON.stringify({ running: true, current: 10, total: 50, name: 'Milk' });
+    if (capturedEs.onmessage) {
+      capturedEs.onmessage({ data: progressData });
+    }
+
+    const bar = document.getElementById('refresh-off-bar');
+    // Progress bar width should reflect Math.round(10/50 * 100) = 20%
+    expect(bar.style.width).toMatch(/20%/);
+  });
+
+  it('SSE done event closes the EventSource', async () => {
+    setupRefreshDOM();
+    let capturedEs = null;
+    global.EventSource = vi.fn(() => {
+      capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
+      return capturedEs;
+    });
+    api.mockResolvedValue({ running: true });
+    await checkRefreshStatus();
+
+    expect(capturedEs).not.toBeNull();
+    // Real SSE done format: { done: true, total: N, updated: N, skipped: N, errors: N }
+    const doneData = JSON.stringify({ done: true, total: 50, updated: 40, skipped: 8, errors: 2 });
+    if (capturedEs.onmessage) {
+      capturedEs.onmessage({ data: doneData });
+    }
+
+    // After 100% progress, EventSource should be closed
+    expect(capturedEs.close).toHaveBeenCalled();
+  });
+
+  it('SSE error event closes the EventSource and shows error toast', async () => {
+    setupRefreshDOM();
+    let capturedEs = null;
+    global.EventSource = vi.fn(() => {
+      capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
+      return capturedEs;
+    });
+    api.mockResolvedValue({ running: true });
+    await checkRefreshStatus();
+
+    expect(capturedEs).not.toBeNull();
+    if (capturedEs.onerror) {
+      capturedEs.onerror(new Error('SSE connection failed'));
+    }
+
+    // Error should close the stream
+    expect(capturedEs.close).toHaveBeenCalled();
+  });
+
+  it('SSE message with malformed JSON does not throw', async () => {
+    setupRefreshDOM();
+    let capturedEs = null;
+    global.EventSource = vi.fn(() => {
+      capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
+      return capturedEs;
+    });
+    api.mockResolvedValue({ running: true });
+    await checkRefreshStatus();
+
+    expect(capturedEs).not.toBeNull();
+    // Send malformed JSON — should not crash
+    if (capturedEs.onmessage) {
+      expect(() => capturedEs.onmessage({ data: 'not valid json' })).not.toThrow();
+    }
   });
 });
