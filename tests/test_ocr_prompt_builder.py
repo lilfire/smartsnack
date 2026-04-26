@@ -1,6 +1,7 @@
 """Tests for the build_ingredient_prompt function and language passing through dispatch."""
 import base64
 import io
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -184,16 +185,14 @@ class TestClaudeLanguageParam:
     def test_language_none_uses_default_prompt(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "sugar"
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="sugar")]
+        )
         with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.messages.create.return_value = mock_message
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img), language=None)
-            call_kwargs = mock_client.messages.create.call_args
+            call_kwargs = mock_cls.return_value.messages.create.call_args
             msgs = call_kwargs[1]["messages"]
             text_content = msgs[0]["content"][1]["text"]
         assert "Extract ONLY" in text_content
@@ -203,16 +202,14 @@ class TestClaudeLanguageParam:
     def test_language_en_uses_translation_prompt(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "sugar"
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="sugar")]
+        )
         with patch("anthropic.Anthropic") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.messages.create.return_value = mock_message
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img), language="en")
-            call_kwargs = mock_client.messages.create.call_args
+            call_kwargs = mock_cls.return_value.messages.create.call_args
             msgs = call_kwargs[1]["messages"]
             text_content = msgs[0]["content"][1]["text"]
         assert "English" in text_content
@@ -222,16 +219,16 @@ class TestGroqLanguageParam:
     def test_language_no_uses_translation_prompt(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "sukker"
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(
+                message=types.SimpleNamespace(content="sukker")
+            )]
+        )
         with patch("groq.Groq") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             _extract_groq(img, _b64(img), language="no")
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             msgs = call_kwargs[1]["messages"]
             text_content = msgs[0]["content"][1]["text"]
         assert "Norwegian" in text_content
@@ -239,16 +236,16 @@ class TestGroqLanguageParam:
     def test_language_none_uses_default_prompt(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "sukker"
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(
+                message=types.SimpleNamespace(content="sukker")
+            )]
+        )
         with patch("groq.Groq") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             _extract_groq(img, _b64(img), language=None)
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             msgs = call_kwargs[1]["messages"]
             text_content = msgs[0]["content"][1]["text"]
         # Task header should not mention translating to a specific language
@@ -259,16 +256,16 @@ class TestOpenAILanguageParam:
     def test_language_se_uses_translation_prompt(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "oai-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "socker"
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(
+                message=types.SimpleNamespace(content="socker")
+            )]
+        )
         with patch("openai.OpenAI") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             _extract_openai(img, _b64(img), language="se")
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             msgs = call_kwargs[1]["messages"]
             text_content = msgs[0]["content"][1]["text"]
         assert "Swedish" in text_content
@@ -278,16 +275,16 @@ class TestOpenRouterLanguageParam:
     def test_language_en_uses_translation_prompt(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "sugar"
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(
+                message=types.SimpleNamespace(content="sugar")
+            )]
+        )
         with patch("openai.OpenAI") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             _extract_openrouter(img, _b64(img), language="en")
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             msgs = call_kwargs[1]["messages"]
             # User message is msgs[1], system is msgs[0]
             user_content = msgs[1]["content"]
@@ -299,15 +296,12 @@ class TestGeminiLanguageParam:
     def test_language_no_uses_translation_prompt(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.text = "sukker"
-        with patch("google.genai.Client") as mock_cls:
-            mock_client = MagicMock()
-            mock_cls.return_value = mock_client
-            mock_client.models.generate_content.return_value = mock_response
+        mock_response = types.SimpleNamespace(text="sukker")
+        with patch("google.genai.Client", autospec=True) as mock_cls:
+            mock_cls.return_value.models.generate_content.return_value = mock_response
             from services.ocr_backends.gemini import _extract_gemini
             _extract_gemini(img, _b64(img), language="no")
-            call_kwargs = mock_client.models.generate_content.call_args
+            call_kwargs = mock_cls.return_value.models.generate_content.call_args
             parts = call_kwargs[1]["contents"][0]["parts"]
             text_part = next(p for p in parts if "text" in p)
         assert "Norwegian" in text_part["text"]
@@ -322,21 +316,20 @@ class TestDispatchOcrPassesLanguage:
     def test_dispatch_ocr_passes_language_to_claude(self):
         """dispatch_ocr should pass the user's language to the Claude provider."""
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "sugar"
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_message
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="sugar")]
+        )
 
-        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision"), \
-             patch("services.settings_service.get_language", return_value="en"), \
-             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError), \
+        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True), \
+             patch("services.settings_service.get_language", return_value="en", autospec=True), \
+             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
              patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
-             patch("anthropic.Anthropic", return_value=mock_client):
+             patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_core import dispatch_ocr
             dispatch_ocr(_b64(img))
 
-        call_kwargs = mock_client.messages.create.call_args
+        call_kwargs = mock_cls.return_value.messages.create.call_args
         msgs = call_kwargs[1]["messages"]
         text_content = msgs[0]["content"][1]["text"]
         assert "English" in text_content
@@ -348,8 +341,8 @@ class TestDispatchOcrPassesLanguage:
             "text": ["sukker"], "conf": [90],
             "left": [0], "top": [0], "width": [30], "height": [10],
         }
-        with patch("services.settings_service.get_ocr_backend", return_value="tesseract"), \
-             patch("pytesseract.image_to_data", return_value=mock_data), \
+        with patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True), \
+             patch("pytesseract.image_to_data", return_value=mock_data, autospec=True), \
              patch("pytesseract.Output", new_callable=lambda: type("O", (), {"DICT": "dict"})):
             from services.ocr_core import dispatch_ocr
             result = dispatch_ocr(_b64(img))
@@ -358,22 +351,21 @@ class TestDispatchOcrPassesLanguage:
     def test_dispatch_ocr_no_language_when_runtime_error(self):
         """If get_language() raises RuntimeError, dispatch_ocr falls back gracefully."""
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "sugar"
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_message
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="sugar")]
+        )
 
-        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision"), \
-             patch("services.settings_service.get_language", side_effect=RuntimeError), \
-             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError), \
+        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True), \
+             patch("services.settings_service.get_language", side_effect=RuntimeError, autospec=True), \
+             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
              patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
-             patch("anthropic.Anthropic", return_value=mock_client):
+             patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_core import dispatch_ocr
             result = dispatch_ocr(_b64(img))
 
         assert result["text"] == "sugar"
-        call_kwargs = mock_client.messages.create.call_args
+        call_kwargs = mock_cls.return_value.messages.create.call_args
         msgs = call_kwargs[1]["messages"]
         text_content = msgs[0]["content"][1]["text"]
         assert "Extract ONLY" in text_content
@@ -388,21 +380,22 @@ class TestDispatchOcrBytesPassesLanguage:
     def test_dispatch_ocr_bytes_passes_language_to_groq(self):
         """dispatch_ocr_bytes should pass the user's language to the Groq provider."""
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "sukker"
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(
+                message=types.SimpleNamespace(content="sukker")
+            )]
+        )
 
-        with patch("services.settings_service.get_ocr_backend", return_value="groq"), \
-             patch("services.settings_service.get_language", return_value="no"), \
-             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError), \
+        with patch("services.settings_service.get_ocr_backend", return_value="groq", autospec=True), \
+             patch("services.settings_service.get_language", return_value="no", autospec=True), \
+             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
              patch.dict("os.environ", {"GROQ_API_KEY": "test-key"}), \
-             patch("groq.Groq", return_value=mock_client):
+             patch("groq.Groq") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_core import dispatch_ocr_bytes
             dispatch_ocr_bytes(img)
 
-        call_kwargs = mock_client.chat.completions.create.call_args
+        call_kwargs = mock_cls.return_value.chat.completions.create.call_args
         msgs = call_kwargs[1]["messages"]
         text_content = msgs[0]["content"][1]["text"]
         assert "Norwegian" in text_content
@@ -414,8 +407,8 @@ class TestDispatchOcrBytesPassesLanguage:
             "text": ["mel"], "conf": [85],
             "left": [0], "top": [0], "width": [30], "height": [10],
         }
-        with patch("services.settings_service.get_ocr_backend", return_value="tesseract"), \
-             patch("pytesseract.image_to_data", return_value=mock_data), \
+        with patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True), \
+             patch("pytesseract.image_to_data", return_value=mock_data, autospec=True), \
              patch("pytesseract.Output", new_callable=lambda: type("O", (), {"DICT": "dict"})):
             from services.ocr_core import dispatch_ocr_bytes
             result = dispatch_ocr_bytes(img)
