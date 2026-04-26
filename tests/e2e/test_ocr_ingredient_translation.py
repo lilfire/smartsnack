@@ -107,15 +107,15 @@ class TestOcrIngredientTranslationE2E:
             if original is not None:
                 ocr_service._PROVIDERS["claude_vision"] = original
 
-    def test_ingredient_scan_without_language_omits_translation(self, live_url):
-        """When no language is configured, the OCR provider should not receive
-        a language kwarg (no translation)."""
+    def test_ingredient_scan_with_default_language_sends_default(self, live_url):
+        """When language is reset to default ('no'), the OCR provider receives
+        language='no' (the system always has a language configured)."""
         from services import ocr_service
 
         os.environ["ANTHROPIC_API_KEY"] = "test-key-e2e"
         _put(f"{live_url}/api/settings/ocr", {"backend": "claude_vision"})
-        # Set language to empty/default (no translation)
-        _put(f"{live_url}/api/settings/language", {"language": ""})
+        # Reset language to default Norwegian
+        _put(f"{live_url}/api/settings/language", {"language": "no"})
 
         captured_kwargs = {}
 
@@ -132,7 +132,7 @@ class TestOcrIngredientTranslationE2E:
             )
             assert status == 200
             assert data["text"] == "sukker, mel, smor"
-            assert "language" not in captured_kwargs
+            assert captured_kwargs.get("language") == "no"
         finally:
             if original is not None:
                 ocr_service._PROVIDERS["claude_vision"] = original

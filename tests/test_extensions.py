@@ -32,9 +32,36 @@ def test_limiter_initialized_in_app(app):
     assert limiter._storage is not None
 
 
-def test_rate_limit_triggers_429_on_201st_request(app):
+def test_rate_limit_triggers_429_on_201st_request(tmp_path, monkeypatch):
     """After 200 requests the 201st to any endpoint should return HTTP 429."""
-    with app.test_client() as c:
+    from extensions import limiter
+    import config
+    import os
+
+    # Ensure limiter is enabled BEFORE create_app calls limiter.init_app.
+    # E2e tests may have disabled it at session scope on an earlier app.
+    limiter.enabled = True
+
+    db_file = str(tmp_path / "ratelimit_test.sqlite")
+    monkeypatch.setenv("DB_PATH", db_file)
+    monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "test-secret")
+    monkeypatch.setattr(config, "DB_PATH", db_file)
+    try:
+        import db as db_mod
+        monkeypatch.setattr(db_mod, "DB_PATH", db_file)
+    except ImportError:
+        pass
+
+    from app import create_app
+    application = create_app()
+    application.config["TESTING"] = True
+    # Explicitly enable rate limiting on this app instance
+    application.config["RATELIMIT_ENABLED"] = True
+
+    with application.app_context():
+        limiter.reset()
+
+    with application.test_client() as c:
         for i in range(200):
             resp = c.get("/api/products")
             assert resp.status_code != 429, f"Rate limited prematurely at request {i + 1}"
