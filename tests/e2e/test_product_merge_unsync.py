@@ -69,8 +69,8 @@ def test_merge_products(live_url, api_create_product):
     assert body.get("ok") is True
 
     # Source product should be deleted after merge
-    products = _get(f"{live_url}/api/products")
-    ids = [p["id"] for p in products]
+    result = _get(f"{live_url}/api/products")
+    ids = [p["id"] for p in result.get("products", [])]
     assert target_id in ids, "Target should still exist after merge"
     assert source_id not in ids, "Source should be deleted after merge"
 

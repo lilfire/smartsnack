@@ -10,8 +10,11 @@ from unittest.mock import patch
 
 
 def _get(url):
-    with urllib.request.urlopen(url, timeout=5) as resp:
-        return resp.status, json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(url, timeout=5) as resp:
+            return resp.status, json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read())
 
 
 def _post(url, payload):
