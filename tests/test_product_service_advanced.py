@@ -287,8 +287,8 @@ class TestComputeCompleteness:
     def test_empty_string_not_counted(self):
         from services.product_service import _compute_completeness
 
-        p_empty = {"ean": ""}
-        p_filled = {"ean": "12345678"}
+        p_empty = {"brand": ""}
+        p_filled = {"brand": "TestBrand"}
         assert _compute_completeness(p_empty) < _compute_completeness(p_filled)
 
     def test_none_value_not_counted(self):

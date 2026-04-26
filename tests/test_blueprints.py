@@ -28,6 +28,29 @@ class TestProductsBlueprint:
         resp = client.get("/api/products?search=Popcorn")
         assert resp.status_code == 200
 
+    def test_list_with_search_validates_response_body(self, client):
+        """Search endpoint returns proper paginated response with product details."""
+        resp = client.get("/api/products?search=Popcorn")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "products" in data
+        assert "total" in data
+        assert isinstance(data["products"], list)
+        assert isinstance(data["total"], int)
+        if data["products"]:
+            product = data["products"][0]
+            assert "id" in product
+            assert "name" in product
+            assert "type" in product
+
+    def test_list_empty_search_returns_valid_structure(self, client):
+        """Empty search results still return proper {products: [], total: 0} structure."""
+        resp = client.get("/api/products?search=zzzNonExistent999")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data["products"], list)
+        assert isinstance(data["total"], int)
+
     def test_list_with_type_filter(self, client):
         resp = client.get("/api/products?type=Snacks")
         assert resp.status_code == 200

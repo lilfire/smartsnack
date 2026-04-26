@@ -2,7 +2,7 @@
 
 import os
 
-APP_VERSION = "0.16"
+APP_VERSION = "0.17"
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 
@@ -101,7 +101,6 @@ ALL_PRODUCT_FIELDS = (
     "est_diaas",
     "type",
     "name",
-    "ean",
     "brand",
     "stores",
     "ingredients",
@@ -115,7 +114,6 @@ _VALID_COLUMNS = frozenset(ALL_PRODUCT_FIELDS + ("id", "image"))
 _TEXT_FIELD_LIMITS = {
     "type": 100,
     "name": 200,
-    "ean": 50,
     "brand": 200,
     "stores": 500,
     "ingredients": 10000,
@@ -353,7 +351,7 @@ MAX_FILTER_DEPTH = 4
 MAX_FILTER_CONDITIONS = 20
 TEXT_FIELDS = frozenset(
     _TEXT_FIELD_LIMITS.keys()
-)  # type, name, ean, brand, stores, ingredients
+)  # type, name, brand, stores, ingredients
 NUMERIC_FIELDS = frozenset(
     NUTRITION_FIELDS + ("taste_score", "est_pdcaas", "est_diaas")
 )
@@ -361,7 +359,6 @@ POST_QUERY_FIELDS = frozenset(("total_score", "completeness"))
 
 # ── Completeness score ────────────────────────────────
 COMPLETENESS_FIELDS = (
-    "ean",
     "brand",
     "stores",
     "ingredients",
@@ -427,12 +424,14 @@ DEFAULT_WEIGHTS = {
 
 # ── SQL helpers ───────────────────────────────────────
 PRODUCT_COLS_NO_IMAGE = (
-    "id, type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "
+    "id, type, name, "
+    "(SELECT ean FROM product_eans WHERE product_id = products.id AND is_primary = 1) AS ean, "
+    "brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, "
     "fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas, "
     "CASE WHEN image != '' THEN 1 ELSE 0 END AS has_image"
 )
 
-INSERT_FIELDS = "type, name, ean, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
+INSERT_FIELDS = "type, name, brand, stores, ingredients, taste_note, taste_score, kcal, energy_kj, carbs, sugar, fat, saturated_fat, protein, fiber, salt, volume, price, weight, portion, est_pdcaas, est_diaas"
 INSERT_PLACEHOLDERS = ",".join(["?"] * len(INSERT_FIELDS.split(",")))
 INSERT_WITH_IMAGE_SQL = (
     f"INSERT INTO products ({INSERT_FIELDS}, image) VALUES ({INSERT_PLACEHOLDERS}, ?)"

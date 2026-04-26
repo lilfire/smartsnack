@@ -120,7 +120,8 @@ def add_ean(pid):
         if err == "ean_already_exists":
             return jsonify({"error": err}), 409
         return jsonify({"error": err}), 400
-    return jsonify(result), 201
+    status = 200 if result.get("already_exists") else 201
+    return jsonify(result), status
 
 
 @bp.route("/api/products/<int:pid>/eans/<int:ean_id>", methods=["DELETE"])

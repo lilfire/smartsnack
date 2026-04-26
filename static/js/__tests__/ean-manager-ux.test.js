@@ -72,8 +72,8 @@ vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn().mockResolvedValue({}),
 }));
 
-import { loadEanManager, addEan } from '../ean-manager.js';
-import { api } from '../state.js';
+import { loadEanManager, addEan, deleteEan, setEanPrimary } from '../ean-manager.js';
+import { api, showToast } from '../state.js';
 import { lookupOFF } from '../off-api.js';
 
 const PRODUCT_ID = 42;
@@ -479,5 +479,269 @@ describe('_fetchEanOff click behaviour', () => {
       { ean: '7038010069307' }
     );
     expect(window._pendingOFFEan).toBe('7038010069307');
+  });
+});
+
+// ── Event delegation in rendered EAN list ────────────
+
+describe('EAN manager event delegation', () => {
+  it('clicking set-primary button calls setEanPrimary', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({});
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    const btn = document.querySelector('[data-ean-action="set-primary"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/2/set-primary',
+        { method: 'PATCH' }
+      );
+    });
+  });
+
+  it('clicking delete button calls deleteEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({});
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+
+    // First delete button is for the primary EAN (id=1)
+    const btn = document.querySelector('[data-ean-action="delete-ean"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans/1',
+        { method: 'DELETE' }
+      );
+    });
+  });
+
+  it('clicking fetch-ean-off button triggers lookupOFF with the EAN value', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const offBtn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    expect(offBtn).not.toBeNull();
+    offBtn.click();
+
+    await vi.waitFor(() => {
+      expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID, { ean: offBtn.dataset.eanValue });
+    });
+  });
+
+  it('clicking area without data-ean-action does nothing', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    container.click();
+
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('pressing Enter in add input triggers addEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
+    addInput.value = '5000000000001';
+
+    api.mockResolvedValueOnce({ id: 3, ean: '5000000000001', is_primary: false });
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+
+    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    addInput.dispatchEvent(enterEvent);
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith(
+        '/api/products/' + PRODUCT_ID + '/eans',
+        { method: 'POST', body: JSON.stringify({ ean: '5000000000001' }) }
+      );
+    });
+    // Wait for addEan's full async chain (loadEanManager reload + showToast)
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('pressing non-Enter key in add input does not trigger addEan', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const addInput = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    expect(addInput).not.toBeNull();
+    addInput.value = '5000000000001';
+
+    const tabEvent = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    addInput.dispatchEvent(tabEvent);
+
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+// Constants not in original file
+const MOCK_EANS_ONE = [{ id: 1, ean: '7038010069307', is_primary: true }];
+
+// ── loadEanManager error / edge paths ───────────────
+
+describe('loadEanManager edge cases', () => {
+  it('does nothing when container element is absent', async () => {
+    document.body.innerHTML = '';
+    await expect(loadEanManager(PRODUCT_ID, false)).resolves.toBeUndefined();
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('renders field-error HTML on API failure', async () => {
+    api.mockRejectedValueOnce(new Error('network'));
+    await loadEanManager(PRODUCT_ID, false);
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    expect(container.querySelector('.field-error')).not.toBeNull();
+  });
+});
+
+// ── Event delegation via click ───────────────────────
+
+describe('event delegation: add-ean click', () => {
+  it('calls addEan logic when add button is clicked', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_ONE);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '5000000000001';
+    api.mockResolvedValueOnce({}); // POST
+    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload
+
+    const addBtn = document.querySelector('[data-ean-action="add-ean"]');
+    addBtn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      '/api/products/' + PRODUCT_ID + '/eans',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+});
+
+describe('event delegation: delete-ean click', () => {
+  it('calls deleteEan logic when delete button is clicked', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_TWO);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    api.mockResolvedValueOnce({}); // DELETE
+    api.mockResolvedValueOnce(MOCK_EANS_ONE); // reload
+
+    const deleteBtn = document.querySelector('[data-ean-action="delete-ean"]');
+    deleteBtn.click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining('/eans/'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+});
+
+describe('event delegation: set-primary click', () => {
+  it('calls setEanPrimary logic when set-primary button is clicked', async () => {
+    // Use MOCK_EANS_THREE to ensure secondary EAN rows with set-primary buttons exist
+    api.mockResolvedValueOnce(MOCK_EANS_THREE);
+    await loadEanManager(PRODUCT_ID, false);
+
+    const setPrimaryBtns = document.querySelectorAll('[data-ean-action="set-primary"]');
+    expect(setPrimaryBtns.length).toBeGreaterThan(0);
+
+    api.mockClear();
+    api.mockResolvedValueOnce({}); // PATCH
+    api.mockResolvedValueOnce(MOCK_EANS_THREE); // reload
+
+    setPrimaryBtns[0].click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining('/set-primary'),
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+});
+
+describe('event delegation: fetch-ean-off click', () => {
+  it('calls lookupOFF after promoting EAN to primary', async () => {
+    const { lookupOFF } = await import('../off-api.js');
+    api.mockResolvedValueOnce(MOCK_EANS_THREE);
+    await loadEanManager(PRODUCT_ID, false);
+
+    const offBtns = document.querySelectorAll('[data-ean-action="fetch-ean-off"]');
+    expect(offBtns.length).toBeGreaterThan(0);
+
+    api.mockClear();
+
+    offBtns[0].click();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(lookupOFF).toHaveBeenCalled();
+  });
+});
+
+// ── Enter key in add input ───────────────────────────
+
+describe('Enter key in ean-add-input triggers addEan', () => {
+  it('submits EAN on Enter keydown', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_ONE);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '5000000000001';
+    api.mockResolvedValueOnce({}); // POST
+    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledWith(
+      '/api/products/' + PRODUCT_ID + '/eans',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('does not submit on other keys', async () => {
+    api.mockResolvedValueOnce(MOCK_EANS_ONE);
+    await loadEanManager(PRODUCT_ID, false);
+    api.mockClear();
+
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '5000000000001';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    await Promise.resolve();
+
+    expect(api).not.toHaveBeenCalled();
   });
 });

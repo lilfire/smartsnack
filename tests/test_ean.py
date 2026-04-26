@@ -155,12 +155,13 @@ class TestAddEan:
         with pytest.raises(ValueError):
             product_service.add_ean(pid, "12345678901234")  # 14 digits — too long
 
-    def test_duplicate_ean_raises_value_error(self, app_ctx):
+    def test_duplicate_ean_on_same_product_is_idempotent(self, app_ctx):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "DupEan", "ean": "12345678"})["id"]
-        with pytest.raises(ValueError, match="ean_already_exists"):
-            product_service.add_ean(pid, "12345678")
+        result = product_service.add_ean(pid, "12345678")
+        assert result["ean"] == "12345678"
+        assert result.get("already_exists") is True
 
     def test_raises_for_unknown_product(self, app_ctx):
         from services import product_service
@@ -201,13 +202,15 @@ class TestDeleteEan:
         assert len(eans) == 1
         assert eans[0]["ean"] == "12345678"
 
-    def test_products_ean_unchanged_after_deleting_secondary(self, app_ctx, db):
+    def test_primary_ean_unchanged_after_deleting_secondary(self, app_ctx, db):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "UnchangedEan", "ean": "12345678"})["id"]
         sec = product_service.add_ean(pid, "87654321")
         product_service.delete_ean(pid, sec["id"])
-        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        row = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+        ).fetchone()
         assert row["ean"] == "12345678"
 
     def test_deleting_primary_promotes_lowest_id(self, app_ctx, db):
@@ -228,7 +231,7 @@ class TestDeleteEan:
         lowest_remaining_id = min(e["id"] for e in eans)
         assert new_primary["id"] == lowest_remaining_id
 
-    def test_deleting_primary_syncs_products_ean(self, app_ctx, db):
+    def test_deleting_primary_promotes_new_primary_in_product_eans(self, app_ctx, db):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "SyncEan", "ean": "11111111"})["id"]
@@ -239,7 +242,9 @@ class TestDeleteEan:
         ).fetchone()
         product_service.delete_ean(pid, primary_row["id"])
 
-        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        row = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+        ).fetchone()
         assert row["ean"] == "22222222"
 
     def test_cannot_remove_only_ean(self, app_ctx):
@@ -370,14 +375,16 @@ class TestSetPrimaryEan:
         old = next(e for e in eans if e["id"] == old_primary_id)
         assert old["is_primary"] is False
 
-    def test_syncs_products_ean(self, app_ctx, db):
+    def test_set_primary_updates_product_eans(self, app_ctx, db):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "SyncPrimary", "ean": "11111111"})["id"]
         sec = product_service.add_ean(pid, "22222222")
         product_service.set_primary_ean(pid, sec["id"])
 
-        row = db.execute("SELECT ean FROM products WHERE id = ?", (pid,)).fetchone()
+        row = db.execute(
+            "SELECT ean FROM product_eans WHERE product_id = ? AND is_primary = 1", (pid,)
+        ).fetchone()
         assert row["ean"] == "22222222"
 
     def test_raises_for_unknown_ean_id(self, app_ctx):
@@ -438,6 +445,45 @@ class TestSearchByEan:
         results = resp.get_json()["products"]
         names = [p["name"] for p in results]
         assert "SecondarySearch" in names
+
+    def test_search_by_primary_ean_with_multiple_secondaries(self, client):
+        """Primary EAN is still findable when product has many secondary EANs."""
+        pid = _add_product(client, name="ManyEans", ean="88880001")
+        for ean in ["88880002", "88880003", "88880004", "88880005"]:
+            client.post(f"/api/products/{pid}/eans", json={"ean": ean})
+        resp = client.get("/api/products?search=88880001")
+        assert resp.status_code == 200
+        names = [p["name"] for p in resp.get_json()["products"]]
+        assert "ManyEans" in names
+
+    def test_search_returns_product_for_any_secondary_ean(self, client):
+        """Product is found when searching by any of its secondary EANs."""
+        pid = _add_product(client, name="AnySecondary", ean="99990001")
+        for ean in ["99990002", "99990003"]:
+            client.post(f"/api/products/{pid}/eans", json={"ean": ean})
+        for ean in ["99990002", "99990003"]:
+            resp = client.get(f"/api/products?search={ean}")
+            assert resp.status_code == 200
+            names = [p["name"] for p in resp.get_json()["products"]]
+            assert "AnySecondary" in names, f"Not found via secondary EAN {ean}"
+
+    def test_search_no_match_returns_empty_list(self, client):
+        """Search for non-existent EAN returns empty product list, not an error."""
+        resp = client.get("/api/products?search=zzzNoMatchAtAll999")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["products"] == []
+        assert data["total"] == 0
+
+    def test_search_by_brand_returns_product(self, client):
+        """Search matches product brand name, not just EAN or product name."""
+        client.post("/api/products", json={
+            "type": "Snacks", "name": "BrandTest", "brand": "SuperBrand",
+        })
+        resp = client.get("/api/products?search=SuperBrand")
+        assert resp.status_code == 200
+        names = [p["name"] for p in resp.get_json()["products"]]
+        assert "BrandTest" in names
 
 
 # ── Product create ─────────────────────────────────────────────────────────────
@@ -550,11 +596,13 @@ class TestAddEanBlueprint:
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "abc"})
         assert resp.status_code == 400
 
-    def test_duplicate_ean_returns_409(self, client):
+    def test_duplicate_ean_on_same_product_returns_200(self, client):
         pid = _add_product(client, name="BPDupEan", ean="12345678")
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "12345678"})
-        assert resp.status_code == 409
-        assert resp.get_json()["error"] == "ean_already_exists"
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ean"] == "12345678"
+        assert data.get("already_exists") is True
 
     def test_unknown_product_returns_404(self, client):
         resp = client.post("/api/products/99999/eans", json={"ean": "12345678"})
@@ -595,7 +643,7 @@ class TestDeleteEanBlueprint:
         assert resp.status_code == 200
         assert resp.get_json()["ok"] is True
 
-    def test_products_ean_unchanged_after_deleting_secondary(self, client):
+    def test_primary_ean_unchanged_after_deleting_secondary(self, client):
         pid = _add_product(client, name="BPUnchanged", ean="11111111")
         add_resp = client.post(f"/api/products/{pid}/eans", json={"ean": "22222222"})
         ean_id = add_resp.get_json()["id"]
@@ -803,12 +851,6 @@ class TestEanSyncedWithOff:
         }
         assert rows["10000000"] == (True, False), "primary must stay primary and unsynced"
         assert rows["20000000"] == (False, True), "secondary must be marked synced"
-
-        # products.ean (the legacy scalar) must still reflect the primary, not the swap
-        prod_ean = db.execute(
-            "SELECT ean FROM products WHERE id = ?", (pid,)
-        ).fetchone()["ean"]
-        assert prod_ean == "10000000"
 
         # Product-level system flag is also set
         flag_row = db.execute(

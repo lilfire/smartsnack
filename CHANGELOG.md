@@ -4,7 +4,40 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.16.0] - 2026-04-11
+## [0.17.0] - 2026-04-26
+
+### Changed
+
+- EAN storage migrated to `product_eans` as the single source of truth: `PRODUCT_COLS_NO_IMAGE` selects `ean` via subquery against the primary row in `product_eans`, and `INSERT_FIELDS` no longer writes to `products.ean`
+- Bulk OFF refresh now reads EANs by joining `product_eans` (`is_primary = 1`) instead of filtering on `products.ean`; the search-by-name phase now selects products with `NOT EXISTS` against `product_eans` rather than empty-string `ean`
+- OFF refresh writes a matched EAN into `product_eans` (with sync flag updated) instead of updating `products.ean` directly
+- Backup export reads `ean` via `product_eans` subquery; backup restore inserts the EAN into `product_eans` after creating the product row
+- Import overwrite/merge paths sync EAN through `product_eans` directly (insert-or-update primary row) instead of relying on a `products.ean` write
+- Duplicate lookup (`_find_duplicate`) now joins `product_eans` for EAN matching, and import lookups search by EAN through `product_eans`
+- `add_ean` endpoint is idempotent: posting an EAN that already belongs to the product returns the existing record with HTTP 200 instead of 409, surfacing `already_exists: true`
+- Search scanner first-pass match accepts both the legacy `p.ean` field and the `p.eans` array, so scans resolve regardless of which shape the API returned
+- `update_product` no longer accepts `ean` as a direct column update; the EAN path runs against `product_eans`, and an `ean`-only payload is now considered a valid (non-empty) update
+
+### Added
+
+- SQLite triggers `trg_ean_insert_sync`, `trg_ean_update_sync`, and `trg_ean_delete_sync` keep `products.ean` aligned with the primary `product_eans` row on every insert, update, and delete
+- Startup repair routine `_repair_ean_mismatches` runs after migrations and corrects any rows where `products.ean` drifted from the primary `product_eans` value
+- `merge_products` transfers all EANs from the source product into the target as non-primary rows before deletion, so secondary EANs survive a merge
+- EAN dual-storage regression test suite covering trigger behavior, repair, and the OFF/import/backup/merge paths
+- Backend coverage additions: direct unit tests for `product_crud`, `product_filters`, `product_duplicate`, scoring quality formulas, schema migrations, stats service, and service coverage gaps
+- Frontend coverage additions: tests for scanner torch, advanced state, scroll, EAN manager UX, settings-OFF, products pagination, render, and tags modules
+
+### Removed
+
+- `ean` from `ALL_PRODUCT_FIELDS`, `_TEXT_FIELD_LIMITS`, `COMPLETENESS_FIELDS`, and the `TEXT_FIELDS` comment — EAN is no longer treated as a product column for validation, completeness scoring, or text-field limits
+- `_sync_primary_ean` helper from `services/product_crud.py` — superseded by triggers, the startup repair pass, and inline sync calls in `update_product` and `import_service`
+
+### Fixed
+
+- EAN drift between `products.ean` and `product_eans` after edits, imports, merges, and OFF refresh — enforced at the schema level by triggers and at startup by the repair pass
+- Import path raising `AttributeError` when an imported product had `ean: null` instead of an empty string
+- Stale EAN left in `product_eans` after an import overwrite changed the EAN value
+- Scanner missing matches when the product API returned only the legacy `ean` field without an `eans` array
 
 ### Added
 
