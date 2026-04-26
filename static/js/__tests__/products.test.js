@@ -69,6 +69,7 @@ vi.mock('../off-utils.js', () => ({
 vi.mock('../off-conflicts.js', () => ({
   showMergeConflictModal: vi.fn(),
   showEditDuplicateModal: vi.fn(),
+  showScanDuplicateModal: vi.fn(),
 }));
 vi.mock('../off-duplicates.js', () => ({
   showDuplicateMergeModal: vi.fn(),
@@ -91,6 +92,7 @@ vi.mock('../images.js', () => ({
 
 import { startEdit, saveProduct, deleteProduct, unlockEan, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
+import { showScanDuplicateModal } from '../off-conflicts.js';
 import { rerender } from '../filters.js';
 import { renderResults, getFlagConfig } from '../render.js';
 import { showDuplicateMergeModal } from '../off-duplicates.js';
@@ -640,7 +642,7 @@ describe('loadData', () => {
     // Advance past rAF (~16ms) but not past the 5000ms highlight removal timer
     vi.advanceTimersByTime(20);
 
-    expect(rowEl.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(rowEl.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
     expect(rowEl.classList.contains('scan-highlight')).toBe(true);
 
     vi.advanceTimersByTime(5000);
@@ -984,14 +986,8 @@ describe('registerProduct advanced paths', () => {
     dupError.status = 409;
     dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: true } };
     api.mockRejectedValueOnce(dupError);
-    const registerPromise = registerProduct();
-    // Wait for microtasks so the modal is appended to DOM
-    await vi.advanceTimersByTimeAsync(0);
-    // For synced duplicates, only the OK button is shown (confirm-yes class)
-    const okBtn = document.querySelector('.scan-modal-btn-register.confirm-yes');
-    expect(okBtn).not.toBeNull();
-    okBtn.click();
-    await registerPromise;
+    vi.mocked(showScanDuplicateModal).mockResolvedValueOnce('cancel');
+    await registerProduct();
     // Should not call api again (no merge/create), button re-enabled
     const btn = document.getElementById('btn-submit');
     expect(btn.disabled).toBe(false);
@@ -1022,13 +1018,9 @@ describe('registerProduct advanced paths', () => {
     dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: false } };
     api.mockRejectedValueOnce(dupError);
     api.mockResolvedValueOnce({ id: 5 }); // overwrite result
+    vi.mocked(showScanDuplicateModal).mockResolvedValueOnce('overwrite');
 
-    const registerPromise = registerProduct();
-    await vi.advanceTimersByTimeAsync(0);
-    // Click the merge/overwrite button (first button with confirm-yes class)
-    const mergeBtn = document.querySelector('.scan-modal-btn-register.confirm-yes');
-    if (mergeBtn) mergeBtn.click();
-    await registerPromise;
+    await registerProduct();
     expect(api).toHaveBeenCalledWith('/api/products', expect.objectContaining({
       method: 'POST',
       body: expect.stringContaining('"on_duplicate":"overwrite"'),

@@ -5,7 +5,7 @@ import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
 import { isValidEan } from './off-utils.js';
-import { showEditDuplicateModal, showMergeConflictModal } from './off-conflicts.js';
+import { showEditDuplicateModal, showMergeConflictModal, showScanDuplicateModal } from './off-conflicts.js';
 import { showDuplicateMergeModal } from './off-duplicates.js';
 import { showOffAddReview } from './off-review.js';
 import { initTagInput, getTagsForSave } from './tags.js';
@@ -267,7 +267,7 @@ export async function loadData() {
       if (search && results.length > 0) {
         const rowEl = document.querySelector('.table-row[data-product-id]');
         if (rowEl) {
-          rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
           rowEl.classList.add('scan-highlight');
           setTimeout(() => { rowEl.classList.remove('scan-highlight'); }, 5000);
         }
@@ -346,51 +346,6 @@ export function clearSearch() {
   document.getElementById('search-input').focus();
 }
 
-function _showDuplicateModal(duplicate) {
-  return new Promise((resolve) => {
-    const bg = document.createElement('div');
-    bg.className = 'scan-modal-bg';
-    bg.setAttribute('role', 'dialog');
-    bg.setAttribute('aria-modal', 'true');
-    const modal = document.createElement('div');
-    modal.className = 'scan-modal';
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'scan-modal-icon';
-    iconDiv.textContent = '\u26A0\uFE0F';
-    modal.appendChild(iconDiv);
-    const h3 = document.createElement('h3');
-    h3.textContent = t('duplicate_found_title');
-    modal.appendChild(h3);
-    const pEl = document.createElement('p');
-    const msgKey = duplicate.is_synced_with_off ? 'duplicate_found_synced' : 'duplicate_found_unsynced';
-    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
-    modal.appendChild(pEl);
-    const actions = document.createElement('div');
-    actions.className = 'scan-modal-actions';
-    if (!duplicate.is_synced_with_off) {
-      const mergeBtn = document.createElement('button');
-      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
-      mergeBtn.textContent = t('duplicate_action_merge');
-      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
-      actions.appendChild(mergeBtn);
-      const createBtn = document.createElement('button');
-      createBtn.className = 'scan-modal-btn-register';
-      createBtn.textContent = t('duplicate_action_create_new');
-      createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
-      actions.appendChild(createBtn);
-    }
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = duplicate.is_synced_with_off ? 'scan-modal-btn-register confirm-yes' : 'scan-modal-btn-cancel confirm-no';
-    cancelBtn.textContent = duplicate.is_synced_with_off ? t('btn_ok') : t('btn_cancel');
-    cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
-    actions.appendChild(cancelBtn);
-    modal.appendChild(actions);
-    bg.appendChild(modal);
-    document.body.appendChild(bg);
-    trapFocus(bg);
-  });
-}
-
 async function _submitProduct(body, on_duplicate) {
   const payload = Object.assign({}, body);
   if (on_duplicate) payload.on_duplicate = on_duplicate;
@@ -440,10 +395,10 @@ export async function registerProduct() {
         const dup = e.data.duplicate;
         if (dup.is_synced_with_off) {
           // Synced with OFF — show info-only modal, no merge allowed
-          await _showDuplicateModal(dup);
+          await showScanDuplicateModal(dup);
           return;
         }
-        const choice = await _showDuplicateModal(dup);
+        const choice = await showScanDuplicateModal(dup);
         if (choice === 'cancel') { return; }
         if (choice === 'overwrite') {
           result = await _submitProduct(body, 'overwrite');
