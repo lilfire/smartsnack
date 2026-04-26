@@ -10,6 +10,7 @@ from services.ocr_core import (  # noqa: F401
     get_available_backends,
     dispatch_ocr,
     dispatch_ocr_bytes,
+    dispatch_nutrition_ocr_bytes,
 )
 from services.ocr_backends.tesseract import (  # noqa: F401
     _prepare_images,

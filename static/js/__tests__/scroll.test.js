@@ -173,3 +173,60 @@ describe('initInfiniteScroll / teardownInfiniteScroll', () => {
     expect(removeSpy).toHaveBeenCalled();
   });
 });
+
+describe('_onScroll (via scroll event)', () => {
+  beforeEach(() => {
+    state.pagination = { offset: 0, total: 200, inFlight: false, pageSize: 50 };
+    state.cachedResults = [];
+    state.currentFilter = [];
+    document.body.innerHTML = '<div id="scroll-loader" style="display:none"></div>';
+    // Default jsdom layout: offsetHeight=0, innerHeight=0, scrollY=0 → distFromBottom=0 <= 200
+    initInfiniteScroll();
+  });
+
+  afterEach(() => {
+    teardownInfiniteScroll();
+    document.body.innerHTML = '';
+  });
+
+  it('does not call fetchProducts when inFlight is true', async () => {
+    state.pagination.inFlight = true;
+    window.dispatchEvent(new Event('scroll'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchProducts).not.toHaveBeenCalled();
+  });
+
+  it('tears down listener when all results are loaded', () => {
+    state.pagination.offset = 150;
+    state.pagination.total = 200;
+    state.pagination.pageSize = 50; // 150 + 50 >= 200
+    const removeSpy = vi.spyOn(window, 'removeEventListener');
+    window.dispatchEvent(new Event('scroll'));
+    expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
+  });
+
+  it('calls loadNextPage when distFromBottom <= SCROLL_THRESHOLD', async () => {
+    // jsdom defaults: offsetHeight=0, innerHeight=0, scrollY=0 → dist=0 ≤ 200
+    fetchProducts.mockResolvedValue({ products: [], total: 200 });
+    window.dispatchEvent(new Event('scroll'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchProducts).toHaveBeenCalled();
+  });
+
+  it('does not call loadNextPage when far from bottom', async () => {
+    // distFromBottom = offsetHeight - innerHeight - scrollY must be > 200
+    // e.g. 2000 - 100 - 0 = 1900 > 200
+    Object.defineProperty(document.body, 'offsetHeight', { get: () => 2000, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { get: () => 100, configurable: true });
+    Object.defineProperty(window, 'scrollY', { get: () => 0, configurable: true });
+
+    window.dispatchEvent(new Event('scroll'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(fetchProducts).not.toHaveBeenCalled();
+
+    // Restore defaults for subsequent tests
+    Object.defineProperty(document.body, 'offsetHeight', { get: () => 0, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { get: () => 0, configurable: true });
+    Object.defineProperty(window, 'scrollY', { get: () => 0, configurable: true });
+  });
+});

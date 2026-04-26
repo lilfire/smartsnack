@@ -253,12 +253,10 @@ export async function estimateProteinQuality(prefix) {
   if (!ingEl || !ingEl.value.trim()) { showToast(t('toast_ingredients_missing'), 'error'); return; }
   if (btn) { btn.classList.add('loading'); btn.disabled = true; }
   try {
-    const res = await fetch('/api/estimate-protein-quality', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const data = await api('/api/estimate-protein-quality', {
+      method: 'POST',
       body: JSON.stringify({ ingredients: ingEl.value })
     });
-    if (!res.ok) { showToast(t('toast_network_error'), 'error'); return; }
-    const data = await res.json();
     if (data.error) { showToast(t('toast_error_prefix', { msg: data.error }), 'error'); return; }
     if (pdcaasEl) pdcaasEl.textContent = data.est_pdcaas != null ? Number(data.est_pdcaas).toFixed(2) : '\u2013';
     if (diEl) diEl.textContent = data.est_diaas != null ? Number(data.est_diaas).toFixed(2) : '\u2013';
