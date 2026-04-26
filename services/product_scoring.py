@@ -29,7 +29,11 @@ def invalidate_scoring_cache() -> None:
 
 
 def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
-    """Load enabled score weights and their config from the database."""
+    """Load enabled score weights and their config from the database.
+
+    Returns (enabled_weights, weight_config, enabled_fields, category_overrides).
+    category_overrides is keyed by (category, field).
+    """
     global _weight_cache, _weight_cache_at
     now = time.monotonic()
     if _weight_cache is not None and now - _weight_cache_at < _SCORING_CACHE_TTL:
@@ -50,7 +54,26 @@ def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
                 "formula_max": r["formula_max"],
             }
     enabled_fields = [f for f in enabled_weights if f in SCORE_CONFIG_MAP]
-    _weight_cache = (enabled_weights, weight_config, enabled_fields)
+
+    try:
+        ov_rows = cur.execute(
+            "SELECT category, field, enabled, weight, direction, formula, "
+            "formula_min, formula_max FROM category_score_weights"
+        ).fetchall()
+    except Exception:
+        ov_rows = []
+    category_overrides = {}
+    for r in ov_rows:
+        category_overrides[(r["category"], r["field"])] = {
+            "enabled": r["enabled"],
+            "weight": r["weight"],
+            "direction": r["direction"],
+            "formula": r["formula"],
+            "formula_min": r["formula_min"],
+            "formula_max": r["formula_max"],
+        }
+
+    _weight_cache = (enabled_weights, weight_config, enabled_fields, category_overrides)
     _weight_cache_at = now
     return _weight_cache
 
@@ -95,6 +118,7 @@ def _score_product(
     enabled_weights: dict,
     weight_config: dict,
     cat_ranges: dict,
+    category_overrides: dict | None = None,
 ) -> None:
     """Compute and attach scores to a product dict in-place."""
     scores = {}
@@ -102,9 +126,27 @@ def _score_product(
     num_scored_fields = 0
     missing_fields = []
     ranges = cat_ranges.get(p["type"], {})
+    product_category = p.get("type", "")
     for field in enabled_fields:
-        cfg = weight_config[field]
+        cfg = dict(weight_config[field])
         weight = enabled_weights[field]
+
+        if category_overrides and product_category:
+            ov = category_overrides.get((product_category, field))
+            if ov is not None:
+                if ov["enabled"] is not None and not ov["enabled"]:
+                    continue
+                if ov["weight"] is not None:
+                    weight = ov["weight"]
+                if ov["direction"] is not None:
+                    cfg["direction"] = ov["direction"]
+                if ov["formula"] is not None:
+                    cfg["formula"] = ov["formula"]
+                if ov["formula_min"] is not None:
+                    cfg["formula_min"] = ov["formula_min"]
+                if ov["formula_max"] is not None:
+                    cfg["formula_max"] = ov["formula_max"]
+
         val = p.get(field)
         if val is None:
             missing_fields.append(field)
