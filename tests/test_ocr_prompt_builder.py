@@ -97,7 +97,7 @@ class TestBuildIngredientPrompt:
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt("")
         assert "Extract ONLY the ingredient list" in prompt
-        assert "translate it to" not in prompt.lower()
+        assert "translate" not in prompt.split("\n")[0].lower()
 
     def test_empty_string_language_equals_no_arg_call(self):
         from services.ocr_backends import build_ingredient_prompt
@@ -111,7 +111,8 @@ class TestBuildIngredientPrompt:
     def test_translation_prompt_contains_translate_directive(self, lang, expected_name):
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt(lang)
-        assert f"translate it to {expected_name}" in prompt
+        assert f"translate every ingredient into {expected_name}" in prompt.lower() or \
+               f"always output in {expected_name}" in prompt
 
     @pytest.mark.parametrize("lang", ["no", "en", "se"])
     def test_translation_prompt_task_header_does_not_say_extract_only(self, lang):
@@ -126,27 +127,41 @@ class TestBuildIngredientPrompt:
         """The default (no-language) prompt must not mention any specific language."""
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt()
-        first_line = prompt.split("\n")[0]
         for name in ("Norwegian", "English", "Swedish"):
-            assert name not in first_line
+            assert name not in prompt
 
     @pytest.mark.parametrize("lang", ["no", "en", "se"])
     def test_translation_prompt_would_catch_conflicting_instructions(self, lang):
         """Regression: the original bug had both 'as it appears' (verbatim) and
         'translate' in the same prompt, creating conflicting instructions.
-        When translation is requested, the task header must clearly say translate
-        and must NOT say 'Extract ONLY' (the verbatim-only instruction)."""
+        When translation is requested, the prompt must contain translation
+        directives and must NOT say 'Extract ONLY' or 'as it appears'."""
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt(lang)
-        task_header = prompt.split("\n\n")[0]
-        assert "translate" in task_header.lower()
-        assert "Extract ONLY" not in task_header
+        assert "translate" in prompt.lower()
+        assert "Extract ONLY" not in prompt
+        assert "exactly as it appears" not in prompt.lower()
 
-    def test_no_translation_prompt_says_extract_only(self):
-        """Without a language, the prompt must clearly instruct verbatim extraction."""
+    def test_no_translation_prompt_uses_verbatim_rules(self):
+        """Without a language, the prompt must use verbatim extraction rules."""
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt()
         assert "Extract ONLY the ingredient list" in prompt
+        assert "as it appears" in prompt.lower()
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_rules_contain_e_number_exception(self, lang):
+        """Translation rules should allow E-numbers to remain untranslated."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "E-number" in prompt or "E471" in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_rules_require_full_translation(self, lang):
+        """Translation rules should require all ingredients to be translated."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "Do NOT output any text in the original label language" in prompt
 
     def test_backward_compat_alias_is_set(self):
         import services.ocr_backends as mod
