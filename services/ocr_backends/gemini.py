@@ -4,7 +4,7 @@ import logging
 
 from PIL import Image
 
-from . import _get_api_key, _INGREDIENT_PROMPT
+from . import _get_api_key, build_ingredient_prompt
 
 logger = logging.getLogger("services.ocr_service")
 
@@ -76,7 +76,7 @@ def _convert_for_gemini(image_bytes):
 _DEFAULT_MODEL = "gemini-2.0-flash"
 
 
-def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None):
+def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None, language=None):
     """Use Google Gemini API to extract ingredient text from an image."""
     api_key = _get_api_key("GEMINI_API_KEY")
 
@@ -96,7 +96,7 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None):
                             "data": image_bytes,
                         }
                     },
-                    {"text": _INGREDIENT_PROMPT},
+                    {"text": build_ingredient_prompt(language)},
                 ]
             }
         ],

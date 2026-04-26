@@ -1,10 +1,10 @@
 """Claude Vision OCR backend."""
-from . import _get_api_key, _INGREDIENT_PROMPT
+from . import _get_api_key, build_ingredient_prompt
 
 _DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
 
-def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=None):
+def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=None, language=None):
     """Use Claude Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("ANTHROPIC_API_KEY")
 
@@ -28,7 +28,7 @@ def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=
                     },
                     {
                         "type": "text",
-                        "text": _INGREDIENT_PROMPT,
+                        "text": build_ingredient_prompt(language),
                     },
                 ],
             }

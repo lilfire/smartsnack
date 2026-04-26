@@ -1,10 +1,10 @@
 """Groq Vision OCR backend."""
-from . import _get_api_key, _INGREDIENT_PROMPT
+from . import _get_api_key, build_ingredient_prompt
 
 _DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
 
-def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None):
+def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None, language=None):
     """Use Groq Vision API to extract ingredient text from an image."""
     api_key = _get_api_key("GROQ_API_KEY")
 
@@ -26,7 +26,7 @@ def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None):
                     },
                     {
                         "type": "text",
-                        "text": _INGREDIENT_PROMPT,
+                        "text": build_ingredient_prompt(language),
                     },
                 ],
             }
