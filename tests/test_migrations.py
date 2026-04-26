@@ -264,6 +264,6 @@ class TestRunMigrations:
         run_migrations(cur)
         db.commit()
         row = db.execute(
-            "SELECT COUNT(*) FROM schema_migrations WHERE name='008_category_score_weights'"
+            "SELECT COUNT(*) FROM schema_migrations WHERE name='020_category_score_weights'"
         ).fetchone()
         assert row[0] == 1
