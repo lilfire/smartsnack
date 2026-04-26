@@ -107,13 +107,24 @@ def app_server(tmp_path_factory):
     # the test server anyway.
     application = create_app()
     application.config["TESTING"] = True
+    application.config["RATELIMIT_ENABLED"] = False
+
+    # Disable rate limiting for e2e tests (limiter is already init'd)
+    from extensions import limiter as _limiter
+    _limiter.enabled = False
 
     # Ensure the translations module uses the temp directory
     import translations as trans_mod
 
     trans_mod.TRANSLATIONS_DIR = trans_dir
 
-    host, port = "127.0.0.1", 5199
+    import socket
+
+    host = "127.0.0.1"
+    # Pick a free port to avoid conflicts with concurrent test runs
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        port = s.getsockname()[1]
 
     server_thread = threading.Thread(
         target=lambda: application.run(host=host, port=port, use_reloader=False),
