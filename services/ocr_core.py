@@ -180,17 +180,24 @@ def dispatch_ocr(image_base64, prompt=None):
     # Resolve display name from config
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
     model = None
+    lang = None
     if backend_id != DEFAULT_OCR_BACKEND:
         try:
             from services import ocr_settings_service
             model = ocr_settings_service.get_model_for_provider(backend_id)
         except RuntimeError:
             pass  # No app context — backend falls back to its own default
+        try:
+            lang = settings_service.get_language()
+        except RuntimeError:
+            pass  # No app context — backend uses default prompt
     kwargs = {}
     if model:
         kwargs["model"] = model
     if prompt:
         kwargs["prompt"] = prompt
+    if lang:
+        kwargs["language"] = lang
     text = provider_fn(image_bytes, raw, mime_type, **kwargs)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}
@@ -237,17 +244,25 @@ def dispatch_ocr_bytes(image_bytes, prompt=None):
     mime_type = _detect_mime_type(image_bytes)
     provider_name = OCR_BACKENDS.get(backend_id, {}).get("name", backend_id)
     model = None
+    lang = None
     if backend_id != DEFAULT_OCR_BACKEND:
         try:
             from services import ocr_settings_service
             model = ocr_settings_service.get_model_for_provider(backend_id)
         except RuntimeError:
             pass  # No app context — backend falls back to its own default
+        try:
+            from services import settings_service
+            lang = settings_service.get_language()
+        except RuntimeError:
+            pass  # No app context — backend uses default prompt
     kwargs = {}
     if model:
         kwargs["model"] = model
     if prompt:
         kwargs["prompt"] = prompt
+    if lang:
+        kwargs["language"] = lang
     text = provider_fn(image_bytes, raw_b64, mime_type, **kwargs)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}
