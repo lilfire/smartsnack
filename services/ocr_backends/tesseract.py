@@ -86,8 +86,12 @@ def _avg_confidence_tesseract(data):
     return sum(confs) / len(confs) if confs else 0.0
 
 
-def _extract_tesseract(image_bytes, image_b64, mime_type="image/jpeg"):
-    """Run pytesseract on image variants, return best text."""
+def _extract_tesseract(image_bytes, image_b64, mime_type="image/jpeg", model=None, prompt=None):
+    """Run pytesseract on image variants, return best text.
+
+    Accepts `model` and `prompt` kwargs for signature parity with vision
+    backends, but ignores them — tesseract has no prompt interface.
+    """
     import pytesseract
 
     variants = _prepare_images(image_bytes)

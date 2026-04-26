@@ -100,7 +100,7 @@ def _get_products(live_url: str) -> list:
         method="GET",
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+        return json.loads(resp.read())["products"]
 
 
 def _reload_and_wait(page) -> None:

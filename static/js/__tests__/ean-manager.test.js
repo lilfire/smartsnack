@@ -69,6 +69,10 @@ vi.mock('../off-review.js', () => ({
   submitToOff: vi.fn(),
 }));
 
+vi.mock('../off-api.js', () => ({
+  lookupOFF: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { loadEanManager, addEan, deleteEan, setEanPrimary } from '../products.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
@@ -252,6 +256,20 @@ describe('Add EAN', () => {
     expect(errorEl.style.display).toBe('');
   });
 
+  it('handles idempotent 200 response without showing an error', async () => {
+    await setupRenderedManager();
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '7038010069307'; // Same EAN already on this product
+    // API returns 200 (idempotent success — same-product duplicate)
+    api.mockResolvedValueOnce({ id: 1, ean: '7038010069307', is_primary: true });
+    api.mockResolvedValueOnce(MOCK_EANS_ONE);
+    await addEan(PRODUCT_ID);
+    const errorEl = document.getElementById('ean-error-' + PRODUCT_ID);
+    expect(errorEl.style.display).toBe('none');
+    expect(showToast).toHaveBeenCalledWith('toast_ean_added', 'success');
+    expect(showToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
   it('does nothing when input is empty', async () => {
     await setupRenderedManager();
 
@@ -401,5 +419,195 @@ describe('Set primary', () => {
     await setEanPrimary(PRODUCT_ID, 2);
 
     expect(document.getElementById('ed-ean').value).toBe('5000000000001');
+  });
+
+  it('shows toast on API error', async () => {
+    await setupRenderedManager();
+
+    const error = new Error('Server Error');
+    api.mockRejectedValueOnce(error);
+
+    await setEanPrimary(PRODUCT_ID, 2);
+
+    expect(showToast).toHaveBeenCalledWith('Server Error', 'error');
+  });
+
+  it('shows generic toast when error has no message', async () => {
+    await setupRenderedManager();
+
+    api.mockRejectedValueOnce(new Error(''));
+
+    await setEanPrimary(PRODUCT_ID, 2);
+
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+});
+
+// ── Load EAN Manager error handling ─────────────────
+
+describe('loadEanManager error handling', () => {
+  it('shows error HTML in container when API throws', async () => {
+    api.mockRejectedValueOnce(new Error('Network error'));
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await loadEanManager(PRODUCT_ID);
+
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    expect(container.innerHTML).toContain('field-error');
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('does nothing when container element does not exist', async () => {
+    document.body.innerHTML = '';
+    await loadEanManager(PRODUCT_ID);
+    // Should not throw or make API calls
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+// ── addEan fallback toast when no errorEl ────────────
+
+describe('addEan fallback toast when errorEl is missing', () => {
+  it('shows toast instead of inline error when ean-error element is absent', async () => {
+    // Render without the error element
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+    await loadEanManager(PRODUCT_ID);
+    api.mockClear();
+
+    // Remove the error element from the DOM
+    const errorEl = document.getElementById('ean-error-' + PRODUCT_ID);
+    if (errorEl) errorEl.remove();
+
+    // Set up input with valid EAN
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '7038010069307';
+
+    const error = new Error('Conflict');
+    error.data = { error: 'error_ean_already_exists' };
+    api.mockRejectedValueOnce(error);
+
+    await addEan(PRODUCT_ID);
+
+    expect(showToast).toHaveBeenCalledWith('error_ean_already_exists', 'error');
+  });
+
+  it('returns early when input element does not exist', async () => {
+    api.mockResolvedValueOnce([{ id: 1, ean: '7038010069307', is_primary: true }]);
+    await loadEanManager(PRODUCT_ID);
+    api.mockClear();
+
+    // Remove the add input from DOM
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    if (input) input.remove();
+
+    await addEan(PRODUCT_ID);
+
+    expect(api).not.toHaveBeenCalled();
+  });
+});
+
+// ── EAN manager event delegation ────────────────────
+
+describe('EAN manager event delegation', () => {
+  async function renderList(eans = MOCK_EANS_TWO) {
+    api.mockResolvedValueOnce(eans);
+    await loadEanManager(PRODUCT_ID, false);
+  }
+
+  it('triggers set-primary when set-primary button is clicked', async () => {
+    await renderList();
+    api.mockResolvedValueOnce({}); // PATCH set-primary
+    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload EANs
+
+    const btn = document.querySelector('[data-ean-action="set-primary"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+    await vi.runAllTimersAsync();
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining('/set-primary'),
+      expect.objectContaining({ method: 'PATCH' }),
+    );
+  });
+
+  it('triggers delete-ean when delete button is clicked', async () => {
+    await renderList(MOCK_EANS_THREE);
+    api.mockResolvedValueOnce({}); // DELETE
+    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload
+
+    const btn = document.querySelector('[data-ean-action="delete-ean"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+    await vi.runAllTimersAsync();
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining('/eans/'),
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('triggers fetch-ean-off when OFF button is clicked', async () => {
+    await renderList(MOCK_EANS_TWO);
+    const { lookupOFF } = await import('../off-api.js');
+
+    const btn = document.querySelector('[data-ean-action="fetch-ean-off"]');
+    expect(btn).not.toBeNull();
+    btn.click();
+    await vi.runAllTimersAsync();
+    expect(lookupOFF).toHaveBeenCalledWith('ed', PRODUCT_ID, { ean: '7038010069307' });
+  });
+
+  it('triggers addEan when add-ean button is clicked', async () => {
+    await renderList(MOCK_EANS_ONE);
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '1234567890123';
+
+    api.mockResolvedValueOnce({}); // POST add-ean
+    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload
+
+    const addBtn = document.querySelector('[data-ean-action="add-ean"]');
+    expect(addBtn).not.toBeNull();
+    addBtn.click();
+    await vi.runAllTimersAsync();
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining('/eans'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('does nothing when click target has no data-ean-action', async () => {
+    await renderList(MOCK_EANS_ONE);
+    api.mockClear(); // reset call count after the initial loadEanManager
+    const container = document.getElementById('ean-manager-' + PRODUCT_ID);
+    // Click directly on the container (not a button)
+    container.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // No additional api calls
+    expect(api).not.toHaveBeenCalled();
+  });
+
+  it('triggers addEan on Enter key in add input', async () => {
+    await renderList(MOCK_EANS_ONE);
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '1234567890123';
+
+    api.mockResolvedValueOnce({}); // POST
+    api.mockResolvedValueOnce(MOCK_EANS_TWO); // reload
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await vi.runAllTimersAsync();
+    expect(api).toHaveBeenCalledWith(
+      expect.stringContaining('/eans'),
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('does nothing on non-Enter keydown in add input', async () => {
+    await renderList(MOCK_EANS_ONE);
+    api.mockClear(); // reset call count after the initial loadEanManager
+    const input = document.getElementById('ean-add-input-' + PRODUCT_ID);
+    input.value = '1234';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    await vi.runAllTimersAsync();
+    // No api calls beyond the initial loadEanManager
+    expect(api).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ vi.mock('../state.js', () => ({
   esc: (s) => String(s),
   showToast: vi.fn(),
   trapFocus: vi.fn(() => vi.fn()),
+  state: { cachedResults: [] },
 }));
 
 vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
@@ -20,7 +21,7 @@ vi.mock('../off-picker.js', () => ({
 import { showOffAddReview, closeOffAddReview, submitToOff } from '../off-review.js';
 import { offState } from '../off-utils.js';
 import { closeOffPicker } from '../off-picker.js';
-import { api, showToast } from '../state.js';
+import { api, showToast, state } from '../state.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -184,5 +185,41 @@ describe('submitToOff', () => {
     api.mockResolvedValue({});
     await submitToOff('12345678', 'q');
     expect(api).toHaveBeenCalled();
+  });
+
+  it('forwards product_id when showOffAddReview was called with one', async () => {
+    setupDOM();
+    showOffAddReview('12345678', 'p', 42);
+    api.mockResolvedValue({ ok: true, synced_flag_set: true });
+    await submitToOff('12345678');
+    const body = JSON.parse(api.mock.calls[0][1].body);
+    expect(body.product_id).toBe(42);
+  });
+
+  it('omits product_id when showOffAddReview was called without one', async () => {
+    setupDOM();
+    showOffAddReview('12345678', 'p');
+    api.mockResolvedValue({ ok: true });
+    await submitToOff('12345678');
+    const body = JSON.parse(api.mock.calls[0][1].body);
+    expect(body.product_id).toBeUndefined();
+  });
+
+  it('shows warning toast when response has image_warning', async () => {
+    setupDOM();
+    showOffAddReview('12345678', 'p', 7);
+    api.mockResolvedValue({ ok: true, image_warning: 'off_err_api', synced_flag_set: true });
+    await submitToOff('12345678');
+    const warningCall = showToast.mock.calls.find((c) => c[1] === 'warning');
+    expect(warningCall).toBeTruthy();
+  });
+
+  it('updates cachedResults entry when synced_flag_set is true', async () => {
+    setupDOM();
+    state.cachedResults = [{ id: 99, name: 'Cached', is_synced_with_off: 0 }];
+    showOffAddReview('12345678', 'p', 99);
+    api.mockResolvedValue({ ok: true, synced_flag_set: true });
+    await submitToOff('12345678');
+    expect(state.cachedResults[0].is_synced_with_off).toBe(1);
   });
 });

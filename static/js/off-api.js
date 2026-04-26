@@ -5,9 +5,15 @@ import { fetchWithTimeout, isValidEan, offState, _gatherNutrition, applyOffProdu
 import { showOffPickerLoading, updateOffPickerResults, closeOffPicker } from './off-picker.js';
 
 export async function lookupOFF(prefix, productId, opts) {
-  const ean = document.getElementById(prefix + '-ean').value.replace(/\s/g, '');
+  // opts.ean, when present, targets a specific EAN (e.g. per-row fetch on a
+  // secondary EAN) without requiring the caller to mutate the hidden input.
+  const explicitEan = opts && opts.ean ? String(opts.ean) : null;
+  const ean = (explicitEan != null
+    ? explicitEan
+    : document.getElementById(prefix + '-ean').value
+  ).replace(/\s/g, '');
   const name = document.getElementById(prefix + '-name').value.trim();
-  offState.ctx = { prefix: prefix, productId: productId || null, autoClose: opts?.autoClose || false };
+  offState.ctx = { prefix: prefix, productId: productId || null, autoClose: opts?.autoClose || false, offEan: explicitEan };
 
   if (isValidEan(ean)) {
     showOffPickerLoading(t('off_searching_ean', { ean: ean }));

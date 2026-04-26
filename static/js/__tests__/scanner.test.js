@@ -1559,6 +1559,142 @@ describe('onSearchScanDetected secondary EAN match', () => {
     fetchProducts.mockResolvedValue([]);
   });
 
+  it('finds product with null ean but populated eans array', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    document.body.appendChild(searchInput);
+    const searchClear = document.createElement('div');
+    searchClear.id = 'search-clear';
+    document.body.appendChild(searchClear);
+    const filterRow = document.createElement('div');
+    filterRow.id = 'filter-row';
+    document.body.appendChild(filterRow);
+    const filterToggle = document.createElement('div');
+    filterToggle.id = 'filter-toggle';
+    document.body.appendChild(filterToggle);
+
+    state.currentView = 'search';
+    const code = '3333333333';
+    const product = { id: 5, name: 'NullEan', type: 'dairy', ean: null, eans: [code] };
+    fetchProducts.mockResolvedValueOnce([product]);
+    fetchProducts.mockResolvedValueOnce([product]);
+
+    openSearchScanner();
+    await vi.waitFor(() => { expect(capturedOnSuccess).toBeDefined(); });
+
+    capturedOnSuccess(code);
+    await vi.waitFor(() => { expect(buildFilters).toHaveBeenCalled(); });
+    expect(state.currentFilter).toEqual(['dairy']);
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('falls back to backend search when eans is empty array and ean is empty string', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    document.body.appendChild(searchInput);
+    const searchClear = document.createElement('div');
+    searchClear.id = 'search-clear';
+    document.body.appendChild(searchClear);
+    const filterRow = document.createElement('div');
+    filterRow.id = 'filter-row';
+    document.body.appendChild(filterRow);
+    const filterToggle = document.createElement('div');
+    filterToggle.id = 'filter-toggle';
+    document.body.appendChild(filterToggle);
+
+    state.currentView = 'search';
+    const code = '4444444444';
+    // Product has empty ean and empty eans - no local match possible
+    fetchProducts.mockResolvedValueOnce([{ id: 6, name: 'NoEan', type: 'snack', ean: '', eans: [] }]);
+    // Backend search also returns nothing
+    fetchProducts.mockResolvedValueOnce([]);
+
+    openSearchScanner();
+    await vi.waitFor(() => { expect(capturedOnSuccess).toBeDefined(); });
+
+    capturedOnSuccess(code);
+    await vi.waitFor(() => {
+      // Should have called fetchProducts with the scanned code for backend search
+      expect(fetchProducts).toHaveBeenCalledWith(code, []);
+    });
+    fetchProducts.mockResolvedValue([]);
+  });
+
+  it('finds product via legacy ean when eans is undefined', async () => {
+    let capturedOnSuccess;
+    const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
+      capturedOnSuccess = onSuccess;
+      return Promise.resolve();
+    });
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: mockStart,
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = {
+      EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3,
+    };
+    navigator.vibrate = vi.fn();
+
+    const searchInput = document.createElement('input');
+    searchInput.id = 'search-input';
+    document.body.appendChild(searchInput);
+    const searchClear = document.createElement('div');
+    searchClear.id = 'search-clear';
+    document.body.appendChild(searchClear);
+    const filterRow = document.createElement('div');
+    filterRow.id = 'filter-row';
+    document.body.appendChild(filterRow);
+    const filterToggle = document.createElement('div');
+    filterToggle.id = 'filter-toggle';
+    document.body.appendChild(filterToggle);
+
+    state.currentView = 'search';
+    const code = '5555555555';
+    // Product has legacy ean only, no eans array at all
+    const product = { id: 7, name: 'LegacyOnly', type: 'bakery', ean: code };
+    fetchProducts.mockResolvedValueOnce([product]);
+    fetchProducts.mockResolvedValueOnce([product]);
+
+    openSearchScanner();
+    await vi.waitFor(() => { expect(capturedOnSuccess).toBeDefined(); });
+
+    capturedOnSuccess(code);
+    await vi.waitFor(() => { expect(buildFilters).toHaveBeenCalled(); });
+    expect(state.currentFilter).toEqual(['bakery']);
+    fetchProducts.mockResolvedValue([]);
+  });
+
   it('falls back to backend search when secondary EAN is not in local eans array', async () => {
     let capturedOnSuccess;
     const mockStart = vi.fn().mockImplementation((facingMode, config, onSuccess) => {
