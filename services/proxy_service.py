@@ -317,6 +317,20 @@ def off_search(query: str, nutrition: dict | None = None, category: str = "") ->
         p["product_name"] = _pick_by_priority(p, "product_name", priority)
         p["ingredients_text"] = _pick_by_priority(p, "ingredients_text", priority)
 
+    # Translate ingredients when not in user's target language
+    from services import llm_translate_service
+    if llm_translate_service.is_available():
+        for p in combined:
+            if (
+                p.get("ingredients_text")
+                and p.get("lang") != priority[0]
+                and not p.get(f"ingredients_text_{priority[0]}", "").strip()
+            ):
+                p["ingredients_text"] = llm_translate_service.translate_ingredients(
+                    p["ingredients_text"], priority[0]
+                )
+                p["ingredients_translated"] = True
+
     # Compute certainty score for each product and sort by it
     for p in combined:
         try:
