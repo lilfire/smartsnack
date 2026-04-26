@@ -80,14 +80,14 @@ def test_add_ean_then_list(live_url, api_create_product):
 
 
 def test_add_duplicate_ean(live_url, api_create_product):
-    """Adding the same EAN twice is idempotent (returns 200 with already_exists flag)."""
+    """Adding the same EAN twice returns 409 conflict."""
     product = api_create_product(name="EanDuplicate")
     pid = product["id"]
 
     _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000002"})
     status, body = _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000002"})
-    assert status == 200, f"Expected 200 for idempotent EAN add, got {status}"
-    assert body.get("already_exists") is True
+    assert status == 409, f"Expected 409 for duplicate EAN add, got {status}"
+    assert body["error"] == "ean_already_exists"
 
 
 def test_delete_ean(live_url, api_create_product):
@@ -95,7 +95,7 @@ def test_delete_ean(live_url, api_create_product):
     product = api_create_product(name="EanDelete")
     pid = product["id"]
 
-    # Add two EANs — deleting the only EAN is not allowed
+    # Add two EANs so we can delete one and verify removal
     _, add_body = _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000003"})
     _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000099"})
     ean_id = add_body["id"]
@@ -107,6 +107,22 @@ def test_delete_ean(live_url, api_create_product):
     _, eans = _get(f"{live_url}/api/products/{pid}/eans")
     ean_ids = [e["id"] for e in eans]
     assert ean_id not in ean_ids
+
+
+def test_delete_last_ean_succeeds(live_url, api_create_product):
+    """Deleting the last remaining EAN on a product is now allowed."""
+    product = api_create_product(name="EanDeleteLast")
+    pid = product["id"]
+
+    _, add_body = _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000050"})
+    ean_id = add_body["id"]
+
+    status, body = _delete(f"{live_url}/api/products/{pid}/eans/{ean_id}")
+    assert status == 200, f"Expected 200 when deleting last EAN, got {status}"
+    assert body.get("ok") is True
+
+    _, eans = _get(f"{live_url}/api/products/{pid}/eans")
+    assert len(eans) == 0, "Product should have no EANs after deleting the last one"
 
 
 def test_set_primary_ean(live_url, api_create_product):
