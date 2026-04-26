@@ -5,23 +5,24 @@ All implementation has been split into focused modules:
 - product_scoring.py   — Scoring formula and weight computation
 - product_filters.py   — Advanced filtering logic
 - product_duplicate.py — Duplicate detection and merging
+- product_eans.py      — EAN CRUD operations
 """
 
 from services.product_crud import (
     _get_product_flags,
-    _get_product_tags,
     _set_user_flags,
-    _set_tags,
-    get_tag_suggestions,
     set_system_flag,
     list_products,
     add_product,
     update_product,
     delete_product,
+)
+from services.product_eans import (
     list_eans,
     add_ean,
     delete_ean,
     set_primary_ean,
+    unsync_ean,
 )
 from services.product_scoring import (
     _load_weight_config,
@@ -46,10 +47,7 @@ from services.product_duplicate import (
 
 __all__ = [
     "_get_product_flags",
-    "_get_product_tags",
     "_set_user_flags",
-    "_set_tags",
-    "get_tag_suggestions",
     "set_system_flag",
     "list_products",
     "add_product",
@@ -59,6 +57,7 @@ __all__ = [
     "add_ean",
     "delete_ean",
     "set_primary_ean",
+    "unsync_ean",
     "_load_weight_config",
     "_compute_category_ranges",
     "_score_product",

@@ -429,7 +429,7 @@ class TestDispatchPassesModel:
 
         called_with = {}
 
-        def mock_claude(image_bytes, image_b64, mime_type="image/png", model=None):
+        def mock_claude(image_bytes, image_b64, mime_type="image/png", model=None, language=None):
             called_with["model"] = model
             return "text"
 

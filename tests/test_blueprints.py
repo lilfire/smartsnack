@@ -28,6 +28,29 @@ class TestProductsBlueprint:
         resp = client.get("/api/products?search=Popcorn")
         assert resp.status_code == 200
 
+    def test_list_with_search_validates_response_body(self, client):
+        """Search endpoint returns proper paginated response with product details."""
+        resp = client.get("/api/products?search=Popcorn")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "products" in data
+        assert "total" in data
+        assert isinstance(data["products"], list)
+        assert isinstance(data["total"], int)
+        if data["products"]:
+            product = data["products"][0]
+            assert "id" in product
+            assert "name" in product
+            assert "type" in product
+
+    def test_list_empty_search_returns_valid_structure(self, client):
+        """Empty search results still return proper {products: [], total: 0} structure."""
+        resp = client.get("/api/products?search=zzzNonExistent999")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data["products"], list)
+        assert isinstance(data["total"], int)
+
     def test_list_with_type_filter(self, client):
         resp = client.get("/api/products?type=Snacks")
         assert resp.status_code == 200
@@ -408,3 +431,168 @@ class TestOffBlueprint:
     def test_missing_json(self, client):
         resp = client.post("/api/off/add-product")
         assert resp.status_code == 400
+
+    def _setup(self, app):
+        from services.settings_service import set_off_credentials
+        with app.app_context():
+            set_off_credentials("user", "pass")
+
+    def test_add_product_no_product_id_legacy(self, client, app):
+        from unittest.mock import patch
+        self._setup(app)
+        with patch(
+            "services.off_service.add_product_to_off",
+            return_value={"status": 1, "status_verbose": "fields saved"},
+        ):
+            resp = client.post(
+                "/api/off/add-product",
+                json={"code": "12345678", "product_name": "Test"},
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["ok"] is True
+        assert data["image_uploaded"] is False
+        assert data["synced_flag_set"] is False
+        assert data["image_warning"] is None
+
+    def test_add_product_with_product_id_and_image(self, client, app):
+        from unittest.mock import patch
+        self._setup(app)
+        with app.app_context():
+            from services.product_crud import add_product
+            from services.image_service import set_image
+            pid = add_product(
+                {"name": "P", "ean": "12345678", "type": ""},
+                on_duplicate="allow_duplicate",
+            )["id"]
+            set_image(
+                pid,
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=",
+            )
+
+        upload_calls = []
+
+        def fake_upload(code, image, imagefield="front"):
+            upload_calls.append({"code": code, "image": image, "imagefield": imagefield})
+            return {"status": "status ok"}
+
+        with patch(
+            "services.off_service.add_product_to_off",
+            return_value={"status": 1, "status_verbose": "fields saved"},
+        ), patch("services.off_service.upload_image_to_off", side_effect=fake_upload):
+            resp = client.post(
+                "/api/off/add-product",
+                json={
+                    "code": "12345678",
+                    "product_name": "Test",
+                    "product_id": pid,
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["image_uploaded"] is True
+        assert data["synced_flag_set"] is True
+        assert data["image_warning"] is None
+        assert len(upload_calls) == 1
+        assert upload_calls[0]["code"] == "12345678"
+
+        with app.app_context():
+            from db import get_db
+            conn = get_db()
+            row = conn.execute(
+                "SELECT flag FROM product_flags WHERE product_id=? AND flag=?",
+                (pid, "is_synced_with_off"),
+            ).fetchone()
+            assert row is not None
+            ean_row = conn.execute(
+                "SELECT synced_with_off FROM product_eans WHERE product_id=? AND ean=?",
+                (pid, "12345678"),
+            ).fetchone()
+            assert ean_row["synced_with_off"] == 1
+
+    def test_add_product_with_product_id_no_image(self, client, app):
+        from unittest.mock import patch
+        self._setup(app)
+        with app.app_context():
+            from services.product_crud import add_product
+            pid = add_product(
+                {"name": "P", "ean": "12345678", "type": ""},
+                on_duplicate="allow_duplicate",
+            )["id"]
+
+        with patch(
+            "services.off_service.add_product_to_off",
+            return_value={"status": 1, "status_verbose": "fields saved"},
+        ), patch(
+            "services.off_service.upload_image_to_off"
+        ) as upload_mock:
+            resp = client.post(
+                "/api/off/add-product",
+                json={
+                    "code": "12345678",
+                    "product_name": "Test",
+                    "product_id": pid,
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["image_uploaded"] is False
+        assert data["synced_flag_set"] is True
+        assert data["image_warning"] is None
+        upload_mock.assert_not_called()
+
+    def test_add_product_image_upload_failure_sets_warning(self, client, app):
+        from unittest.mock import patch
+        self._setup(app)
+        with app.app_context():
+            from services.product_crud import add_product
+            from services.image_service import set_image
+            pid = add_product(
+                {"name": "P", "ean": "12345678", "type": ""},
+                on_duplicate="allow_duplicate",
+            )["id"]
+            set_image(
+                pid,
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII=",
+            )
+
+        with patch(
+            "services.off_service.add_product_to_off",
+            return_value={"status": 1, "status_verbose": "fields saved"},
+        ), patch(
+            "services.off_service.upload_image_to_off",
+            side_effect=RuntimeError("off_err_api"),
+        ):
+            resp = client.post(
+                "/api/off/add-product",
+                json={
+                    "code": "12345678",
+                    "product_name": "Test",
+                    "product_id": pid,
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["image_uploaded"] is False
+        assert data["image_warning"] == "off_err_api"
+        assert data["synced_flag_set"] is True
+
+    def test_add_product_invalid_product_id_ignored(self, client, app):
+        from unittest.mock import patch
+        self._setup(app)
+        with patch(
+            "services.off_service.add_product_to_off",
+            return_value={"status": 1, "status_verbose": "fields saved"},
+        ):
+            resp = client.post(
+                "/api/off/add-product",
+                json={
+                    "code": "12345678",
+                    "product_name": "Test",
+                    "product_id": "not-a-number",
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["synced_flag_set"] is False
+        assert data["image_uploaded"] is False

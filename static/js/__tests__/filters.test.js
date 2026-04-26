@@ -530,7 +530,7 @@ describe('buildTypeSelect', () => {
 describe('rerender', () => {
   it('calls renderResults via dynamic import', async () => {
     const mockRenderResults = vi.fn();
-    // Intercept the dynamic import by mocking it at module level
+    vi.resetModules();
     vi.doMock('../render.js', () => ({ renderResults: mockRenderResults }));
 
     const searchInput = document.createElement('input');
@@ -542,29 +542,34 @@ describe('rerender', () => {
     rerender();
 
     // Wait for the dynamic import promise to resolve
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockRenderResults).toHaveBeenCalledWith(state.cachedResults, 'query');
+    await vi.waitFor(() => {
+      expect(mockRenderResults).toHaveBeenCalledWith(state.cachedResults, 'query');
+    }, { timeout: 500 });
   });
 
   it('uses empty string when search-input not present', async () => {
     const mockRenderResults = vi.fn();
+    vi.resetModules();
     vi.doMock('../render.js', () => ({ renderResults: mockRenderResults }));
 
     document.body.innerHTML = '';
     state.cachedResults = [];
 
     rerender();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockRenderResults).toHaveBeenCalledWith([], '');
+    await vi.waitFor(() => {
+      expect(mockRenderResults).toHaveBeenCalledWith([], '');
+    }, { timeout: 500 });
   });
 
   it('catches and logs error when dynamic import fails', async () => {
+    vi.resetModules();
     vi.doMock('../render.js', () => { throw new Error('module load failure'); });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     rerender();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(errorSpy).toHaveBeenCalledWith('Failed to load render module:', expect.any(Error));
+    await vi.waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith('Failed to load render module:', expect.any(Error));
+    }, { timeout: 500 });
     errorSpy.mockRestore();
   });
 });
