@@ -263,6 +263,16 @@ export async function loadData() {
     if (total !== null) state.pagination.total = total;
     state.pagination.offset = results.length > 0 ? state.pagination.pageSize : 0;
     renderResults(results, search);
+    requestAnimationFrame(() => {
+      if (search && results.length > 0) {
+        const rowEl = document.querySelector('.table-row[data-product-id]');
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          rowEl.classList.add('scan-highlight');
+          setTimeout(() => { rowEl.classList.remove('scan-highlight'); }, 5000);
+        }
+      }
+    });
     announceStatus(t('stats_line', { total: results.length, types: state.cachedStats.types }));
     // Set up infinite scroll if more results may exist
     const allLoaded = total !== null && results.length >= total;

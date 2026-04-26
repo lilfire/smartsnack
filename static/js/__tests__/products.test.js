@@ -624,6 +624,76 @@ describe('loadData', () => {
     const result = getSearch();
     expect(result).toBe('');
   });
+
+  it('scrolls and highlights first result row when search has results', async () => {
+    document.getElementById('search-input').value = 'milk';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'table-row';
+    rowEl.dataset.productId = '1';
+    rowEl.scrollIntoView = vi.fn();
+    document.body.appendChild(rowEl);
+
+    await loadData();
+    // Advance past rAF (~16ms) but not past the 5000ms highlight removal timer
+    vi.advanceTimersByTime(20);
+
+    expect(rowEl.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(rowEl.classList.contains('scan-highlight')).toBe(true);
+
+    vi.advanceTimersByTime(5000);
+    expect(rowEl.classList.contains('scan-highlight')).toBe(false);
+  });
+
+  it('does not scroll or highlight when search is empty', async () => {
+    document.getElementById('search-input').value = '';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'table-row';
+    rowEl.dataset.productId = '1';
+    rowEl.scrollIntoView = vi.fn();
+    document.body.appendChild(rowEl);
+
+    await loadData();
+    vi.advanceTimersByTime(20);
+
+    expect(rowEl.scrollIntoView).not.toHaveBeenCalled();
+    expect(rowEl.classList.contains('scan-highlight')).toBe(false);
+  });
+
+  it('does not scroll or highlight when results are empty', async () => {
+    document.getElementById('search-input').value = 'milk';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([]);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'table-row';
+    rowEl.dataset.productId = '1';
+    rowEl.scrollIntoView = vi.fn();
+    document.body.appendChild(rowEl);
+
+    await loadData();
+    vi.advanceTimersByTime(20);
+
+    expect(rowEl.scrollIntoView).not.toHaveBeenCalled();
+    expect(rowEl.classList.contains('scan-highlight')).toBe(false);
+  });
+
+  it('does not throw when no .table-row is in the DOM', async () => {
+    document.getElementById('search-input').value = 'milk';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+    // No .table-row element added to DOM
+
+    await expect(async () => {
+      await loadData();
+      vi.advanceTimersByTime(20);
+    }).not.toThrow();
+  });
 });
 
 describe('switchView settings', () => {
