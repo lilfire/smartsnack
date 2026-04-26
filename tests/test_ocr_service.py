@@ -251,7 +251,7 @@ class TestClaudeVisionBackend:
         mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="sukker, hvetemel, vann, salt")])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -265,7 +265,7 @@ class TestClaudeVisionBackend:
         mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="ingredients list")])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_data_uri(png_bytes))
@@ -292,7 +292,7 @@ class TestClaudeVisionBackend:
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("ANTHROPIC_API_KEY", None)
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -306,7 +306,7 @@ class TestClaudeVisionBackend:
         mock_msg = types.SimpleNamespace(content=[])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -735,7 +735,7 @@ class TestOpenAIBackend:
         )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-openai-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -766,7 +766,7 @@ class TestOpenAIBackend:
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("OPENAI_API_KEY", None)
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
@@ -781,7 +781,7 @@ class TestOpenAIBackend:
         )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -806,7 +806,7 @@ class TestOpenRouterBackend:
         )
 
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-openrouter-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -846,7 +846,7 @@ class TestOpenRouterBackend:
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("OPENROUTER_API_KEY", None)
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
@@ -869,7 +869,7 @@ class TestOpenRouterBackend:
             "OPENROUTER_API_KEY": "test-key",
             "OPENROUTER_MODEL": "anthropic/claude-3.5-sonnet",
         }, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
@@ -886,7 +886,7 @@ class TestOpenRouterBackend:
         )
 
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -911,7 +911,7 @@ class TestGroqBackend:
         )
 
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-groq-key"}, clear=False):
-            with patch("groq.Groq", autospec=True) as mock_cls:
+            with patch("groq.Groq") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -942,7 +942,7 @@ class TestGroqBackend:
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("GROQ_API_KEY", None)
-            with patch("groq.Groq", autospec=True) as mock_cls:
+            with patch("groq.Groq") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
@@ -957,7 +957,7 @@ class TestGroqBackend:
         )
 
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}, clear=False):
-            with patch("groq.Groq", autospec=True) as mock_cls:
+            with patch("groq.Groq") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -980,7 +980,7 @@ class TestBackwardCompatibility:
         mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="sukker, mel")])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
@@ -1273,7 +1273,7 @@ class TestMimeTypeExtraction:
         jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
@@ -1294,7 +1294,7 @@ class TestMimeTypeExtraction:
         png_uri = f"data:image/png;base64,{_b64(png_bytes)}"
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
@@ -1313,7 +1313,7 @@ class TestMimeTypeExtraction:
         jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True):
                     from services.ocr_service import dispatch_ocr
@@ -1332,7 +1332,7 @@ class TestMimeTypeExtraction:
         png_uri = f"data:image/png;base64,{_b64(png_bytes)}"
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True):
                     from services.ocr_service import dispatch_ocr
@@ -1409,7 +1409,7 @@ class TestMagicByteFallback:
         raw_b64 = _b64(unknown_bytes)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr

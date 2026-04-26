@@ -72,7 +72,7 @@ class TestOpenAI:
         mock_response = types.SimpleNamespace(
             choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="  sugar, flour  "))]
         )
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             result = _extract_openai(img, _b64(img), "image/png")
@@ -84,7 +84,7 @@ class TestOpenAI:
         mock_response = types.SimpleNamespace(
             choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
         )
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             _extract_openai(img, _b64(img), "image/png")
@@ -97,7 +97,7 @@ class TestOpenAI:
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
         mock_response = types.SimpleNamespace(choices=[])
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             result = _extract_openai(img, _b64(img))
@@ -121,7 +121,7 @@ class TestOpenRouter:
         mock_response = types.SimpleNamespace(
             choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredients"))]
         )
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             result = _extract_openrouter(img, _b64(img))
@@ -134,7 +134,7 @@ class TestOpenRouter:
         mock_response = types.SimpleNamespace(
             choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
         )
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             _extract_openrouter(img, _b64(img))
@@ -146,7 +146,7 @@ class TestOpenRouter:
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         img = _tiny_png_bytes()
         mock_response = types.SimpleNamespace(choices=[])
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             assert _extract_openrouter(img, _b64(img)) == ""
@@ -169,7 +169,7 @@ class TestGroq:
         mock_response = types.SimpleNamespace(
             choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="groq result"))]
         )
-        with patch("groq.Groq", autospec=True) as mock_cls:
+        with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             result = _extract_groq(img, _b64(img))
@@ -181,7 +181,7 @@ class TestGroq:
         mock_response = types.SimpleNamespace(
             choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
         )
-        with patch("groq.Groq", autospec=True) as mock_cls:
+        with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             _extract_groq(img, _b64(img))
@@ -193,7 +193,7 @@ class TestGroq:
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
         mock_response = types.SimpleNamespace(choices=[])
-        with patch("groq.Groq", autospec=True) as mock_cls:
+        with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             assert _extract_groq(img, _b64(img)) == ""
@@ -216,7 +216,7 @@ class TestClaude:
         mock_message = types.SimpleNamespace(
             content=[types.SimpleNamespace(text="  claude result  ")]
         )
-        with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+        with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             result = _extract_claude_vision(img, _b64(img))
@@ -228,7 +228,7 @@ class TestClaude:
         mock_message = types.SimpleNamespace(
             content=[types.SimpleNamespace(text="ok")]
         )
-        with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+        with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img))
@@ -242,7 +242,7 @@ class TestClaude:
         mock_message = types.SimpleNamespace(
             content=[types.SimpleNamespace(text="ok")]
         )
-        with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+        with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img))
@@ -255,7 +255,7 @@ class TestClaude:
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
         mock_message = types.SimpleNamespace(content=[])
-        with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+        with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             assert _extract_claude_vision(img, _b64(img)) == ""

@@ -81,7 +81,7 @@ class TestWebpMimeTypePropagation:
         webp_uri = _data_uri(webp_bytes, "image/webp")
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", autospec=True) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
                 mock_cls.return_value.chat.completions.create.return_value = mock_response
                 with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
@@ -102,7 +102,7 @@ class TestWebpMimeTypePropagation:
         webp_uri = _data_uri(webp_bytes, "image/webp")
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
                 mock_cls.return_value.messages.create.return_value = mock_msg
                 with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True):
                     from services.ocr_service import dispatch_ocr

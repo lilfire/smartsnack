@@ -188,7 +188,7 @@ class TestClaudeLanguageParam:
         mock_message = types.SimpleNamespace(
             content=[types.SimpleNamespace(text="sugar")]
         )
-        with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+        with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img), language=None)
@@ -205,7 +205,7 @@ class TestClaudeLanguageParam:
         mock_message = types.SimpleNamespace(
             content=[types.SimpleNamespace(text="sugar")]
         )
-        with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+        with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img), language="en")
@@ -224,7 +224,7 @@ class TestGroqLanguageParam:
                 message=types.SimpleNamespace(content="sukker")
             )]
         )
-        with patch("groq.Groq", autospec=True) as mock_cls:
+        with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             _extract_groq(img, _b64(img), language="no")
@@ -241,7 +241,7 @@ class TestGroqLanguageParam:
                 message=types.SimpleNamespace(content="sukker")
             )]
         )
-        with patch("groq.Groq", autospec=True) as mock_cls:
+        with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             _extract_groq(img, _b64(img), language=None)
@@ -261,7 +261,7 @@ class TestOpenAILanguageParam:
                 message=types.SimpleNamespace(content="socker")
             )]
         )
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             _extract_openai(img, _b64(img), language="se")
@@ -280,7 +280,7 @@ class TestOpenRouterLanguageParam:
                 message=types.SimpleNamespace(content="sugar")
             )]
         )
-        with patch("openai.OpenAI", autospec=True) as mock_cls:
+        with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             _extract_openrouter(img, _b64(img), language="en")
@@ -324,7 +324,7 @@ class TestDispatchOcrPassesLanguage:
              patch("services.settings_service.get_language", return_value="en", autospec=True), \
              patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
              patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
-             patch("anthropic.Anthropic", autospec=True) as mock_cls:
+             patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_core import dispatch_ocr
             dispatch_ocr(_b64(img))
@@ -359,7 +359,7 @@ class TestDispatchOcrPassesLanguage:
              patch("services.settings_service.get_language", side_effect=RuntimeError, autospec=True), \
              patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
              patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
-             patch("anthropic.Anthropic", autospec=True) as mock_cls:
+             patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_core import dispatch_ocr
             result = dispatch_ocr(_b64(img))
@@ -390,7 +390,7 @@ class TestDispatchOcrBytesPassesLanguage:
              patch("services.settings_service.get_language", return_value="no", autospec=True), \
              patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
              patch.dict("os.environ", {"GROQ_API_KEY": "test-key"}), \
-             patch("groq.Groq", autospec=True) as mock_cls:
+             patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_core import dispatch_ocr_bytes
             dispatch_ocr_bytes(img)

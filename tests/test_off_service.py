@@ -2,6 +2,7 @@
 
 import base64
 import http.client
+import io
 import json
 import pytest
 from unittest.mock import patch, create_autospec
@@ -72,12 +73,12 @@ class TestAddProductToOff:
         import urllib.error
 
         set_off_credentials("user", "pass")
-        mock_fp = create_autospec(http.client.HTTPResponse, instance=True)
-        mock_fp.read.return_value = b"error"
+        # io.BytesIO used as fp: HTTPError reads from fp internally;
+        # create_autospec(HTTPResponse) is incompatible with HTTPError's __init__
         with patch(
             "urllib.request.urlopen",
             side_effect=urllib.error.HTTPError(
-                "url", 500, "Server Error", {}, mock_fp
+                "url", 500, "Server Error", {}, io.BytesIO(b"error")
             ),
          autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
@@ -189,12 +190,12 @@ class TestUploadImageToOff:
         import urllib.error
 
         set_off_credentials("user", "pass")
-        mock_fp = create_autospec(http.client.HTTPResponse, instance=True)
-        mock_fp.read.return_value = b"error"
+        # io.BytesIO used as fp: HTTPError reads from fp internally;
+        # create_autospec(HTTPResponse) is incompatible with HTTPError's __init__
         with patch(
             "urllib.request.urlopen",
             side_effect=urllib.error.HTTPError(
-                "url", 500, "Server Error", {}, mock_fp
+                "url", 500, "Server Error", {}, io.BytesIO(b"error")
             ),
          autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
