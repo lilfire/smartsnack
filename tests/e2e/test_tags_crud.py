@@ -55,6 +55,19 @@ def _cleanup_tag(live_url, tag_id):
     _api_raw(live_url, f"/api/tags/{tag_id}", method="DELETE")
 
 
+def _get_product_by_id(live_url, product_id):
+    """Fetch a single product by searching the product list.
+
+    There is no GET /api/products/<id> endpoint; use the list endpoint
+    and filter client-side.
+    """
+    _, data = _api_raw(live_url, f"/api/products?limit=1000")
+    for p in data.get("products", []):
+        if p["id"] == product_id:
+            return p
+    return {}
+
+
 # ---------------------------------------------------------------------------
 # POST /api/tags — Create
 # ---------------------------------------------------------------------------
@@ -322,12 +335,16 @@ def test_tag_lifecycle_create_assign_update_delete(live_url, api_create_product)
     _, tag2 = _api_raw(live_url, "/api/tags", method="POST", body={"label": "e2e-lifecycle-b"})
     assert tag1["id"] != tag2["id"]
 
-    # 2. Create a product with these tags
-    product = api_create_product(name="LifecycleTagProd", tags=[tag1["id"], tag2["id"]])
+    # 2. Create a product then assign tags via PUT
+    product = api_create_product(name="LifecycleTagProd")
     product_id = product["id"]
+    _api_raw(
+        live_url, f"/api/products/{product_id}",
+        method="PUT", body={"tagIds": [tag1["id"], tag2["id"]]}
+    )
 
     # 3. Verify tags are associated with the product
-    _, prod_data = _api_raw(live_url, f"/api/products/{product_id}")
+    prod_data = _get_product_by_id(live_url, product_id)
     prod_tag_ids = [t["id"] for t in prod_data.get("tags", [])]
     assert tag1["id"] in prod_tag_ids
     assert tag2["id"] in prod_tag_ids
@@ -341,7 +358,7 @@ def test_tag_lifecycle_create_assign_update_delete(live_url, api_create_product)
     assert updated["label"] == "e2e-lifecycle-renamed"
 
     # 5. Verify product still has the renamed tag
-    _, prod_data2 = _api_raw(live_url, f"/api/products/{product_id}")
+    prod_data2 = _get_product_by_id(live_url, product_id)
     prod_tag_labels = [t["label"] for t in prod_data2.get("tags", [])]
     assert "e2e-lifecycle-renamed" in prod_tag_labels
 
@@ -350,7 +367,7 @@ def test_tag_lifecycle_create_assign_update_delete(live_url, api_create_product)
     assert status == 200
 
     # 7. Verify product no longer has deleted tag but still has tag2
-    _, prod_data3 = _api_raw(live_url, f"/api/products/{product_id}")
+    prod_data3 = _get_product_by_id(live_url, product_id)
     remaining_ids = [t["id"] for t in prod_data3.get("tags", [])]
     assert tag1["id"] not in remaining_ids
     assert tag2["id"] in remaining_ids
@@ -367,11 +384,13 @@ def test_tag_assignment_multiple_products(live_url, api_create_product):
     """A single tag can be shared across multiple products."""
     _, tag = _api_raw(live_url, "/api/tags", method="POST", body={"label": "e2e-multi-prod"})
 
-    prod1 = api_create_product(name="MultiTagProd1", tags=[tag["id"]])
-    prod2 = api_create_product(name="MultiTagProd2", tags=[tag["id"]])
+    prod1 = api_create_product(name="MultiTagProd1")
+    _api_raw(live_url, f"/api/products/{prod1['id']}", method="PUT", body={"tagIds": [tag["id"]]})
+    prod2 = api_create_product(name="MultiTagProd2")
+    _api_raw(live_url, f"/api/products/{prod2['id']}", method="PUT", body={"tagIds": [tag["id"]]})
 
-    _, p1 = _api_raw(live_url, f"/api/products/{prod1['id']}")
-    _, p2 = _api_raw(live_url, f"/api/products/{prod2['id']}")
+    p1 = _get_product_by_id(live_url, prod1["id"])
+    p2 = _get_product_by_id(live_url, prod2["id"])
 
     assert tag["id"] in [t["id"] for t in p1.get("tags", [])]
     assert tag["id"] in [t["id"] for t in p2.get("tags", [])]
@@ -379,8 +398,8 @@ def test_tag_assignment_multiple_products(live_url, api_create_product):
     # Deleting the tag removes it from both products
     _api_raw(live_url, f"/api/tags/{tag['id']}", method="DELETE")
 
-    _, p1_after = _api_raw(live_url, f"/api/products/{prod1['id']}")
-    _, p2_after = _api_raw(live_url, f"/api/products/{prod2['id']}")
+    p1_after = _get_product_by_id(live_url, prod1["id"])
+    p2_after = _get_product_by_id(live_url, prod2["id"])
 
     assert tag["id"] not in [t["id"] for t in p1_after.get("tags", [])]
     assert tag["id"] not in [t["id"] for t in p2_after.get("tags", [])]
@@ -391,17 +410,21 @@ def test_tag_removal_from_product_via_update(live_url, api_create_product):
     _, tag1 = _api_raw(live_url, "/api/tags", method="POST", body={"label": "e2e-remove-a"})
     _, tag2 = _api_raw(live_url, "/api/tags", method="POST", body={"label": "e2e-remove-b"})
 
-    product = api_create_product(name="TagRemoveProd", tags=[tag1["id"], tag2["id"]])
+    product = api_create_product(name="TagRemoveProd")
     product_id = product["id"]
+    _api_raw(
+        live_url, f"/api/products/{product_id}",
+        method="PUT", body={"tagIds": [tag1["id"], tag2["id"]]}
+    )
 
     # Update product to only have tag2
     _api_raw(
         live_url, f"/api/products/{product_id}",
         method="PUT",
-        body={"tags": [tag2["id"]]}
+        body={"tagIds": [tag2["id"]]}
     )
 
-    _, updated_prod = _api_raw(live_url, f"/api/products/{product_id}")
+    updated_prod = _get_product_by_id(live_url, product_id)
     tag_ids = [t["id"] for t in updated_prod.get("tags", [])]
     assert tag1["id"] not in tag_ids
     assert tag2["id"] in tag_ids

@@ -261,7 +261,9 @@ class TestEanValidation:
 
     def test_valid_ean_13(self, live_url, api_create_product):
         """Valid 13-digit EAN is accepted."""
-        product = api_create_product(name="Ean13Product", ean="1234567890123")
+        import random
+        unique_ean = f"{random.randint(1000000000000, 9999999999999)}"
+        product = api_create_product(name=f"Ean13Product-{unique_ean}", ean=unique_ean)
         assert "id" in product
 
     def test_valid_ean_8(self, live_url, api_create_product):
@@ -336,10 +338,14 @@ class TestEanDuplicateDetection:
         assert "duplicate" in body
         assert body["duplicate"]["match_type"] == "ean"
 
-    def test_duplicate_ean_add_to_different_product_rejected(
+    def test_duplicate_ean_add_to_different_product_allowed(
         self, live_url, api_create_product
     ):
-        """Adding an EAN that belongs to another product returns 409."""
+        """Adding an EAN that belongs to another product is allowed.
+
+        The UNIQUE constraint is (product_id, ean), so the same EAN can
+        exist on multiple products via the EAN-add endpoint.
+        """
         ean = "9992222222222"
         api_create_product(name="ProdWithEan1", ean=ean)
         product_b = api_create_product(
@@ -349,19 +355,19 @@ class TestEanDuplicateDetection:
         status, body = _post(f"{live_url}/api/products/{pid_b}/eans", {
             "ean": ean,
         })
-        assert status == 409
-        assert body["error"] == "ean_already_exists"
+        assert status == 201
+        assert body["ean"] == ean
 
-    def test_same_ean_same_product_idempotent(self, live_url, api_create_product):
-        """Adding the same EAN to the same product is idempotent (200)."""
+    def test_same_ean_same_product_rejected(self, live_url, api_create_product):
+        """Adding the same EAN to the same product returns 409."""
         ean = "9993333333333"
         product = api_create_product(name="IdempotentEan", ean=ean)
         pid = product["id"]
         status, body = _post(f"{live_url}/api/products/{pid}/eans", {
             "ean": ean,
         })
-        assert status == 200
-        assert body.get("already_exists") is True
+        assert status == 409
+        assert body["error"] == "ean_already_exists"
 
     def test_duplicate_ean_on_create_returns_existing_id(
         self, live_url, api_create_product
