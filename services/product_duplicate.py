@@ -14,6 +14,7 @@ def _find_duplicate(ean, name, exclude_id=None):
     cur = conn.cursor()
 
     fields_sql = ", ".join(f"p.{f}" for f in ALL_PRODUCT_FIELDS)
+    ean_subquery = "(SELECT pe2.ean FROM product_eans pe2 WHERE pe2.product_id = p.id AND pe2.is_primary = 1) AS ean"
 
     # Check EAN match first (if ean is provided and non-empty)
     if ean and ean.strip():
@@ -22,7 +23,7 @@ def _find_duplicate(ean, name, exclude_id=None):
         if exclude_id:
             params.append(exclude_id)
         row = cur.execute(
-            f"""SELECT p.id, {fields_sql},
+            f"""SELECT p.id, {fields_sql}, {ean_subquery},
                    EXISTS(SELECT 1 FROM product_flags pf
                           WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
                    AS is_synced_with_off
@@ -34,6 +35,7 @@ def _find_duplicate(ean, name, exclude_id=None):
         if row:
             result = {f: row[f] for f in ALL_PRODUCT_FIELDS}
             result["id"] = row["id"]
+            result["ean"] = row["ean"]
             result["match_type"] = "ean"
             result["is_synced_with_off"] = bool(row["is_synced_with_off"])
             return result
@@ -45,7 +47,7 @@ def _find_duplicate(ean, name, exclude_id=None):
         if exclude_id:
             params.append(exclude_id)
         row = cur.execute(
-            f"""SELECT p.id, {fields_sql},
+            f"""SELECT p.id, {fields_sql}, {ean_subquery},
                    EXISTS(SELECT 1 FROM product_flags pf
                           WHERE pf.product_id = p.id AND pf.flag = 'is_synced_with_off')
                    AS is_synced_with_off
@@ -57,6 +59,7 @@ def _find_duplicate(ean, name, exclude_id=None):
         if row:
             result = {f: row[f] for f in ALL_PRODUCT_FIELDS}
             result["id"] = row["id"]
+            result["ean"] = row["ean"]
             result["match_type"] = "name"
             result["is_synced_with_off"] = bool(row["is_synced_with_off"])
             return result
@@ -131,6 +134,16 @@ def merge_products(target_id: int, source_id: int, choices: dict | None = None) 
         cur.execute(
             "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
             (target_id, row["flag"]),
+        )
+
+    # Transfer EANs from source to target
+    source_eans = cur.execute(
+        "SELECT ean FROM product_eans WHERE product_id = ?", (source_id,)
+    ).fetchall()
+    for row in source_eans:
+        cur.execute(
+            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 0)",
+            (target_id, row["ean"]),
         )
 
     cur.execute("DELETE FROM products WHERE id = ?", (source_id,))

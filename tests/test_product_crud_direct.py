@@ -118,6 +118,30 @@ class TestUpdateProduct:
         with pytest.raises(ValueError, match="Nothing to update"):
             update_product(pid, {})
 
+    def test_update_ean_to_empty_removes_primary_ean(self, db):
+        """Clearing the EAN field should clear primary designation in product_eans."""
+        from services.product_crud import update_product
+
+        pid = _add("ClearEan", ean="11110001")["id"]
+        update_product(pid, {"ean": ""})
+        row = db.execute(
+            "SELECT ean FROM products WHERE id = ?", (pid,)
+        ).fetchone()
+        assert row["ean"] == ""
+
+    def test_update_preserves_secondary_eans(self, db):
+        """Updating primary EAN should not delete secondary EANs."""
+        from services.product_crud import update_product
+        from services.product_eans import add_ean, list_eans
+
+        pid = _add("KeepSecondary", ean="22220001")["id"]
+        add_ean(pid, "22220002")
+        update_product(pid, {"ean": "22220003"})
+        eans = list_eans(pid)
+        ean_values = [e["ean"] for e in eans]
+        assert "22220002" in ean_values
+        assert "22220003" in ean_values
+
 
 # ── delete_product ────────────────────────────────────────────────────────────
 

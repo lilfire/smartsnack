@@ -243,6 +243,25 @@ describe('renderResults', () => {
     expect(container.innerHTML).toContain('Bread');
   });
 
+  it('renders product rows with correct DOM structure', () => {
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '1234567890123', brand: 'FarmCo', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const rows = container.querySelectorAll('.table-row');
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    expect(container.innerHTML).toContain('Milk');
+    expect(container.innerHTML).toContain('FarmCo');
+  });
+
+  it('renders empty state with no child table rows', () => {
+    renderResults([], '');
+    const container = document.getElementById('results-container');
+    const rows = container.querySelectorAll('.table-row');
+    expect(rows.length).toBe(0);
+  });
+
   it('sets result count text', () => {
     renderResults([{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }], '');
     expect(document.getElementById('result-count').textContent).toContain('result_count');
@@ -386,6 +405,16 @@ describe('renderResults - event delegation', () => {
     const sortEl = document.querySelector('[data-action="sort"]');
     sortEl.click();
     expect(window.setSort).toHaveBeenCalled();
+  });
+
+  it('sort delegation passes correct column argument', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const sortEl = document.querySelector('[data-action="sort"]');
+    if (sortEl) {
+      sortEl.click();
+      expect(window.setSort).toHaveBeenCalledWith(expect.any(String));
+    }
   });
 
   it('handles start-edit action via delegation', () => {

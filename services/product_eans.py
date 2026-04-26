@@ -30,7 +30,7 @@ def list_eans(pid: int) -> list:
 
 
 def add_ean(pid: int, ean: str) -> dict:
-    """Add a new EAN to a product."""
+    """Add a new EAN to a product. Idempotent: returns existing record if EAN already on this product."""
     ean = ean.strip()
     if not re.fullmatch(r"\d{8,13}", ean):
         raise ValueError("EAN must be 8-13 digits")
@@ -38,6 +38,13 @@ def add_ean(pid: int, ean: str) -> dict:
     exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
     if not exists:
         raise LookupError("Product not found")
+    # Idempotency: if EAN already belongs to this product, return existing record
+    existing = conn.execute(
+        "SELECT id, ean, is_primary FROM product_eans WHERE product_id = ? AND ean = ?",
+        (pid, ean),
+    ).fetchone()
+    if existing:
+        return {"id": existing["id"], "ean": existing["ean"], "is_primary": bool(existing["is_primary"]), "already_exists": True}
     count = conn.execute(
         "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
     ).fetchone()[0]
