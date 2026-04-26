@@ -178,24 +178,13 @@ async function onSearchScanDetected(code) {
   try {
     if (state.currentView !== 'search') switchView('search');
 
-    const allProducts = await fetchProducts('', []);
-
-    // First pass: check both legacy ean field and eans array
+    const raw = await fetchProducts(code, []);
+    const products = Array.isArray(raw) ? raw : (raw.products || []);
     let found = null;
-    for (let i = 0; i < allProducts.length; i++) {
-      const p = allProducts[i];
-      const eans = Array.isArray(p.eans) ? p.eans : [];
-      if (eans.includes(code) || p.ean === code) { found = p; break; }
-    }
-
-    // Second pass: if no primary match, search via backend (covers secondary EANs)
-    if (!found) {
-      const bySearch = await fetchProducts(code, []);
-      if (bySearch.length === 1) {
-        found = bySearch[0];
-      } else if (bySearch.length > 1) {
-        found = bySearch.find((p) => p.ean === code) || null;
-      }
+    if (products.length === 1) {
+      found = products[0];
+    } else if (products.length > 1) {
+      found = products.find((p) => p.ean === code) || null;
     }
 
     if (found) {
