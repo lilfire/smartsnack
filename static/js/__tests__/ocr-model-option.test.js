@@ -380,3 +380,95 @@ describe('Custom dropdown wrapper integration', () => {
     expect(wasUpgraded).toBe(true);
   });
 });
+
+describe('Model validation edge cases', () => {
+  it('provider with no models list renders text input', async () => {
+    const noModelsProviders = {
+      providers: [
+        ...MOCK_PROVIDERS_RESPONSE.providers,
+        { key: 'custom_provider', label: 'Custom Provider', models: [] },
+      ],
+    };
+    api.mockResolvedValueOnce(noModelsProviders);
+    await loadOcrProviders();
+
+    api.mockResolvedValueOnce({ provider: 'custom_provider', fallback_to_tesseract: false, models: {} });
+    await loadOcrSettings();
+
+    const providerSel = document.getElementById('ocr-provider-select');
+    providerSel.value = 'custom_provider';
+    providerSel.dispatchEvent(new Event('change'));
+
+    const modelInput = document.getElementById('ocr-model-input');
+    const modelSelect = document.getElementById('ocr-model-select');
+    // No models → should show free-text input
+    const inputShown = modelInput.style.display !== 'none' || modelSelect.style.display === 'none';
+    expect(inputShown).toBe(true);
+  });
+
+  it('save with no model row elements does not throw', async () => {
+    document.body.innerHTML = `
+      <select id="ocr-provider-select">
+        <option value="tesseract" selected>Tesseract</option>
+      </select>
+      <div id="ocr-fallback-wrapper">
+        <input type="checkbox" id="ocr-fallback-checkbox">
+      </div>`;
+    // No model row or select in DOM
+    api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
+    await loadOcrProviders();
+
+    api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
+    await loadOcrSettings();
+
+    api.mockResolvedValueOnce({ ok: true });
+    await expect(saveOcrSettings()).resolves.not.toThrow();
+    expect(api).toHaveBeenCalledWith('/api/ocr/settings', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('saved models body omits models key when provider is tesseract', async () => {
+    api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
+    await loadOcrProviders();
+
+    api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
+    await loadOcrSettings();
+
+    const providerSel = document.getElementById('ocr-provider-select');
+    providerSel.value = 'tesseract';
+    providerSel.dispatchEvent(new Event('change'));
+
+    api.mockResolvedValueOnce({ ok: true });
+    await saveOcrSettings();
+
+    const lastCall = api.mock.calls[api.mock.calls.length - 1];
+    const body = JSON.parse(lastCall[1].body);
+    expect(body.provider).toBe('tesseract');
+    // No models key for tesseract (it has no models)
+    expect(body).not.toHaveProperty('models');
+  });
+
+  it('provider switching clears stale model selection', async () => {
+    api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
+    await loadOcrProviders();
+
+    api.mockResolvedValueOnce(MOCK_SETTINGS_RESPONSE);
+    await loadOcrSettings();
+
+    const providerSel = document.getElementById('ocr-provider-select');
+    const modelSelect = document.getElementById('ocr-model-select');
+
+    // Switch to claude_vision
+    providerSel.value = 'claude_vision';
+    providerSel.dispatchEvent(new Event('change'));
+    const claudeModel = modelSelect.value;
+
+    // Switch to groq
+    providerSel.value = 'groq';
+    providerSel.dispatchEvent(new Event('change'));
+    const groqModel = modelSelect.value;
+
+    // Models should differ between providers
+    expect(groqModel).not.toBe('');
+    expect(groqModel).not.toBe(claudeModel);
+  });
+});

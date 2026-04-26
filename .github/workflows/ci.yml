@@ -44,6 +44,22 @@ jobs:
       - name: Run vitest with coverage
         run: npx vitest run --coverage
 
+  e2e-coverage:
+    name: E2E Endpoint Coverage Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check E2E endpoint coverage
+        # Warning-only: does not block the build. Use --strict to make it a hard gate.
+        run: python scripts/check_e2e_coverage.py
+
   build:
     name: Docker Build
     runs-on: ubuntu-latest

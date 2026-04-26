@@ -218,3 +218,48 @@ export function showMergeConflictModal(formData, duplicate, offAppliedFields) {
     trapFocus(bg);
   });
 }
+
+export function showScanDuplicateModal(duplicate) {
+  return new Promise((resolve) => {
+    const bg = document.createElement('div');
+    bg.className = 'scan-modal-bg';
+    bg.setAttribute('role', 'dialog');
+    bg.setAttribute('aria-modal', 'true');
+    const modal = document.createElement('div');
+    modal.className = 'scan-modal';
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'scan-modal-icon';
+    iconDiv.textContent = '\u26A0\uFE0F';
+    modal.appendChild(iconDiv);
+    const h3 = document.createElement('h3');
+    h3.textContent = t('duplicate_found_title');
+    modal.appendChild(h3);
+    const pEl = document.createElement('p');
+    const msgKey = duplicate.is_synced_with_off ? 'duplicate_found_synced' : 'duplicate_found_unsynced';
+    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
+    modal.appendChild(pEl);
+    const actions = document.createElement('div');
+    actions.className = 'scan-modal-actions';
+    if (!duplicate.is_synced_with_off) {
+      const mergeBtn = document.createElement('button');
+      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
+      mergeBtn.textContent = t('duplicate_action_merge');
+      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
+      actions.appendChild(mergeBtn);
+      const createBtn = document.createElement('button');
+      createBtn.className = 'scan-modal-btn-register';
+      createBtn.textContent = t('duplicate_action_create_new');
+      createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
+      actions.appendChild(createBtn);
+    }
+    const cancelBtn2 = document.createElement('button');
+    cancelBtn2.className = duplicate.is_synced_with_off ? 'scan-modal-btn-register confirm-yes' : 'scan-modal-btn-cancel confirm-no';
+    cancelBtn2.textContent = duplicate.is_synced_with_off ? t('btn_ok') : t('btn_cancel');
+    cancelBtn2.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
+    actions.appendChild(cancelBtn2);
+    modal.appendChild(actions);
+    bg.appendChild(modal);
+    document.body.appendChild(bg);
+    trapFocus(bg);
+  });
+}

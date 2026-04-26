@@ -393,6 +393,15 @@ def update_product(pid: int, data: dict) -> None:
         mark_product_synced_with_off(pid, ean_val)
 
 
+def get_product(pid: int) -> dict | None:
+    """Return the product row as a dict, or None if not found."""
+    conn = get_db()
+    row = conn.execute(
+        f"SELECT {PRODUCT_COLS_NO_IMAGE} FROM products WHERE id = ?", (pid,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
 def delete_product(pid: int) -> bool:
     conn = get_db()
     cur = conn.cursor()

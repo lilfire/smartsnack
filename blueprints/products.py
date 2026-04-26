@@ -65,8 +65,12 @@ def update_product(pid):
 def unsync_product(pid):
     """Remove the is_synced_with_off flag from a product."""
     try:
+        if not product_service.get_product(pid):
+            raise LookupError("Product not found")
         product_service.set_system_flag(pid, "is_synced_with_off", False)
-    except (LookupError, ValueError) as e:
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True})
 

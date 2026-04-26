@@ -81,6 +81,135 @@ async function triggerScan(prefix) {
   return fileInput;
 }
 
+describe('OCR error_type — edge cases', () => {
+  const prefix = 'edge354';
+
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    vi.clearAllMocks();
+  });
+
+  it('handles null error.data — does not throw', async () => {
+    createDOM(prefix);
+    const err = new Error('Something failed');
+    err.data = null;
+    api.mockRejectedValueOnce(err);
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    expect(showToast.mock.calls[showToast.mock.calls.length - 1][1]).toBe('error');
+  });
+
+  it('handles undefined error.data — does not throw', async () => {
+    createDOM(prefix);
+    const err = new Error('No data');
+    // error.data intentionally left undefined
+    api.mockRejectedValueOnce(err);
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    expect(showToast.mock.calls[showToast.mock.calls.length - 1][1]).toBe('error');
+  });
+
+  it('uses generic handler for unknown error_type', async () => {
+    createDOM(prefix);
+    const err = new Error('Unknown error');
+    err.data = { error: 'Something weird', error_type: 'unknown_future_type' };
+    api.mockRejectedValueOnce(err);
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    const calls = showToast.mock.calls;
+    const toastCall = calls[calls.length - 1];
+    // Unknown types fall through to the generic handler
+    expect(toastCall[1]).toBe('error');
+  });
+
+  it('shows provider_timeout toast for error_type "provider_timeout"', async () => {
+    createDOM(prefix);
+    const err = new Error('Provider timeout');
+    err.data = { error: 'OCR provider is not responding', error_type: 'provider_timeout' };
+    api.mockRejectedValueOnce(err);
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    const toastCall = showToast.mock.calls[showToast.mock.calls.length - 1];
+    expect(toastCall[1]).toBe('error');
+  });
+
+  it('shows provider_quota toast for error_type "provider_quota"', async () => {
+    createDOM(prefix);
+    const err = new Error('Quota exceeded');
+    err.data = {
+      error: 'OCR provider quota exceeded',
+      error_type: 'provider_quota',
+      error_detail: 'The selected OCR provider has reached its usage quota.',
+    };
+    api.mockRejectedValueOnce(err);
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    const toastCall = showToast.mock.calls[showToast.mock.calls.length - 1];
+    expect(toastCall[1]).toBe('error');
+  });
+
+  it('shows invalid_image toast for error_type "invalid_image"', async () => {
+    createDOM(prefix);
+    const err = new Error('Invalid or corrupt image');
+    err.data = { error: 'Invalid or corrupt image', error_type: 'invalid_image' };
+    api.mockRejectedValueOnce(err);
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(showToast).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    const toastCall = showToast.mock.calls[showToast.mock.calls.length - 1];
+    expect(toastCall[1]).toBe('error');
+  });
+
+  it('partial OCR result — success ingredients mixed with error fields', async () => {
+    createDOM(prefix);
+    // Simulate a successful OCR response with partial data (some fields resolved)
+    api.mockResolvedValueOnce({
+      text: 'Milk, water, salt',
+      provider: 'tesseract',
+      fallback: false,
+    });
+
+    await triggerScan(prefix);
+
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalled();
+    }, { timeout: 2000 });
+
+    const textarea = document.getElementById(`${prefix}-ingredients`);
+    // Successful OCR should populate the textarea
+    expect(textarea.value).toBe('Milk, water, salt');
+  });
+});
+
 describe('OCR error_type regression — token_limit_exceeded (LSO-354)', () => {
   const prefix = 'reg354';
 
