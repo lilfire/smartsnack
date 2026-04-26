@@ -80,13 +80,14 @@ def test_add_ean_then_list(live_url, api_create_product):
 
 
 def test_add_duplicate_ean(live_url, api_create_product):
-    """Adding the same EAN twice returns 409."""
+    """Adding the same EAN twice is idempotent (returns 200 with already_exists flag)."""
     product = api_create_product(name="EanDuplicate")
     pid = product["id"]
 
     _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000002"})
     status, body = _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000002"})
-    assert status == 409, f"Expected 409 for duplicate EAN, got {status}"
+    assert status == 200, f"Expected 200 for idempotent EAN add, got {status}"
+    assert body.get("already_exists") is True
 
 
 def test_delete_ean(live_url, api_create_product):
@@ -94,7 +95,9 @@ def test_delete_ean(live_url, api_create_product):
     product = api_create_product(name="EanDelete")
     pid = product["id"]
 
+    # Add two EANs — deleting the only EAN is not allowed
     _, add_body = _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000003"})
+    _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000099"})
     ean_id = add_body["id"]
 
     status, body = _delete(f"{live_url}/api/products/{pid}/eans/{ean_id}")

@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 
 from helpers import _require_json
-from services import product_service
+from services import product_service, tag_service
 from config import DEFAULT_PAGE_SIZE
 
 bp = Blueprint("products", __name__)
@@ -56,8 +56,12 @@ def update_product(pid):
 def unsync_product(pid):
     """Remove the is_synced_with_off flag from a product."""
     try:
+        if not product_service.get_product(pid):
+            raise LookupError("Product not found")
         product_service.set_system_flag(pid, "is_synced_with_off", False)
-    except (LookupError, ValueError) as e:
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True})
 
@@ -96,6 +100,14 @@ def delete_product(pid):
     if not found:
         return jsonify({"error": "Product not found"}), 404
     return jsonify({"ok": True, "message": "Deleted"})
+
+
+@bp.route("/api/products/tags/suggestions")
+def tag_suggestions():
+    """Return tag label strings matching the given prefix."""
+    q = request.args.get("q", "")
+    tags = tag_service.search_tags(q)
+    return jsonify([t["label"] for t in tags])
 
 
 @bp.route("/api/products/<int:pid>/eans")
