@@ -37,6 +37,10 @@ class TestBuildIngredientPrompt:
         prompt = build_ingredient_prompt(None)
         assert "Extract ONLY the ingredient list" in prompt
 
+    def test_none_language_equals_no_arg_call(self):
+        from services.ocr_backends import build_ingredient_prompt
+        assert build_ingredient_prompt(None) == build_ingredient_prompt()
+
     def test_unknown_language_returns_default_task(self):
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt("xx")
@@ -52,7 +56,7 @@ class TestBuildIngredientPrompt:
     def test_norwegian_includes_language_name(self):
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt("no")
-        assert "Norwegian" in prompt
+        assert "Norwegian (Bokmål)" in prompt
         assert "translate" in prompt.lower()
 
     def test_english_includes_language_name(self):
@@ -72,6 +76,8 @@ class TestBuildIngredientPrompt:
         for lang in [None, "no", "en", "se"]:
             prompt = build_ingredient_prompt(lang)
             assert "INGREDIENSER" in prompt
+            assert "INGREDIENTS" in prompt
+            assert "ZUTATEN" in prompt
 
     def test_all_prompts_contain_no_narrative_rule(self):
         from services.ocr_backends import build_ingredient_prompt
