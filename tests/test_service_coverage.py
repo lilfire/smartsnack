@@ -511,7 +511,7 @@ class TestRefreshFromOff:
             "status": 1,
         }
         with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data, autospec=True), \
-             patch("services.bulk_service.proxy_service.proxy_image", return_value=(b"\xff\xd8\xff", "image/jpeg", autospec=True)), \
+             patch("services.bulk_service.proxy_service.proxy_image", return_value=(b"\xff\xd8\xff", "image/jpeg"), autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
