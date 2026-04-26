@@ -13,6 +13,7 @@ Bug 2 — error_type: The backend must return error_type="token_limit_exceeded"
 import base64
 import io
 import os
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -49,23 +50,20 @@ class TestWebpMimeTypePropagation:
 
     def test_webp_data_uri_passes_correct_mime_to_gemini(self):
         """Gemini should receive image/webp when the data URI declares WebP."""
-        mock_response = MagicMock()
-        mock_response.text = "sukker"
+        mock_response = types.SimpleNamespace(text="sukker")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         webp_bytes = _make_image("WEBP")
         webp_uri = _data_uri(webp_bytes, "image/webp")
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
-                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(webp_uri)
 
@@ -76,44 +74,42 @@ class TestWebpMimeTypePropagation:
 
     def test_webp_data_uri_passes_correct_mime_to_openai(self):
         """OpenAI data URI should contain image/webp when input is WebP."""
-        mock_choice = MagicMock()
-        mock_choice.message.content = "ingredienser"
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_choice = types.SimpleNamespace(message=types.SimpleNamespace(content="ingredienser"))
+        mock_response = types.SimpleNamespace(choices=[mock_choice])
 
         webp_bytes = _make_image("WEBP")
         webp_uri = _data_uri(webp_bytes, "image/webp")
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="openai"):
+            with patch("openai.OpenAI", autospec=True) as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
+                with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(webp_uri)
 
-        call_args = mock_client.chat.completions.create.call_args
+                call_args = mock_cls.return_value.chat.completions.create.call_args
+
         messages = call_args[1]["messages"]
         image_url = messages[0]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/webp;base64,")
 
     def test_webp_data_uri_passes_correct_media_type_to_claude(self):
         """Claude Vision should receive media_type=image/webp when input is WebP."""
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="sukker")]
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_content_item = types.SimpleNamespace(text="sukker")
+        mock_msg = types.SimpleNamespace(content=[mock_content_item])
 
         webp_bytes = _make_image("WEBP")
         webp_uri = _data_uri(webp_bytes, "image/webp")
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision"):
+            with patch("anthropic.Anthropic", autospec=True) as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
+                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(webp_uri)
 
-        call_args = mock_client.messages.create.call_args
+                call_args = mock_cls.return_value.messages.create.call_args
+
         messages = call_args[1]["messages"]
         source = messages[0]["content"][0]["source"]
         assert source["media_type"] == "image/webp"
@@ -126,7 +122,7 @@ class TestWebpMimeTypePropagation:
 class TestTesseractMimeTypeAgnostic:
     """Tesseract backend should process images regardless of declared MIME type."""
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_jpeg_data_uri_works_with_tesseract(self, mock_output, mock_itd):
         """Tesseract should process a JPEG data URI without error."""
@@ -138,14 +134,14 @@ class TestTesseractMimeTypeAgnostic:
         jpeg_bytes = _make_image("JPEG")
         jpeg_uri = _data_uri(jpeg_bytes, "image/jpeg")
 
-        with patch("services.settings_service.get_ocr_backend", return_value="tesseract"):
+        with patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True):
             from services.ocr_service import dispatch_ocr
             result = dispatch_ocr(jpeg_uri)
 
         assert "ingredienser" in result["text"]
         assert result["fallback"] is False
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_png_data_uri_works_with_tesseract(self, mock_output, mock_itd):
         """Tesseract should process a PNG data URI without error."""
@@ -157,13 +153,13 @@ class TestTesseractMimeTypeAgnostic:
         png_bytes = _make_image("PNG")
         png_uri = _data_uri(png_bytes, "image/png")
 
-        with patch("services.settings_service.get_ocr_backend", return_value="tesseract"):
+        with patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True):
             from services.ocr_service import dispatch_ocr
             result = dispatch_ocr(png_uri)
 
         assert "sukker" in result["text"]
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_webp_data_uri_works_with_tesseract(self, mock_output, mock_itd):
         """Tesseract should process a WebP data URI without error."""
@@ -175,7 +171,7 @@ class TestTesseractMimeTypeAgnostic:
         webp_bytes = _make_image("WEBP")
         webp_uri = _data_uri(webp_bytes, "image/webp")
 
-        with patch("services.settings_service.get_ocr_backend", return_value="tesseract"):
+        with patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True):
             from services.ocr_service import dispatch_ocr
             result = dispatch_ocr(webp_uri)
 
@@ -196,7 +192,7 @@ def client(app):
 class TestErrorTypeTokenLimitExceeded:
     """Backend must return error_type='token_limit_exceeded', never 'token_limit'."""
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("Token limit exceeded"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("Token limit exceeded"), autospec=True)
     def test_token_limit_error_returns_token_limit_exceeded(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
@@ -205,7 +201,7 @@ class TestErrorTypeTokenLimitExceeded:
         data = resp.get_json()
         assert data["error_type"] == "token_limit_exceeded"
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("token_limit reached"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("token_limit reached"), autospec=True)
     def test_token_limit_keyword_variant(self, mock_dispatch, client):
         """Alternative phrasing containing 'token_limit' still maps correctly."""
         resp = client.post(
@@ -215,7 +211,7 @@ class TestErrorTypeTokenLimitExceeded:
         data = resp.get_json()
         assert data["error_type"] == "token_limit_exceeded"
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("usage budget exceeded"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("usage budget exceeded"), autospec=True)
     def test_usage_budget_keyword(self, mock_dispatch, client):
         """'usage budget' errors also map to token_limit_exceeded."""
         resp = client.post(
@@ -225,7 +221,7 @@ class TestErrorTypeTokenLimitExceeded:
         data = resp.get_json()
         assert data["error_type"] == "token_limit_exceeded"
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("quota exceeded"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("quota exceeded"), autospec=True)
     def test_quota_exceeded_keyword(self, mock_dispatch, client):
         """'quota exceeded' errors also map to token_limit_exceeded."""
         resp = client.post(
@@ -239,7 +235,7 @@ class TestErrorTypeTokenLimitExceeded:
 class TestErrorTypeGenericFallback:
     """Non-token-limit errors must return error_type='generic'."""
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=Exception("something broke"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=Exception("something broke"), autospec=True)
     def test_unexpected_error_returns_generic(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
@@ -249,7 +245,7 @@ class TestErrorTypeGenericFallback:
         data = resp.get_json()
         assert data["error_type"] == "generic"
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("Invalid base64 data"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("Invalid base64 data"), autospec=True)
     def test_value_error_without_token_keyword_returns_generic(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
@@ -270,7 +266,7 @@ class TestErrorTypeMultipartPath:
     @patch(
         "services.ocr_service.dispatch_ocr_bytes",
         side_effect=ValueError("Token limit exceeded"),
-    )
+        autospec=True)
     def test_multipart_token_limit_returns_correct_error_type(self, mock_dispatch, client):
         png = _make_image("PNG")
         resp = client.post(
@@ -284,7 +280,7 @@ class TestErrorTypeMultipartPath:
     @patch(
         "services.ocr_service.dispatch_ocr_bytes",
         side_effect=Exception("OCR crashed"),
-    )
+        autospec=True)
     def test_multipart_generic_error_returns_generic_type(self, mock_dispatch, client):
         png = _make_image("PNG")
         resp = client.post(

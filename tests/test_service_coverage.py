@@ -1,6 +1,7 @@
 """Additional tests for proxy_service and bulk_service to reach 75%+ coverage."""
 
 import json
+import types
 from unittest.mock import patch, MagicMock
 
 import pytest
@@ -33,8 +34,8 @@ class TestOffSearch:
         products_c = [
             {"code": "222", "product_name": "Chips B", "completeness": 0.8},
         ]
-        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": products_c}):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": products_c}, autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 2
@@ -47,8 +48,8 @@ class TestOffSearch:
 
         products_a = [{"code": "111", "product_name": "Chips", "completeness": 0.9}]
         products_c = [{"code": "111", "product_name": "Chips", "completeness": 0.9}]
-        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": products_c}):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": products_c}, autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 1
@@ -57,8 +58,8 @@ class TestOffSearch:
         from services.proxy_service import off_search
 
         products_c = [{"code": "222", "product_name": "Chips", "completeness": 0.8}]
-        with patch("services.proxy_service._off_search_a_licious", side_effect=RuntimeError("down")), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": products_c}):
+        with patch("services.proxy_service._off_search_a_licious", side_effect=RuntimeError("down"), autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": products_c}, autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 1
@@ -67,8 +68,8 @@ class TestOffSearch:
         from services.proxy_service import off_search
 
         products_a = [{"code": "111", "product_name": "Chips", "completeness": 0.9}]
-        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}), \
-             patch("services.proxy_service._off_search_classic", side_effect=RuntimeError("down")):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", side_effect=RuntimeError("down"), autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 1
@@ -76,8 +77,8 @@ class TestOffSearch:
     def test_handles_both_failures(self):
         from services.proxy_service import off_search
 
-        with patch("services.proxy_service._off_search_a_licious", side_effect=RuntimeError("down")), \
-             patch("services.proxy_service._off_search_classic", side_effect=RuntimeError("down")):
+        with patch("services.proxy_service._off_search_a_licious", side_effect=RuntimeError("down"), autospec=True), \
+             patch("services.proxy_service._off_search_classic", side_effect=RuntimeError("down"), autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 0
@@ -85,8 +86,8 @@ class TestOffSearch:
     def test_non_list_products_ignored(self):
         from services.proxy_service import off_search
 
-        with patch("services.proxy_service._off_search_a_licious", return_value={"products": "bad"}), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": None}):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"products": "bad"}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": None}, autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 0
@@ -95,8 +96,8 @@ class TestOffSearch:
         from services.proxy_service import off_search
 
         products_a = [{"code": "111", "product_name": "Chips"}, "not_a_dict", 42]
-        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": []}):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"products": products_a}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True):
             result = off_search("Chips")
 
         assert result["count"] == 1
@@ -110,8 +111,8 @@ class TestOffSearch:
             "nutriments": {"proteins_100g": 20},
             "completeness": 0.9,
         }
-        with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": []}):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True):
             result = off_search("Protein Bar", nutrition={"protein": 20})
 
         assert result["count"] == 1
@@ -120,8 +121,8 @@ class TestOffSearch:
     def test_a_licious_returns_hits_key(self):
         from services.proxy_service import off_search
 
-        with patch("services.proxy_service._off_search_a_licious", return_value={"hits": [{"code": "111", "product_name": "X"}]}), \
-             patch("services.proxy_service._off_search_classic", return_value={"products": []}):
+        with patch("services.proxy_service._off_search_a_licious", return_value={"hits": [{"code": "111", "product_name": "X"}]}, autospec=True), \
+             patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True):
             result = off_search("test query")
 
         assert result["count"] == 1
@@ -149,7 +150,7 @@ class TestOffProduct:
         from services.proxy_service import off_product
 
         mock_data = {"product": {"code": "1234567890123"}, "status": 1}
-        with patch("services.proxy_service._off_get_json", return_value=mock_data):
+        with patch("services.proxy_service._off_get_json", return_value=mock_data, autospec=True):
             result = off_product("1234567890123")
 
         assert result["status"] == 1
@@ -157,7 +158,7 @@ class TestOffProduct:
     def test_not_found_error_returns_not_found(self):
         from services.proxy_service import off_product, _OffNotFoundError
 
-        with patch("services.proxy_service._off_get_json", side_effect=_OffNotFoundError("Not found")):
+        with patch("services.proxy_service._off_get_json", side_effect=_OffNotFoundError("Not found"), autospec=True):
             result = off_product("1234567890123")
 
         assert result["status"] == 0
@@ -166,7 +167,7 @@ class TestOffProduct:
     def test_runtime_error_propagates(self):
         from services.proxy_service import off_product
 
-        with patch("services.proxy_service._off_get_json", side_effect=RuntimeError("Server error")):
+        with patch("services.proxy_service._off_get_json", side_effect=RuntimeError("Server error"), autospec=True):
             with pytest.raises(RuntimeError):
                 off_product("1234567890123")
 
@@ -180,12 +181,12 @@ class TestOffGetJson:
     def test_success(self):
         from services.proxy_service import _off_get_json
 
-        mock_resp = MagicMock()
+        mock_resp = MagicMock(spec=["read", "__enter__", "__exit__"])
         mock_resp.read.return_value = json.dumps({"ok": True}).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__exit__ = MagicMock(spec=["__call__"], return_value=False)
 
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             result = _off_get_json("https://example.com/api")
 
         assert result["ok"] is True
@@ -193,7 +194,7 @@ class TestOffGetJson:
     def test_failure_raises_runtime_error(self):
         from services.proxy_service import _off_get_json
 
-        with patch("urllib.request.urlopen", side_effect=Exception("network")):
+        with patch("urllib.request.urlopen", side_effect=Exception("network"), autospec=True):
             with pytest.raises(RuntimeError, match="Failed to fetch"):
                 _off_get_json("https://example.com/api")
 
@@ -208,12 +209,12 @@ class TestOffSearchALicious:
         from services.proxy_service import _off_search_a_licious
 
         api_response = {"hits": [{"code": "123", "product_name": "Test"}]}
-        mock_resp = MagicMock()
+        mock_resp = MagicMock(spec=["read", "__enter__", "__exit__"])
         mock_resp.read.return_value = json.dumps(api_response).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__exit__ = MagicMock(spec=["__call__"], return_value=False)
 
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             result = _off_search_a_licious("test")
 
         assert "products" in result
@@ -228,12 +229,12 @@ class TestOffSearchALicious:
                 "hits": [{"_source": {"code": "123", "product_name": "Test"}}],
             }
         }
-        mock_resp = MagicMock()
+        mock_resp = MagicMock(spec=["read", "__enter__", "__exit__"])
         mock_resp.read.return_value = json.dumps(api_response).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__exit__ = MagicMock(spec=["__call__"], return_value=False)
 
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             result = _off_search_a_licious("test")
 
         assert result["products"][0]["code"] == "123"
@@ -241,7 +242,7 @@ class TestOffSearchALicious:
     def test_error_raises_runtime_error(self):
         from services.proxy_service import _off_search_a_licious
 
-        with patch("urllib.request.urlopen", side_effect=Exception("timeout")):
+        with patch("urllib.request.urlopen", side_effect=Exception("timeout"), autospec=True):
             with pytest.raises(RuntimeError, match="search-a-licious"):
                 _off_search_a_licious("test")
 
@@ -249,12 +250,12 @@ class TestOffSearchALicious:
         from services.proxy_service import _off_search_a_licious
 
         api_response = {"products": [{"code": "123"}]}
-        mock_resp = MagicMock()
+        mock_resp = MagicMock(spec=["read", "__enter__", "__exit__"])
         mock_resp.read.return_value = json.dumps(api_response).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__exit__ = MagicMock(spec=["__call__"], return_value=False)
 
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             result = _off_search_a_licious("test")
 
         assert len(result["products"]) == 1
@@ -269,7 +270,7 @@ class TestOffSearchClassic:
     def test_calls_off_get_json(self):
         from services.proxy_service import _off_search_classic
 
-        with patch("services.proxy_service._off_get_json", return_value={"products": []}) as mock_get:
+        with patch("services.proxy_service._off_get_json", return_value={"products": []}, autospec=True) as mock_get:
             result = _off_search_classic("chips")
 
         assert result == {"products": []}
@@ -345,7 +346,7 @@ class TestNoRedirectHandler:
         handler = _NoRedirectHandler()
         with pytest.raises(urllib.error.HTTPError):
             handler.redirect_request(
-                MagicMock(full_url="https://example.com"),
+                types.SimpleNamespace(full_url="https://example.com"),
                 None, 302, "Found", {}, "https://other.com",
             )
 
@@ -399,7 +400,7 @@ class TestRefreshFromOff:
         db.execute("UPDATE products SET ean = ''")
         db.commit()
 
-        with patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
         assert result["total"] == 0
@@ -422,9 +423,9 @@ class TestRefreshFromOff:
             },
             "status": 1,
         }
-        with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data), \
-             patch("services.bulk_service._fetch_off_image", return_value=None), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
         assert result["updated"] >= 1
@@ -439,8 +440,8 @@ class TestRefreshFromOff:
         )
         db.commit()
 
-        with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
         assert result["skipped"] >= 1
@@ -455,8 +456,8 @@ class TestRefreshFromOff:
         )
         db.commit()
 
-        with patch("services.bulk_service.proxy_service.off_product", side_effect=RuntimeError("API down")), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", side_effect=RuntimeError("API down"), autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
         assert result["errors"] >= 1
@@ -479,9 +480,9 @@ class TestRefreshFromOff:
             },
             "status": 1,
         }
-        with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data), \
-             patch("services.bulk_service._fetch_off_image", return_value=None), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
         assert result["skipped"] >= 1
@@ -509,9 +510,9 @@ class TestRefreshFromOff:
             },
             "status": 1,
         }
-        with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data), \
-             patch("services.bulk_service.proxy_service.proxy_image", return_value=(b"\xff\xd8\xff", "image/jpeg")), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_product_data, autospec=True), \
+             patch("services.bulk_service.proxy_service.proxy_image", return_value=(b"\xff\xd8\xff", "image/jpeg", autospec=True)), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             result = refresh_from_off()
 
         assert result["updated"] >= 1
@@ -550,9 +551,9 @@ class TestRunRefresh:
             },
             "status": 1,
         }
-        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data), \
-             patch("services.bulk_service._fetch_off_image", return_value=None), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh()
 
         with svc._refresh_lock:
@@ -567,8 +568,8 @@ class TestRunRefresh:
         self._setup_db(db)
         monkeypatch.setattr(svc, "DB_PATH", db.execute("PRAGMA database_list").fetchone()[2])
 
-        with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh()
 
         with svc._refresh_lock:
@@ -585,9 +586,9 @@ class TestRunRefresh:
             "product": {"nutriments": {}, "product_name": "", "brands": ""},
             "status": 1,
         }
-        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data), \
-             patch("services.bulk_service._fetch_off_image", return_value=None), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh()
 
         with svc._refresh_lock:
@@ -600,8 +601,8 @@ class TestRunRefresh:
         self._setup_db(db)
         monkeypatch.setattr(svc, "DB_PATH", db.execute("PRAGMA database_list").fetchone()[2])
 
-        with patch("services.bulk_service.proxy_service.off_product", side_effect=RuntimeError("fail")), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", side_effect=RuntimeError("fail"), autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh()
 
         with svc._refresh_lock:
@@ -621,9 +622,9 @@ class TestRunRefresh:
             },
             "status": 1,
         }
-        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data), \
-             patch("services.bulk_service._fetch_off_image", return_value="data:image/jpeg;base64,abc"), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", return_value=off_data, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value="data:image/jpeg;base64,abc", autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh()
 
         with svc._refresh_lock:
@@ -642,9 +643,9 @@ class TestRunRefresh:
         db.commit()
         monkeypatch.setattr(svc, "DB_PATH", db.execute("PRAGMA database_list").fetchone()[2])
 
-        with patch("services.bulk_service.proxy_service.off_product"), \
-             patch("services.bulk_service.proxy_service.off_search", return_value={"products": []}), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
+             patch("services.bulk_service.proxy_service.off_search", return_value={"products": []}, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
         with svc._refresh_lock:
@@ -668,9 +669,9 @@ class TestRunRefresh:
                 {"code": "999", "product_name": "Low Cert", "certainty": 10, "completeness": 0.1},
             ]
         }
-        with patch("services.bulk_service.proxy_service.off_product"), \
-             patch("services.bulk_service.proxy_service.off_search", return_value=search_result), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
+             patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh({"search_missing": True, "min_certainty": 90, "min_completeness": 90})
 
         with svc._refresh_lock:
@@ -700,10 +701,10 @@ class TestRunRefresh:
                 },
             ]
         }
-        with patch("services.bulk_service.proxy_service.off_product"), \
-             patch("services.bulk_service.proxy_service.off_search", return_value=search_result), \
-             patch("services.bulk_service._fetch_off_image", return_value=None), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
+             patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
         with svc._refresh_lock:
@@ -721,9 +722,9 @@ class TestRunRefresh:
         db.commit()
         monkeypatch.setattr(svc, "DB_PATH", db.execute("PRAGMA database_list").fetchone()[2])
 
-        with patch("services.bulk_service.proxy_service.off_product"), \
-             patch("services.bulk_service.proxy_service.off_search", side_effect=RuntimeError("search fail")), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
+             patch("services.bulk_service.proxy_service.off_search", side_effect=RuntimeError("search fail"), autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
         with svc._refresh_lock:
@@ -738,15 +739,14 @@ class TestRunRefresh:
 
         # Force a crash inside the try block: let PRAGMA pass but crash on SELECT
         call_count = [0]
-        original_execute = None
 
-        with patch("services.bulk_service.sqlite3.connect") as mock_connect:
-            mock_conn = MagicMock()
+        with patch("services.bulk_service.sqlite3.connect", autospec=True) as mock_connect:
+            mock_conn = MagicMock(spec=["execute", "close", "__enter__", "__exit__"])
 
             def side_effect_execute(sql, *args):
                 call_count[0] += 1
                 if call_count[0] <= 1:  # PRAGMA busy_timeout
-                    return MagicMock()
+                    return types.SimpleNamespace()
                 raise RuntimeError("DB crashed on query")
 
             mock_conn.execute = side_effect_execute
@@ -779,10 +779,10 @@ class TestRunRefresh:
                 },
             ]
         }
-        with patch("services.bulk_service.proxy_service.off_product"), \
-             patch("services.bulk_service.proxy_service.off_search", return_value=search_result), \
-             patch("services.bulk_service._fetch_off_image", return_value="data:image/png;base64,xyz"), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
+             patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value="data:image/png;base64,xyz", autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
         with svc._refresh_lock:
@@ -812,10 +812,10 @@ class TestRunRefresh:
                 },
             ]
         }
-        with patch("services.bulk_service.proxy_service.off_product"), \
-             patch("services.bulk_service.proxy_service.off_search", return_value=search_result), \
-             patch("services.bulk_service._fetch_off_image", return_value=None), \
-             patch("services.bulk_service.time.sleep"):
+        with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
+             patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
+             patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
+             patch("services.bulk_service.time.sleep", autospec=True):
             svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
         with svc._refresh_lock:
@@ -839,7 +839,7 @@ class TestFetchOffImage:
         from services.bulk_service import _fetch_off_image
 
         product = {"image_front_url": "https://images.openfoodfacts.org/test.jpg"}
-        with patch("services.bulk_service.proxy_service.proxy_image", side_effect=Exception("no")):
+        with patch("services.bulk_service.proxy_service.proxy_image", side_effect=Exception("no"), autospec=True):
             assert _fetch_off_image(product) is None
 
     def test_valid_image_produces_data_uri(self):
@@ -849,7 +849,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(b"\xff\xd8\xff\xe0" + b"\x00" * 50, "image/jpeg"),
-        ):
+            autospec=True):
             result = _fetch_off_image(product)
 
         assert result is not None
@@ -863,7 +863,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(big, "image/jpeg"),
-        ):
+            autospec=True):
             result = _fetch_off_image(product)
 
         assert result is None
@@ -875,7 +875,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(b"\x89PNG\r\n" + b"\x00" * 30, "image/png"),
-        ) as mock_proxy:
+            autospec=True) as mock_proxy:
             result = _fetch_off_image(product)
 
         assert result is not None
@@ -888,7 +888,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(b"\xff\xd8\xff" + b"\x00" * 30, "image/jpeg; charset=utf-8"),
-        ):
+            autospec=True):
             result = _fetch_off_image(product)
 
         assert result is not None
@@ -902,7 +902,7 @@ class TestFetchOffImage:
         small_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 40
         resized_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 20
 
-        mock_img = MagicMock()
+        mock_img = MagicMock(spec=["save", "thumbnail", "width", "height"])
         mock_img.width = 800
         mock_img.height = 600
 
@@ -910,18 +910,17 @@ class TestFetchOffImage:
             buf.write(resized_bytes)
 
         mock_img.save = fake_save
-        mock_img.thumbnail = MagicMock()
 
-        mock_pil_image = MagicMock()
-        mock_pil_image.open.return_value = mock_img
-        mock_pil_image.LANCZOS = MagicMock()
-        fake_pil = MagicMock()
-        fake_pil.Image = mock_pil_image
+        mock_pil_image = types.SimpleNamespace(
+            open=lambda buf: mock_img,
+            LANCZOS=object(),
+        )
+        fake_pil = types.SimpleNamespace(Image=mock_pil_image)
 
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(small_bytes, "image/jpeg"),
-        ), patch.dict(sys.modules, {"PIL": fake_pil, "PIL.Image": mock_pil_image}):
+            autospec=True), patch.dict(sys.modules, {"PIL": fake_pil, "PIL.Image": mock_pil_image}):
             result = _fetch_off_image(product)
 
         mock_img.thumbnail.assert_called_once()
@@ -935,7 +934,7 @@ class TestFetchOffImage:
         small_bytes = b"\x89PNG\r\n" + b"\x00" * 40
         png_bytes = b"\x89PNG\r\n" + b"\x00" * 10
 
-        mock_img = MagicMock()
+        mock_img = MagicMock(spec=["save", "thumbnail", "width", "height"])
         mock_img.width = 500
         mock_img.height = 500
 
@@ -943,18 +942,17 @@ class TestFetchOffImage:
             buf.write(png_bytes)
 
         mock_img.save = fake_save
-        mock_img.thumbnail = MagicMock()
 
-        mock_pil_image = MagicMock()
-        mock_pil_image.open.return_value = mock_img
-        mock_pil_image.LANCZOS = MagicMock()
-        fake_pil = MagicMock()
-        fake_pil.Image = mock_pil_image
+        mock_pil_image = types.SimpleNamespace(
+            open=lambda buf: mock_img,
+            LANCZOS=object(),
+        )
+        fake_pil = types.SimpleNamespace(Image=mock_pil_image)
 
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(small_bytes, "image/png"),
-        ), patch.dict(sys.modules, {"PIL": fake_pil, "PIL.Image": mock_pil_image}):
+            autospec=True), patch.dict(sys.modules, {"PIL": fake_pil, "PIL.Image": mock_pil_image}):
             result = _fetch_off_image(product)
 
         mock_img.thumbnail.assert_called_once()
@@ -970,9 +968,8 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(raw_bytes, "image/jpeg"),
-        ), patch.dict(sys.modules, {"PIL": None}):
+            autospec=True), patch.dict(sys.modules, {"PIL": None}):
             result = _fetch_off_image(product)
 
         assert result is not None
         assert result.startswith("data:image/jpeg;base64,")
-

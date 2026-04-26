@@ -1,9 +1,10 @@
 """Tests for services/off_service.py — Open Food Facts API integration."""
 
 import base64
+import http.client
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, create_autospec
 
 from tests.mock_shape_validator import (
     validate_off_add_product_response,
@@ -48,11 +49,13 @@ class TestAddProductToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = json.dumps({"status": 1}).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             result = add_product_to_off(
                 {
                     "code": "12345678",
@@ -69,12 +72,14 @@ class TestAddProductToOff:
         import urllib.error
 
         set_off_credentials("user", "pass")
+        mock_fp = create_autospec(http.client.HTTPResponse, instance=True)
+        mock_fp.read.return_value = b"error"
         with patch(
             "urllib.request.urlopen",
             side_effect=urllib.error.HTTPError(
-                "url", 500, "Server Error", {}, MagicMock(read=lambda: b"error")
+                "url", 500, "Server Error", {}, mock_fp
             ),
-        ):
+         autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 add_product_to_off({"code": "123", "product_name": "Test"})
 
@@ -86,7 +91,7 @@ class TestAddProductToOff:
         set_off_credentials("user", "pass")
         with patch(
             "urllib.request.urlopen", side_effect=urllib.error.URLError("timeout")
-        ):
+            , autospec=True):
             with pytest.raises(RuntimeError, match="off_err_network"):
                 add_product_to_off({"code": "123", "product_name": "Test"})
 
@@ -127,12 +132,14 @@ class TestUploadImageToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = json.dumps(
             {"status": "status ok", "imagefield": "front"}
         ).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
 
         captured = {}
 
@@ -142,7 +149,7 @@ class TestUploadImageToOff:
             captured["content_type"] = req.headers.get("Content-type", "")
             return mock_resp
 
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen, autospec=True):
             result = upload_image_to_off("12345678", _PNG_DATA_URI)
             validate_off_upload_image_response(result)
             assert result["status"] == "status ok"
@@ -164,13 +171,15 @@ class TestUploadImageToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = json.dumps(
             {"status": "status not ok", "status_verbose": "boom"}
         ).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             with pytest.raises(RuntimeError, match="boom"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 
@@ -180,12 +189,14 @@ class TestUploadImageToOff:
         import urllib.error
 
         set_off_credentials("user", "pass")
+        mock_fp = create_autospec(http.client.HTTPResponse, instance=True)
+        mock_fp.read.return_value = b"error"
         with patch(
             "urllib.request.urlopen",
             side_effect=urllib.error.HTTPError(
-                "url", 500, "Server Error", {}, MagicMock(read=lambda: b"error")
+                "url", 500, "Server Error", {}, mock_fp
             ),
-        ):
+         autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 
@@ -197,7 +208,7 @@ class TestUploadImageToOff:
         set_off_credentials("user", "pass")
         with patch(
             "urllib.request.urlopen", side_effect=urllib.error.URLError("timeout")
-        ):
+            , autospec=True):
             with pytest.raises(RuntimeError, match="off_err_network"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 
@@ -206,11 +217,13 @@ class TestUploadImageToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = b"not json"
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 

@@ -1,7 +1,8 @@
 """Tests for POST /api/ocr/nutrition endpoint and dispatch_nutrition_ocr_bytes."""
 import io
 import json
-from unittest.mock import patch
+import types
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -33,7 +34,7 @@ class TestNutritionSuccessResponse:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         return_value=_nutrition_result(),
-    )
+        autospec=True)
     def test_json_path_success(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/nutrition",
@@ -49,7 +50,7 @@ class TestNutritionSuccessResponse:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         return_value=_nutrition_result(),
-    )
+        autospec=True)
     def test_multipart_path_success(self, mock_dispatch, client):
         data = io.BytesIO(b"\x89PNG\r\n\x1a\nfake-png-bytes")
         resp = client.post(
@@ -65,7 +66,7 @@ class TestNutritionSuccessResponse:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         return_value=_nutrition_result(fallback=True, provider="Tesseract (Local)"),
-    )
+        autospec=True)
     def test_fallback_true_propagated(self, mock_dispatch, client):
         resp = client.post("/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI})
         data = resp.get_json()
@@ -87,7 +88,7 @@ class TestNutritionSuccessResponse:
                 "salt": 0.8,
             }
         ),
-    )
+     autospec=True)
     def test_full_nutrition_dict(self, mock_dispatch, client):
         resp = client.post("/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI})
         data = resp.get_json()
@@ -104,7 +105,7 @@ class TestNutritionNoValuesResponse:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         return_value=_nutrition_result(values={}, provider="Gemini Vision"),
-    )
+        autospec=True)
     def test_no_values_is_200(self, mock_dispatch, client):
         resp = client.post("/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI})
         assert resp.status_code == 200
@@ -112,7 +113,7 @@ class TestNutritionNoValuesResponse:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         return_value=_nutrition_result(values={}, provider="Gemini Vision"),
-    )
+        autospec=True)
     def test_no_values_error_type(self, mock_dispatch, client):
         resp = client.post("/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI})
         data = resp.get_json()
@@ -143,7 +144,7 @@ class TestNutritionErrorMapping:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         side_effect=ValueError("Token limit exceeded"),
-    )
+        autospec=True)
     def test_token_limit_exceeded(self, mock_dispatch, client):
         resp = client.post("/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI})
         assert resp.status_code == 400
@@ -153,7 +154,7 @@ class TestNutritionErrorMapping:
     @patch(
         "services.ocr_service.dispatch_nutrition_ocr_bytes",
         side_effect=TimeoutError("provider timeout"),
-    )
+        autospec=True)
     def test_provider_timeout(self, mock_dispatch, client):
         resp = client.post("/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI})
         assert resp.status_code == 503
@@ -168,7 +169,7 @@ class TestNutritionErrorMapping:
         with patch(
             "services.ocr_service.dispatch_nutrition_ocr_bytes",
             side_effect=QuotaError("too many requests", 429),
-        ):
+            autospec=True):
             resp = client.post(
                 "/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI}
             )
@@ -179,7 +180,7 @@ class TestNutritionErrorMapping:
         with patch(
             "services.ocr_service.dispatch_nutrition_ocr_bytes",
             side_effect=Exception("quota exceeded for this month"),
-        ):
+            autospec=True):
             resp = client.post(
                 "/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI}
             )
@@ -192,7 +193,7 @@ class TestNutritionErrorMapping:
         with patch(
             "services.ocr_service.dispatch_nutrition_ocr_bytes",
             side_effect=UnidentifiedImageError("cannot identify image"),
-        ):
+            autospec=True):
             resp = client.post(
                 "/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI}
             )
@@ -203,7 +204,7 @@ class TestNutritionErrorMapping:
         with patch(
             "services.ocr_service.dispatch_nutrition_ocr_bytes",
             side_effect=Exception("something broke"),
-        ):
+            autospec=True):
             resp = client.post(
                 "/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI}
             )
@@ -219,7 +220,7 @@ class TestNutritionErrorMapping:
         with patch(
             "services.ocr_service.dispatch_nutrition_ocr_bytes",
             side_effect=ProviderError("image too large", 413),
-        ):
+            autospec=True):
             resp = client.post(
                 "/api/ocr/nutrition", json={"image": _VALID_PNG_DATA_URI}
             )
@@ -244,7 +245,7 @@ class TestDispatchNutritionOcrBytes:
                 "fallback": False,
             }
 
-        with patch.object(ocr_core, "dispatch_ocr_bytes", side_effect=fake_dispatch):
+        with patch.object(ocr_core, "dispatch_ocr_bytes", side_effect=fake_dispatch, autospec=True):
             result = ocr_core.dispatch_nutrition_ocr_bytes(b"fake-image-bytes")
 
         assert result["values"] == {"kcal": 250.0, "fat": 12.5}
@@ -263,7 +264,7 @@ class TestDispatchNutritionOcrBytes:
                 "provider": "Tesseract (Local)",
                 "fallback": True,
             },
-        ):
+         autospec=True):
             result = ocr_core.dispatch_nutrition_ocr_bytes(b"fake")
         assert result["values"]["kcal"] == 250.0
         assert result["values"]["energy_kj"] == 1050.0
@@ -279,7 +280,7 @@ class TestDispatchNutritionOcrBytes:
             ocr_core,
             "dispatch_ocr_bytes",
             return_value={"text": "", "provider": "Tesseract (Local)", "fallback": False},
-        ):
+            autospec=True):
             result = ocr_core.dispatch_nutrition_ocr_bytes(b"fake")
         assert result["values"] == {}
         assert result["text"] == ""
@@ -289,12 +290,12 @@ class TestPromptThreadedThroughBackends:
     """Each vision backend must forward a prompt kwarg to its vendor SDK."""
 
     def test_claude_forwards_prompt(self):
-        from unittest.mock import MagicMock
         from services.ocr_backends import claude as claude_backend
 
-        fake_anthropic = MagicMock()
-        fake_message = MagicMock()
-        fake_message.content = [MagicMock(text="result text")]
+        fake_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="result text")]
+        )
+        fake_anthropic = MagicMock(spec=["Anthropic"])
         fake_anthropic.Anthropic.return_value.messages.create.return_value = fake_message
 
         with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test"}):
@@ -309,18 +310,14 @@ class TestPromptThreadedThroughBackends:
         assert text_block["text"] == "CUSTOM PROMPT"
 
     def test_gemini_forwards_prompt(self):
-        from unittest.mock import MagicMock
         from services.ocr_backends import gemini as gemini_backend
 
-        fake_genai_module = MagicMock()
-        fake_client = MagicMock()
-        fake_response = MagicMock()
-        fake_response.text = "result"
+        fake_response = types.SimpleNamespace(text="result")
+        fake_client = MagicMock(spec=["models"])
         fake_client.models.generate_content.return_value = fake_response
+        fake_genai_module = MagicMock(spec=["Client"])
         fake_genai_module.Client.return_value = fake_client
-
-        fake_google = MagicMock()
-        fake_google.genai = fake_genai_module
+        fake_google = types.SimpleNamespace(genai=fake_genai_module)
 
         with patch.dict("os.environ", {"GEMINI_API_KEY": "test"}):
             with patch.dict(
@@ -331,7 +328,7 @@ class TestPromptThreadedThroughBackends:
                     gemini_backend,
                     "_convert_for_gemini",
                     return_value=(b"bytes", "image/png"),
-                ):
+                    autospec=True):
                     gemini_backend._extract_gemini(
                         b"bytes", "b64", "image/png", prompt="CUSTOM PROMPT"
                     )
@@ -342,14 +339,13 @@ class TestPromptThreadedThroughBackends:
         assert text_part["text"] == "CUSTOM PROMPT"
 
     def test_openai_forwards_prompt(self):
-        from unittest.mock import MagicMock
         from services.ocr_backends import openai as openai_backend
 
-        fake_openai = MagicMock()
-        fake_response = MagicMock()
-        fake_choice = MagicMock()
-        fake_choice.message.content = "result"
-        fake_response.choices = [fake_choice]
+        fake_choice = types.SimpleNamespace(
+            message=types.SimpleNamespace(content="result")
+        )
+        fake_response = types.SimpleNamespace(choices=[fake_choice])
+        fake_openai = MagicMock(spec=["OpenAI"])
         fake_openai.OpenAI.return_value.chat.completions.create.return_value = fake_response
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test"}):
@@ -364,14 +360,13 @@ class TestPromptThreadedThroughBackends:
         assert text_block["text"] == "CUSTOM PROMPT"
 
     def test_groq_forwards_prompt(self):
-        from unittest.mock import MagicMock
         from services.ocr_backends import groq as groq_backend
 
-        fake_groq_module = MagicMock()
-        fake_response = MagicMock()
-        fake_choice = MagicMock()
-        fake_choice.message.content = "result"
-        fake_response.choices = [fake_choice]
+        fake_choice = types.SimpleNamespace(
+            message=types.SimpleNamespace(content="result")
+        )
+        fake_response = types.SimpleNamespace(choices=[fake_choice])
+        fake_groq_module = MagicMock(spec=["Groq"])
         fake_groq_module.Groq.return_value.chat.completions.create.return_value = fake_response
 
         with patch.dict("os.environ", {"GROQ_API_KEY": "test"}):
@@ -386,14 +381,13 @@ class TestPromptThreadedThroughBackends:
         assert text_block["text"] == "CUSTOM PROMPT"
 
     def test_openrouter_forwards_prompt_and_drops_system(self):
-        from unittest.mock import MagicMock
         from services.ocr_backends import openrouter as openrouter_backend
 
-        fake_openai_module = MagicMock()
-        fake_response = MagicMock()
-        fake_choice = MagicMock()
-        fake_choice.message.content = "result"
-        fake_response.choices = [fake_choice]
+        fake_choice = types.SimpleNamespace(
+            message=types.SimpleNamespace(content="result")
+        )
+        fake_response = types.SimpleNamespace(choices=[fake_choice])
+        fake_openai_module = MagicMock(spec=["OpenAI"])
         fake_openai_module.OpenAI.return_value.chat.completions.create.return_value = fake_response
 
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"}):
@@ -413,14 +407,13 @@ class TestPromptThreadedThroughBackends:
         assert user_msg["content"][1]["text"] == "CUSTOM PROMPT"
 
     def test_openrouter_keeps_system_for_default_prompt(self):
-        from unittest.mock import MagicMock
         from services.ocr_backends import openrouter as openrouter_backend
 
-        fake_openai_module = MagicMock()
-        fake_response = MagicMock()
-        fake_choice = MagicMock()
-        fake_choice.message.content = "result"
-        fake_response.choices = [fake_choice]
+        fake_choice = types.SimpleNamespace(
+            message=types.SimpleNamespace(content="result")
+        )
+        fake_response = types.SimpleNamespace(choices=[fake_choice])
+        fake_openai_module = MagicMock(spec=["OpenAI"])
         fake_openai_module.OpenAI.return_value.chat.completions.create.return_value = fake_response
 
         with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"}):
