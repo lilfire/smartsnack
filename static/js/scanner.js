@@ -194,7 +194,8 @@ async function onSearchScanDetected(code) {
       state.sortCol = 'total_score';
       state.sortDir = 'desc';
 
-      const filtered = await fetchProducts('', state.currentFilter);
+      const filteredRaw = await fetchProducts('', state.currentFilter);
+      const filtered = Array.isArray(filteredRaw) ? filteredRaw : (filteredRaw.products || []);
       renderResults(filtered, '');
 
       document.getElementById('search-input').value = '';
@@ -372,7 +373,8 @@ export async function scanPickerSearch() {
   body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('scan_searching', { query: query });
   try {
-    const results = await fetchProducts(query, []);
+    const raw = await fetchProducts(query, []);
+    const results = Array.isArray(raw) ? raw : (raw.products || []);
     if (!results.length) {
       body.innerHTML = '<div class="off-modal-empty">' + esc(t('off_no_results_for', { query: query })) + '</div>';
       if (cnt) cnt.textContent = t('off_zero_results');
