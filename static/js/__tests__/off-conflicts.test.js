@@ -17,6 +17,7 @@ import {
   USER_ONLY_MERGE_FIELDS,
   showEditDuplicateModal,
   showMergeConflictModal,
+  showScanDuplicateModal,
 } from '../off-conflicts.js';
 
 beforeEach(() => {
@@ -174,5 +175,86 @@ describe('showMergeConflictModal', () => {
     applyBtn.click();
     const result = await p;
     expect(result.brand).toBe('B');
+  });
+});
+
+// ── showScanDuplicateModal ────────────────────────────
+describe('showScanDuplicateModal', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('renders a dialog with aria-modal for synced duplicate', async () => {
+    const dup = { is_synced_with_off: true, match_type: 'ean', name: 'SyncedProd' };
+    const p = showScanDuplicateModal(dup);
+    const bg = document.querySelector('.scan-modal-bg');
+    expect(bg).not.toBeNull();
+    expect(bg.getAttribute('role')).toBe('dialog');
+    expect(bg.getAttribute('aria-modal')).toBe('true');
+    // Synced duplicate: only an OK button (confirm-yes class)
+    const okBtn = bg.querySelector('.confirm-yes');
+    expect(okBtn).not.toBeNull();
+    okBtn.click();
+    expect(await p).toBe('cancel');
+  });
+
+  it('uses synced message key for synced duplicate', async () => {
+    const { t } = await import('../i18n.js');
+    const dup = { is_synced_with_off: true, match_type: 'ean', name: 'A' };
+    showScanDuplicateModal(dup);
+    // The modal text used duplicate_found_synced key
+    expect(t).toHaveBeenCalledWith('duplicate_found_synced', expect.objectContaining({ name: 'A' }));
+    document.querySelector('.scan-modal-bg').querySelector('.confirm-yes').click();
+  });
+
+  it('resolves "overwrite" when merge button clicked for unsynced duplicate', async () => {
+    const dup = { is_synced_with_off: false, match_type: 'name', name: 'UnsyncedProd' };
+    const p = showScanDuplicateModal(dup);
+    const bg = document.querySelector('.scan-modal-bg');
+    const mergeBtn = bg.querySelector('.confirm-yes');
+    expect(mergeBtn).not.toBeNull();
+    mergeBtn.click();
+    expect(await p).toBe('overwrite');
+    expect(document.body.contains(bg)).toBe(false);
+  });
+
+  it('resolves "create_new" when create_new button clicked for unsynced duplicate', async () => {
+    const dup = { is_synced_with_off: false, match_type: 'barcode', name: 'Dup2' };
+    const p = showScanDuplicateModal(dup);
+    const bg = document.querySelector('.scan-modal-bg');
+    const btns = bg.querySelectorAll('.scan-modal-btn-register');
+    // First btn = merge (confirm-yes), second = create_new
+    const createNewBtn = Array.from(btns).find((b) => !b.classList.contains('confirm-yes'));
+    expect(createNewBtn).not.toBeNull();
+    createNewBtn.click();
+    expect(await p).toBe('create_new');
+  });
+
+  it('resolves "cancel" when cancel button clicked for unsynced duplicate', async () => {
+    const dup = { is_synced_with_off: false, match_type: 'ean', name: 'Dup3' };
+    const p = showScanDuplicateModal(dup);
+    const bg = document.querySelector('.scan-modal-bg');
+    const cancelBtn = bg.querySelector('.confirm-no');
+    expect(cancelBtn).not.toBeNull();
+    cancelBtn.click();
+    expect(await p).toBe('cancel');
+  });
+
+  it('uses unsynced message key for unsynced duplicate', async () => {
+    const { t } = await import('../i18n.js');
+    t.mockClear();
+    const dup = { is_synced_with_off: false, match_type: 'name', name: 'B' };
+    showScanDuplicateModal(dup);
+    expect(t).toHaveBeenCalledWith('duplicate_found_unsynced', expect.objectContaining({ name: 'B' }));
+    document.querySelector('.confirm-no').click();
+  });
+
+  it('removes modal from DOM after resolution', async () => {
+    const dup = { is_synced_with_off: false, match_type: 'ean', name: 'Dup4' };
+    const p = showScanDuplicateModal(dup);
+    const bg = document.querySelector('.scan-modal-bg');
+    bg.querySelector('.confirm-no').click();
+    await p;
+    expect(document.querySelector('.scan-modal-bg')).toBeNull();
   });
 });

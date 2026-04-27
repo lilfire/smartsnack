@@ -1,7 +1,7 @@
 """OpenRouter Vision OCR backend."""
 import os
 
-from . import _get_api_key, _INGREDIENT_PROMPT
+from . import _get_api_key, build_ingredient_prompt
 
 _OPENROUTER_SYSTEM_PROMPT = (
     "You are a precise food label reader. Your only job is to extract the exact "
@@ -14,13 +14,14 @@ _OPENROUTER_SYSTEM_PROMPT = (
 _DEFAULT_MODEL = "google/gemini-2.0-flash-001"
 
 
-def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg", model=None, prompt=None):
+def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg", model=None, prompt=None, language=None):
     """Use OpenRouter Vision API to extract text from an image.
 
     The `prompt` kwarg selects the extraction task (ingredients vs. nutrition);
-    defaults to _INGREDIENT_PROMPT for backward compatibility. A task-specific
-    system prompt is used for ingredients; for any custom prompt the system
-    message is dropped and the user prompt is relied on for instructions.
+    defaults to the ingredient prompt with optional language translation. A
+    task-specific system prompt is used for ingredients; for any custom prompt
+    the system message is dropped and the user prompt is relied on for
+    instructions.
     """
     api_key = _get_api_key("OPENROUTER_API_KEY")
     model = model or os.environ.get("OPENROUTER_MODEL", _DEFAULT_MODEL)
@@ -32,9 +33,10 @@ def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg", model=No
         base_url="https://openrouter.ai/api/v1",
         default_headers={"HTTP-Referer": "https://smartsnack.app"},
     )
-    user_prompt = prompt or _INGREDIENT_PROMPT
+    ingredient_prompt = build_ingredient_prompt(language)
+    user_prompt = prompt or ingredient_prompt
     messages = []
-    if user_prompt is _INGREDIENT_PROMPT or user_prompt == _INGREDIENT_PROMPT:
+    if not prompt:
         messages.append({"role": "system", "content": _OPENROUTER_SYSTEM_PROMPT})
     messages.append(
         {

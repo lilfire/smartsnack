@@ -178,24 +178,13 @@ async function onSearchScanDetected(code) {
   try {
     if (state.currentView !== 'search') switchView('search');
 
-    const allProducts = await fetchProducts('', []);
-
-    // First pass: check both legacy ean field and eans array
+    const raw = await fetchProducts(code, []);
+    const products = Array.isArray(raw) ? raw : (raw.products || []);
     let found = null;
-    for (let i = 0; i < allProducts.length; i++) {
-      const p = allProducts[i];
-      const eans = Array.isArray(p.eans) ? p.eans : [];
-      if (eans.includes(code) || p.ean === code) { found = p; break; }
-    }
-
-    // Second pass: if no primary match, search via backend (covers secondary EANs)
-    if (!found) {
-      const bySearch = await fetchProducts(code, []);
-      if (bySearch.length === 1) {
-        found = bySearch[0];
-      } else if (bySearch.length > 1) {
-        found = bySearch.find((p) => p.ean === code) || null;
-      }
+    if (products.length === 1) {
+      found = products[0];
+    } else if (products.length > 1) {
+      found = products.find((p) => p.ean === code) || null;
     }
 
     if (found) {
@@ -205,7 +194,8 @@ async function onSearchScanDetected(code) {
       state.sortCol = 'total_score';
       state.sortDir = 'desc';
 
-      const filtered = await fetchProducts('', state.currentFilter);
+      const filteredRaw = await fetchProducts('', state.currentFilter);
+      const filtered = Array.isArray(filteredRaw) ? filteredRaw : (filteredRaw.products || []);
       renderResults(filtered, '');
 
       document.getElementById('search-input').value = '';
@@ -383,7 +373,8 @@ export async function scanPickerSearch() {
   body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('scan_searching', { query: query });
   try {
-    const results = await fetchProducts(query, []);
+    const raw = await fetchProducts(query, []);
+    const results = Array.isArray(raw) ? raw : (raw.products || []);
     if (!results.length) {
       body.innerHTML = '<div class="off-modal-empty">' + esc(t('off_no_results_for', { query: query })) + '</div>';
       if (cnt) cnt.textContent = t('off_zero_results');

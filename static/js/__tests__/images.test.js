@@ -370,6 +370,42 @@ describe('viewProductImage', () => {
   });
 });
 
+describe('triggerImageUpload - reader.onerror', () => {
+  it('shows error toast when FileReader fires onerror', async () => {
+    let capturedOnchange;
+    const origFileReader = global.FileReader;
+    const origCreate = document.createElement.bind(document);
+
+    global.FileReader = class {
+      readAsDataURL() {
+        if (this.onerror) this.onerror();
+      }
+    };
+
+    vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      if (tag === 'input') {
+        const inp = {
+          type: '', accept: '',
+          click: vi.fn(),
+          files: [{ size: 1024, name: 'photo.jpg' }],
+          set onchange(fn) { capturedOnchange = fn; },
+          get onchange() { return capturedOnchange; },
+        };
+        return inp;
+      }
+      return origCreate(tag);
+    });
+
+    triggerImageUpload(1);
+    await capturedOnchange();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(showToast).toHaveBeenCalledWith('toast_image_upload_error', 'error');
+    document.createElement.mockRestore?.();
+    global.FileReader = origFileReader;
+  });
+});
+
 describe('removeProductImage', () => {
   it('confirms and removes image', async () => {
     showConfirmModal.mockResolvedValue(true);

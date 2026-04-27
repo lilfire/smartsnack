@@ -1,9 +1,16 @@
 """Tests for services/off_service.py — Open Food Facts API integration."""
 
 import base64
+import http.client
+import io
 import json
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, create_autospec
+
+from tests.mock_shape_validator import (
+    validate_off_add_product_response,
+    validate_off_upload_image_response,
+)
 
 
 _PNG_1x1 = (
@@ -43,11 +50,13 @@ class TestAddProductToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = json.dumps({"status": 1}).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             result = add_product_to_off(
                 {
                     "code": "12345678",
@@ -55,6 +64,7 @@ class TestAddProductToOff:
                     "brands": "TestBrand",
                 }
             )
+            validate_off_add_product_response(result)
             assert result["status"] == 1
 
     def test_api_error(self, app_ctx):
@@ -63,12 +73,14 @@ class TestAddProductToOff:
         import urllib.error
 
         set_off_credentials("user", "pass")
+        # io.BytesIO used as fp: HTTPError reads from fp internally;
+        # create_autospec(HTTPResponse) is incompatible with HTTPError's __init__
         with patch(
             "urllib.request.urlopen",
             side_effect=urllib.error.HTTPError(
-                "url", 500, "Server Error", {}, MagicMock(read=lambda: b"error")
+                "url", 500, "Server Error", {}, io.BytesIO(b"error")
             ),
-        ):
+         autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 add_product_to_off({"code": "123", "product_name": "Test"})
 
@@ -80,7 +92,7 @@ class TestAddProductToOff:
         set_off_credentials("user", "pass")
         with patch(
             "urllib.request.urlopen", side_effect=urllib.error.URLError("timeout")
-        ):
+            , autospec=True):
             with pytest.raises(RuntimeError, match="off_err_network"):
                 add_product_to_off({"code": "123", "product_name": "Test"})
 
@@ -121,12 +133,14 @@ class TestUploadImageToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = json.dumps(
             {"status": "status ok", "imagefield": "front"}
         ).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
 
         captured = {}
 
@@ -136,8 +150,9 @@ class TestUploadImageToOff:
             captured["content_type"] = req.headers.get("Content-type", "")
             return mock_resp
 
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen, autospec=True):
             result = upload_image_to_off("12345678", _PNG_DATA_URI)
+            validate_off_upload_image_response(result)
             assert result["status"] == "status ok"
 
         assert "product_image_upload.pl" in captured["url"]
@@ -157,13 +172,15 @@ class TestUploadImageToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = json.dumps(
             {"status": "status not ok", "status_verbose": "boom"}
         ).encode()
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             with pytest.raises(RuntimeError, match="boom"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 
@@ -173,12 +190,14 @@ class TestUploadImageToOff:
         import urllib.error
 
         set_off_credentials("user", "pass")
+        # io.BytesIO used as fp: HTTPError reads from fp internally;
+        # create_autospec(HTTPResponse) is incompatible with HTTPError's __init__
         with patch(
             "urllib.request.urlopen",
             side_effect=urllib.error.HTTPError(
-                "url", 500, "Server Error", {}, MagicMock(read=lambda: b"error")
+                "url", 500, "Server Error", {}, io.BytesIO(b"error")
             ),
-        ):
+         autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 
@@ -190,7 +209,7 @@ class TestUploadImageToOff:
         set_off_credentials("user", "pass")
         with patch(
             "urllib.request.urlopen", side_effect=urllib.error.URLError("timeout")
-        ):
+            , autospec=True):
             with pytest.raises(RuntimeError, match="off_err_network"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
 
@@ -199,10 +218,42 @@ class TestUploadImageToOff:
         from services.settings_service import set_off_credentials
 
         set_off_credentials("user", "pass")
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = b"not json"
         mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
+        mock_resp.__exit__ = create_autospec(
+            http.client.HTTPResponse.__exit__, return_value=False
+        )
+        with patch("urllib.request.urlopen", return_value=mock_resp, autospec=True):
             with pytest.raises(RuntimeError, match="off_err_api"):
                 upload_image_to_off("12345678", _PNG_DATA_URI)
+
+
+class TestOffApiMockShapes:
+    """Validate canonical dict forms of OFF API responses match documented shapes.
+
+    If the OFF API changes its response structure, update these dicts and the
+    validators in mock_shape_validator.py — these tests will fail to remind you.
+    """
+
+    def test_add_product_canonical_response(self):
+        validate_off_add_product_response({"status": 1})
+
+    def test_add_product_rejects_missing_status(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_off_add_product_response({"product_id": "abc"})
+
+    def test_add_product_rejects_string_status(self):
+        with pytest.raises(AssertionError, match="must be an int"):
+            validate_off_add_product_response({"status": "ok"})
+
+    def test_upload_image_canonical_response(self):
+        validate_off_upload_image_response({"status": "status ok", "imagefield": "front"})
+
+    def test_upload_image_rejects_missing_imagefield(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_off_upload_image_response({"status": "status ok"})
+
+    def test_upload_image_rejects_int_status(self):
+        with pytest.raises(AssertionError, match="must be a str"):
+            validate_off_upload_image_response({"status": 1, "imagefield": "front"})

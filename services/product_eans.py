@@ -38,13 +38,13 @@ def add_ean(pid: int, ean: str) -> dict:
     exists = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
     if not exists:
         raise LookupError("Product not found")
-    # Idempotency: if EAN already belongs to this product, return existing record
+    # Check if EAN already belongs to this product
     existing = conn.execute(
         "SELECT id, ean, is_primary FROM product_eans WHERE product_id = ? AND ean = ?",
         (pid, ean),
     ).fetchone()
     if existing:
-        return {"id": existing["id"], "ean": existing["ean"], "is_primary": bool(existing["is_primary"]), "already_exists": True}
+        raise ValueError("ean_already_exists")
     count = conn.execute(
         "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
     ).fetchone()[0]
@@ -77,11 +77,6 @@ def delete_ean(pid: int, ean_id: int) -> None:
         raise LookupError("EAN not found")
     if row["synced_with_off"]:
         raise ValueError("cannot_delete_synced_ean")
-    count = conn.execute(
-        "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
-    ).fetchone()[0]
-    if count == 1:
-        raise ValueError("cannot_remove_only_ean")
     conn.execute("DELETE FROM product_eans WHERE id = ?", (ean_id,))
     if row["is_primary"]:
         next_row = conn.execute(
