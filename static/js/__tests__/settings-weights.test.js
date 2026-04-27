@@ -37,7 +37,7 @@ import {
   saveWeights,
   renderWeightItems,
 } from '../settings-weights.js';
-import { api, showToast } from '../state.js';
+import { api, showToast, upgradeSelect } from '../state.js';
 import { loadData } from '../products.js';
 
 beforeEach(() => {
@@ -245,5 +245,72 @@ describe('renderWeightItems', () => {
     addWeightItem('kcal', true, 60);
     renderWeightItems();
     expect(document.getElementById('weight-add-select')).toBeNull();
+  });
+});
+
+// ── renderWeightItems upgradeSelect callbacks ──────────
+// Invoke anonymous callbacks passed to upgradeSelect to cover lines 228, 232, 235
+
+describe('renderWeightItems - weight-add-select callback (line 228)', () => {
+  it('calling the upgradeSelect callback for weight-add-select triggers addWeightFromDropdown', () => {
+    document.body.innerHTML = '<div id="weight-items"></div>';
+    addWeightItem('kcal', true, 60);
+    addWeightItem('fat', false, 0);
+    vi.clearAllMocks();
+    renderWeightItems();
+
+    // upgradeSelect mock.calls:
+    // [0] = weight-add-select (disabled weights present)
+    // [1] = wd-kcal, [2] = wf-kcal
+    const addCallback = upgradeSelect.mock.calls[0]?.[1];
+    expect(typeof addCallback).toBe('function');
+
+    // Set the dropdown value so addWeightFromDropdown does something
+    const sel = document.getElementById('weight-add-select');
+    if (sel) sel.value = 'fat';
+    addCallback();
+
+    const fatItem = weightData.find((w) => w.field === 'fat');
+    expect(fatItem.enabled).toBe(true);
+  });
+});
+
+describe('renderWeightItems - direction/formula callbacks (lines 232, 235)', () => {
+  it('direction callback calls onWeightDirection for the field', () => {
+    document.body.innerHTML = `
+      <div id="weight-items"></div>
+      <select id="wd-kcal"><option value="higher">Higher</option></select>
+      <select id="wf-kcal"><option value="minmax">Minmax</option></select>
+      <input id="wn-kcal" style="display:none">
+      <input id="wm-kcal" style="display:none">`;
+    addWeightItem('kcal', true, 60, 'lower', 'minmax');
+    vi.clearAllMocks();
+    renderWeightItems();
+
+    // upgradeSelect call order: [0]=weight-add-select, [1]=wd-kcal, [2]=wf-kcal
+    const dirCallback = upgradeSelect.mock.calls[1]?.[1];
+    expect(typeof dirCallback).toBe('function');
+    document.getElementById('wd-kcal').value = 'higher';
+    dirCallback();
+    expect(weightData.find((w) => w.field === 'kcal').direction).toBe('higher');
+  });
+
+  it('formula callback calls onWeightFormula for the field', () => {
+    document.body.innerHTML = `
+      <div id="weight-items"></div>
+      <select id="wd-kcal"><option value="lower">Lower</option></select>
+      <select id="wf-kcal"><option value="direct">Direct</option></select>
+      <input id="wn-kcal" style="display:none">
+      <input id="wm-kcal" style="display:none">`;
+    addWeightItem('kcal', true, 60, 'lower', 'minmax');
+    vi.clearAllMocks();
+    renderWeightItems();
+
+    // upgradeSelect call order: [0]=weight-add-select, [1]=wd-kcal, [2]=wf-kcal
+    const fmlaCallback = upgradeSelect.mock.calls[2]?.[1];
+    expect(typeof fmlaCallback).toBe('function');
+    document.getElementById('wf-kcal').value = 'direct';
+    fmlaCallback();
+    expect(weightData.find((w) => w.field === 'kcal').formula).toBe('direct');
   });
 });
