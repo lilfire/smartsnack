@@ -4,6 +4,7 @@ import base64
 import io
 import os
 import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -140,11 +141,11 @@ class TestExtractTextValidation:
 # Tesseract backend
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="tesseract")
+@patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True)
 class TestTesseractBackend:
     """Tests for the pytesseract-based OCR backend."""
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_extract_text_calls_pytesseract(self, mock_output, mock_itd, _mock_backend):
         """extract_text should call pytesseract.image_to_data with correct params."""
@@ -164,7 +165,7 @@ class TestTesseractBackend:
         assert "Sukker" in result
         assert "mel" in result
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_extract_text_with_data_uri(self, mock_output, mock_itd, _mock_backend):
         """Should handle data URI format input."""
@@ -180,7 +181,7 @@ class TestTesseractBackend:
 
         assert result == "ingredienser"
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_filters_low_confidence(self, mock_output, mock_itd, _mock_backend):
         """Words with confidence < 30 should be dropped."""
@@ -198,7 +199,7 @@ class TestTesseractBackend:
         assert "good" in result
         assert "noise" not in result
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_empty_ocr_returns_empty_string(self, mock_output, mock_itd, _mock_backend):
         """When OCR produces no text, return empty string."""
@@ -211,7 +212,7 @@ class TestTesseractBackend:
 
         assert result == ""
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_multi_variant_picks_best(self, mock_output, mock_itd, _mock_backend):
         """Should try multiple image variants and pick highest confidence."""
@@ -239,7 +240,7 @@ class TestTesseractBackend:
 # Claude Vision backend
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="claude_vision")
+@patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True)
 class TestClaudeVisionBackend:
     """Tests for the Claude Vision OCR backend."""
 
@@ -247,29 +248,25 @@ class TestClaudeVisionBackend:
         """When backend=claude_vision, should use Claude Vision."""
         from services.ocr_service import extract_text
 
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="sukker, hvetemel, vann, salt")]
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="sukker, hvetemel, vann, salt")])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
-                assert mock_client.messages.create.called
+                assert mock_cls.return_value.messages.create.called
                 assert result == "sukker, hvetemel, vann, salt"
 
     def test_claude_vision_with_data_uri(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="ingredients list")]
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="ingredients list")])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_data_uri(png_bytes))
 
@@ -291,15 +288,12 @@ class TestClaudeVisionBackend:
         """Should use LLM_API_KEY when ANTHROPIC_API_KEY is not set."""
         from services.ocr_service import extract_text
 
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="ingredients here")]
-
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="ingredients here")])
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("ANTHROPIC_API_KEY", None)
-            with patch("anthropic.Anthropic", return_value=mock_client) as mock_cls:
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
@@ -309,13 +303,11 @@ class TestClaudeVisionBackend:
     def test_empty_response(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_msg = MagicMock()
-        mock_msg.content = []
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
@@ -326,36 +318,42 @@ class TestClaudeVisionBackend:
 # Gemini backend
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="gemini")
+@patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True)
 class TestGeminiBackend:
     """Tests for the Gemini Vision OCR backend."""
 
     def _patch_genai(self, mock_client):
         """Create sys.modules patches for google.genai with mock_client."""
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
         return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
 
     def test_extract_text_calls_gemini(self, _mock_backend):
         """Should call google.genai.Client with correct API shape."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "sukker, mel, vann"
+        mock_response = types.SimpleNamespace(text="sukker, mel, vann")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, mock_genai = self._patch_genai(mock_client)
+        # For this test we need to assert Client was called with api_key,
+        # so we use a tracking wrapper instead of a plain lambda.
+        calls = []
+
+        def make_client(**kw):
+            calls.append(kw)
+            return mock_client
+
+        mock_genai = types.SimpleNamespace(Client=make_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-gemini-key"}, clear=False):
-            with patcher:
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
-                mock_genai.Client.assert_called_once_with(api_key="test-gemini-key")
+                assert calls == [{"api_key": "test-gemini-key"}]
                 mock_client.models.generate_content.assert_called_once()
                 call_kwargs = mock_client.models.generate_content.call_args
                 assert call_kwargs[1]["model"] == "gemini-2.0-flash"
@@ -375,29 +373,34 @@ class TestGeminiBackend:
     def test_falls_back_to_llm_api_key(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "ingredients"
+        mock_response = types.SimpleNamespace(text="ingredients")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, mock_genai = self._patch_genai(mock_client)
+        calls = []
+
+        def make_client(**kw):
+            calls.append(kw)
+            return mock_client
+
+        mock_genai = types.SimpleNamespace(Client=make_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("GEMINI_API_KEY", None)
-            with patcher:
+            with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
 
-                mock_genai.Client.assert_called_once_with(api_key="fallback-key")
+                assert calls == [{"api_key": "fallback-key"}]
 
     def test_empty_response(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = ""
+        mock_response = types.SimpleNamespace(text="")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _ = self._patch_genai(mock_client)
@@ -413,13 +416,12 @@ class TestGeminiBackend:
         """BMP image should be converted to PNG before calling Gemini API."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "sukker, mel"
+        mock_response = types.SimpleNamespace(text="sukker, mel")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        patcher, mock_genai = self._patch_genai(mock_client)
+        patcher, _ = self._patch_genai(mock_client)
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
@@ -436,10 +438,9 @@ class TestGeminiBackend:
         """TIFF image should be converted to PNG before calling Gemini API."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "ingredients"
+        mock_response = types.SimpleNamespace(text="ingredients")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _ = self._patch_genai(mock_client)
@@ -459,10 +460,9 @@ class TestGeminiBackend:
         """GIF image should be converted to PNG before calling Gemini API."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "ingredients"
+        mock_response = types.SimpleNamespace(text="ingredients")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _ = self._patch_genai(mock_client)
@@ -482,10 +482,9 @@ class TestGeminiBackend:
         """JPEG should pass through with image/jpeg mime type."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "sukker"
+        mock_response = types.SimpleNamespace(text="sukker")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _ = self._patch_genai(mock_client)
@@ -505,10 +504,9 @@ class TestGeminiBackend:
         """PNG should pass through with image/png mime type."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "mel"
+        mock_response = types.SimpleNamespace(text="mel")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _ = self._patch_genai(mock_client)
@@ -528,10 +526,9 @@ class TestGeminiBackend:
         """SVG image should be converted to PNG before calling Gemini API."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "ingredients"
+        mock_response = types.SimpleNamespace(text="ingredients")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _ = self._patch_genai(mock_client)
@@ -540,7 +537,7 @@ class TestGeminiBackend:
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patcher:
-                with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
+                with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True) as mock_svg:
                     svg_bytes = _make_minimal_svg()
                     result = extract_text(_b64(svg_bytes))
 
@@ -656,7 +653,7 @@ class TestConvertForGemini:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True) as mock_svg:
             out_bytes, mime = _convert_for_gemini(svg_bytes)
 
         mock_svg.assert_called_once_with(svg_bytes)
@@ -670,7 +667,7 @@ class TestConvertForGemini:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True):
             with caplog.at_level(logging.INFO, logger="services.ocr_service"):
                 _convert_for_gemini(svg_bytes)
 
@@ -683,7 +680,7 @@ class TestConvertForGemini:
         svg_bytes = b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>'
         fake_png = _make_tiny_png()
 
-        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png) as mock_svg:
+        with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True) as mock_svg:
             out_bytes, mime = _convert_for_gemini(svg_bytes)
 
         mock_svg.assert_called_once()
@@ -703,8 +700,7 @@ class TestSvgToPng:
         svg_bytes = _make_minimal_svg()
         fake_png = _make_tiny_png()
 
-        mock_cairosvg = MagicMock()
-        mock_cairosvg.svg2png.return_value = fake_png
+        mock_cairosvg = types.SimpleNamespace(svg2png=MagicMock(return_value=fake_png))
 
         with patch.dict("sys.modules", {"cairosvg": mock_cairosvg}):
             result = _svg_to_png(svg_bytes)
@@ -726,7 +722,7 @@ class TestSvgToPng:
 # OpenAI backend
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="openai")
+@patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True)
 class TestOpenAIBackend:
     """Tests for the OpenAI Vision OCR backend."""
 
@@ -734,23 +730,19 @@ class TestOpenAIBackend:
         """Should call openai.OpenAI with correct API shape."""
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "sukker, mel, vann"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="sukker, mel, vann"))]
+        )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-openai-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
                 mock_cls.assert_called_once_with(api_key="test-openai-key")
-                mock_client.chat.completions.create.assert_called_once()
-                call_kwargs = mock_client.chat.completions.create.call_args
+                mock_cls.return_value.chat.completions.create.assert_called_once()
+                call_kwargs = mock_cls.return_value.chat.completions.create.call_args
                 assert call_kwargs[1]["model"] == "gpt-4o"
                 assert result == "sukker, mel, vann"
 
@@ -768,18 +760,14 @@ class TestOpenAIBackend:
     def test_falls_back_to_llm_api_key(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "ingredients"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredients"))]
+        )
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("OPENAI_API_KEY", None)
-            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
 
@@ -788,17 +776,13 @@ class TestOpenAIBackend:
     def test_empty_response(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = ""
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""))]
+        )
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
@@ -809,7 +793,7 @@ class TestOpenAIBackend:
 # OpenRouter backend
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="openrouter")
+@patch("services.settings_service.get_ocr_backend", return_value="openrouter", autospec=True)
 class TestOpenRouterBackend:
     """Tests for the OpenRouter Vision OCR backend."""
 
@@ -817,17 +801,13 @@ class TestOpenRouterBackend:
         """Should call openai.OpenAI with base_url for OpenRouter and correct API key."""
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "sukker, mel, vann"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="sukker, mel, vann"))]
+        )
 
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-openrouter-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
@@ -836,8 +816,8 @@ class TestOpenRouterBackend:
                     base_url="https://openrouter.ai/api/v1",
                     default_headers={"HTTP-Referer": "https://smartsnack.app"},
                 )
-                mock_client.chat.completions.create.assert_called_once()
-                call_kwargs = mock_client.chat.completions.create.call_args
+                mock_cls.return_value.chat.completions.create.assert_called_once()
+                call_kwargs = mock_cls.return_value.chat.completions.create.call_args
                 assert call_kwargs[1]["model"] == "google/gemini-2.0-flash-001"
                 # Verify system prompt is included in messages
                 messages = call_kwargs[1]["messages"]
@@ -860,18 +840,14 @@ class TestOpenRouterBackend:
         """When OPENROUTER_API_KEY absent but LLM_API_KEY set, use LLM_API_KEY."""
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "ingredients"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredients"))]
+        )
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("OPENROUTER_API_KEY", None)
-            with patch("openai.OpenAI", return_value=mock_client) as mock_cls:
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
 
@@ -885,41 +861,33 @@ class TestOpenRouterBackend:
         """When OPENROUTER_MODEL env var is set, use that model instead of default."""
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "mel"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="mel"))]
+        )
 
         with patch.dict(os.environ, {
             "OPENROUTER_API_KEY": "test-key",
             "OPENROUTER_MODEL": "anthropic/claude-3.5-sonnet",
         }, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
 
-                call_kwargs = mock_client.chat.completions.create.call_args
+                call_kwargs = mock_cls.return_value.chat.completions.create.call_args
                 assert call_kwargs[1]["model"] == "anthropic/claude-3.5-sonnet"
 
     def test_empty_response(self, _mock_backend):
         """When response content is empty string, extract_text() returns empty string."""
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = ""
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""))]
+        )
 
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
@@ -930,7 +898,7 @@ class TestOpenRouterBackend:
 # Groq backend
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="groq")
+@patch("services.settings_service.get_ocr_backend", return_value="groq", autospec=True)
 class TestGroqBackend:
     """Tests for the Groq Vision OCR backend."""
 
@@ -938,23 +906,19 @@ class TestGroqBackend:
         """Should call groq.Groq with correct API shape."""
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "sukker, mel, vann"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="sukker, mel, vann"))]
+        )
 
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-groq-key"}, clear=False):
-            with patch("groq.Groq", return_value=mock_client) as mock_cls:
+            with patch("groq.Groq") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
                 mock_cls.assert_called_once_with(api_key="test-groq-key")
-                mock_client.chat.completions.create.assert_called_once()
-                call_kwargs = mock_client.chat.completions.create.call_args
+                mock_cls.return_value.chat.completions.create.assert_called_once()
+                call_kwargs = mock_cls.return_value.chat.completions.create.call_args
                 assert call_kwargs[1]["model"] == "meta-llama/llama-4-scout-17b-16e-instruct"
                 assert result == "sukker, mel, vann"
 
@@ -972,18 +936,14 @@ class TestGroqBackend:
     def test_falls_back_to_llm_api_key(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = "ingredients"
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredients"))]
+        )
 
         with patch.dict(os.environ, {"LLM_API_KEY": "fallback-key"}, clear=False):
             os.environ.pop("GROQ_API_KEY", None)
-            with patch("groq.Groq", return_value=mock_client) as mock_cls:
+            with patch("groq.Groq") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 extract_text(_b64(png_bytes))
 
@@ -992,17 +952,13 @@ class TestGroqBackend:
     def test_empty_response(self, _mock_backend):
         from services.ocr_service import extract_text
 
-        mock_choice = MagicMock()
-        mock_choice.message.content = ""
-
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=""))]
+        )
 
         with patch.dict(os.environ, {"GROQ_API_KEY": "test-key"}, clear=False):
-            with patch("groq.Groq", return_value=mock_client):
+            with patch("groq.Groq") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
@@ -1013,7 +969,7 @@ class TestGroqBackend:
 # Backward compatibility
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="llm")
+@patch("services.settings_service.get_ocr_backend", return_value="llm", autospec=True)
 class TestBackwardCompatibility:
     """Verify backend=llm still routes to Claude Vision."""
 
@@ -1021,17 +977,15 @@ class TestBackwardCompatibility:
         """backend=llm should use the Claude Vision provider (anthropic SDK)."""
         from services.ocr_service import extract_text
 
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="sukker, mel")]
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="sukker, mel")])
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
                 png_bytes = _make_tiny_png()
                 result = extract_text(_b64(png_bytes))
 
-                assert mock_client.messages.create.called
+                assert mock_cls.return_value.messages.create.called
                 assert result == "sukker, mel"
 
     def test_llm_alias_in_providers_registry(self, _mock_backend):
@@ -1049,7 +1003,7 @@ class TestBackwardCompatibility:
 class TestUnknownBackend:
     """Verify clear error message for invalid backend values."""
 
-    @patch("services.settings_service.get_ocr_backend", return_value="invalid_provider")
+    @patch("services.settings_service.get_ocr_backend", return_value="invalid_provider", autospec=True)
     def test_unknown_backend_raises_value_error(self, _mock_backend):
         from services.ocr_service import extract_text
 
@@ -1057,7 +1011,7 @@ class TestUnknownBackend:
         with pytest.raises(ValueError, match="Unknown OCR backend"):
             extract_text(_b64(png_bytes))
 
-    @patch("services.settings_service.get_ocr_backend", return_value="banana_vision")
+    @patch("services.settings_service.get_ocr_backend", return_value="banana_vision", autospec=True)
     def test_error_message_includes_backend_name(self, _mock_backend):
         from services.ocr_service import extract_text
 
@@ -1201,7 +1155,7 @@ class TestAvgConfidenceTesseract:
 class TestOCRBlueprint:
     """Test the /api/ocr/ingredients endpoint contract is preserved."""
 
-    @patch("services.ocr_service.dispatch_ocr")
+    @patch("services.ocr_service.dispatch_ocr", autospec=True)
     def test_post_returns_text(self, mock_dispatch, client):
         mock_dispatch.return_value = {
             "text": "sukker, mel",
@@ -1221,7 +1175,7 @@ class TestOCRBlueprint:
         assert resp.status_code == 400
         assert "error" in resp.get_json()
 
-    @patch("services.ocr_service.dispatch_ocr")
+    @patch("services.ocr_service.dispatch_ocr", autospec=True)
     def test_post_empty_result(self, mock_dispatch, client):
         mock_dispatch.return_value = {
             "text": "",
@@ -1237,7 +1191,7 @@ class TestOCRBlueprint:
         assert data["text"] == ""
         assert "error" in data  # "No text found in image"
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("bad input"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("bad input"), autospec=True)
     def test_post_value_error_returns_400(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
@@ -1245,7 +1199,7 @@ class TestOCRBlueprint:
         )
         assert resp.status_code == 400
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("boom"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("boom"), autospec=True)
     def test_post_runtime_error_returns_500(self, mock_dispatch, client):
         resp = client.post(
             "/api/ocr/ingredients",
@@ -1263,23 +1217,20 @@ class TestMimeTypeExtraction:
 
     def test_jpeg_data_uri_passes_correct_mime_to_gemini(self):
         """Gemini should receive image/jpeg when the data URI declares JPEG."""
-        mock_response = MagicMock()
-        mock_response.text = "sukker"
+        mock_response = types.SimpleNamespace(text="sukker")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         jpeg_bytes = _make_tiny_jpeg()
         jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
-                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(jpeg_uri)
 
@@ -1290,23 +1241,20 @@ class TestMimeTypeExtraction:
 
     def test_png_data_uri_passes_correct_mime_to_gemini(self):
         """Gemini should receive image/png when the data URI declares PNG."""
-        mock_response = MagicMock()
-        mock_response.text = "mel"
+        mock_response = types.SimpleNamespace(text="mel")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         png_bytes = _make_tiny_png()
         png_uri = f"data:image/png;base64,{_b64(png_bytes)}"
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
-                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(png_uri)
 
@@ -1317,88 +1265,80 @@ class TestMimeTypeExtraction:
 
     def test_jpeg_data_uri_passes_correct_mime_to_openai(self):
         """OpenAI data URI should contain image/jpeg when input is JPEG."""
-        mock_choice = MagicMock()
-        mock_choice.message.content = "ingredienser"
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredienser"))]
+        )
 
         jpeg_bytes = _make_tiny_jpeg()
         jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="openai"):
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
+                with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(jpeg_uri)
 
-        call_args = mock_client.chat.completions.create.call_args
+        call_args = mock_cls.return_value.chat.completions.create.call_args
         messages = call_args[1]["messages"]
         image_url = messages[0]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/jpeg;base64,")
 
     def test_png_data_uri_passes_correct_mime_to_openai(self):
         """OpenAI data URI should contain image/png when input is PNG."""
-        mock_choice = MagicMock()
-        mock_choice.message.content = "ingredienser"
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredienser"))]
+        )
 
         png_bytes = _make_tiny_png()
         png_uri = f"data:image/png;base64,{_b64(png_bytes)}"
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="openai"):
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
+                with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(png_uri)
 
-        call_args = mock_client.chat.completions.create.call_args
+        call_args = mock_cls.return_value.chat.completions.create.call_args
         messages = call_args[1]["messages"]
         image_url = messages[0]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/png;base64,")
 
     def test_jpeg_data_uri_passes_correct_media_type_to_claude(self):
         """Claude Vision should receive media_type=image/jpeg when input is JPEG."""
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="sukker")]
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="sukker")])
 
         jpeg_bytes = _make_tiny_jpeg()
         jpeg_uri = f"data:image/jpeg;base64,{_b64(jpeg_bytes)}"
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision"):
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
+                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(jpeg_uri)
 
-        call_args = mock_client.messages.create.call_args
+        call_args = mock_cls.return_value.messages.create.call_args
         messages = call_args[1]["messages"]
         source = messages[0]["content"][0]["source"]
         assert source["media_type"] == "image/jpeg"
 
     def test_png_data_uri_passes_correct_media_type_to_claude(self):
         """Claude Vision should receive media_type=image/png when input is PNG."""
-        mock_msg = MagicMock()
-        mock_msg.content = [MagicMock(text="mel")]
-        mock_client = MagicMock()
-        mock_client.messages.create.return_value = mock_msg
+        mock_msg = types.SimpleNamespace(content=[types.SimpleNamespace(text="mel")])
 
         png_bytes = _make_tiny_png()
         png_uri = f"data:image/png;base64,{_b64(png_bytes)}"
 
         with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}, clear=False):
-            with patch("anthropic.Anthropic", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision"):
+            with patch("anthropic.Anthropic") as mock_cls:
+                mock_cls.return_value.messages.create.return_value = mock_msg
+                with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(png_uri)
 
-        call_args = mock_client.messages.create.call_args
+        call_args = mock_cls.return_value.messages.create.call_args
         messages = call_args[1]["messages"]
         source = messages[0]["content"][0]["source"]
         assert source["media_type"] == "image/png"
@@ -1409,23 +1349,20 @@ class TestMagicByteFallback:
 
     def test_raw_jpeg_base64_defaults_to_jpeg(self):
         """Raw JPEG base64 (no data URI) should be detected as image/jpeg."""
-        mock_response = MagicMock()
-        mock_response.text = "sukker"
+        mock_response = types.SimpleNamespace(text="sukker")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         jpeg_bytes = _make_tiny_jpeg()
         raw_b64 = _b64(jpeg_bytes)  # no data URI prefix
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
-                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(raw_b64)
 
@@ -1436,23 +1373,20 @@ class TestMagicByteFallback:
 
     def test_raw_png_base64_detects_png(self):
         """Raw PNG base64 (no data URI) should be detected as image/png."""
-        mock_response = MagicMock()
-        mock_response.text = "mel"
+        mock_response = types.SimpleNamespace(text="mel")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
 
         png_bytes = _make_tiny_png()
         raw_b64 = _b64(png_bytes)  # no data URI prefix
 
         with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
             with patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}):
-                with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
+                with patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(raw_b64)
 
@@ -1466,24 +1400,22 @@ class TestMagicByteFallback:
 
         Uses OpenAI provider since Gemini overrides MIME type via _convert_for_gemini.
         """
-        mock_choice = MagicMock()
-        mock_choice.message.content = "text"
-        mock_response = MagicMock()
-        mock_response.choices = [mock_choice]
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
+        )
 
         # Bytes with unknown magic bytes (not JPEG or PNG)
         unknown_bytes = b"\x00\x01\x02\x03" + b"\xff" * 200
         raw_b64 = _b64(unknown_bytes)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}, clear=False):
-            with patch("openai.OpenAI", return_value=mock_client):
-                with patch("services.settings_service.get_ocr_backend", return_value="openai"):
+            with patch("openai.OpenAI") as mock_cls:
+                mock_cls.return_value.chat.completions.create.return_value = mock_response
+                with patch("services.settings_service.get_ocr_backend", return_value="openai", autospec=True):
                     from services.ocr_service import dispatch_ocr
                     dispatch_ocr(raw_b64)
 
-        call_args = mock_client.chat.completions.create.call_args
+        call_args = mock_cls.return_value.chat.completions.create.call_args
         messages = call_args[1]["messages"]
         image_url = messages[0]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/jpeg;base64,")
@@ -1492,7 +1424,7 @@ class TestMagicByteFallback:
 class TestBlueprintErrorMessages:
     """OCR blueprint should include provider name in error responses."""
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("No image provided"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("No image provided"), autospec=True)
     def test_value_error_returns_error_type(self, mock_dispatch, client):
         resp = client.post("/api/ocr/ingredients", json={"image": "bad"})
         assert resp.status_code == 400
@@ -1500,7 +1432,7 @@ class TestBlueprintErrorMessages:
         assert "error" in data
         assert "error_type" in data
 
-    @patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("provider failed"))
+    @patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("provider failed"), autospec=True)
     def test_runtime_error_returns_500_with_error_detail(self, mock_dispatch, client):
         resp = client.post("/api/ocr/ingredients", json={"image": "dGVzdA=="})
         assert resp.status_code == 500
@@ -1516,7 +1448,7 @@ class TestBlueprintErrorMessages:
 class TestDispatchOcrFallbackSetting:
     """dispatch_ocr() should respect ocr_fallback_to_tesseract user preference."""
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_fallback_allowed_when_setting_enabled(self, mock_output, mock_itd, app_ctx):
         """When fallback is enabled and provider unavailable, fall back to tesseract."""
@@ -1558,7 +1490,7 @@ class TestDispatchOcrFallbackSetting:
             with pytest.raises(ValueError, match="unavailable"):
                 dispatch_ocr(_b64(png_bytes))
 
-    @patch("pytesseract.image_to_data")
+    @patch("pytesseract.image_to_data", autospec=True)
     @patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"}))
     def test_no_fallback_when_provider_available(self, mock_output, mock_itd, app_ctx):
         """When selected provider is available (tesseract), no fallback occurs."""
@@ -1598,25 +1530,22 @@ class TestLegacyEnvVarRemoved:
 # LSO-383: _extract_gemini must pass raw bytes to inline_data.data
 # ---------------------------------------------------------------------------
 
-@patch("services.settings_service.get_ocr_backend", return_value="gemini")
+@patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True)
 class TestGeminiRawBytesPassthrough:
     """_extract_gemini must pass raw image_bytes (not a base64 string) to inline_data.data."""
 
     def _patch_genai(self, mock_client):
-        mock_genai = MagicMock()
-        mock_genai.Client.return_value = mock_client
-        mock_google = MagicMock()
-        mock_google.genai = mock_genai
+        mock_genai = types.SimpleNamespace(Client=lambda **kw: mock_client)
+        mock_google = types.SimpleNamespace(genai=mock_genai)
         return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai}), mock_genai
 
     def test_inline_data_receives_bytes_not_string(self, _mock_backend):
         """inline_data.data must be bytes, not a base64-encoded string."""
         from services.ocr_service import extract_text
 
-        mock_response = MagicMock()
-        mock_response.text = "sukker, mel"
+        mock_response = types.SimpleNamespace(text="sukker, mel")
 
-        mock_client = MagicMock()
+        mock_client = MagicMock(spec=["models"])
         mock_client.models.generate_content.return_value = mock_response
 
         patcher, _mock_genai = self._patch_genai(mock_client)

@@ -17,7 +17,8 @@ Service helpers (services/bulk_service.py):
   - start_refresh_from_off — returns False when job is already running
 """
 
-from unittest.mock import MagicMock, patch
+import threading
+from unittest.mock import create_autospec, patch
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ class TestRefreshOffStartEndpoint:
     def test_valid_request_starts_job_and_returns_ok(self, client):
         """A well-formed request should start the background job (mocked) and
         return HTTP 200 with {"ok": true}."""
-        with patch("services.bulk_service.start_refresh_from_off", return_value=True):
+        with patch("services.bulk_service.start_refresh_from_off", return_value=True, autospec=True):
             resp = client.post(
                 "/api/bulk/refresh-off/start",
                 json={
@@ -66,7 +67,7 @@ class TestRefreshOffStartEndpoint:
     def test_already_running_returns_409(self, client):
         """When the service reports a job is already running the endpoint
         must return HTTP 409 with error 'already_running'."""
-        with patch("services.bulk_service.start_refresh_from_off", return_value=False):
+        with patch("services.bulk_service.start_refresh_from_off", return_value=False, autospec=True):
             resp = client.post(
                 "/api/bulk/refresh-off/start",
                 json={"min_certainty": 50},
@@ -77,7 +78,7 @@ class TestRefreshOffStartEndpoint:
 
     def test_min_certainty_clamped_at_100(self, client):
         """Values above 100 are clamped silently — still a valid request."""
-        with patch("services.bulk_service.start_refresh_from_off", return_value=True):
+        with patch("services.bulk_service.start_refresh_from_off", return_value=True, autospec=True):
             resp = client.post(
                 "/api/bulk/refresh-off/start",
                 json={"min_certainty": 999},
@@ -86,7 +87,7 @@ class TestRefreshOffStartEndpoint:
 
     def test_min_certainty_clamped_at_0(self, client):
         """Negative values are clamped to 0 — still a valid request."""
-        with patch("services.bulk_service.start_refresh_from_off", return_value=True):
+        with patch("services.bulk_service.start_refresh_from_off", return_value=True, autospec=True):
             resp = client.post(
                 "/api/bulk/refresh-off/start",
                 json={"min_certainty": -10},
@@ -96,7 +97,7 @@ class TestRefreshOffStartEndpoint:
     def test_empty_body_uses_defaults(self, client):
         """A POST with no body (or empty JSON) must not raise and must accept
         default parameter values."""
-        with patch("services.bulk_service.start_refresh_from_off", return_value=True):
+        with patch("services.bulk_service.start_refresh_from_off", return_value=True, autospec=True):
             resp = client.post("/api/bulk/refresh-off/start", json={})
         assert resp.status_code == 200
 
@@ -165,7 +166,7 @@ class TestEstimatePqEndpoint:
         with patch(
             "services.bulk_service.estimate_all_pq",
             side_effect=RuntimeError("db gone"),
-        ):
+            autospec=True):
             resp = client.post("/api/bulk/estimate-pq")
         assert resp.status_code == 500
         assert "error" in resp.get_json()
@@ -629,7 +630,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(fake_image_bytes, "image/jpeg"),
-        ):
+            autospec=True):
             result = _fetch_off_image(
                 {"image_front_url": "https://example.com/img.jpg"}
             )
@@ -645,7 +646,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             side_effect=ConnectionError("unreachable"),
-        ):
+            autospec=True):
             result = _fetch_off_image(
                 {"image_front_url": "https://example.com/img.jpg"}
             )
@@ -661,7 +662,7 @@ class TestFetchOffImage:
         with patch(
             "services.bulk_service.proxy_service.proxy_image",
             return_value=(large_bytes, "image/jpeg"),
-        ):
+            autospec=True):
             result = _fetch_off_image(
                 {"image_front_url": "https://example.com/large.jpg"}
             )
@@ -743,12 +744,12 @@ class TestStartRefreshFromOff:
         with svc._refresh_lock:
             svc._refresh_job["running"] = False
 
-        with patch("services.bulk_service._run_refresh"):
+        with patch("services.bulk_service._run_refresh", autospec=True):
             # Patch threading.Thread so no real thread is created
-            mock_thread = MagicMock()
+            mock_thread = create_autospec(threading.Thread, instance=True)
             with patch(
                 "services.bulk_service.threading.Thread", return_value=mock_thread
-            ):
+                , autospec=True):
                 result = svc.start_refresh_from_off({"search_missing": False})
 
         # Restore state (thread was mocked so running is still True from the update)
@@ -766,7 +767,7 @@ class TestStartRefreshFromOff:
             svc._refresh_job["running"] = False
 
         captured_args = {}
-        mock_thread = MagicMock()
+        mock_thread = create_autospec(threading.Thread, instance=True)
 
         def capture_thread(**kwargs):
             captured_args.update(kwargs)
@@ -774,7 +775,7 @@ class TestStartRefreshFromOff:
 
         with patch(
             "services.bulk_service.threading.Thread", side_effect=capture_thread
-        ):
+            , autospec=True):
             svc.start_refresh_from_off({"min_certainty": 80})
 
         with svc._refresh_lock:
@@ -795,8 +796,8 @@ class TestStartRefreshFromOff:
                 done=True,
             )
 
-        mock_thread = MagicMock()
-        with patch("services.bulk_service.threading.Thread", return_value=mock_thread):
+        mock_thread = create_autospec(threading.Thread, instance=True)
+        with patch("services.bulk_service.threading.Thread", return_value=mock_thread, autospec=True):
             svc.start_refresh_from_off()
 
         with svc._refresh_lock:

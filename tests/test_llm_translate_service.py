@@ -1,6 +1,7 @@
 """Tests for services/llm_translate_service.py"""
 
 import os
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -70,15 +71,12 @@ def test_translate_returns_translation_via_claude(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    mock_content = MagicMock()
-    mock_content.text = "Sukker, vann"
-    mock_msg = MagicMock()
-    mock_msg.content = [mock_content]
+    mock_content = types.SimpleNamespace(text="Sukker, vann")
+    mock_msg = types.SimpleNamespace(content=[mock_content])
 
-    mock_client = MagicMock()
+    mock_client = MagicMock(spec=["messages"])
     mock_client.messages.create.return_value = mock_msg
-    mock_anthropic = MagicMock()
-    mock_anthropic.Anthropic.return_value = mock_client
+    mock_anthropic = types.SimpleNamespace(Anthropic=lambda **kwargs: mock_client)
 
     with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
         result = svc.translate_ingredients("Sugar, water", "no")
@@ -101,15 +99,12 @@ def test_translate_returns_translation_via_openai(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    mock_choice = MagicMock()
-    mock_choice.message.content = "Sukker, vann"
-    mock_resp = MagicMock()
-    mock_resp.choices = [mock_choice]
+    mock_choice = types.SimpleNamespace(message=types.SimpleNamespace(content="Sukker, vann"))
+    mock_resp = types.SimpleNamespace(choices=[mock_choice])
 
-    mock_client = MagicMock()
+    mock_client = MagicMock(spec=["chat"])
     mock_client.chat.completions.create.return_value = mock_resp
-    mock_openai = MagicMock()
-    mock_openai.OpenAI.return_value = mock_client
+    mock_openai = types.SimpleNamespace(OpenAI=lambda **kwargs: mock_client)
 
     with patch.dict("sys.modules", {"openai": mock_openai}):
         result = svc.translate_ingredients("Sugar, water", "no")
@@ -127,15 +122,15 @@ def test_translate_returns_translation_via_gemini(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "fake-key")
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    mock_resp = MagicMock()
-    mock_resp.text = "Sukker, vann"
-    mock_model = MagicMock()
+    mock_resp = types.SimpleNamespace(text="Sukker, vann")
+    mock_model = MagicMock(spec=["generate_content"])
     mock_model.generate_content.return_value = mock_resp
-    mock_genai = MagicMock()
-    mock_genai.GenerativeModel.return_value = mock_model
+    mock_genai = types.SimpleNamespace(
+        configure=lambda **kwargs: None,
+        GenerativeModel=lambda *args, **kwargs: mock_model,
+    )
 
-    mock_google = MagicMock()
-    mock_google.generativeai = mock_genai
+    mock_google = types.SimpleNamespace(generativeai=mock_genai)
 
     with patch.dict("sys.modules", {"google.generativeai": mock_genai, "google": mock_google}):
         result = svc.translate_ingredients("Sugar, water", "no")
@@ -153,15 +148,12 @@ def test_translate_returns_translation_via_groq(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.setenv("GROQ_API_KEY", "fake-key")
 
-    mock_choice = MagicMock()
-    mock_choice.message.content = "Sukker, vann"
-    mock_resp = MagicMock()
-    mock_resp.choices = [mock_choice]
+    mock_choice = types.SimpleNamespace(message=types.SimpleNamespace(content="Sukker, vann"))
+    mock_resp = types.SimpleNamespace(choices=[mock_choice])
 
-    mock_client = MagicMock()
+    mock_client = MagicMock(spec=["chat"])
     mock_client.chat.completions.create.return_value = mock_resp
-    mock_groq = MagicMock()
-    mock_groq.Groq.return_value = mock_client
+    mock_groq = types.SimpleNamespace(Groq=lambda **kwargs: mock_client)
 
     with patch.dict("sys.modules", {"groq": mock_groq}):
         result = svc.translate_ingredients("Sugar, water", "no")
@@ -179,10 +171,9 @@ def test_translate_returns_original_on_exception(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    mock_client = MagicMock()
+    mock_client = MagicMock(spec=["messages"])
     mock_client.messages.create.side_effect = Exception("API error")
-    mock_anthropic = MagicMock()
-    mock_anthropic.Anthropic.return_value = mock_client
+    mock_anthropic = types.SimpleNamespace(Anthropic=lambda **kwargs: mock_client)
 
     with patch.dict("sys.modules", {"anthropic": mock_anthropic}):
         result = svc.translate_ingredients("Sugar, water", "no")
@@ -210,22 +201,20 @@ def test_translate_backend_priority_claude_first(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
 
-    mock_content = MagicMock()
-    mock_content.text = "from-claude"
-    mock_msg = MagicMock()
-    mock_msg.content = [mock_content]
-    mock_client = MagicMock()
+    mock_content = types.SimpleNamespace(text="from-claude")
+    mock_msg = types.SimpleNamespace(content=[mock_content])
+    mock_client = MagicMock(spec=["messages"])
     mock_client.messages.create.return_value = mock_msg
-    mock_anthropic = MagicMock()
-    mock_anthropic.Anthropic.return_value = mock_client
+    mock_anthropic = types.SimpleNamespace(Anthropic=lambda **kwargs: mock_client)
 
-    mock_openai = MagicMock()
+    mock_openai_constructor = MagicMock(spec=["__call__"])
+    mock_openai = types.SimpleNamespace(OpenAI=mock_openai_constructor)
 
     with patch.dict("sys.modules", {"anthropic": mock_anthropic, "openai": mock_openai}):
         result = svc.translate_ingredients("Sugar", "no")
 
     assert result == "from-claude"
-    mock_openai.OpenAI.assert_not_called()
+    mock_openai_constructor.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -248,11 +237,11 @@ def test_off_search_translates_when_all_conditions_met():
         "completeness": 0.5,
     }
 
-    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}), \
-         patch("services.proxy_service._off_search_classic", return_value={"products": []}), \
-         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"]), \
-         patch.object(translate_svc, "is_available", return_value=True), \
-         patch.object(translate_svc, "translate_ingredients", return_value="Sukker, vann") as mock_translate:
+    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}, autospec=True), \
+         patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True), \
+         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"], autospec=True), \
+         patch.object(translate_svc, "is_available", return_value=True, autospec=True), \
+         patch.object(translate_svc, "translate_ingredients", return_value="Sukker, vann", autospec=True) as mock_translate:
         result = off_search("Testprodukt")
 
     p = result["products"][0]
@@ -276,11 +265,11 @@ def test_off_search_no_translation_when_lang_matches():
         "completeness": 0.5,
     }
 
-    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}), \
-         patch("services.proxy_service._off_search_classic", return_value={"products": []}), \
-         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"]), \
-         patch.object(translate_svc, "is_available", return_value=True), \
-         patch.object(translate_svc, "translate_ingredients", return_value="should not be called") as mock_translate:
+    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}, autospec=True), \
+         patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True), \
+         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"], autospec=True), \
+         patch.object(translate_svc, "is_available", return_value=True, autospec=True), \
+         patch.object(translate_svc, "translate_ingredients", return_value="should not be called", autospec=True) as mock_translate:
         result = off_search("Testprodukt")
 
     mock_translate.assert_not_called()
@@ -302,11 +291,11 @@ def test_off_search_no_translation_when_ingredients_empty():
         "completeness": 0.5,
     }
 
-    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}), \
-         patch("services.proxy_service._off_search_classic", return_value={"products": []}), \
-         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"]), \
-         patch.object(translate_svc, "is_available", return_value=True), \
-         patch.object(translate_svc, "translate_ingredients") as mock_translate:
+    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}, autospec=True), \
+         patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True), \
+         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"], autospec=True), \
+         patch.object(translate_svc, "is_available", return_value=True, autospec=True), \
+         patch.object(translate_svc, "translate_ingredients", autospec=True) as mock_translate:
         off_search("Testprodukt")
 
     mock_translate.assert_not_called()
@@ -327,11 +316,11 @@ def test_off_search_no_translation_when_llm_unavailable():
         "completeness": 0.5,
     }
 
-    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}), \
-         patch("services.proxy_service._off_search_classic", return_value={"products": []}), \
-         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"]), \
-         patch.object(translate_svc, "is_available", return_value=False), \
-         patch.object(translate_svc, "translate_ingredients") as mock_translate:
+    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}, autospec=True), \
+         patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True), \
+         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"], autospec=True), \
+         patch.object(translate_svc, "is_available", return_value=False, autospec=True), \
+         patch.object(translate_svc, "translate_ingredients", autospec=True) as mock_translate:
         off_search("Testprodukt")
 
     mock_translate.assert_not_called()
@@ -352,11 +341,11 @@ def test_off_search_no_translation_when_native_variant_exists():
         "completeness": 0.5,
     }
 
-    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}), \
-         patch("services.proxy_service._off_search_classic", return_value={"products": []}), \
-         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"]), \
-         patch.object(translate_svc, "is_available", return_value=True), \
-         patch.object(translate_svc, "translate_ingredients") as mock_translate:
+    with patch("services.proxy_service._off_search_a_licious", return_value={"products": [product]}, autospec=True), \
+         patch("services.proxy_service._off_search_classic", return_value={"products": []}, autospec=True), \
+         patch("services.settings_service.get_off_language_priority", return_value=["no", "en"], autospec=True), \
+         patch.object(translate_svc, "is_available", return_value=True, autospec=True), \
+         patch.object(translate_svc, "translate_ingredients", autospec=True) as mock_translate:
         off_search("Testprodukt")
 
     mock_translate.assert_not_called()

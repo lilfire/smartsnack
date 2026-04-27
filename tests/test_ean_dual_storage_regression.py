@@ -151,27 +151,25 @@ class TestLegacyEanOnlyInProductsTable:
 
 
 class TestDuplicateEanIdempotent:
-    """Scenario B: verify duplicate EAN on same product is idempotent (not 409).
+    """Scenario B: verify duplicate EAN on same product returns 409.
 
     These tests complement the existing coverage in test_ean.py by testing
     the full API roundtrip explicitly as a regression guard.
     """
 
-    def test_add_same_ean_via_api_returns_200_not_409(self, client):
-        """POST /api/products/<pid>/eans with the product's own EAN returns 200."""
+    def test_add_same_ean_via_api_returns_409(self, client):
+        """POST /api/products/<pid>/eans with the product's own EAN returns 409."""
         pid = _add_product(client, name="DupApiCheck", ean="44556677")
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "44556677"})
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["ean"] == "44556677"
-        assert data.get("already_exists") is True
+        assert resp.status_code == 409
+        assert resp.get_json()["error"] == "ean_already_exists"
 
-    def test_add_same_secondary_ean_twice_is_idempotent(self, client):
-        """Adding the same secondary EAN twice returns 200 on the second call."""
+    def test_add_same_secondary_ean_twice_returns_409(self, client):
+        """Adding the same secondary EAN twice returns 409 on the second call."""
         pid = _add_product(client, name="DupSecondary", ean="11112222")
         resp1 = client.post(f"/api/products/{pid}/eans", json={"ean": "33334444"})
         assert resp1.status_code == 201
 
         resp2 = client.post(f"/api/products/{pid}/eans", json={"ean": "33334444"})
-        assert resp2.status_code == 200
-        assert resp2.get_json().get("already_exists") is True
+        assert resp2.status_code == 409
+        assert resp2.get_json()["error"] == "ean_already_exists"
