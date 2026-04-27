@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 # 
 
+## [0.18.0] - 2026-04-27
+
+### Added
+
+- Per-category score-weight overrides: any field's enabled state, weight, direction, formula, and formula min/max can now be overridden for a specific category, replacing the global value for products in that category. Overrides are *exclusive* — once a category has any override row, only the override-enabled fields are scored for its products, and an override can enable a field that's globally disabled. Implemented as a new `category_score_weights` table (migration `020_category_score_weights`) keyed on `(category, field)` with a foreign key to `categories(name)` on cascade delete
+- New service `services/category_weight_service.py` with `get_category_weights` (returns the full field list with effective values and an `is_overridden` flag, falling back to global defaults for non-overridden fields) and `update_category_weights` (upserts override rows where `is_overridden=true`, deletes them where `is_overridden=false`, validates direction/formula/weight bounds, and invalidates the scoring cache)
+- `GET /api/categories/<name>/weights` and `PUT /api/categories/<name>/weights` endpoints exposing per-category overrides, with category-name validation and 404 for unknown categories
+- "Apply to" scope selector in Settings → Score weighting that switches the weights editor between Global and any individual category, reusing the same row UI for both scopes (in category scope, the "active" rows are the overridden ones; un-overridden fields appear in the add-dropdown)
+- "+ Add category override" picker modal listing only categories that don't yet have overrides; selecting one switches the editor into that category's scope
+- "Delete category override" button that clears every override for the active category in a single PUT (with a confirmation modal and success toast), then drops the editor back to Global
+- Per-row trash button in category scope for removing a single field's override (sends `is_overridden=false` for that row)
+- Translated hint paragraph under the scope row explaining global vs per-category scope
+- `has_weight_overrides` flag on every `GET /api/categories` entry, computed from `SELECT DISTINCT category FROM category_score_weights`, so the scope dropdown only lists categories that actually have overrides
+- Localized `label` and `desc` on each row of `GET /api/categories/<name>/weights`, matching the global `/api/weights` shape so the same renderer covers both scopes
+- 11 new translation keys per language (Norwegian, English, Swedish): `weights_scope_label`, `weights_scope_global`, `weights_scope_hint_global`, `weights_scope_hint_category`, `btn_add_override`, `btn_remove_override`, `btn_add_category_override`, `btn_delete_category_override`, `add_category_override_title`, `add_category_override_hint`, `confirm_delete_category_override`, `toast_category_override_deleted`, `toast_no_categories_without_overrides`
+- Backend tests in `tests/test_category_weight_service.py` and `tests/test_category_service.py`; frontend tests in `static/js/__tests__/settings-weights.test.js` covering scope dropdown population, scope change, add/remove in category scope, picker modal, and the saveWeights branch
+
+### Changed
+
+- Scoring weight cache (`_weight_cache`, `_range_cache`) is now keyed on SQLite's `PRAGMA data_version` instead of a 30-second TTL, so any Gunicorn worker that didn't handle the write still detects it on the next read and reloads from the DB. `invalidate_scoring_cache` now only clears the local process's caches — cross-worker invalidation is handled automatically by the data_version key
+- `_load_weight_config` now returns weight entries for the *union* of globally-enabled and override-enabled fields, with each entry carrying a `globally_enabled` flag. `_score_product` uses that flag together with the category's override rows to gate per-product scoring, supporting both exclusive-mode (category has overrides) and inherit-mode (no overrides → fall back to globals)
+- Category CRUD (add, rename, emoji change, delete, reassign) now calls `refreshScopeSelect()` so the override scope dropdown stays in sync without a full settings reload
+
 ## [0.17.0] - 2026-04-26
 
 ### Changed
@@ -36,8 +59,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
-- Category weight overrides are now *exclusive*: as soon as a category has any row in `category_score_weights`, only those override-enabled fields are scored for products in that category — the global enabled set is ignored. Previously the per-category override was also broken in the other direction: overrides that enabled a globally-disabled field were silently dropped because `_load_weight_config` / `_score_product` only iterated globally-enabled fields. Iteration now spans the union of globally-enabled and override-enabled fields, with exclusive-mode gating in `_score_product`
-- Scoring cache no longer goes stale across Gunicorn workers: the TTL-based `_weight_cache` / `_range_cache` are now keyed on SQLite's `PRAGMA data_version`, so any worker that didn't handle the write still detects it on the next read and reloads from the DB (previously, a 30-second window after saving a weight or override could serve stale scores from the non-writer worker)
 - EAN drift between `products.ean` and `product_eans` after edits, imports, merges, and OFF refresh — enforced at the schema level by triggers and at startup by the repair pass
 - Import path raising `AttributeError` when an imported product had `ean: null` instead of an empty string
 - Stale EAN left in `product_eans` after an import overwrite changed the EAN value
