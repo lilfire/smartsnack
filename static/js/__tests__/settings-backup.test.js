@@ -23,6 +23,7 @@ import {
   handleRestore,
   handleImport,
   estimateAllPq,
+  initRestoreDragDrop,
 } from '../settings-backup.js';
 import { api, showToast, showConfirmModal, state } from '../state.js';
 import { loadData } from '../products.js';
@@ -205,5 +206,63 @@ describe('handleImport', () => {
     handleImport(input);
     await new Promise((r) => setTimeout(r, 50));
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+});
+
+// ── initRestoreDragDrop ───────────────────────────────
+describe('initRestoreDragDrop', () => {
+  it('does nothing when restore-drop element is absent', () => {
+    document.body.innerHTML = '';
+    expect(() => initRestoreDragDrop()).not.toThrow();
+  });
+
+  it('adds dragover class on dragover event', () => {
+    document.body.innerHTML = '<div id="restore-drop"></div>';
+    initRestoreDragDrop();
+    const drop = document.getElementById('restore-drop');
+    const ev = new Event('dragover');
+    ev.preventDefault = vi.fn();
+    drop.dispatchEvent(ev);
+    expect(drop.classList.contains('dragover')).toBe(true);
+    expect(ev.preventDefault).toHaveBeenCalled();
+  });
+
+  it('removes dragover class on dragleave', () => {
+    document.body.innerHTML = '<div id="restore-drop"></div>';
+    initRestoreDragDrop();
+    const drop = document.getElementById('restore-drop');
+    drop.classList.add('dragover');
+    drop.dispatchEvent(new Event('dragleave'));
+    expect(drop.classList.contains('dragover')).toBe(false);
+  });
+
+  it('calls handleRestore with the dropped file on drop', async () => {
+    document.body.innerHTML = '<div id="restore-drop"></div>';
+    initRestoreDragDrop();
+    const drop = document.getElementById('restore-drop');
+    const mockFile = new Blob(['{}'], { type: 'application/json' });
+    const dropEvent = new Event('drop');
+    dropEvent.preventDefault = vi.fn();
+    dropEvent.dataTransfer = { files: [mockFile] };
+    drop.classList.add('dragover');
+    drop.dispatchEvent(dropEvent);
+    expect(drop.classList.contains('dragover')).toBe(false);
+    expect(dropEvent.preventDefault).toHaveBeenCalled();
+    // handleRestore is triggered with the file; api would be called
+    await new Promise((r) => setTimeout(r, 50));
+    // Confirm dialog shown (from handleRestore)
+    expect(showConfirmModal).toHaveBeenCalled();
+  });
+
+  it('does not call handleRestore when no files dropped', () => {
+    document.body.innerHTML = '<div id="restore-drop"></div>';
+    initRestoreDragDrop();
+    const drop = document.getElementById('restore-drop');
+    const dropEvent = new Event('drop');
+    dropEvent.preventDefault = vi.fn();
+    dropEvent.dataTransfer = { files: [] };
+    drop.dispatchEvent(dropEvent);
+    // showConfirmModal not called since no file
+    expect(showConfirmModal).not.toHaveBeenCalled();
   });
 });
