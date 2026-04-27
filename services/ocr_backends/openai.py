@@ -1,14 +1,14 @@
 """OpenAI Vision OCR backend."""
-from . import _get_api_key, _INGREDIENT_PROMPT
+from . import _get_api_key, build_ingredient_prompt
 
 _DEFAULT_MODEL = "gpt-4o"
 
 
-def _extract_openai(image_bytes, image_b64, mime_type="image/png", model=None, prompt=None):
+def _extract_openai(image_bytes, image_b64, mime_type="image/png", model=None, prompt=None, language=None):
     """Use OpenAI Vision API to extract text from an image.
 
     The `prompt` kwarg selects the extraction task (ingredients vs. nutrition);
-    defaults to _INGREDIENT_PROMPT for backward compatibility.
+    defaults to the ingredient prompt with optional language translation.
     """
     api_key = _get_api_key("OPENAI_API_KEY")
 
@@ -30,7 +30,7 @@ def _extract_openai(image_bytes, image_b64, mime_type="image/png", model=None, p
                     },
                     {
                         "type": "text",
-                        "text": prompt or _INGREDIENT_PROMPT,
+                        "text": prompt or build_ingredient_prompt(language),
                     },
                 ],
             }

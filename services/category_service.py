@@ -15,7 +15,7 @@ from translations import (
 
 
 def list_categories() -> list:
-    """Return all categories with labels and product counts."""
+    """Return all categories with labels, product counts, and override flag."""
     conn = get_db()
     cats = conn.execute("SELECT name, emoji FROM categories ORDER BY name").fetchall()
     counts = {}
@@ -23,12 +23,19 @@ def list_categories() -> list:
         "SELECT type, COUNT(*) as count FROM products GROUP BY type"
     ).fetchall():
         counts[r["type"]] = r["count"]
+    override_names = {
+        r["category"]
+        for r in conn.execute(
+            "SELECT DISTINCT category FROM category_score_weights"
+        ).fetchall()
+    }
     return [
         {
             "name": c["name"],
             "emoji": c["emoji"],
             "label": _category_label(c["name"]),
             "count": counts.get(c["name"], 0),
+            "has_weight_overrides": c["name"] in override_names,
         }
         for c in cats
     ]

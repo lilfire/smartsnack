@@ -244,6 +244,23 @@ MIGRATIONS = [
             "VALUES ('cocoa', 0.55, 0.48)",
         ],
     ),
+    (
+        "020_category_score_weights",
+        [
+            """CREATE TABLE IF NOT EXISTS category_score_weights (
+                category TEXT NOT NULL,
+                field TEXT NOT NULL,
+                enabled INTEGER,
+                weight REAL,
+                direction TEXT,
+                formula TEXT,
+                formula_min REAL,
+                formula_max REAL,
+                PRIMARY KEY (category, field),
+                FOREIGN KEY (category) REFERENCES categories(name) ON DELETE CASCADE
+            )""",
+        ],
+    ),
 ]
 
 

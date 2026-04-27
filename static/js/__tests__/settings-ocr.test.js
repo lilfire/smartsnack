@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MOCK_OCR_SETTINGS } from './mock-shapes.js';
 
 vi.mock('../state.js', () => ({
-  api: vi.fn().mockResolvedValue({}),
+  api: vi.fn().mockResolvedValue({ provider: 'tesseract', fallback_to_tesseract: false, models: {} }),
   showToast: vi.fn(),
   upgradeSelect: vi.fn(),
 }));
@@ -14,7 +15,7 @@ import { api, showToast } from '../state.js';
 beforeEach(() => {
   vi.clearAllMocks();
   document.body.innerHTML = '';
-  api.mockResolvedValue({});
+  api.mockResolvedValue(MOCK_OCR_SETTINGS);
 });
 
 function setupOcrDOM(provider = 'tesseract', fallback = false) {

@@ -2,6 +2,7 @@
 import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal, showToast } from './state.js';
 import { t } from './i18n.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
+import { refreshScopeSelect } from './settings-weights.js';
 
 function updateStatsLine() {
   const el = document.getElementById('stats-line');
@@ -55,6 +56,7 @@ export async function updateCategoryLabel(name, val) {
     showToast(t('toast_category_updated'), 'success');
     await fetchStats();
     updateStatsLine();
+    refreshScopeSelect();
   } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
 }
 
@@ -65,6 +67,7 @@ export async function updateCategoryEmoji(name, emoji) {
     await fetchStats();
     updateStatsLine();
     loadCategories();
+    refreshScopeSelect();
   } catch(e) { console.error(e); showToast(t('toast_save_error'), 'error'); }
 }
 
@@ -84,6 +87,7 @@ export async function addCategory() {
     await fetchStats();
     updateStatsLine();
     loadCategories();
+    refreshScopeSelect();
   } catch(e) {
     console.error(e);
     showToast(t('toast_network_error'), 'error');
@@ -101,6 +105,7 @@ export async function deleteCategory(name, label, count) {
       await fetchStats();
       updateStatsLine();
       loadCategories();
+      refreshScopeSelect();
       return;
     }
     // Has products – show reassignment modal
@@ -166,6 +171,7 @@ export async function deleteCategory(name, label, count) {
         await fetchStats();
         updateStatsLine();
         loadCategories();
+        refreshScopeSelect();
       } catch(e2) {
         console.error(e2);
         showToast(t('toast_network_error'), 'error');

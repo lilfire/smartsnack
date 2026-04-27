@@ -13,6 +13,7 @@ import io
 import logging
 import os
 import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -52,17 +53,14 @@ def _data_uri(raw_bytes, mime="image/png"):
 
 def _mock_genai_modules(mock_client):
     """Patch sys.modules for google.genai with a mock client."""
-    mock_genai = MagicMock()
-    mock_genai.Client.return_value = mock_client
-    mock_google = MagicMock()
-    mock_google.genai = mock_genai
+    mock_genai = types.SimpleNamespace(Client=lambda **_kwargs: mock_client)
+    mock_google = types.SimpleNamespace(genai=mock_genai)
     return patch.dict("sys.modules", {"google": mock_google, "google.genai": mock_genai})
 
 
 def _make_gemini_response(text="sukker, mel, vann"):
-    mock_response = MagicMock()
-    mock_response.text = text
-    mock_client = MagicMock()
+    mock_response = types.SimpleNamespace(text=text)
+    mock_client = MagicMock(spec=["models"])
     mock_client.models.generate_content.return_value = mock_response
     return mock_client
 
@@ -80,7 +78,7 @@ class TestDispatchOcrFormatConversion:
 
     def _setup_gemini_setting(self):
         """Patch settings_service to return 'gemini' as selected backend."""
-        return patch("services.settings_service.get_ocr_backend", return_value="gemini")
+        return patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True)
 
     @pytest.mark.parametrize("fmt,expected_mime", [
         ("BMP", "image/png"),
@@ -120,7 +118,7 @@ class TestDispatchOcrFormatConversion:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True):
                         result = dispatch_ocr(_b64(svg_bytes))
 
         assert result["text"] == "ingredienser fra svg"
@@ -297,7 +295,7 @@ class TestFormatConversionLogging:
     """Verify conversion logging through the full dispatch_ocr path."""
 
     def _setup_gemini_setting(self):
-        return patch("services.settings_service.get_ocr_backend", return_value="gemini")
+        return patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True)
 
     @pytest.mark.parametrize("fmt,expected_log_fragment", [
         ("BMP", "OCR: converted bmp"),
@@ -333,7 +331,7 @@ class TestFormatConversionLogging:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True):
                         with caplog.at_level(logging.INFO, logger="services.ocr_service"):
                             dispatch_ocr(_b64(svg_bytes))
 
@@ -386,7 +384,7 @@ class TestBlueprintFormatConversion:
     """
 
     def _setup_gemini_setting(self):
-        return patch("services.settings_service.get_ocr_backend", return_value="gemini")
+        return patch("services.settings_service.get_ocr_backend", return_value="gemini", autospec=True)
 
     @pytest.mark.parametrize("fmt,label", [
         ("BMP", "bmp"),
@@ -423,7 +421,7 @@ class TestBlueprintFormatConversion:
         with self._setup_gemini_setting():
             with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}, clear=False):
                 with genai_patch:
-                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png):
+                    with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True):
                         resp = client.post(
                             "/api/ocr/ingredients",
                             json={"image": _b64(svg_bytes)},

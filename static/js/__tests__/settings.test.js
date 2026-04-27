@@ -1259,8 +1259,9 @@ describe('loadSettings', () => {
   it('loads weights, languages, categories, flags, and PQ', async () => {
     api
       .mockResolvedValueOnce([{ field: 'kcal', label: 'Kcal', enabled: true, weight: 50, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 500 }]) // /api/weights
+      .mockResolvedValueOnce([{ name: 'dairy', emoji: '🧀', label: 'Dairy', count: 5, has_weight_overrides: false }]) // /api/categories (scope dropdown)
       .mockResolvedValueOnce([{ code: 'no', label: 'Norsk', flag: '🇳🇴' }, { code: 'en', label: 'English', flag: '🇬🇧' }]) // /api/languages
-      .mockResolvedValueOnce([{ name: 'dairy', emoji: '🧀', label: 'Dairy', count: 5 }]) // /api/categories
+      .mockResolvedValueOnce([{ name: 'dairy', emoji: '🧀', label: 'Dairy', count: 5 }]) // /api/categories (loadCategories)
       .mockResolvedValueOnce([{ name: 'organic', label: 'Organic', type: 'user', count: 0 }]) // /api/flags
       .mockResolvedValueOnce([]) // /api/protein-quality
       .mockResolvedValueOnce({ off_user_id: '', has_password: false }) // /api/settings/off-credentials
@@ -1278,8 +1279,9 @@ describe('loadSettings', () => {
   it('handles weight loading error gracefully', async () => {
     api
       .mockRejectedValueOnce(new Error('weight fail')) // /api/weights fails
+      .mockResolvedValueOnce([]) // /api/categories (scope dropdown — never reached due to throw, but here for safety)
       .mockResolvedValueOnce([{ code: 'no', label: 'Norsk' }]) // /api/languages
-      .mockResolvedValueOnce([]) // /api/categories
+      .mockResolvedValueOnce([]) // /api/categories (loadCategories)
       .mockResolvedValueOnce([]) // /api/flags
       .mockResolvedValueOnce([]) // /api/protein-quality
       .mockResolvedValueOnce({ off_user_id: '', has_password: false }) // /api/settings/off-credentials

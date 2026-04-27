@@ -8,7 +8,7 @@ class TestLoadWeightConfig:
         from services.product_service import _load_weight_config
 
         cur = db.cursor()
-        enabled_weights, weight_config, enabled_fields = _load_weight_config(cur)
+        enabled_weights, weight_config, enabled_fields, _ = _load_weight_config(cur)
         # taste_score is enabled by default
         assert "taste_score" in enabled_weights
         assert "taste_score" in weight_config
@@ -19,7 +19,7 @@ class TestLoadWeightConfig:
 
         cur = db.cursor()
         # kcal is disabled by default
-        enabled_weights, _, _ = _load_weight_config(cur)
+        enabled_weights, _, _, _ = _load_weight_config(cur)
         assert "kcal" not in enabled_weights
 
 

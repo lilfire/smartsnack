@@ -3,10 +3,19 @@
 from flask import Blueprint, request, jsonify
 
 from helpers import _require_json
-from services import product_service
+from services import product_service, tag_service
 from config import DEFAULT_PAGE_SIZE
 
 bp = Blueprint("products", __name__)
+
+
+@bp.route("/api/products/tags/suggestions")
+def tag_suggestions():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    tags = tag_service.search_tags(q)
+    return jsonify([t["label"] for t in tags])
 
 
 @bp.route("/api/products")
@@ -56,8 +65,12 @@ def update_product(pid):
 def unsync_product(pid):
     """Remove the is_synced_with_off flag from a product."""
     try:
+        if not product_service.get_product(pid):
+            raise LookupError("Product not found")
         product_service.set_system_flag(pid, "is_synced_with_off", False)
-    except (LookupError, ValueError) as e:
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 400
+    except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True})
 
@@ -120,8 +133,7 @@ def add_ean(pid):
         if err == "ean_already_exists":
             return jsonify({"error": err}), 409
         return jsonify({"error": err}), 400
-    status = 200 if result.get("already_exists") else 201
-    return jsonify(result), status
+    return jsonify(result), 201
 
 
 @bp.route("/api/products/<int:pid>/eans/<int:ean_id>", methods=["DELETE"])
