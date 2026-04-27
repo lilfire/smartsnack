@@ -1,5 +1,5 @@
 // ── Settings: Nutrition Weights ──────────────────────
-import { api, esc, upgradeSelect, showToast } from './state.js';
+import { api, esc, upgradeSelect, showToast, showConfirmModal } from './state.js';
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { loadData } from './products.js';
 import { initEmojiPicker } from './emoji-picker.js';
@@ -23,7 +23,22 @@ export const SCORE_COLORS = {
 export const SCORE_CFG_MAP = {};
 export const weightData = [];
 
+// ── Per-category override scope state ────────────────
+let _activeScope = '';
+const categoryScopeData = [];
+let _allCategories = [];
+
 let _settingsLoading = false;
+
+async function reloadGlobalWeights() {
+  weightData.length = 0;
+  const wd = await api('/api/weights');
+  wd.forEach((w) => { weightData.push(w); });
+  Object.keys(SCORE_CFG_MAP).forEach((k) => { delete SCORE_CFG_MAP[k]; });
+  weightData.forEach((w) => {
+    SCORE_CFG_MAP[w.field] = { label: w.label, direction: w.direction, formula: w.formula, formula_min: w.formula_min, formula_max: w.formula_max };
+  });
+}
 
 export async function loadSettings() {
   if (_settingsLoading) return;
@@ -34,15 +49,13 @@ export async function loadSettings() {
     if (settingsLoading) settingsLoading.style.display = '';
     if (settingsContent) settingsContent.style.display = 'none';
     try {
-      weightData.length = 0;
-      const wd = await api('/api/weights');
-      wd.forEach((w) => { weightData.push(w); });
-      // Reset and rebuild SCORE_CFG_MAP
-      Object.keys(SCORE_CFG_MAP).forEach((k) => { delete SCORE_CFG_MAP[k]; });
-      weightData.forEach((w) => {
-        SCORE_CFG_MAP[w.field] = { label: w.label, direction: w.direction, formula: w.formula, formula_min: w.formula_min, formula_max: w.formula_max };
-      });
+      await reloadGlobalWeights();
+      _allCategories = await api('/api/categories');
+      _activeScope = '';
+      populateScopeSelect();
       renderWeightItems();
+      updateScopeHint();
+      updateScopeButtons();
     } catch(e) { showToast(t('toast_load_error'), 'error'); }
     if (settingsLoading) settingsLoading.style.display = 'none';
     if (settingsContent) settingsContent.style.display = '';
@@ -77,15 +90,203 @@ export async function loadSettings() {
   }
 }
 
+// ── Scope dropdown / add / delete ──────────────────────
+function populateScopeSelect() {
+  const sel = document.getElementById('weight-scope-select');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const globalOpt = document.createElement('option');
+  globalOpt.value = '';
+  globalOpt.textContent = t('weights_scope_global');
+  sel.appendChild(globalOpt);
+  _allCategories
+    .filter((c) => c.has_weight_overrides)
+    .forEach((c) => {
+      const opt = document.createElement('option');
+      opt.value = c.name;
+      opt.textContent = (c.emoji ? c.emoji + ' ' : '') + c.label;
+      sel.appendChild(opt);
+    });
+  sel.value = _activeScope;
+  upgradeSelect(sel, (val) => onScopeChange(val));
+  const addBtn = document.getElementById('weight-scope-add');
+  if (addBtn && !addBtn._wired) {
+    addBtn.addEventListener('click', openAddOverridePicker);
+    addBtn._wired = true;
+  }
+  const delBtn = document.getElementById('weight-scope-delete');
+  if (delBtn && !delBtn._wired) {
+    delBtn.addEventListener('click', deleteActiveCategoryOverride);
+    delBtn._wired = true;
+  }
+}
 
+function updateScopeButtons() {
+  const addBtn = document.getElementById('weight-scope-add');
+  const delBtn = document.getElementById('weight-scope-delete');
+  const anyWithoutOverride = _allCategories.some((c) => !c.has_weight_overrides);
+  if (addBtn) addBtn.style.display = anyWithoutOverride ? '' : 'none';
+  if (delBtn) delBtn.style.display = _activeScope ? '' : 'none';
+}
+
+function updateScopeHint() {
+  const el = document.getElementById('weight-scope-hint');
+  if (!el) return;
+  el.textContent = _activeScope
+    ? t('weights_scope_hint_category')
+    : t('weights_scope_hint_global');
+}
+
+export async function onScopeChange(scope) {
+  _activeScope = scope || '';
+  try {
+    if (_activeScope === '') {
+      await reloadGlobalWeights();
+    } else {
+      const data = await api('/api/categories/' + encodeURIComponent(_activeScope) + '/weights');
+      categoryScopeData.length = 0;
+      data.forEach((d) => categoryScopeData.push(d));
+    }
+    renderWeightItems();
+    updateScopeHint();
+    updateScopeButtons();
+  } catch(e) {
+    showToast(t('toast_load_error'), 'error');
+  }
+}
+
+export async function refreshScopeSelect() {
+  try {
+    _allCategories = await api('/api/categories');
+    if (_activeScope && !_allCategories.some((c) => c.name === _activeScope && c.has_weight_overrides)) {
+      _activeScope = '';
+      await reloadGlobalWeights();
+      renderWeightItems();
+      updateScopeHint();
+    }
+    populateScopeSelect();
+    updateScopeButtons();
+  } catch(e) { /* best-effort */ }
+}
+
+export function openAddOverridePicker() {
+  const candidates = _allCategories.filter((c) => !c.has_weight_overrides);
+  if (!candidates.length) {
+    showToast(t('toast_no_categories_without_overrides'), 'info');
+    return;
+  }
+  const bg = document.createElement('div');
+  bg.className = 'scan-modal-bg';
+  const modal = document.createElement('div');
+  modal.className = 'scan-modal';
+  const iconDiv = document.createElement('div');
+  iconDiv.className = 'scan-modal-icon';
+  iconDiv.textContent = '⚙';
+  modal.appendChild(iconDiv);
+  const h3 = document.createElement('h3');
+  h3.textContent = t('add_category_override_title');
+  modal.appendChild(h3);
+  const p = document.createElement('p');
+  p.textContent = t('add_category_override_hint');
+  modal.appendChild(p);
+
+  const sel = document.createElement('select');
+  sel.className = 'field-select cat-move-select';
+  candidates.forEach((c) => {
+    const opt = document.createElement('option');
+    opt.value = c.name;
+    opt.textContent = (c.emoji ? c.emoji + ' ' : '') + c.label;
+    sel.appendChild(opt);
+  });
+  modal.appendChild(sel);
+
+  const actions = document.createElement('div');
+  actions.className = 'scan-modal-actions';
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'scan-modal-btn-register';
+  confirmBtn.textContent = t('btn_save');
+  actions.appendChild(confirmBtn);
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'scan-modal-btn-cancel';
+  cancelBtn.textContent = t('btn_cancel');
+  actions.appendChild(cancelBtn);
+  modal.appendChild(actions);
+
+  bg.appendChild(modal);
+  document.body.appendChild(bg);
+  upgradeSelect(sel);
+
+  function close() { bg.remove(); }
+  cancelBtn.onclick = close;
+  bg.addEventListener('click', (e) => { if (e.target === bg) close(); });
+  confirmBtn.onclick = async () => {
+    const chosen = sel.value;
+    const cat = _allCategories.find((c) => c.name === chosen);
+    if (cat) cat.has_weight_overrides = true;
+    populateScopeSelect();
+    const scopeSel = document.getElementById('weight-scope-select');
+    if (scopeSel) scopeSel.value = chosen;
+    close();
+    await onScopeChange(chosen);
+  };
+}
+
+export async function deleteActiveCategoryOverride() {
+  if (!_activeScope) return;
+  const cat = _allCategories.find((c) => c.name === _activeScope);
+  const label = cat ? cat.label : _activeScope;
+  const ok = await showConfirmModal(
+    '\u{1F5D1}',
+    label,
+    t('confirm_delete_category_override', { name: label }),
+    t('btn_delete'),
+    t('btn_cancel')
+  );
+  if (!ok) return;
+  const targetName = _activeScope;
+  const payload = categoryScopeData.map((w) => ({
+    field: w.field,
+    is_overridden: false,
+    enabled: !!w.enabled,
+    weight: w.weight,
+    direction: w.direction,
+    formula: w.formula,
+    formula_min: w.formula_min != null ? w.formula_min : 0,
+    formula_max: w.formula_max != null ? w.formula_max : 0,
+  }));
+  try {
+    await api('/api/categories/' + encodeURIComponent(targetName) + '/weights', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    });
+    if (cat) cat.has_weight_overrides = false;
+    showToast(t('toast_category_override_deleted'), 'success');
+    _activeScope = '';
+    await reloadGlobalWeights();
+    populateScopeSelect();
+    renderWeightItems();
+    updateScopeHint();
+    updateScopeButtons();
+    loadData();
+  } catch(e) {
+    showToast(t('toast_save_error'), 'error');
+  }
+}
+
+// ── Renderer (identical UI for global and category scope) ──
+// In category scope, "active" = is_overridden, "inactive" = inherited.
+// In global scope,   "active" = enabled,       "inactive" = disabled.
 export function renderWeightItems() {
   const container = document.getElementById('weight-items');
-  const enabled = weightData.filter((w) => w.enabled);
-  const disabled = weightData.filter((w) => !w.enabled);
-  // Build weight items using DOM to avoid inline onclick XSS
+  if (!container) return;
+  const isCategory = !!_activeScope;
+  const source = isCategory ? categoryScopeData : weightData;
+  const isActive = (w) => isCategory ? !!w.is_overridden : !!w.enabled;
+  const active = source.filter(isActive);
+  const inactive = source.filter((w) => !isActive(w));
   container.innerHTML = '';
 
-  enabled.forEach((w) => {
+  active.forEach((w) => {
     const col = SCORE_COLORS[w.field] || '#888';
     const dirLower = w.direction === 'lower';
     const isDirect = w.formula === 'direct';
@@ -111,7 +312,7 @@ export function renderWeightItems() {
     const valSpan = document.createElement('span');
     valSpan.className = 'weight-val mono accent';
     valSpan.id = 'wv-' + sf;
-    valSpan.textContent = w.weight.toFixed(1);
+    valSpan.textContent = (w.weight != null ? w.weight : 0).toFixed(1);
     header.appendChild(valSpan);
 
     const cfgBtn = document.createElement('button');
@@ -123,14 +324,13 @@ export function renderWeightItems() {
 
     const removeBtn = document.createElement('button');
     removeBtn.className = 'btn-sm btn-red';
-    removeBtn.title = 'Remove';
+    removeBtn.title = isCategory ? t('btn_remove_override') : 'Remove';
     removeBtn.innerHTML = '&#128465;';
     removeBtn.addEventListener('click', () => removeWeight(sf));
     header.appendChild(removeBtn);
 
     item.appendChild(header);
 
-    // Config section
     const cfgDiv = document.createElement('div');
     cfgDiv.className = 'weight-config';
     cfgDiv.id = 'wcfg-' + sf;
@@ -185,7 +385,7 @@ export function renderWeightItems() {
     slider.min = '0';
     slider.max = '100';
     slider.step = '1';
-    slider.value = w.weight;
+    slider.value = w.weight != null ? w.weight : 0;
     slider.id = 'w-' + sf;
     slider.className = 'weight-slider';
     slider.addEventListener('input', () => onWeightSlider(sf));
@@ -194,9 +394,9 @@ export function renderWeightItems() {
     container.appendChild(item);
   });
 
-  // Dropdown to add disabled weights
-  if (disabled.length) {
-    const placeholder = '\u2014 ' + t('btn_add_weight') + ' \u2014';
+  // Bottom "+ add weight / + add override" dropdown — same UI for both scopes.
+  if (inactive.length) {
+    const placeholder = '— ' + t(isCategory ? 'btn_add_override' : 'btn_add_weight') + ' —';
     const addRow = document.createElement('div');
     addRow.className = 'weight-add-row';
 
@@ -207,7 +407,7 @@ export function renderWeightItems() {
     placeholderOpt.value = '';
     placeholderOpt.textContent = placeholder;
     addSelect.appendChild(placeholderOpt);
-    disabled.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach((w) => {
+    inactive.slice().sort((a, b) => a.label.localeCompare(b.label)).forEach((w) => {
       const opt = document.createElement('option');
       opt.value = w.field;
       opt.textContent = w.label;
@@ -227,7 +427,7 @@ export function renderWeightItems() {
   upgradeSelect(document.getElementById('weight-add-select'), () => {
     addWeightFromDropdown();
   });
-  enabled.forEach((w) => {
+  active.forEach((w) => {
     upgradeSelect(document.getElementById('wd-' + w.field), () => {
       onWeightDirection(w.field);
     });
@@ -246,9 +446,21 @@ let _weightSaveTimer = null;
 let _weightSavedTimer = null;
 function debouncedSaveWeights() { clearTimeout(_weightSaveTimer); _weightSaveTimer = setTimeout(saveWeights, 400); }
 
+function getActiveItem(field) {
+  const source = _activeScope ? categoryScopeData : weightData;
+  return source.find((w) => w.field === field);
+}
+
 export function removeWeight(field) {
-  const item = weightData.find((w) => w.field === field);
-  if (item) { item.enabled = false; item.weight = 0; }
+  const item = getActiveItem(field);
+  if (item) {
+    if (_activeScope) {
+      item.is_overridden = false;
+    } else {
+      item.enabled = false;
+      item.weight = 0;
+    }
+  }
   renderWeightItems();
   debouncedSaveWeights();
 }
@@ -256,20 +468,29 @@ export function removeWeight(field) {
 export function addWeightFromDropdown() {
   const sel = document.getElementById('weight-add-select');
   if (!sel || !sel.value) return;
-  const item = weightData.find((w) => w.field === sel.value);
-  if (item) { item.enabled = true; if (item.weight === 0) item.weight = 10; }
+  const item = getActiveItem(sel.value);
+  if (item) {
+    if (_activeScope) {
+      item.is_overridden = true;
+      if (!item.enabled) item.enabled = true;
+      if (item.weight == null || item.weight === 0) item.weight = 10;
+    } else {
+      item.enabled = true;
+      if (item.weight === 0) item.weight = 10;
+    }
+  }
   renderWeightItems();
   debouncedSaveWeights();
 }
 
 export function onWeightDirection(field) {
-  const item = weightData.find((w) => w.field === field);
+  const item = getActiveItem(field);
   if (item) item.direction = document.getElementById('wd-' + field).value;
   debouncedSaveWeights();
 }
 
 export function onWeightFormula(field) {
-  const item = weightData.find((w) => w.field === field);
+  const item = getActiveItem(field);
   const val = document.getElementById('wf-' + field).value;
   if (item) item.formula = val;
   const minEl = document.getElementById('wn-' + field);
@@ -280,13 +501,13 @@ export function onWeightFormula(field) {
 }
 
 export function onWeightMin(field) {
-  const item = weightData.find((w) => w.field === field);
+  const item = getActiveItem(field);
   if (item) item.formula_min = parseFloat(document.getElementById('wn-' + field).value) || 0;
   debouncedSaveWeights();
 }
 
 export function onWeightMax(field) {
-  const item = weightData.find((w) => w.field === field);
+  const item = getActiveItem(field);
   if (item) item.formula_max = parseFloat(document.getElementById('wm-' + field).value) || 0;
   debouncedSaveWeights();
 }
@@ -294,7 +515,7 @@ export function onWeightMax(field) {
 export function onWeightSlider(field) {
   const val = parseFloat(document.getElementById('w-' + field).value);
   document.getElementById('wv-' + field).textContent = val.toFixed(1);
-  const item = weightData.find((w) => w.field === field);
+  const item = getActiveItem(field);
   if (item) item.weight = val;
   debouncedSaveWeights();
 }
@@ -304,21 +525,52 @@ export async function saveWeights() {
   if (_weightSaving) return;
   _weightSaving = true;
   try {
-    const payload = weightData.map((w) => {
+    const isCategory = !!_activeScope;
+    const source = isCategory ? categoryScopeData : weightData;
+    const payload = source.map((w) => {
       const fMin = w.formula_min != null ? w.formula_min : 0;
       const fMax = w.formula_max != null ? w.formula_max : 0;
-      if (!w.enabled) {
-        // For disabled weights, preserve existing values from weightData
-        return { field: w.field, enabled: w.enabled, weight: w.weight, direction: w.direction, formula: w.formula, formula_min: fMin, formula_max: fMax };
-      }
-      const minEl = document.getElementById('wn-' + w.field);
-      const maxEl = document.getElementById('wm-' + w.field);
-      const sliderEl = document.getElementById('w-' + w.field);
+      // Pull the live values from the DOM only for rows currently rendered as editable.
+      const editableInDom = isCategory ? !!w.is_overridden : !!w.enabled;
+      const minEl = editableInDom ? document.getElementById('wn-' + w.field) : null;
+      const maxEl = editableInDom ? document.getElementById('wm-' + w.field) : null;
+      const sliderEl = editableInDom ? document.getElementById('w-' + w.field) : null;
       const minVal = (minEl && minEl.value !== '') ? parseFloat(minEl.value) : NaN;
       const maxVal = (maxEl && maxEl.value !== '') ? parseFloat(maxEl.value) : NaN;
-      return { field: w.field, enabled: w.enabled, weight: parseFloat(sliderEl ? sliderEl.value : w.weight), direction: w.direction, formula: w.formula, formula_min: isFinite(minVal) ? minVal : fMin, formula_max: isFinite(maxVal) ? maxVal : fMax };
+      const base = {
+        field: w.field,
+        enabled: !!w.enabled,
+        weight: parseFloat(sliderEl ? sliderEl.value : w.weight),
+        direction: w.direction,
+        formula: w.formula,
+        formula_min: isFinite(minVal) ? minVal : fMin,
+        formula_max: isFinite(maxVal) ? maxVal : fMax,
+      };
+      if (isCategory) base.is_overridden = !!w.is_overridden;
+      return base;
     });
-    await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
+    if (isCategory) {
+      const targetName = _activeScope;
+      await api('/api/categories/' + encodeURIComponent(targetName) + '/weights', {
+        method: 'PUT', body: JSON.stringify(payload),
+      });
+      // Update has_weight_overrides flag in the cached list and refresh dropdown if it changed
+      const cat = _allCategories.find((c) => c.name === targetName);
+      const anyOverride = payload.some((p) => p.is_overridden);
+      if (cat && cat.has_weight_overrides !== anyOverride) {
+        cat.has_weight_overrides = anyOverride;
+        if (!anyOverride) {
+          // category no longer has overrides — keep current scope but refresh dropdown
+          populateScopeSelect();
+          updateScopeButtons();
+        } else {
+          populateScopeSelect();
+          updateScopeButtons();
+        }
+      }
+    } else {
+      await api('/api/weights', { method: 'PUT', body: JSON.stringify(payload) });
+    }
     const indicator = document.getElementById('weights-saved-indicator');
     if (indicator) { indicator.style.opacity = '1'; clearTimeout(_weightSavedTimer); _weightSavedTimer = setTimeout(() => { indicator.style.opacity = '0'; }, 1500); }
     loadData();

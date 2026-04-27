@@ -15,6 +15,13 @@
           </h3>
           <div class="settings-section-body" style="display:none">
             <p class="form-sub" data-i18n="settings_weights_desc">Choose which nutritional values affect the score, and adjust the weighting</p>
+            <div class="weights-scope-row">
+              <label class="field-label" for="weight-scope-select" data-i18n="weights_scope_label">Apply to</label>
+              <select class="field-select" id="weight-scope-select"></select>
+              <button type="button" class="btn-sm btn-blue" id="weight-scope-add" data-i18n="btn_add_category_override">+ Add category override</button>
+              <button type="button" class="btn-sm btn-red" id="weight-scope-delete" style="display:none" data-i18n="btn_delete_category_override">Delete category override</button>
+            </div>
+            <p id="weight-scope-hint" class="form-sub weights-scope-hint"></p>
             <div class="form-fields">
               <div id="weight-items"></div>
             </div>

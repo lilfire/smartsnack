@@ -4,6 +4,8 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+# 
+
 ## [0.17.0] - 2026-04-26
 
 ### Changed
@@ -34,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 
+- Category weight overrides are now *exclusive*: as soon as a category has any row in `category_score_weights`, only those override-enabled fields are scored for products in that category — the global enabled set is ignored. Previously the per-category override was also broken in the other direction: overrides that enabled a globally-disabled field were silently dropped because `_load_weight_config` / `_score_product` only iterated globally-enabled fields. Iteration now spans the union of globally-enabled and override-enabled fields, with exclusive-mode gating in `_score_product`
+- Scoring cache no longer goes stale across Gunicorn workers: the TTL-based `_weight_cache` / `_range_cache` are now keyed on SQLite's `PRAGMA data_version`, so any worker that didn't handle the write still detects it on the next read and reloads from the DB (previously, a 30-second window after saving a weight or override could serve stale scores from the non-writer worker)
 - EAN drift between `products.ean` and `product_eans` after edits, imports, merges, and OFF refresh — enforced at the schema level by triggers and at startup by the repair pass
 - Import path raising `AttributeError` when an imported product had `ean: null` instead of an empty string
 - Stale EAN left in `product_eans` after an import overwrite changed the EAN value

@@ -4,6 +4,7 @@ from config import SCORE_CONFIG, SCORE_CONFIG_MAP
 from db import get_db
 from helpers import _safe_float
 from services.product_scoring import invalidate_scoring_cache
+from translations import _t, _get_current_lang
 
 _VALID_DIRECTIONS = frozenset({"lower", "higher"})
 _VALID_FORMULAS = frozenset({"minmax", "direct"})
@@ -56,6 +57,7 @@ def get_category_weights(category_name: str) -> list | None:
         for r in override_rows
     }
 
+    lang = _get_current_lang()
     result = []
     for sc in SCORE_CONFIG:
         f = sc["field"]
@@ -81,6 +83,8 @@ def get_category_weights(category_name: str) -> list | None:
         result.append(
             {
                 "field": f,
+                "label": _t(str(sc["label_key"]), lang),
+                "desc": _t(str(sc["desc_key"]), lang),
                 "enabled": bool(_pick("enabled", g["enabled"])),
                 "weight": _pick("weight", g["weight"]),
                 "direction": _pick("direction", g["direction"]),

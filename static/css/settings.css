@@ -689,3 +689,23 @@
   max-height: 60px;
   opacity: 1;
 }
+
+/* ── Settings: Score-weighting scope (per-category) ───── */
+.weights-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 6px;
+  flex-wrap: wrap;
+}
+.weights-scope-row .field-label {
+  margin: 0;
+}
+.weights-scope-row .field-select {
+  min-width: 220px;
+  flex: 0 1 240px;
+}
+.weights-scope-hint {
+  margin: 0 0 14px;
+  font-style: italic;
+}
