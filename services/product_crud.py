@@ -182,7 +182,8 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     # from_off_ean is only meaningful on update (per-row fetch on an existing
     # product). On add there's only ever one EAN, so just drop it.
     data.pop("from_off_ean", None)
-    if not data.get("name", "").strip():
+    raw_name = data.get("name")
+    if raw_name is None or not str(raw_name).strip():
         raise ValueError("name is required")
     for tf, max_len in _TEXT_FIELD_LIMITS.items():
         val = data.get(tf, "")
