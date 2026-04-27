@@ -64,6 +64,8 @@ def set_system_flag(pid: int, flag_name: str, value: bool) -> None:
     if flag_name not in flag_service.get_all_flag_names():
         raise ValueError(f"Unknown flag: {flag_name!r}")
     conn = get_db()
+    if not conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone():
+        raise LookupError("Product not found")
     if value:
         conn.execute(
             "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, ?)",
@@ -300,7 +302,7 @@ def update_product(pid: int, data: dict) -> None:
     # Extract flags, tagIds, and from_off before field validation loop
     incoming_flags = data.pop("flags", None)
     incoming_tag_ids = data.pop("tagIds", None)
-    data.pop("tags", None)  # ignore legacy tags field if present
+    incoming_tag_labels = data.pop("tags", None)  # label-based tag assignment
     from_off = data.pop("from_off", False)
     # from_off_ean names the specific EAN that was fetched from OFF, so the
     # caller can target a non-primary row without causing a primary swap via
@@ -330,7 +332,7 @@ def update_product(pid: int, data: dict) -> None:
                     v = _safe_float(v, f)
             updates.append(f"{f} = ?")
             vals.append(v)
-    if not updates and incoming_flags is None and incoming_tag_ids is None and "ean" not in data:
+    if not updates and incoming_flags is None and incoming_tag_ids is None and incoming_tag_labels is None and "ean" not in data:
         raise ValueError("Nothing to update")
     conn = get_db()
     if "type" in data and data["type"]:
@@ -379,6 +381,9 @@ def update_product(pid: int, data: dict) -> None:
         _set_user_flags(conn, pid, incoming_flags)
     if incoming_tag_ids is not None and isinstance(incoming_tag_ids, list):
         tag_service.set_tags_for_product(pid, incoming_tag_ids)
+    if incoming_tag_labels is not None and isinstance(incoming_tag_labels, list):
+        label_ids = [tag_service.create_tag(lbl)["id"] for lbl in incoming_tag_labels if isinstance(lbl, str) and lbl.strip()]
+        tag_service.set_tags_for_product(pid, label_ids)
     conn.commit()
     from services.product_scoring import invalidate_scoring_cache
     invalidate_scoring_cache()

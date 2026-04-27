@@ -99,6 +99,8 @@ class TestGetOcrSettings:
         assert isinstance(data["available_backends"], list)
 
     def test_default_backend_is_tesseract(self, live_url):
+        # Reset backend to tesseract to avoid pollution from prior tests
+        _put(f"{live_url}/api/settings/ocr", {"backend": "tesseract"})
         status, data = _get(f"{live_url}/api/settings/ocr")
         assert status == 200
         assert data["current_backend"] == "tesseract"

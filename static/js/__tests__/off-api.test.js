@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MOCK_OFF_SEARCH_RESULTS } from './mock-shapes.js';
 
 vi.mock('../state.js', () => ({
   showToast: vi.fn(),
-  api: vi.fn().mockResolvedValue({}),
+  api: vi.fn().mockResolvedValue({ products: [], total: 0 }),
 }));
 
 vi.mock('../i18n.js', () => ({ t: vi.fn((k) => k) }));
@@ -85,6 +86,73 @@ describe('searchOFF', () => {
     const call = fetchWithTimeout.mock.calls[0][1];
     const body = JSON.parse(call.body);
     expect(body).not.toHaveProperty('nutrition');
+  });
+});
+
+// ── searchOFF — nutriments and filtering ─────────────
+describe('searchOFF — nutriments shape', () => {
+  it('preserves full nutriments object on returned products', async () => {
+    const products = [
+      {
+        product_name: 'Chicken',
+        nutriments: {
+          'energy-kcal_100g': 165,
+          'fat_100g': 3.6,
+          'carbohydrates_100g': 0,
+          'proteins_100g': 31.0,
+          'salt_100g': 0.17,
+          'fiber_100g': 0,
+        },
+      },
+    ];
+    fetchWithTimeout.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products }),
+    });
+    const result = await searchOFF('chicken', null, '');
+    expect(result[0].nutriments).toMatchObject({
+      'energy-kcal_100g': 165,
+      'proteins_100g': 31.0,
+    });
+  });
+
+  it('filters out products with empty product_name and product_name_no', async () => {
+    const products = [
+      { product_name: 'ValidProduct', nutriments: {} },
+      { product_name: '', product_name_no: null, nutriments: {} },
+      { product_name: '', product_name_no: 'NorwegianProduct', nutriments: {} },
+    ];
+    fetchWithTimeout.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products }),
+    });
+    const result = await searchOFF('test', null, '');
+    // Only products with at least one non-empty name field
+    expect(result.some((p) => p.product_name === 'ValidProduct')).toBe(true);
+    expect(result.some((p) => p.product_name_no === 'NorwegianProduct')).toBe(true);
+    expect(result.length).toBe(2);
+  });
+
+  it('sends category in body when provided', async () => {
+    fetchWithTimeout.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [] }),
+    });
+    await searchOFF('yogurt', null, 'dairy');
+    const call = fetchWithTimeout.mock.calls[0][1];
+    const body = JSON.parse(call.body);
+    expect(body.category).toBe('dairy');
+  });
+
+  it('omits category from body when empty string provided', async () => {
+    fetchWithTimeout.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ products: [] }),
+    });
+    await searchOFF('test', null, '');
+    const call = fetchWithTimeout.mock.calls[0][1];
+    const body = JSON.parse(call.body);
+    expect(body.category).toBeUndefined();
   });
 });
 

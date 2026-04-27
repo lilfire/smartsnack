@@ -9,6 +9,15 @@ from config import DEFAULT_PAGE_SIZE
 bp = Blueprint("products", __name__)
 
 
+@bp.route("/api/products/tags/suggestions")
+def tag_suggestions():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify([])
+    tags = tag_service.search_tags(q)
+    return jsonify([t["label"] for t in tags])
+
+
 @bp.route("/api/products")
 def get_products():
     search = request.args.get("search", "").strip()
@@ -102,14 +111,6 @@ def delete_product(pid):
     return jsonify({"ok": True, "message": "Deleted"})
 
 
-@bp.route("/api/products/tags/suggestions")
-def tag_suggestions():
-    """Return tag label strings matching the given prefix."""
-    q = request.args.get("q", "")
-    tags = tag_service.search_tags(q)
-    return jsonify([t["label"] for t in tags])
-
-
 @bp.route("/api/products/<int:pid>/eans")
 def list_eans(pid):
     try:
@@ -132,8 +133,7 @@ def add_ean(pid):
         if err == "ean_already_exists":
             return jsonify({"error": err}), 409
         return jsonify({"error": err}), 400
-    status = 200 if result.get("already_exists") else 201
-    return jsonify(result), status
+    return jsonify(result), 201
 
 
 @bp.route("/api/products/<int:pid>/eans/<int:ean_id>", methods=["DELETE"])

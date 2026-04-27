@@ -155,13 +155,12 @@ class TestAddEan:
         with pytest.raises(ValueError):
             product_service.add_ean(pid, "12345678901234")  # 14 digits — too long
 
-    def test_duplicate_ean_on_same_product_is_idempotent(self, app_ctx):
+    def test_duplicate_ean_on_same_product_raises_409(self, app_ctx):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "DupEan", "ean": "12345678"})["id"]
-        result = product_service.add_ean(pid, "12345678")
-        assert result["ean"] == "12345678"
-        assert result.get("already_exists") is True
+        with pytest.raises(ValueError, match="ean_already_exists"):
+            product_service.add_ean(pid, "12345678")
 
     def test_raises_for_unknown_product(self, app_ctx):
         from services import product_service
@@ -247,13 +246,13 @@ class TestDeleteEan:
         ).fetchone()
         assert row["ean"] == "22222222"
 
-    def test_cannot_remove_only_ean(self, app_ctx):
+    def test_can_remove_only_ean(self, app_ctx):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "OnlyEan", "ean": "12345678"})["id"]
         ean_id = product_service.list_eans(pid)[0]["id"]
-        with pytest.raises(ValueError, match="cannot_remove_only_ean"):
-            product_service.delete_ean(pid, ean_id)
+        product_service.delete_ean(pid, ean_id)
+        assert product_service.list_eans(pid) == []
 
     def test_raises_404_for_unknown_ean_id(self, app_ctx):
         from services import product_service
@@ -596,13 +595,11 @@ class TestAddEanBlueprint:
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "abc"})
         assert resp.status_code == 400
 
-    def test_duplicate_ean_on_same_product_returns_200(self, client):
+    def test_duplicate_ean_on_same_product_returns_409(self, client):
         pid = _add_product(client, name="BPDupEan", ean="12345678")
         resp = client.post(f"/api/products/{pid}/eans", json={"ean": "12345678"})
-        assert resp.status_code == 200
-        data = resp.get_json()
-        assert data["ean"] == "12345678"
-        assert data.get("already_exists") is True
+        assert resp.status_code == 409
+        assert resp.get_json()["error"] == "ean_already_exists"
 
     def test_unknown_product_returns_404(self, client):
         resp = client.post("/api/products/99999/eans", json={"ean": "12345678"})
@@ -652,12 +649,12 @@ class TestDeleteEanBlueprint:
         eans = client.get(f"/api/products/{pid}/eans").get_json()
         assert eans[0]["ean"] == "11111111"
 
-    def test_last_ean_returns_400_cannot_remove_only_ean(self, client):
+    def test_last_ean_can_be_deleted(self, client):
         pid = _add_product(client, name="BPLastEan", ean="11111111")
         ean_id = client.get(f"/api/products/{pid}/eans").get_json()[0]["id"]
         resp = client.delete(f"/api/products/{pid}/eans/{ean_id}")
-        assert resp.status_code == 400
-        assert resp.get_json()["error"] == "cannot_remove_only_ean"
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
 
     def test_unknown_ean_id_returns_404(self, client):
         pid = _add_product(client, name="BPUnknownEan", ean="11111111")

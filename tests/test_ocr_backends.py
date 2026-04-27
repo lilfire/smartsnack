@@ -1,10 +1,17 @@
 """Tests for services/ocr_backends/ — all 6 backends with mocked external calls."""
 import io
 import base64
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
+
+from tests.mock_shape_validator import (
+    validate_openai_response_shape,
+    validate_gemini_response_shape,
+    validate_claude_response_shape,
+)
 
 
 # ── Shared helpers ────────────────────────────────────────────────────────────
@@ -62,13 +69,11 @@ class TestOpenAI:
     def test_success_returns_extracted_text(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "  sugar, flour  "
-        with patch("openai.OpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="  sugar, flour  "))]
+        )
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             result = _extract_openai(img, _b64(img), "image/png")
         assert result == "sugar, flour"
@@ -76,16 +81,14 @@ class TestOpenAI:
     def test_image_url_starts_with_data_uri(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "text"
-        with patch("openai.OpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
+        )
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             _extract_openai(img, _b64(img), "image/png")
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             msgs = call_kwargs[1]["messages"] if call_kwargs[1] else call_kwargs[0][0]
             url = msgs[0]["content"][0]["image_url"]["url"]
             assert url.startswith("data:image/png;base64,")
@@ -93,12 +96,9 @@ class TestOpenAI:
     def test_empty_choices_returns_empty_string(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = []
-        with patch("openai.OpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(choices=[])
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
             result = _extract_openai(img, _b64(img))
         assert result == ""
@@ -118,13 +118,11 @@ class TestOpenRouter:
     def test_success_returns_text(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "ingredients"
-        with patch("openai.OpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredients"))]
+        )
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             result = _extract_openrouter(img, _b64(img))
         assert result == "ingredients"
@@ -133,28 +131,23 @@ class TestOpenRouter:
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "text"
-        with patch("openai.OpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
+        )
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             _extract_openrouter(img, _b64(img))
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             model = call_kwargs[1].get("model") or call_kwargs[0][0]
             assert model == "google/gemini-2.0-flash-001"
 
     def test_empty_choices_returns_empty_string(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = []
-        with patch("openai.OpenAI") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(choices=[])
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
             assert _extract_openrouter(img, _b64(img)) == ""
 
@@ -173,13 +166,11 @@ class TestGroq:
     def test_success_returns_text(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "groq result"
-        with patch("groq.Groq") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="groq result"))]
+        )
+        with patch("groq.Groq") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             result = _extract_groq(img, _b64(img))
         assert result == "groq result"
@@ -187,28 +178,23 @@ class TestGroq:
     def test_model_is_llama(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = "ok"
-        with patch("groq.Groq") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
+        )
+        with patch("groq.Groq") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             _extract_groq(img, _b64(img))
-            call_kwargs = mock_client.chat.completions.create.call_args
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             model = call_kwargs[1].get("model")
             assert "llama" in model
 
     def test_empty_choices_returns_empty_string(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.choices = []
-        with patch("groq.Groq") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.chat.completions.create.return_value = mock_response
+        mock_response = types.SimpleNamespace(choices=[])
+        with patch("groq.Groq") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
             assert _extract_groq(img, _b64(img)) == ""
 
@@ -227,13 +213,11 @@ class TestClaude:
     def test_success_returns_text(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "  claude result  "
-        with patch("anthropic.Anthropic") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.messages.create.return_value = mock_message
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="  claude result  ")]
+        )
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             result = _extract_claude_vision(img, _b64(img))
         assert result == "claude result"
@@ -241,32 +225,28 @@ class TestClaude:
     def test_model_is_claude_sonnet(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "ok"
-        with patch("anthropic.Anthropic") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.messages.create.return_value = mock_message
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="ok")]
+        )
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img))
-            call_kwargs = mock_client.messages.create.call_args
+            call_kwargs = mock_cls.return_value.messages.create.call_args
             model = call_kwargs[1].get("model")
             assert "claude" in model.lower()
 
     def test_image_source_type_is_base64(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = [MagicMock()]
-        mock_message.content[0].text = "ok"
-        with patch("anthropic.Anthropic") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.messages.create.return_value = mock_message
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="ok")]
+        )
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             _extract_claude_vision(img, _b64(img))
-            call_kwargs = mock_client.messages.create.call_args
+            call_kwargs = mock_cls.return_value.messages.create.call_args
             msgs = call_kwargs[1].get("messages")
             source = msgs[0]["content"][0]["source"]
             assert source["type"] == "base64"
@@ -274,12 +254,9 @@ class TestClaude:
     def test_empty_content_returns_empty_string(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = MagicMock()
-        mock_message.content = []
-        with patch("anthropic.Anthropic") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.messages.create.return_value = mock_message
+        mock_message = types.SimpleNamespace(content=[])
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
             assert _extract_claude_vision(img, _b64(img)) == ""
 
@@ -298,12 +275,9 @@ class TestGemini:
     def test_extract_gemini_returns_text(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
         img = _tiny_png_bytes()
-        mock_response = MagicMock()
-        mock_response.text = "  gemini result  "
-        with patch("google.genai.Client") as mock_class:
-            mock_client = MagicMock()
-            mock_class.return_value = mock_client
-            mock_client.models.generate_content.return_value = mock_response
+        mock_response = types.SimpleNamespace(text="  gemini result  ")
+        with patch("google.genai.Client", autospec=True) as mock_cls:
+            mock_cls.return_value.models.generate_content.return_value = mock_response
             from services.ocr_backends.gemini import _extract_gemini
             result = _extract_gemini(img, _b64(img))
         assert result == "gemini result"
@@ -333,7 +307,7 @@ class TestGemini:
         import sys
         svg = b"<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'></svg>"
         png_stub = b"\x89PNG\r\n\x1a\n"
-        mock_cairosvg = MagicMock()
+        mock_cairosvg = MagicMock(spec=["svg2png"])
         mock_cairosvg.svg2png.return_value = png_stub
         with patch.dict(sys.modules, {"cairosvg": mock_cairosvg}):
             from services.ocr_backends.gemini import _svg_to_png
@@ -387,7 +361,7 @@ class TestTesseract:
             "width": [30, 30, 30],
             "height": [10, 10, 10],
         }
-        with patch("pytesseract.image_to_data", return_value=mock_data):
+        with patch("pytesseract.image_to_data", return_value=mock_data, autospec=True):
             result = _extract_tesseract(_tiny_png_bytes(), "b64")
         assert "sugar" in result
         assert "flour" in result
@@ -403,6 +377,70 @@ class TestTesseract:
             "width": [30, 30],
             "height": [10, 10],
         }
-        with patch("pytesseract.image_to_data", return_value=mock_data):
+        with patch("pytesseract.image_to_data", return_value=mock_data, autospec=True):
             result = _extract_tesseract(_tiny_png_bytes(), "b64")
         assert result == ""
+
+
+# ── Mock shape validation: canonical dict forms ────────────────────────────────
+
+
+class TestOcrApiMockShapes:
+    """Validate that the canonical dict forms of external API responses match their real shapes.
+
+    If the real API changes its response structure, update these canonical dicts
+    AND the corresponding validators in mock_shape_validator.py — these tests will
+    fail to remind you to keep them in sync.
+    """
+
+    def test_openai_canonical_response_shape(self):
+        canonical = {
+            "choices": [
+                {"message": {"role": "assistant", "content": "sugar, flour"}}
+            ]
+        }
+        validate_openai_response_shape(canonical)
+
+    def test_groq_canonical_response_shape(self):
+        """Groq uses the OpenAI-compatible API format."""
+        canonical = {
+            "choices": [
+                {"message": {"role": "assistant", "content": "ingredienser"}}
+            ]
+        }
+        validate_openai_response_shape(canonical)
+
+    def test_openrouter_canonical_response_shape(self):
+        """OpenRouter uses the OpenAI-compatible API format."""
+        canonical = {
+            "choices": [
+                {"message": {"role": "assistant", "content": "ingredients list"}}
+            ]
+        }
+        validate_openai_response_shape(canonical)
+
+    def test_gemini_canonical_response_shape(self):
+        canonical = {"text": "sukker, mel, vann"}
+        validate_gemini_response_shape(canonical)
+
+    def test_claude_canonical_response_shape(self):
+        canonical = {
+            "content": [{"type": "text", "text": "ingredienser"}]
+        }
+        validate_claude_response_shape(canonical)
+
+    def test_openai_rejects_missing_choices(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_openai_response_shape({"id": "chatcmpl-123"})
+
+    def test_openai_rejects_empty_choices(self):
+        with pytest.raises(AssertionError, match="Non-empty"):
+            validate_openai_response_shape({"choices": []})
+
+    def test_gemini_rejects_missing_text(self):
+        with pytest.raises(AssertionError, match="missing keys"):
+            validate_gemini_response_shape({"candidates": []})
+
+    def test_claude_rejects_empty_content(self):
+        with pytest.raises(AssertionError, match="Non-empty"):
+            validate_claude_response_shape({"content": []})
