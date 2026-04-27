@@ -1,5 +1,6 @@
 """Error scenario tests: network timeouts, HTTP errors, malformed responses, DB constraints."""
 
+import http.client
 import io
 import json
 import urllib.error
@@ -91,10 +92,10 @@ class TestOffHttpErrors:
 
 class TestOffMalformedResponse:
     def _mock_urlopen(self, body: bytes):
-        mock_resp = MagicMock()
+        mock_resp = create_autospec(http.client.HTTPResponse, instance=True)
         mock_resp.read.return_value = body
-        mock_resp.__enter__ = lambda s: s
-        mock_resp.__exit__ = MagicMock(return_value=False)
+        mock_resp.__enter__.return_value = mock_resp
+        mock_resp.__exit__.return_value = False
         return mock_resp
 
     def _set_creds(self, app_ctx):
