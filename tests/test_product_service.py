@@ -260,8 +260,11 @@ class TestUpdateProduct:
 
     def test_update_numeric_field(self, app_ctx, seed_product):
         from services.product_service import update_product
+        from db import get_db
 
         update_product(seed_product, {"kcal": 500.0})
+        row = get_db().execute("SELECT kcal FROM products WHERE id=?", (seed_product,)).fetchone()
+        assert row["kcal"] == 500.0
 
     def test_invalid_field(self, app_ctx, seed_product):
         from services.product_service import update_product

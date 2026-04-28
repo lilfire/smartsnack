@@ -12,8 +12,12 @@ Uses mock_shape_validator to verify the dispatch_ocr result shape.
 import base64
 import io
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, create_autospec, patch
 
+import google
+import google.genai
+from google.genai.types import GenerateContentResponse
+import openai
 import pytest
 from PIL import Image
 
@@ -134,11 +138,11 @@ class TestProviderRuntimeFailure:
         """If Gemini raises ValueError at runtime, dispatch_ocr should not silently swallow it."""
         monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
-        mock_genai = MagicMock()
+        mock_genai = MagicMock(spec=google.genai)
         mock_genai.Client.side_effect = RuntimeError("quota exceeded")
 
         with patch("services.settings_service.get_ocr_backend", return_value="gemini"):
-            with patch.dict("sys.modules", {"google.genai": mock_genai, "google": MagicMock(genai=mock_genai)}):
+            with patch.dict("sys.modules", {"google.genai": mock_genai, "google": MagicMock(spec=google, genai=mock_genai)}):
                 from services.ocr_core import dispatch_ocr
                 with pytest.raises(Exception):
                     dispatch_ocr(_make_tiny_png_b64())
@@ -147,11 +151,12 @@ class TestProviderRuntimeFailure:
         """If OpenAI raises at runtime, dispatch_ocr propagates the error."""
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
+        # Create spec mock before patching so openai.OpenAI still refers to the real class
+        mock_client = MagicMock(spec=openai.OpenAI)
+        mock_client.chat.completions.create.side_effect = RuntimeError("rate limit")
         with patch("services.settings_service.get_ocr_backend", return_value="openai"):
             with patch("openai.OpenAI") as mock_class:
-                mock_client = MagicMock()
                 mock_class.return_value = mock_client
-                mock_client.chat.completions.create.side_effect = RuntimeError("rate limit")
                 from services.ocr_core import dispatch_ocr
                 with pytest.raises(RuntimeError, match="rate limit"):
                     dispatch_ocr(_make_tiny_png_b64())
@@ -168,10 +173,10 @@ class TestGemini20FlashModelFormat:
     def test_dispatch_ocr_with_gemini_result_has_provider_field(self, app_ctx, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
-        mock_response = MagicMock()
+        mock_response = MagicMock(spec=GenerateContentResponse)
         mock_response.text = "mel, sukker"
-        mock_genai = MagicMock()
-        mock_client = MagicMock()
+        mock_genai = MagicMock(spec=google.genai)
+        mock_client = MagicMock(spec=google.genai.Client)
         mock_genai.Client.return_value = mock_client
         mock_client.models.generate_content.return_value = mock_response
 

@@ -742,9 +742,12 @@ class TestRestoreScoreWeights:
         from services.backup_core import _restore_score_weights
 
         cur = db.cursor()
-        # Should not raise
         _restore_score_weights(cur, [{"field": "nonexistent_field"}])
         db.commit()
+        row = db.execute(
+            "SELECT weight FROM score_weights WHERE field='nonexistent_field'"
+        ).fetchone()
+        assert row is None
 
 
 class TestRestoreCategories:

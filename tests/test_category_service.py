@@ -87,8 +87,10 @@ class TestUpdateCategory:
 
     def test_update_label(self, app_ctx, translations_dir):
         from services.category_service import update_category
+        from translations import _t, _category_key
 
         update_category("Snacks", "Snackser", "")
+        assert _t(_category_key("Snacks")) == "Snackser"
 
     def test_nothing_to_update(self, app_ctx, translations_dir):
         from services.category_service import update_category
