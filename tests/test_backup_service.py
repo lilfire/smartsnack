@@ -261,13 +261,6 @@ class TestBackupRoundTripEans:
         product_service.add_ean(pid, "6666666666666")  # secondary, not synced
 
         backup = create_backup(include_images=False)
-        # Strip the legacy top-level `ean` key so that _restore_product
-        # relies exclusively on the `eans` list (which carries the
-        # per-row synced_with_off flag). Keeping both would cause the
-        # early INSERT OR IGNORE to pre-empt the eans-list INSERT and
-        # lose the synced flag.
-        for p in backup["products"]:
-            p.pop("ean", None)
         # Wipe everything (simulates the user's restore-from-clean-DB scenario)
         get_db_conn = __import__("db", fromlist=["get_db"]).get_db
         get_db_conn().execute("DELETE FROM products")
@@ -294,6 +287,47 @@ class TestBackupRoundTripEans:
         assert secondary["ean"] == "6666666666666"
         assert secondary["is_primary"] == 0
         assert secondary["synced_with_off"] == 0
+
+
+    def test_real_backup_output_preserves_synced_off(
+        self, app_ctx, db, seed_category, translations_dir
+    ):
+        """create_backup() output (unmodified) must restore synced_with_off=True
+        on the primary EAN. Regression test for the bug where the unconditional
+        top-level `ean` INSERT OR IGNORE pre-empted the `eans`-list insert and
+        lost the synced flag."""
+        from services import product_service
+        from services.backup_core import create_backup, restore_backup
+
+        product_service.add_product(
+            {
+                "type": "Snacks",
+                "name": "SyncedProduct",
+                "ean": "7310865004703",
+                "from_off": True,
+            }
+        )
+
+        backup = create_backup(include_images=False)
+        # No modifications to backup — use real create_backup() output as-is
+
+        get_db_conn = __import__("db", fromlist=["get_db"]).get_db
+        get_db_conn().execute("DELETE FROM products")
+        get_db_conn().commit()
+
+        restore_backup(backup)
+
+        new_pid = get_db_conn().execute(
+            "SELECT id FROM products WHERE name='SyncedProduct'"
+        ).fetchone()["id"]
+        row = get_db_conn().execute(
+            "SELECT ean, is_primary, synced_with_off FROM product_eans "
+            "WHERE product_id = ? AND is_primary = 1",
+            (new_pid,),
+        ).fetchone()
+        assert row is not None
+        assert row["ean"] == "7310865004703"
+        assert row["synced_with_off"] == 1
 
 
 class TestImportSyncsProductEans:
