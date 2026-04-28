@@ -4,7 +4,9 @@ import { t } from './i18n.js';
 import { loadData } from './products.js';
 
 export function downloadBackup() {
-  window.location.href = '/api/backup';
+  const apiKey = window.SMARTSNACK_API_KEY;
+  const url = apiKey ? '/api/backup?api_key=' + encodeURIComponent(apiKey) : '/api/backup';
+  window.location.href = url;
   showToast(t('toast_backup_downloaded'), 'success');
 }
 
@@ -26,7 +28,7 @@ export async function handleRestore(input) {
           loadSettings();
         }
       }
-    } catch(err) { showToast(t('toast_invalid_file'), 'error'); }
+    } catch(err) { showToast(err instanceof SyntaxError ? t('toast_invalid_file') : err.message, 'error'); }
     input.value = '';
   };
   reader.readAsText(input.files[0]);
