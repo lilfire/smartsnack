@@ -646,6 +646,7 @@
   "bulk_report_no_new_data": "Inga nya data",
   "bulk_report_no_results": "Inga resultat från OFF",
   "bulk_report_below_threshold": "Under tröskel",
+  "bulk_report_updated": "Uppdaterad",
   "bulk_report_fields": "Fält: {fields}",
   "duplicate_found_title": "Dubblett hittad",
   "duplicate_found_synced": "En produkt med detta {match_type} finns redan och är synkroniserad med OFF: \"{name}\"",

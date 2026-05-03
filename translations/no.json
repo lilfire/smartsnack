@@ -646,6 +646,7 @@
   "bulk_report_no_new_data": "Ingen nye data",
   "bulk_report_no_results": "Ingen resultater fra OFF",
   "bulk_report_below_threshold": "Under terskel",
+  "bulk_report_updated": "Oppdatert",
   "bulk_report_fields": "Felt: {fields}",
   "category_drinks": "Drikker",
   "category_snacks": "Updated Snacks",
