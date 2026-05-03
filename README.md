@@ -187,6 +187,39 @@ npx vitest
 4. Switch to the **Søk** (Search) tab to browse and compare products by score.
 5. Use **Innstillinger** (Settings) to tune scoring weights, manage categories, or backup/restore data.
 
+## Repository Maintenance
+
+### Stale Branch & PR Audit
+
+An automated audit detects stale branches and lingering PRs. It runs daily via GitHub Actions and can also be triggered manually.
+
+**What it detects:**
+- Open PRs targeting `development` with all checks green, open longer than 24 hours
+- Feature branches (`LSO-*`) with no open PR and no commits in 48+ hours
+- Branches linked to Paperclip issues that are already `done` or `cancelled`
+
+**Run locally (dry-run by default):**
+
+```bash
+./scripts/audit-stale-branches.sh
+```
+
+**Run with cleanup (merges green PRs, deletes stale branches):**
+
+```bash
+./scripts/audit-stale-branches.sh --cleanup
+```
+
+**Customize thresholds:**
+
+```bash
+./scripts/audit-stale-branches.sh --stale-branch-hours 72 --stale-pr-hours 48
+```
+
+**GitHub Actions:** The `Stale Branch & PR Audit` workflow runs daily at 06:00 UTC. Use `workflow_dispatch` to trigger it manually with optional cleanup mode. Results are posted as comments on a tracking issue labeled `audit`.
+
+**Required secrets for Paperclip integration:** `PAPERCLIP_API_URL`, `PAPERCLIP_API_KEY`, `PAPERCLIP_COMPANY_ID` (optional — if not set, the done/cancelled issue check is skipped).
+
 ## License
 
 MIT
