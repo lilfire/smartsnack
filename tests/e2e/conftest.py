@@ -36,12 +36,22 @@ def _inject_csrf_header():
     urllib.request.Request.__init__ = _orig_init
 
 
+_BROWSERS_PATH = "/tmp/ms-playwright"
+
+# Set PLAYWRIGHT_BROWSERS_PATH early so that both the install subprocess
+# and the Playwright library resolve the browser from a writable location
+# rather than /root/.cache which may be inaccessible in agent containers.
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", _BROWSERS_PATH)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_browsers():
     """Install Playwright Chromium if not already present."""
+    env = {**os.environ, "PLAYWRIGHT_BROWSERS_PATH": _BROWSERS_PATH}
     subprocess.run(
         [sys.executable, "-m", "playwright", "install", "chromium"],
         check=True,
+        env=env,
     )
 
 
