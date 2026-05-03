@@ -771,5 +771,11 @@
   "label_product_image": "Product image",
   "btn_capture_image": "Photo",
   "btn_capture_image_title": "Take a photo or upload an image",
-  "btn_remove_image_title": "Remove image"
+  "btn_remove_image_title": "Remove image",
+  "aria_clear_search": "Clear search",
+  "aria_search_results": "Search results",
+  "aria_loading_more": "Loading more products",
+  "aria_restore_file": "Restore backup file",
+  "aria_import_file": "Import data file",
+  "aria_main_navigation": "Main navigation"
 }

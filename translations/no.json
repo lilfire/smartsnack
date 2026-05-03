@@ -771,5 +771,11 @@
   "label_product_image": "Produktbilde",
   "btn_capture_image": "Foto",
   "btn_capture_image_title": "Ta bilde eller last opp",
-  "btn_remove_image_title": "Fjern bilde"
+  "btn_remove_image_title": "Fjern bilde",
+  "aria_clear_search": "Fjern søk",
+  "aria_search_results": "Søkeresultater",
+  "aria_loading_more": "Laster flere produkter",
+  "aria_restore_file": "Gjenopprett sikkerhetskopifil",
+  "aria_import_file": "Importer datafil",
+  "aria_main_navigation": "Hovednavigasjon"
 }

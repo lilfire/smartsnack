@@ -248,7 +248,7 @@ class TestTranslationKeysUsedInSource:
         """Extract translation keys from data-i18n* attributes in HTML templates."""
         keys = set()
         templates_dir = os.path.join(ROOT_DIR, "templates")
-        attr_re = re.compile(r'data-i18n(?:-(?:html|placeholder|title))?="([a-z_][a-z0-9_]*)"')
+        attr_re = re.compile(r'data-i18n(?:-(?:html|placeholder|title|aria-label))?="([a-z_][a-z0-9_]*)"')
 
         for dirpath, _, filenames in os.walk(templates_dir):
             for filename in filenames:
