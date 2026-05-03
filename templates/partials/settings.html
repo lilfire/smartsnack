@@ -96,11 +96,11 @@
               </div>
               <div class="pq-add-nums">
                 <div>
-                  <label class="field-label" for="pq-add-pdcaas">PDCAAS</label>
+                  <label class="field-label" for="pq-add-pdcaas" data-i18n="weight_label_est_pdcaas">PDCAAS</label>
                   <input class="field-input" id="pq-add-pdcaas" type="number" step="0.01" min="0" max="1" placeholder="0.57">
                 </div>
                 <div>
-                  <label class="field-label" for="pq-add-diaas">DIAAS</label>
+                  <label class="field-label" for="pq-add-diaas" data-i18n="weight_label_est_diaas">DIAAS</label>
                   <input class="field-input" id="pq-add-diaas" type="number" step="0.01" min="0" max="1.2" placeholder="0.53">
                 </div>
               </div>
@@ -210,8 +210,8 @@
                 <span data-i18n="restore_drop_text">&#128260; Drop a backup file here, or click to restore</span>
                 <span class="restore-warning" data-i18n="restore_warning">Warning: Restore replaces all existing data</span>
               </div>
-              <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)" aria-label="Restore backup file">
-              <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)" aria-label="Import data file">
+              <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)" data-i18n-aria-label="aria_restore_file" aria-label="Restore backup file">
+              <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)" data-i18n-aria-label="aria_import_file" aria-label="Import data file">
               <p class="backup-note" data-i18n="backup_note">Backup exports all products (including images), categories and weights as a JSON file. Import adds products without deleting existing ones. Restore replaces everything.</p>
             </div>
           </div>

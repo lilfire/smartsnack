@@ -646,6 +646,7 @@
   "bulk_report_no_new_data": "Inga nya data",
   "bulk_report_no_results": "Inga resultat från OFF",
   "bulk_report_below_threshold": "Under tröskel",
+  "bulk_report_updated": "Uppdaterad",
   "bulk_report_fields": "Fält: {fields}",
   "duplicate_found_title": "Dubblett hittad",
   "duplicate_found_synced": "En produkt med detta {match_type} finns redan och är synkroniserad med OFF: \"{name}\"",
@@ -770,5 +771,11 @@
   "label_product_image": "Produktbild",
   "btn_capture_image": "Foto",
   "btn_capture_image_title": "Ta foto eller ladda upp bild",
-  "btn_remove_image_title": "Ta bort bild"
+  "btn_remove_image_title": "Ta bort bild",
+  "aria_clear_search": "Rensa sökning",
+  "aria_search_results": "Sökresultat",
+  "aria_loading_more": "Laddar fler produkter",
+  "aria_restore_file": "Återställ säkerhetskopia",
+  "aria_import_file": "Importera datafil",
+  "aria_main_navigation": "Huvudnavigering"
 }
