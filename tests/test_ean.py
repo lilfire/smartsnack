@@ -246,13 +246,13 @@ class TestDeleteEan:
         ).fetchone()
         assert row["ean"] == "22222222"
 
-    def test_can_remove_only_ean(self, app_ctx):
+    def test_cannot_delete_only_ean(self, app_ctx):
         from services import product_service
 
         pid = product_service.add_product({"type": "Snacks", "name": "OnlyEan", "ean": "12345678"})["id"]
         ean_id = product_service.list_eans(pid)[0]["id"]
-        product_service.delete_ean(pid, ean_id)
-        assert product_service.list_eans(pid) == []
+        with pytest.raises(ValueError, match="cannot_delete_only_ean"):
+            product_service.delete_ean(pid, ean_id)
 
     def test_raises_404_for_unknown_ean_id(self, app_ctx):
         from services import product_service
@@ -649,12 +649,12 @@ class TestDeleteEanBlueprint:
         eans = client.get(f"/api/products/{pid}/eans").get_json()
         assert eans[0]["ean"] == "11111111"
 
-    def test_last_ean_can_be_deleted(self, client):
+    def test_last_ean_cannot_be_deleted(self, client):
         pid = _add_product(client, name="BPLastEan", ean="11111111")
         ean_id = client.get(f"/api/products/{pid}/eans").get_json()[0]["id"]
         resp = client.delete(f"/api/products/{pid}/eans/{ean_id}")
-        assert resp.status_code == 200
-        assert resp.get_json()["ok"] is True
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "cannot_delete_only_ean"
 
     def test_unknown_ean_id_returns_404(self, client):
         pid = _add_product(client, name="BPUnknownEan", ean="11111111")

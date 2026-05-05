@@ -46,14 +46,14 @@ def test_create_tag(client):
     assert isinstance(data["id"], int)
 
 
-def test_create_tag_lowercases_and_strips(client):
+def test_create_tag_strips_whitespace_preserves_case(client):
     resp = client.post(
         "/api/tags",
         data=json.dumps({"label": "  Organic  "}),
         content_type="application/json",
     )
     assert resp.status_code == 201
-    assert resp.get_json()["label"] == "organic"
+    assert resp.get_json()["label"] == "Organic"
 
 
 def test_create_tag_idempotent_on_duplicate(client):

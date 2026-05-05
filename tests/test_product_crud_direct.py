@@ -250,12 +250,13 @@ class TestEanFunctions:
         result = add_ean(pid, "87654321")
         assert result["is_primary"] is False
 
-    def test_delete_only_ean_succeeds(self, db):
-        from services.product_eans import add_ean, delete_ean, list_eans
+    def test_delete_only_ean_raises_error(self, db):
+        import pytest
+        from services.product_eans import add_ean, delete_ean
         pid = self._create_product(db)
         ean = add_ean(pid, "12345678")
-        delete_ean(pid, ean["id"])
-        assert list_eans(pid) == []
+        with pytest.raises(ValueError, match="cannot_delete_only_ean"):
+            delete_ean(pid, ean["id"])
 
     def test_delete_primary_ean_promotes_next(self, db):
         from services.product_eans import add_ean, delete_ean, list_eans
