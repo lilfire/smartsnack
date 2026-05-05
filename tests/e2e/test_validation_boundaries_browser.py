@@ -195,11 +195,12 @@ class TestTasteScoreSlider:
 class TestEditFormValidation:
     """Test validation in the product edit form."""
 
-    def test_edit_name_field_required(self, page, api_create_product):
+    def test_edit_name_field_required(self, page, api_create_product, unique_name):
         """Saving with empty name should fail."""
-        api_create_product(name="EditValProd")
+        prod_name = unique_name("EditValProd")
+        api_create_product(name=prod_name)
         _reload_and_wait(page)
-        _open_edit_form(page, "EditValProd")
+        _open_edit_form(page, prod_name)
 
         # Clear the name field
         name_field = page.locator("#ed-name")
@@ -214,11 +215,12 @@ class TestEditFormValidation:
         # The product should still be in edit mode (not saved)
         expect(name_field).to_be_visible()
 
-    def test_edit_cancel_discards_changes(self, page, api_create_product):
+    def test_edit_cancel_discards_changes(self, page, api_create_product, unique_name):
         """Cancelling edit should discard changes."""
-        api_create_product(name="EditCancelProd")
+        prod_name = unique_name("EditCancelProd")
+        api_create_product(name=prod_name)
         _reload_and_wait(page)
-        _open_edit_form(page, "EditCancelProd")
+        _open_edit_form(page, prod_name)
 
         # Change the name
         page.locator("#ed-name").fill("Changed Name")
@@ -229,5 +231,5 @@ class TestEditFormValidation:
         page.wait_for_timeout(300)
 
         # Original name should still be visible
-        row = page.locator(f".table-row:has-text('EditCancelProd')").first
+        row = page.locator(f".table-row:has-text('{prod_name}')").first
         expect(row).to_be_visible()

@@ -98,11 +98,12 @@ class TestProductToasts:
         page.locator("#btn-submit").click()
         _wait_for_toast(page, t["toast_invalid_ean"])
 
-    def test_toast_product_added(self, page):
+    def test_toast_product_added(self, page, unique_name):
         """Registering a product shows success toast with product name."""
         t = _load_translations()
+        prod_name = unique_name("ToastTestProduct")
         _go_to_register(page)
-        page.locator("#f-name").fill("ToastTestProduct")
+        page.locator("#f-name").fill(prod_name)
         page.locator("#f-kcal").fill("150")
         page.locator("#f-protein").fill("10")
         page.locator("#f-fat").fill("5")
@@ -115,13 +116,14 @@ class TestProductToasts:
         page.wait_for_timeout(500)
         _dismiss_modal(page)
         # The toast text is the template with {name} replaced
-        expected = t["toast_product_added"].replace("{name}", "ToastTestProduct")
+        expected = t["toast_product_added"].replace("{name}", prod_name)
         _wait_for_toast(page, expected)
 
-    def test_toast_product_deleted(self, page, api_create_product):
+    def test_toast_product_deleted(self, page, api_create_product, unique_name):
         """Deleting a product shows delete toast with product name."""
         t = _load_translations()
-        product = api_create_product(name="DeleteMeToast")
+        prod_name = unique_name("DeleteMeToast")
+        product = api_create_product(name=prod_name)
         _go_to_search(page)
         page.reload(wait_until="domcontentloaded")
         page.wait_for_function(
@@ -143,13 +145,13 @@ class TestProductToasts:
         confirm_btn = page.locator(".scan-modal-bg .scan-modal button").first
         if confirm_btn.is_visible():
             confirm_btn.click()
-        expected = t["toast_product_deleted"].replace("{name}", "DeleteMeToast")
+        expected = t["toast_product_deleted"].replace("{name}", prod_name)
         _wait_for_toast(page, expected)
 
-    def test_toast_product_updated(self, page, api_create_product):
+    def test_toast_product_updated(self, page, api_create_product, unique_name):
         """Editing and saving a product shows updated toast."""
         t = _load_translations()
-        product = api_create_product(name="EditMeToast")
+        product = api_create_product(name=unique_name("EditMeToast"))
         _go_to_search(page)
         page.reload(wait_until="domcontentloaded")
         page.wait_for_function(
