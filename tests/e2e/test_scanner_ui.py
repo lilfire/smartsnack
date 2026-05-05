@@ -139,8 +139,8 @@ def test_scanner_button_exists_in_register_view(page):
     expect(scan_btn).to_be_visible(timeout=3000)
     expect(scan_btn).to_be_enabled()
 
-    # Verify the button has the correct aria label
-    expect(scan_btn).to_have_attribute("aria-label", "Scan barcode")
+    # Verify the button has the i18n aria-label key (translated at runtime)
+    expect(scan_btn).to_have_attribute("data-i18n-aria-label", "btn_scan_title")
 
 
 def test_search_scanner_button_exists(page):

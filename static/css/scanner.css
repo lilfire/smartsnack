@@ -7,16 +7,10 @@
   color: rgba(255, 255, 255, 0.7);
   font-size: 16px;
   cursor: pointer;
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
-}
-
-@media (pointer: coarse) {
-  .btn-scan {
-    display: flex;
-  }
 }
 
 .btn-scan:disabled {
