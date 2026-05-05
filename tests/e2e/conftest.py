@@ -70,6 +70,19 @@ def _ensure_browsers():
 
 
 @pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """Add container-friendly flags so Chrome runs without a display server."""
+    return {
+        **browser_type_launch_args,
+        "args": [
+            *browser_type_launch_args.get("args", []),
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+        ],
+    }
+
+
+@pytest.fixture(scope="session")
 def browser(launch_browser):
     """Launch browser, skipping all browser-based tests if unavailable."""
     try:
