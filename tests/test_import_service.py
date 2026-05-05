@@ -397,9 +397,13 @@ class TestImportProductsCategories:
 
     def test_duplicate_explicit_category_silently_ignored(self, app_ctx):
         from services.import_service import import_products
-        # Should not raise even if category already exists
+        from db import get_db
         import_products({"categories": [{"name": "Snacks"}], "products": []})
         import_products({"categories": [{"name": "Snacks"}], "products": []})
+        count = get_db().execute(
+            "SELECT COUNT(*) FROM categories WHERE name='Snacks'"
+        ).fetchone()[0]
+        assert count == 1  # duplicate was not inserted
 
 
 # ── import_products: flag handling ────────────────────────────────────────────

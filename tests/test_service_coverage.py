@@ -971,5 +971,5 @@ class TestFetchOffImage:
             autospec=True), patch.dict(sys.modules, {"PIL": None}):
             result = _fetch_off_image(product)
 
-        assert result is not None
+        assert isinstance(result, str)
         assert result.startswith("data:image/jpeg;base64,")

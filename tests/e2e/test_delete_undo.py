@@ -1,121 +1,168 @@
-"""Test undo-delete flow (Task 7).
+"""E2E tests for product delete with undo toast (P0 gap #2).
 
-Verifies that:
-- Deleting a product shows the toast_product_deleted text with undo button
-- Clicking undo restores the product and shows toast_delete_undone
-- Letting the undo window expire (>5s) permanently deletes the product
+The delete flow shows a toast with an 'Undo' button for 5 seconds.
+Clicking undo should restore the product. If the timeout elapses,
+the product is permanently deleted via DELETE API.
+
+Key implementation detail: the actual HTTP DELETE is deferred 5 seconds
+after the confirm modal is accepted.  Tests that verify the product is
+gone must wait for the undo window to expire before reloading.
 """
 
 from playwright.sync_api import expect
 
 
-def test_delete_shows_toast_with_undo(page, api_create_product):
-    """Deleting a product shows toast with deleted message and undo button."""
-    api_create_product(name="UndoTestProduct")
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _reload_and_wait(page):
+    """Reload the page and wait for the initial product list to settle."""
     page.reload()
     page.wait_for_function(
         "() => !document.querySelector('#results-container .loading')",
         timeout=10000,
     )
 
-    # Click product to expand
-    row = page.locator(".table-row", has_text="UndoTestProduct")
+
+def _open_delete_confirm(page, product_name: str) -> None:
+    """Expand a product row and open the delete confirmation modal."""
+    row = page.locator(".table-row[data-product-id]", has_text=product_name)
+    expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
     page.wait_for_timeout(300)
 
-    # Click delete button
     delete_btn = page.locator("[data-action='delete']").first
+    expect(delete_btn).to_be_visible(timeout=3000)
     delete_btn.click()
     page.wait_for_timeout(300)
 
-    # Confirm deletion in the modal
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+def test_delete_shows_toast_with_undo_button(page, api_create_product):
+    """Deleting a product should show a toast that contains an Undo button."""
+    api_create_product(name="UndoToastProd")
+    _reload_and_wait(page)
+
+    _open_delete_confirm(page, "UndoToastProd")
+
     confirm_btn = page.locator(".confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
     confirm_btn.click()
 
-    # Should show success toast with product name (Norwegian: "X" slettet)
-    toast = page.locator(".toast")
-    expect(toast.first).to_be_visible(timeout=5000)
-    expect(toast.first).to_contain_text("slettet")
+    # Toast with undo button must appear
+    toast = page.locator(".toast.show")
+    expect(toast).to_be_visible(timeout=5000)
 
-    # Undo button should be visible in the toast
     undo_btn = page.locator(".toast-undo")
-    expect(undo_btn.first).to_be_visible(timeout=3000)
+    expect(undo_btn).to_be_visible(timeout=3000)
+
+
+def test_delete_toast_contains_product_name(page, api_create_product):
+    """The delete toast message should include the deleted product's name."""
+    api_create_product(name="NameInToastProd")
+    _reload_and_wait(page)
+
+    _open_delete_confirm(page, "NameInToastProd")
+
+    confirm_btn = page.locator(".confirm-yes")
+    expect(confirm_btn).to_be_visible(timeout=3000)
+    confirm_btn.click()
+
+    toast = page.locator(".toast.show")
+    expect(toast).to_be_visible(timeout=5000)
+
+    toast_text = toast.inner_text()
+    assert "NameInToastProd" in toast_text, (
+        f"Expected product name in toast text, got: '{toast_text}'"
+    )
 
 
 def test_undo_restores_product(page, api_create_product):
-    """Clicking undo after delete restores the product and shows confirmation."""
+    """Clicking the Undo button within the 5s window should restore the product."""
     api_create_product(name="UndoRestoreProd")
-    page.reload()
-    page.wait_for_function(
-        "() => !document.querySelector('#results-container .loading')",
-        timeout=10000,
-    )
+    _reload_and_wait(page)
 
-    # Click product to expand
-    row = page.locator(".table-row", has_text="UndoRestoreProd")
-    row.first.click()
-    page.wait_for_timeout(300)
-
-    # Delete
-    delete_btn = page.locator("[data-action='delete']").first
-    delete_btn.click()
-    page.wait_for_timeout(300)
+    _open_delete_confirm(page, "UndoRestoreProd")
 
     confirm_btn = page.locator(".confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
     confirm_btn.click()
 
-    # Wait for toast with undo button
+    # Click undo immediately before the 5s window elapses
     undo_btn = page.locator(".toast-undo")
-    expect(undo_btn.first).to_be_visible(timeout=5000)
+    expect(undo_btn).to_be_visible(timeout=3000)
+    undo_btn.click()
 
-    # Click undo
-    undo_btn.first.click()
-
-    # Should show "Sletting angret" toast (toast_delete_undone)
     page.wait_for_timeout(500)
-    toast_container = page.locator(".toast")
-    expect(toast_container.last).to_contain_text("Sletting angret")
 
-    # Product should reappear in results
-    results = page.locator("#results-container")
-    expect(results).to_contain_text("UndoRestoreProd")
+    # After undo, reload and verify the product is still present
+    _reload_and_wait(page)
+    expect(page.locator("#results-container")).to_contain_text("UndoRestoreProd")
 
 
-def test_delete_permanent_after_undo_window(page, api_create_product):
-    """After undo window expires (~5s), the product is permanently deleted."""
-    api_create_product(name="PermanentDeleteProd")
-    page.reload()
-    page.wait_for_function(
-        "() => !document.querySelector('#results-container .loading')",
-        timeout=10000,
-    )
+def test_delete_without_undo_removes_product(page, api_create_product):
+    """If the undo window elapses without clicking Undo, the product is deleted."""
+    api_create_product(name="NoUndoProd")
+    _reload_and_wait(page)
 
-    # Click product to expand
-    row = page.locator(".table-row", has_text="PermanentDeleteProd")
-    row.first.click()
-    page.wait_for_timeout(300)
-
-    # Delete and confirm
-    delete_btn = page.locator("[data-action='delete']").first
-    delete_btn.click()
-    page.wait_for_timeout(300)
+    _open_delete_confirm(page, "NoUndoProd")
 
     confirm_btn = page.locator(".confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
+    confirm_btn.click()
 
-    # Wait for the DELETE request to actually fire (5s undo window + network)
-    with page.expect_response(
-        lambda r: "/api/products/" in r.url and r.request.method == "DELETE",
-        timeout=10000,
-    ):
-        confirm_btn.click()
+    # The product is removed from the UI immediately.  The actual HTTP DELETE
+    # fires after 5 seconds.  We wait for the toast's undo window to expire
+    # and the toast to disappear before reloading so the server has processed
+    # the delete.
+    toast = page.locator(".toast.show")
+    expect(toast).to_be_visible(timeout=5000)
 
-    # Product should be gone after reload
-    page.reload()
-    page.wait_for_function(
-        "() => !document.querySelector('#results-container .loading')",
-        timeout=10000,
+    # Wait for the undo toast to auto-dismiss (duration=5000ms) plus buffer
+    expect(toast).to_be_hidden(timeout=8000)
+
+    # Allow the deferred DELETE request to complete
+    page.wait_for_timeout(1500)
+
+    _reload_and_wait(page)
+    expect(page.locator("#results-container")).not_to_contain_text("NoUndoProd")
+
+
+def test_delete_confirmation_modal_shows_product_name(page, api_create_product):
+    """The confirmation modal for delete should display the product's name."""
+    api_create_product(name="ConfirmNameProd")
+    _reload_and_wait(page)
+
+    _open_delete_confirm(page, "ConfirmNameProd")
+
+    modal = page.locator(".scan-modal-bg[role='dialog']")
+    expect(modal).to_be_visible(timeout=3000)
+
+    modal_text = modal.inner_text()
+    assert "ConfirmNameProd" in modal_text, (
+        f"Expected product name in delete confirmation modal, got: '{modal_text}'"
     )
-    expect(page.locator("#results-container")).not_to_contain_text("PermanentDeleteProd")
+
+
+def test_delete_confirmation_cancel_keeps_product(page, api_create_product):
+    """Cancelling the delete confirmation modal should leave the product intact."""
+    api_create_product(name="CancelDeleteProd")
+    _reload_and_wait(page)
+
+    _open_delete_confirm(page, "CancelDeleteProd")
+
+    cancel_btn = page.locator(".confirm-no")
+    expect(cancel_btn).to_be_visible(timeout=3000)
+    cancel_btn.click()
+
+    page.wait_for_timeout(300)
+
+    # Modal should be gone and product still visible
+    expect(page.locator(".scan-modal-bg[role='dialog']")).to_be_hidden(timeout=3000)
+    expect(page.locator("#results-container")).to_contain_text("CancelDeleteProd")

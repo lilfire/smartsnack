@@ -82,3 +82,15 @@ def test_language_persists_across_reload(page):
     # Should still be English
     search_tab = page.locator("button[data-view='search']")
     expect(search_tab).to_contain_text(re.compile("Search", re.IGNORECASE))
+
+
+def test_switch_to_swedish(page):
+    """Switching language to Swedish should update UI text."""
+    _go_to_settings(page)
+    _open_language_section(page)
+
+    _change_language(page, "se")
+
+    # Nav should show Swedish
+    search_tab = page.locator("button[data-view='search']")
+    expect(search_tab).to_contain_text(re.compile("Sök", re.IGNORECASE))

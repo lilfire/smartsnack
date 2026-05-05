@@ -37,10 +37,13 @@ class TestCloseDb:
         assert "db" not in g
 
     def test_close_without_db(self, app_ctx):
-        from db import close_db
+        from db import close_db, get_db
+        from flask import g
 
-        # Should not raise
         close_db()
+        assert "db" not in g  # still absent: close with no DB open is a silent no-op
+        db = get_db()
+        assert db is not None  # normal DB access still works after the no-op close
 
 
 class TestInitDb:

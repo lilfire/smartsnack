@@ -115,7 +115,7 @@ class TestUpdateEntry:
             update_entry(99999, {"pdcaas": 0.5})
 
     def test_update_keywords(self, app_ctx, translations_dir):
-        from services.protein_quality_service import update_entry
+        from services.protein_quality_service import update_entry, list_entries
         from db import get_db
 
         row = (
@@ -124,6 +124,10 @@ class TestUpdateEntry:
             .fetchone()
         )
         update_entry(row["id"], {"keywords": ["whey protein", "serum"]})
+        entries = list_entries()
+        whey = next(e for e in entries if e["name"] == "whey")
+        assert "whey protein" in whey["keywords"]
+        assert "serum" in whey["keywords"]
 
 
 class TestDeleteEntry:
