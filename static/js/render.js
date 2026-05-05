@@ -106,9 +106,12 @@ window.addEventListener('resize', () => {
 
 export function renderResults(results, search) {
   state.cachedResults = results;
+  const displayTotal = (!search && state.pagination.total !== null)
+    ? state.pagination.total
+    : results.length;
   document.getElementById('result-count').textContent = search
     ? (results.length !== 1 ? t('result_count_search_plural', { count: results.length, query: search }) : t('result_count_search', { count: results.length, query: search }))
-    : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
+    : (displayTotal !== 1 ? t('result_count_plural', { count: displayTotal }) : t('result_count', { count: displayTotal }));
   const container = document.getElementById('results-container');
   if (!results.length) {
     // Clean up any existing delegation listener — prevents ghost handlers when
