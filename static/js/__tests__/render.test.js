@@ -1135,6 +1135,24 @@ describe('renderResults - additional branch coverage', () => {
     expect(window.toggleExpand).toHaveBeenCalled();
   });
 
+  it('pressing Enter on a focused table-row calls toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row[data-action="toggle-expand"]');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('pressing non-Enter key on table-row does not call toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row[data-action="toggle-expand"]');
+    const event = new KeyboardEvent('keydown', { key: 'Space', bubbles: true });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
   it('does not toggle-expand when clicking a button inside the row', () => {
     state.expandedId = 1;
     state.editingId = null;
