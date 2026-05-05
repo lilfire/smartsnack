@@ -8,7 +8,6 @@ unittest.mock.patch, which does not work across process boundaries.
 """
 
 import json
-import base64
 
 import pytest
 from playwright.sync_api import expect
@@ -18,17 +17,10 @@ from playwright.sync_api import expect
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Minimal 1×1 white JPEG, base64-encoded, as raw bytes for a fake file.
-_TINY_JPEG_B64 = (
-    "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8U"
-    "HRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgN"
-    "DRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy"
-    "MjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAABgUE/8QAIhAA"
-    "AgIBBAMAAAAAAAAAAAAAAQIDBAUREiExQf/EABQBAQAAAAAAAAAAAAAAAAAAAAD/xAAUEQEA"
-    "AAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwc52yqt2pJrK3lxb3Lf8AUk5YIr3wOp"
-    "Fftjf6oAA/9k="
-)
-_TINY_JPEG_BYTES = base64.b64decode(_TINY_JPEG_B64)
+# Fake JPEG bytes for file uploads. The OCR API is mocked via page.route(),
+# so the actual content does not need to be a valid image — only the JPEG
+# SOI/EOI markers are included for realism.
+_TINY_JPEG_BYTES = b"\xff\xd8\xff\xd9"
 
 
 def _go_to_register(page):
