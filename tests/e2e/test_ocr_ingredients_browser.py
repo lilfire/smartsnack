@@ -83,10 +83,20 @@ class TestOcrIngredientTranslationBrowser:
         toggle.click()
         page.wait_for_timeout(300)
 
-        # The native select is wrapped in a custom dropdown on desktop (display:none).
-        # Accept either the visible custom trigger or the native select (mobile).
-        lang_trigger = page.locator(
-            ".custom-select-wrap:has(#language-select) .custom-select-trigger"
+        # On desktop upgradeSelect() wraps the native select in .custom-select-wrap and
+        # hides it with CSS, exposing .custom-select-trigger instead.  On mobile the
+        # native select is shown directly.  Use wait_for_function to avoid Playwright
+        # strict-mode failures from or_() when both elements exist in the DOM at once.
+        page.wait_for_function(
+            """() => {
+                const sel = document.getElementById('language-select');
+                if (!sel) return false;
+                const wrap = sel.closest('.custom-select-wrap');
+                if (wrap) {
+                    const trigger = wrap.querySelector('.custom-select-trigger');
+                    return !!(trigger && trigger.offsetParent !== null);
+                }
+                return sel.offsetParent !== null;
+            }""",
+            timeout=5000,
         )
-        lang_native = page.locator("#language-select")
-        expect(lang_trigger.or_(lang_native)).to_be_visible()
