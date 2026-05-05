@@ -75,11 +75,6 @@ def delete_ean(pid: int, ean_id: int) -> None:
     ).fetchone()
     if not row:
         raise LookupError("EAN not found")
-    ean_count = conn.execute(
-        "SELECT COUNT(*) FROM product_eans WHERE product_id = ?", (pid,)
-    ).fetchone()[0]
-    if ean_count <= 1:
-        raise ValueError("cannot_delete_only_ean")
     if row["synced_with_off"]:
         raise ValueError("cannot_delete_synced_ean")
     conn.execute("DELETE FROM product_eans WHERE id = ?", (ean_id,))
