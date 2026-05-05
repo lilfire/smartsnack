@@ -8,6 +8,7 @@ unittest.mock.patch, which does not work across process boundaries.
 """
 
 import json
+import re
 
 import pytest
 from playwright.sync_api import expect
@@ -162,9 +163,9 @@ def test_ocr_ingredients_error_toast_on_no_text(page, tmp_path):
         page.locator("#f-ocr-btn").click()
     fc_info.value.set_files(str(fake_image))
 
-    # An error toast must appear.
+    # An error toast must appear with the error CSS class.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
-    expect(page.locator("#toast.show")).to_have_class(lambda cls: "error" in cls, timeout=5000)
+    expect(page.locator("#toast.show")).to_have_class(re.compile(r"error"), timeout=5000)
 
 
 # ---------------------------------------------------------------------------

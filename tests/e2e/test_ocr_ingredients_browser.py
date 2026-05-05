@@ -25,7 +25,8 @@ def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
     page.wait_for_timeout(300)
-    edit_btn = row.locator("[data-action='start-edit']")
+    # The start-edit button is in the sibling .expanded div, not inside .table-row.
+    edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
     page.wait_for_timeout(300)
@@ -82,4 +83,10 @@ class TestOcrIngredientTranslationBrowser:
         toggle.click()
         page.wait_for_timeout(300)
 
-        expect(page.locator("#language-select")).to_be_visible()
+        # The native select is wrapped in a custom dropdown on desktop (display:none).
+        # Accept either the visible custom trigger or the native select (mobile).
+        lang_trigger = page.locator(
+            ".custom-select-wrap:has(#language-select) .custom-select-trigger"
+        )
+        lang_native = page.locator("#language-select")
+        expect(lang_trigger.or_(lang_native)).to_be_visible()

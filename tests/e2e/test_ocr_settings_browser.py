@@ -4,7 +4,19 @@ Covers OCR provider selection, model row visibility,
 fallback checkbox, and save interactions.
 """
 
+import json
+
 from playwright.sync_api import expect
+
+
+# Minimal provider list for tests that need a non-tesseract option.
+# The fallback checkbox is only visible when a non-tesseract provider is active.
+_MOCK_PROVIDERS = json.dumps({
+    "providers": [
+        {"key": "tesseract", "label": "Tesseract OCR", "models": [], "free_text_model": False},
+        {"key": "openai", "label": "OpenAI Vision", "models": [], "free_text_model": True},
+    ]
+})
 
 
 def _go_to_settings(page):
@@ -26,7 +38,13 @@ class TestOcrProviderSelectBrowser:
         """The OCR provider dropdown should be visible."""
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
-        expect(page.locator("#ocr-provider-select")).to_be_visible()
+        # On desktop the native select is hidden and replaced by a custom dropdown.
+        # Accept either the custom trigger button or the native select (mobile).
+        ocr_trigger = page.locator(
+            ".custom-select-wrap:has(#ocr-provider-select) .custom-select-trigger"
+        )
+        ocr_native = page.locator("#ocr-provider-select")
+        expect(ocr_trigger.or_(ocr_native)).to_be_visible()
 
     def test_tesseract_is_default(self, page):
         """Tesseract should be selected by default."""
@@ -51,7 +69,9 @@ class TestOcrModelRowBrowser:
         """The model row should be hidden when Tesseract is selected."""
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
-        page.locator("#ocr-provider-select").select_option("tesseract")
+        # force=True bypasses visibility check — native select is hidden on desktop
+        # by the custom-dropdown CSS (.custom-select-wrap select { display:none }).
+        page.locator("#ocr-provider-select").select_option("tesseract", force=True)
         page.wait_for_timeout(300)
         model_row = page.locator("#ocr-model-row")
         expect(model_row).to_be_hidden()
@@ -61,18 +81,37 @@ class TestOcrFallbackBrowser:
     """Test the OCR fallback checkbox behavior."""
 
     def test_fallback_checkbox_visible(self, page):
-        """The fallback checkbox should be visible in OCR settings."""
+        """The fallback checkbox should be visible when a non-tesseract provider is active."""
+        # The fallback wrapper is hidden for tesseract (the default). Mock providers
+        # so openai is available, then select it to reveal the wrapper.
+        page.route(
+            "**/api/ocr/providers",
+            lambda route: route.fulfill(
+                status=200, content_type="application/json", body=_MOCK_PROVIDERS
+            ),
+        )
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
+        page.locator("#ocr-provider-select").select_option("openai", force=True)
+        page.wait_for_timeout(400)  # allow CSS transition (0.3s) to complete
         expect(page.locator("#ocr-fallback-checkbox")).to_be_visible()
 
     def test_fallback_checkbox_toggleable(self, page):
-        """The fallback checkbox should be toggleable."""
+        """The fallback checkbox should be toggleable when a non-tesseract provider is active."""
+        # The fallback wrapper is hidden for tesseract (the default). Mock providers
+        # so openai is available, then select it to reveal the wrapper.
+        page.route(
+            "**/api/ocr/providers",
+            lambda route: route.fulfill(
+                status=200, content_type="application/json", body=_MOCK_PROVIDERS
+            ),
+        )
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
-        cb = page.locator("#ocr-fallback-checkbox")
+        page.locator("#ocr-provider-select").select_option("openai", force=True)
+        page.wait_for_timeout(400)  # allow CSS transition (0.3s) to complete
 
-        # Check the initial state and toggle
+        cb = page.locator("#ocr-fallback-checkbox")
         was_checked = cb.is_checked()
         cb.click()
         page.wait_for_timeout(200)
