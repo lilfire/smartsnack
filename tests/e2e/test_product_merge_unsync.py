@@ -24,9 +24,9 @@ def _get(url):
         return json.loads(resp.read())
 
 
-def test_unsync_product(live_url, api_create_product):
+def test_unsync_product(live_url, api_create_product, unique_name):
     """POST /api/products/<id>/unsync removes the synced flag."""
-    product = api_create_product(name="UnsyncProduct")
+    product = api_create_product(name=unique_name("UnsyncProduct"))
     pid = product["id"]
 
     status, body = _post(f"{live_url}/api/products/{pid}/unsync", {})
@@ -35,29 +35,30 @@ def test_unsync_product(live_url, api_create_product):
 
 
 def test_unsync_nonexistent(live_url):
-    """POST /api/products/999999/unsync returns 400."""
+    """POST /api/products/<missing-id>/unsync returns 404 (LSO-1035)."""
     status, body = _post(f"{live_url}/api/products/999999/unsync", {})
-    assert status == 400
+    assert status == 404
 
 
-def test_check_duplicate(live_url, api_create_product):
+def test_check_duplicate(live_url, api_create_product, unique_name):
     """POST /api/products/<id>/check-duplicate returns duplicate info."""
-    product = api_create_product(name="DupCheckProduct", ean="1111111111111")
+    name = unique_name("DupCheckProduct")
+    product = api_create_product(name=name, ean="1111111111111")
     pid = product["id"]
 
     status, body = _post(
         f"{live_url}/api/products/{pid}/check-duplicate",
-        {"ean": "1111111111111", "name": "DupCheckProduct"},
+        {"ean": "1111111111111", "name": name},
     )
     assert status == 200
     assert "duplicate" in body
     assert "a_is_synced_with_off" in body
 
 
-def test_merge_products(live_url, api_create_product):
+def test_merge_products(live_url, api_create_product, unique_name):
     """POST /api/products/<id>/merge merges source into target."""
-    target = api_create_product(name="MergeTarget")
-    source = api_create_product(name="MergeSource")
+    target = api_create_product(name=unique_name("MergeTarget"))
+    source = api_create_product(name=unique_name("MergeSource"))
     target_id = target["id"]
     source_id = source["id"]
 
@@ -75,9 +76,9 @@ def test_merge_products(live_url, api_create_product):
     assert source_id not in ids, "Source should be deleted after merge"
 
 
-def test_merge_invalid_source(live_url, api_create_product):
+def test_merge_invalid_source(live_url, api_create_product, unique_name):
     """POST /api/products/<id>/merge with invalid source_id returns 400."""
-    product = api_create_product(name="MergeInvalid")
+    product = api_create_product(name=unique_name("MergeInvalid"))
     pid = product["id"]
 
     status, body = _post(

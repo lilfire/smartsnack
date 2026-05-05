@@ -47,9 +47,14 @@ def test_tags_search_api_returns_list(live_url):
     )
 
 
-def test_tags_create_api_returns_tag_object(live_url):
-    """POST /api/tags must return an object with both 'id' and 'label' fields."""
-    payload = json.dumps({"label": "E2EAPITag"}).encode()
+def test_tags_create_api_returns_tag_object(live_url, unique_name):
+    """POST /api/tags must return an object with both 'id' and 'label' fields.
+
+    The API preserves the original label case (LSO-1035); duplicate
+    detection is still case-insensitive via COLLATE NOCASE.
+    """
+    raw_label = unique_name("E2EAPITag")
+    payload = json.dumps({"label": raw_label}).encode()
     req = urllib.request.Request(
         f"{live_url}/api/tags",
         data=payload,
@@ -61,8 +66,8 @@ def test_tags_create_api_returns_tag_object(live_url):
 
     assert "id" in body, f"Expected 'id' in tag creation response, got: {body}"
     assert "label" in body, f"Expected 'label' in tag creation response, got: {body}"
-    assert body["label"] == "E2EAPITag", (
-        f"Expected label='E2EAPITag', got: {body['label']!r}"
+    assert body["label"] == raw_label, (
+        f"Expected label={raw_label!r}, got: {body['label']!r}"
     )
 
 
@@ -71,31 +76,34 @@ def test_tags_create_api_returns_tag_object(live_url):
 # ---------------------------------------------------------------------------
 
 
-def test_tag_field_visible_in_edit(page, api_create_product):
+def test_tag_field_visible_in_edit(page, api_create_product, unique_name):
     """The #tag-field-ed container must be visible in the product edit form."""
-    api_create_product(name="TagFieldProd")
+    name = unique_name("TagFieldProd")
+    api_create_product(name=name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagFieldProd")
+    _expand_and_edit(page, name)
 
     tag_field = page.locator("#tag-field-ed")
     expect(tag_field).to_be_visible(timeout=5000)
 
 
-def test_add_tag_button_exists_in_edit(page, api_create_product):
+def test_add_tag_button_exists_in_edit(page, api_create_product, unique_name):
     """The #add-tag-btn button must be visible inside the edit form."""
-    api_create_product(name="TagAddBtnProd")
+    name = unique_name("TagAddBtnProd")
+    api_create_product(name=name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagAddBtnProd")
+    _expand_and_edit(page, name)
 
     add_btn = page.locator("#add-tag-btn")
     expect(add_btn).to_be_visible(timeout=5000)
 
 
-def test_tag_modal_opens_on_add_click(page, api_create_product):
+def test_tag_modal_opens_on_add_click(page, api_create_product, unique_name):
     """Clicking #add-tag-btn must show the #tag-modal-overlay dialog."""
-    api_create_product(name="TagModalProd")
+    name = unique_name("TagModalProd")
+    api_create_product(name=name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagModalProd")
+    _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
     page.wait_for_timeout(300)
@@ -104,11 +112,12 @@ def test_tag_modal_opens_on_add_click(page, api_create_product):
     expect(modal).to_be_visible(timeout=3000)
 
 
-def test_tag_modal_has_role_dialog(page, api_create_product):
+def test_tag_modal_has_role_dialog(page, api_create_product, unique_name):
     """The tag modal overlay must have role='dialog' for accessibility."""
-    api_create_product(name="TagRoleProd")
+    name = unique_name("TagRoleProd")
+    api_create_product(name=name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagRoleProd")
+    _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
     page.wait_for_timeout(300)
@@ -121,11 +130,12 @@ def test_tag_modal_has_role_dialog(page, api_create_product):
     )
 
 
-def test_tag_modal_has_input_and_buttons(page, api_create_product):
+def test_tag_modal_has_input_and_buttons(page, api_create_product, unique_name):
     """The tag modal must have a text input, a confirm button, and a cancel button."""
-    api_create_product(name="TagBtnsProd")
+    name = unique_name("TagBtnsProd")
+    api_create_product(name=name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagBtnsProd")
+    _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
     page.wait_for_timeout(300)
@@ -135,11 +145,12 @@ def test_tag_modal_has_input_and_buttons(page, api_create_product):
     expect(page.locator("#tag-modal-cancel")).to_be_visible(timeout=3000)
 
 
-def test_tag_modal_cancel_closes_modal(page, api_create_product):
+def test_tag_modal_cancel_closes_modal(page, api_create_product, unique_name):
     """Clicking the cancel button must hide the tag modal."""
-    api_create_product(name="TagCancelProd")
+    name = unique_name("TagCancelProd")
+    api_create_product(name=name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagCancelProd")
+    _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
     modal = page.locator("#tag-modal-overlay")
@@ -151,16 +162,18 @@ def test_tag_modal_cancel_closes_modal(page, api_create_product):
     expect(modal).to_be_hidden(timeout=3000)
 
 
-def test_adding_tag_creates_pill(page, api_create_product):
+def test_adding_tag_creates_pill(page, api_create_product, unique_name):
     """Typing a tag name and confirming must add a .tag-pill inside #tag-field-ed."""
-    api_create_product(name="TagNewProd")
+    prod_name = unique_name("TagNewProd")
+    tag_label = unique_name("TestTagPill")
+    api_create_product(name=prod_name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagNewProd")
+    _expand_and_edit(page, prod_name)
 
     page.locator("#add-tag-btn").click()
     page.wait_for_timeout(300)
 
-    page.locator("#tag-modal-input").fill("TestTagPill")
+    page.locator("#tag-modal-input").fill(tag_label)
     page.locator("#tag-modal-confirm").click()
     page.wait_for_timeout(600)
 
@@ -171,16 +184,18 @@ def test_adding_tag_creates_pill(page, api_create_product):
     )
 
 
-def test_tag_remove_button_decreases_pill_count(page, api_create_product):
+def test_tag_remove_button_decreases_pill_count(page, api_create_product, unique_name):
     """Clicking the .tag-remove button on a pill must remove exactly that pill."""
-    api_create_product(name="TagRemoveProd")
+    prod_name = unique_name("TagRemoveProd")
+    tag_label = unique_name("RemoveThisTag")
+    api_create_product(name=prod_name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagRemoveProd")
+    _expand_and_edit(page, prod_name)
 
     # Add a tag so there is something to remove
     page.locator("#add-tag-btn").click()
     page.wait_for_timeout(300)
-    page.locator("#tag-modal-input").fill("RemoveThisTag")
+    page.locator("#tag-modal-input").fill(tag_label)
     page.locator("#tag-modal-confirm").click()
     page.wait_for_timeout(600)
 
@@ -199,10 +214,11 @@ def test_tag_remove_button_decreases_pill_count(page, api_create_product):
     )
 
 
-def test_tag_suggestions_appear_for_existing_tag(page, api_create_product, live_url):
+def test_tag_suggestions_appear_for_existing_tag(page, api_create_product, live_url, unique_name):
     """Typing in the tag modal input must show matching suggestions for a known tag."""
     # Create a tag via API that the suggestion search can find
-    payload = json.dumps({"label": "SuggestionTagE2E"}).encode()
+    tag_label = unique_name("SuggestionTagE2E")
+    payload = json.dumps({"label": tag_label}).encode()
     req = urllib.request.Request(
         f"{live_url}/api/tags",
         data=payload,
@@ -211,21 +227,23 @@ def test_tag_suggestions_appear_for_existing_tag(page, api_create_product, live_
     )
     urllib.request.urlopen(req, timeout=5)
 
-    api_create_product(name="TagSuggestProd")
+    prod_name = unique_name("TagSuggestProd")
+    api_create_product(name=prod_name)
     _reload_and_wait(page)
-    _expand_and_edit(page, "TagSuggestProd")
+    _expand_and_edit(page, prod_name)
 
     page.locator("#add-tag-btn").click()
     page.wait_for_timeout(300)
 
-    # Type the beginning of the known tag label
-    page.locator("#tag-modal-input").fill("SuggestionTag")
+    # Type a prefix of the known tag label so the suggestion search matches
+    search_prefix = tag_label.split("-")[0]
+    page.locator("#tag-modal-input").fill(search_prefix)
     # Wait for the debounced fetch (200 ms) plus render time
     page.wait_for_timeout(700)
 
     suggestions = page.locator("#tag-modal-suggestions li")
     suggestion_count = suggestions.count()
     assert suggestion_count >= 1, (
-        f"Expected at least one suggestion for 'SuggestionTag', got {suggestion_count}"
+        f"Expected at least one suggestion for {search_prefix!r}, got {suggestion_count}"
     )
     expect(suggestions.first).to_be_visible(timeout=3000)
