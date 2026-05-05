@@ -29,14 +29,19 @@ export function renderPqTable() {
       + '</div>';
   });
   container.innerHTML = h;
-  // Attach change handlers for autosave
+  // Attach autosave handlers — both 'change' and 'blur' so that programmatic
+  // fills (e.g. Playwright .fill()) followed by a Tab keypress reliably trigger
+  // the save even when the browser skips the 'change' event.
   pqData.forEach((row) => {
     const labelEl = document.getElementById('pqe-label-' + row.id);
     const pdcaasEl = document.getElementById('pqe-pdcaas-' + row.id);
     const diaasEl = document.getElementById('pqe-diaas-' + row.id);
     const kwEl = document.getElementById('pqe-kw-' + row.id);
     [labelEl, pdcaasEl, diaasEl, kwEl].forEach((el) => {
-      if (el) el.addEventListener('change', () => { autosavePq(row.id); });
+      if (el) {
+        el.addEventListener('change', () => { autosavePq(row.id); });
+        el.addEventListener('blur', () => { autosavePq(row.id); });
+      }
     });
   });
   // Attach delete handlers
