@@ -19,7 +19,7 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(600)
 
 
 class TestCategoryListBrowser:
@@ -88,6 +88,13 @@ class TestCategoryAddBrowser:
         # Now go to register and check
         page.locator("button[data-view='register']").click()
         expect(page.locator("#view-register")).to_be_visible()
+
+        # Wait for loadData() to complete — it calls buildTypeSelect() which
+        # rebuilds #f-type with the latest categories from the API.
+        page.wait_for_function(
+            "() => !document.querySelector('#results-container .loading')",
+            timeout=5000,
+        )
 
         category_select = page.locator("#f-type")
         options_text = category_select.inner_text()

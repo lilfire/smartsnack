@@ -39,7 +39,11 @@ def _open_categories_section(page):
             }
         }
     }""")
-    page.wait_for_timeout(600)
+    # Wait for loadCategories() to populate the list (at least one .cat-item)
+    page.wait_for_function(
+        "() => document.querySelectorAll('#cat-list .cat-item').length > 0",
+        timeout=8000,
+    )
 
 
 def _api(live_url, path, *, method="GET", body=None):

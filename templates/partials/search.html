@@ -7,7 +7,7 @@
       <input class="search-input" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Search for product or EAN..." oninput="onSearchInput()" aria-label="Search for product or EAN">
       <button type="button" class="search-clear" id="search-clear" onclick="clearSearch()" data-i18n-aria-label="aria_clear_search" aria-label="Clear search">&times;</button>
     </div>
-    <button type="button" class="btn-scan-search" onclick="openSearchScanner()" data-i18n-aria-label="search_scan_title" aria-label="Scan barcode to find product">&#128247;</button>
+    <button type="button" class="btn-scan-search" onclick="openSearchScanner()" data-i18n-aria-label="search_scan_title" data-i18n-title="search_scan_title" aria-label="Scan barcode to find product">&#128247;</button>
   </div>
   <div class="filter-wrap" id="filter-wrap">
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -19,7 +19,7 @@
     <div class="filter-row" id="filter-row"></div>
   </div>
   <div id="advanced-filters" class="adv-filters"></div>
-  <div class="result-count" id="result-count"></div>
+  <div class="result-count" id="result-count" role="status" aria-live="polite"></div>
   <div id="results-container" role="region" data-i18n-aria-label="aria_search_results" aria-label="Search results">
     <div class="loading" role="status" aria-live="polite">
       <span class="spinner" aria-hidden="true"></span>
