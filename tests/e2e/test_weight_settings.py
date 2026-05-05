@@ -51,10 +51,18 @@ def test_weight_items_container_is_visible(page):
 
 
 def test_weight_scope_selector_is_visible(page):
-    """The scope selector dropdown (#weight-scope-select) must be visible."""
+    """The custom-select trigger for #weight-scope-select must be visible.
+
+    The native <select> is CSS-hidden on desktop (>=640 px viewport) by
+    forms.css; upgradeSelect() wraps it in .custom-select-wrap and exposes a
+    .custom-select-trigger button instead.
+    """
     _go_to_settings(page)
     _open_weights_section(page)
-    expect(page.locator("#weight-scope-select")).to_be_visible(timeout=5000)
+    scope_wrapper = page.locator(".custom-select-wrap").filter(
+        has=page.locator("#weight-scope-select")
+    )
+    expect(scope_wrapper.locator(".custom-select-trigger")).to_be_visible(timeout=5000)
 
 
 def test_scope_selector_has_global_option(page):
@@ -174,15 +182,19 @@ def test_config_button_expands_advanced_config(page):
 
 
 def test_config_section_has_direction_select(page):
-    """The advanced config section must contain a direction <select>."""
+    """The advanced config section must expose a visible direction trigger.
+
+    The native wd-* <select> is CSS-hidden on desktop; the custom-select
+    trigger button is the visible element to assert against.
+    """
     _go_to_settings(page)
     _open_weights_section(page)
 
     page.locator("#weight-items .weight-cfg-btn").first.click()
     page.wait_for_timeout(300)
 
-    direction_select = page.locator("#weight-items select[id^='wd-']").first
-    expect(direction_select).to_be_visible(timeout=3000)
+    direction_wrapper = page.locator("#weight-items .wc-row .custom-select-wrap").first
+    expect(direction_wrapper.locator(".custom-select-trigger")).to_be_visible(timeout=3000)
 
 
 # ---------------------------------------------------------------------------

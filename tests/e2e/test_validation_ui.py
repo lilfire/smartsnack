@@ -245,24 +245,49 @@ class TestCategoryValidation:
             except urllib.error.HTTPError:
                 pass
 
+        # Reload so the UI reflects the post-cleanup DB state before navigating.
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function(
+            "() => !document.querySelector('#results-container .loading')",
+            timeout=10000,
+        )
+
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
-        page.wait_for_timeout(500)
 
-        # Find the only remaining category's delete button
+        # Wait for delete button (proves the section rendered with data).
+        page.wait_for_selector("[data-action='delete-cat']", state="visible", timeout=5000)
+
+        # Guard: cleanup must have left exactly 1 category.
+        btn_count = page.locator("[data-action='delete-cat']").count()
+        assert btn_count == 1, (
+            f"Expected exactly 1 delete button after cleanup, got {btn_count} — "
+            "prior-test contamination suspected"
+        )
+
         delete_btn = page.locator("[data-action='delete-cat']").first
-        if delete_btn.count() > 0:
-            delete_btn.click()
-            page.wait_for_timeout(300)
+        delete_btn.click()
+        page.wait_for_timeout(300)
 
-            # Confirm if modal appears
-            confirm = page.locator(".confirm-yes")
-            if confirm.is_visible():
-                confirm.click()
+        # If a cat-move modal appeared, cleanup failed — cancel and fail clearly.
+        cat_move_modal = page.locator(".scan-modal-bg")
+        if cat_move_modal.is_visible():
+            cancel_btn = page.locator(".scan-modal-bg .scan-modal button:last-child")
+            if cancel_btn.is_visible():
+                cancel_btn.click()
+            assert False, (
+                "cat-move modal appeared — cleanup did not reduce to 1 category; "
+                "prior-test contamination"
+            )
 
-            toast = page.locator(".toast").last
-            expect(toast).to_be_visible(timeout=5000)
-            expect(toast).to_contain_text(t["toast_cannot_delete_only_category"])
+        # Confirm the deletion attempt if a confirm dialog appeared.
+        confirm = page.locator(".confirm-yes")
+        if confirm.is_visible():
+            confirm.click()
+
+        toast = page.locator(".toast").last
+        expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text(t["toast_cannot_delete_only_category"])
 
 
 # ---------------------------------------------------------------------------
