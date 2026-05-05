@@ -173,8 +173,9 @@ def test_category_label_edit_via_ui(live_url, page):
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
 
-        # Wait for the category list to render
-        expect(page.locator("#cat-list")).to_be_visible()
+        # Wait for loadCategories() to finish and populate items (the container
+        # becomes visible before the async fetch completes)
+        page.wait_for_selector("#cat-list .cat-item", state="visible", timeout=8000)
 
         # Find the label input for our category
         label_input = page.locator(
