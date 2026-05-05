@@ -37,6 +37,7 @@ import {
 } from './openfoodfacts.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
 import { scanIngredients } from './ocr.js';
+import { onOcrProviderChange, saveOcrSettings } from './ocr-settings.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
 Object.assign(window, {
@@ -75,6 +76,8 @@ Object.assign(window, {
   scanOffFetch, closeScanOffConfirm,
   // ocr
   scanIngredients,
+  // ocr settings
+  onOcrProviderChange, saveOcrSettings,
   // openfoodfacts
   validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
   selectOffResult, estimateProteinQuality, updateEstimateBtn,

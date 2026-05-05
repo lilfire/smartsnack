@@ -117,6 +117,36 @@
             </select>
           </div>
         </div>
+        <!-- OCR Settings -->
+        <div>
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
+            <span data-i18n="settings_ocr_title">OCR</span>
+            <span class="settings-chevron">&#9660;</span>
+          </h3>
+          <div class="settings-section-body" style="display:none">
+            <p class="form-sub" data-i18n="settings_ocr_desc">Ingredient text recognition settings</p>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div>
+                <label class="field-label" for="ocr-provider" data-i18n="settings_ocr_provider">Provider</label>
+                <select class="field-select" id="ocr-provider" onchange="onOcrProviderChange()">
+                  <option value="easyocr">EasyOCR</option>
+                  <option value="tesseract">Tesseract</option>
+                </select>
+              </div>
+              <div id="ocr-model-row">
+                <label class="field-label" for="ocr-model" data-i18n="settings_ocr_model">Model</label>
+                <input class="field-input" id="ocr-model" placeholder="e.g. en, no">
+              </div>
+              <div>
+                <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="ocr-fallback">
+                  <span data-i18n="settings_ocr_fallback">Fallback to Tesseract on failure</span>
+                </label>
+              </div>
+              <button type="button" class="btn-register" onclick="saveOcrSettings()" data-i18n="btn_save_ocr_settings">Save OCR settings</button>
+            </div>
+          </div>
+        </div>
         <!-- Open Food Facts -->
         <div>
           <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">

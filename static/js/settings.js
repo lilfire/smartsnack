@@ -3,6 +3,8 @@ import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal, showToast
 import { t, getCurrentLang, changeLanguage } from './i18n.js';
 import { loadData } from './products.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
+import { loadOcrSettings } from './ocr-settings.js';
+export { loadOcrSettings } from './ocr-settings.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -70,6 +72,7 @@ export async function loadSettings() {
     loadFlags();
     loadPq();
     loadOffCredentials();
+    loadOcrSettings();
     checkRefreshStatus();
   } finally {
     _settingsLoading = false;

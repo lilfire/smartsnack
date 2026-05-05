@@ -62,3 +62,24 @@ def set_off_credentials():
     except RuntimeError:
         return jsonify({"error": "encryption_not_configured"}), 500
     return jsonify({"ok": True})
+
+
+@bp.route("/api/settings/ocr")
+def get_ocr_settings():
+    return jsonify(settings_service.get_ocr_settings())
+
+
+@bp.route("/api/settings/ocr", methods=["PUT"])
+def set_ocr_settings():
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    provider = data.get("provider", "easyocr")
+    model = data.get("model", "")
+    fallback = bool(data.get("fallback_to_tesseract", False))
+    try:
+        settings_service.set_ocr_settings(provider, model, fallback)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True})

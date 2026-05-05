@@ -150,3 +150,42 @@ def set_off_credentials(user_id: str, password: str) -> None:
         (encrypted_password,),
     )
     conn.commit()
+
+
+_VALID_OCR_PROVIDERS = ("easyocr", "tesseract")
+
+
+def get_ocr_settings() -> dict:
+    conn = get_db()
+    rows = conn.execute(
+        "SELECT key, value FROM user_settings"
+        " WHERE key IN ('ocr_provider', 'ocr_model', 'ocr_fallback_to_tesseract')"
+    ).fetchall()
+    data = {r["key"]: r["value"] for r in rows}
+    return {
+        "provider": data.get("ocr_provider", "easyocr"),
+        "model": data.get("ocr_model", ""),
+        "fallback_to_tesseract": data.get("ocr_fallback_to_tesseract", "false") == "true",
+    }
+
+
+def set_ocr_settings(provider: str, model: str, fallback_to_tesseract: bool) -> None:
+    if provider not in _VALID_OCR_PROVIDERS:
+        raise ValueError(
+            f"Invalid provider. Must be one of: {', '.join(_VALID_OCR_PROVIDERS)}"
+        )
+    conn = get_db()
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_provider', ?)",
+        (provider,),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings (key, value) VALUES ('ocr_model', ?)",
+        (model.strip(),),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO user_settings"
+        " (key, value) VALUES ('ocr_fallback_to_tesseract', ?)",
+        ("true" if fallback_to_tesseract else "false",),
+    )
+    conn.commit()
