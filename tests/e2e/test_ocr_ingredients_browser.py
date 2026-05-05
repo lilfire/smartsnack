@@ -25,7 +25,8 @@ def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
     page.wait_for_timeout(300)
-    edit_btn = row.locator("[data-action='start-edit']")
+    # The start-edit button is in the sibling .expanded div, not inside .table-row.
+    edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
     page.wait_for_timeout(300)
@@ -82,4 +83,20 @@ class TestOcrIngredientTranslationBrowser:
         toggle.click()
         page.wait_for_timeout(300)
 
-        expect(page.locator("#language-select")).to_be_visible()
+        # On desktop upgradeSelect() wraps the native select in .custom-select-wrap and
+        # hides it with CSS, exposing .custom-select-trigger instead.  On mobile the
+        # native select is shown directly.  Use wait_for_function to avoid Playwright
+        # strict-mode failures from or_() when both elements exist in the DOM at once.
+        page.wait_for_function(
+            """() => {
+                const sel = document.getElementById('language-select');
+                if (!sel) return false;
+                const wrap = sel.closest('.custom-select-wrap');
+                if (wrap) {
+                    const trigger = wrap.querySelector('.custom-select-trigger');
+                    return !!(trigger && trigger.offsetParent !== null);
+                }
+                return sel.offsetParent !== null;
+            }""",
+            timeout=5000,
+        )

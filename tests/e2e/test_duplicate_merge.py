@@ -169,7 +169,7 @@ def test_edit_duplicate_detection(page, api_create_product):
 def test_merge_conflict_shows_conflicting_fields(page, api_create_product):
     """The merge conflict modal should display conflicting fields for resolution."""
     api_create_product(name="ConflictA", brand="BrandAlpha", kcal=100)
-    api_create_product(name="ConflictA", brand="BrandBeta", kcal=200)
+    api_create_product(name="ConflictA", brand="BrandBeta", kcal=200, on_duplicate="allow_duplicate")
     _reload_and_wait(page)
 
     # Expand the second product and edit to trigger merge

@@ -106,9 +106,12 @@ window.addEventListener('resize', () => {
 
 export function renderResults(results, search) {
   state.cachedResults = results;
+  const displayTotal = (!search && state.pagination?.total != null)
+    ? state.pagination.total
+    : results.length;
   document.getElementById('result-count').textContent = search
     ? (results.length !== 1 ? t('result_count_search_plural', { count: results.length, query: search }) : t('result_count_search', { count: results.length, query: search }))
-    : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
+    : (displayTotal !== 1 ? t('result_count_plural', { count: displayTotal }) : t('result_count', { count: displayTotal }));
   const container = document.getElementById('results-container');
   if (!results.length) {
     // Clean up any existing delegation listener — prevents ghost handlers when
@@ -383,6 +386,14 @@ export function renderResults(results, search) {
         window.estimateProteinQuality('ed');
         break;
     }
+  }, { signal: _resultsAbort.signal });
+
+  // Enter key on product rows expands them (accessibility)
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const row = e.target.closest('.table-row[data-product-id]');
+    if (!row || e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('input')) return;
+    window.toggleExpand(parseInt(row.dataset.productId, 10));
   }, { signal: _resultsAbort.signal });
 
   // Attach input handlers for validation

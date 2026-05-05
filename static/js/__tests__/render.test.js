@@ -14,6 +14,7 @@ vi.mock('../state.js', () => {
     categories: [],
     imageCache: {},
     advancedFilters: null,
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -63,6 +64,7 @@ vi.mock('../off-utils.js', () => ({
 import { renderNutriTable, fmtCell, getActiveCols, getGridTemplate, renderResults, getFlagConfig, loadFlagConfig } from '../render.js';
 import { state } from '../state.js';
 import { weightData } from '../settings-weights.js';
+import { t } from '../i18n.js';
 
 beforeEach(() => {
   state.expandedId = null;
@@ -1329,6 +1331,69 @@ describe('renderResults - EAN display in product list', () => {
     renderResults(products, '');
     const container = document.getElementById('results-container');
     expect(container.querySelector('.prod-ean')).toBeNull();
+  });
+});
+
+describe('renderResults - pagination guard', () => {
+  let savedPagination;
+  beforeEach(() => {
+    savedPagination = state.pagination;
+    const count = document.createElement('div');
+    count.id = 'result-count';
+    document.body.appendChild(count);
+    const container = document.createElement('div');
+    container.id = 'results-container';
+    document.body.appendChild(container);
+    t.mockClear();
+  });
+  afterEach(() => {
+    state.pagination = savedPagination;
+  });
+
+  it('does not throw and falls back to results.length when state.pagination is undefined', () => {
+    state.pagination = undefined;
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '', has_image: 0 },
+      { id: 2, name: 'Bread', type: 'bakery', total_score: 70, ean: '', has_image: 0 },
+    ];
+    expect(() => renderResults(products, '')).not.toThrow();
+    const countCall = t.mock.calls.find(([key]) => key === 'result_count_plural');
+    expect(countCall).toBeDefined();
+    expect(countCall[1]).toEqual({ count: 2 });
+  });
+
+  it('falls back to results.length when state.pagination.total is null', () => {
+    state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const countCall = t.mock.calls.find(([key]) => key === 'result_count');
+    expect(countCall).toBeDefined();
+    expect(countCall[1]).toEqual({ count: 1 });
+  });
+
+  it('uses state.pagination.total when it is a number in non-search mode', () => {
+    state.pagination = { offset: 0, total: 42, inFlight: false, pageSize: 50 };
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '', has_image: 0 },
+    ];
+    renderResults(products, '');
+    const countCall = t.mock.calls.find(([key]) => key === 'result_count_plural');
+    expect(countCall).toBeDefined();
+    expect(countCall[1]).toEqual({ count: 42 });
+  });
+
+  it('ignores pagination.total in search mode and uses results.length', () => {
+    state.pagination = { offset: 0, total: 42, inFlight: false, pageSize: 50 };
+    const products = [
+      { id: 1, name: 'Milk', type: 'dairy', total_score: 85, ean: '', has_image: 0 },
+      { id: 2, name: 'Bread', type: 'bakery', total_score: 70, ean: '', has_image: 0 },
+    ];
+    renderResults(products, 'milk');
+    const searchCall = t.mock.calls.find(([key]) => key === 'result_count_search_plural');
+    expect(searchCall).toBeDefined();
+    expect(searchCall[1]).toEqual({ count: 2, query: 'milk' });
   });
 });
 

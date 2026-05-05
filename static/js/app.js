@@ -18,7 +18,7 @@ import {
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights,
 } from './settings-weights.js';
-import { updateCategoryLabel, addCategory, deleteCategory } from './settings-categories.js';
+import { loadCategories, updateCategoryLabel, addCategory, deleteCategory } from './settings-categories.js';
 import { addFlag, deleteFlag, updateFlagLabel } from './settings-flags.js';
 import { autosavePq, deletePq, addPq } from './settings-pq.js';
 import {
@@ -60,7 +60,7 @@ Object.assign(window, {
   toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   // settings — categories
-  updateCategoryLabel, addCategory, deleteCategory,
+  loadCategories, updateCategoryLabel, addCategory, deleteCategory,
   // settings — flags
   addFlag, deleteFlag, updateFlagLabel,
   // settings — protein quality

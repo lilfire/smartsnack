@@ -40,7 +40,7 @@ function _renderEanList(productId, eans) {
   html += '</ul>';
 
   html += '<div class="ean-add-row">'
-    + '<input id="ean-add-input-' + productId + '" class="ean-add-input" placeholder="EAN..." maxlength="13" aria-label="' + esc(t('btn_add_ean')) + '">'
+    + '<input id="ean-add-input-' + productId + '" class="ean-add-input" data-ean-new placeholder="EAN..." maxlength="13" aria-label="' + esc(t('btn_add_ean')) + '">'
     + '<button class="btn-ean-add" data-ean-action="add-ean" data-product-id="' + productId + '">' + t('btn_add_ean') + '</button>'
     + '</div>'
     + '<div id="ean-error-' + productId + '" class="field-error" style="display:none"></div>';

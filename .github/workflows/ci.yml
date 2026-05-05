@@ -115,3 +115,37 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down
+
+  e2e-test:
+    name: E2E Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: [build]
+    env:
+      SMARTSNACK_SECRET_KEY: ci-e2e-dummy-key
+      PLAYWRIGHT_BROWSERS_PATH: /tmp/ms-playwright
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr libcairo2
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Install Playwright browsers
+        run: python -m playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        # The tests/e2e/ conftest.py launches its own in-process Flask server
+        # on a random port (see app_server fixture), so no external server is
+        # needed. Tests use Playwright to drive a real browser against the
+        # in-process app.
+        run: python -m pytest tests/e2e/ --tb=short -q

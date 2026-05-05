@@ -70,6 +70,19 @@ def _ensure_browsers():
 
 
 @pytest.fixture(scope="session")
+def browser_type_launch_args(browser_type_launch_args):
+    """Add container-friendly flags so Chrome runs without a display server."""
+    return {
+        **browser_type_launch_args,
+        "args": [
+            *browser_type_launch_args.get("args", []),
+            "--disable-dev-shm-usage",
+            "--no-sandbox",
+        ],
+    }
+
+
+@pytest.fixture(scope="session")
 def browser(launch_browser):
     """Launch browser, skipping all browser-based tests if unavailable."""
     try:
@@ -181,6 +194,15 @@ def app_server(tmp_path_factory):
         dst.close()
     _SNAPSHOT_PATH = snapshot_file
 
+    # Remove seed product so reset_db restores to truly empty product state
+    _snap_conn = sqlite3.connect(snapshot_file)
+    try:
+        _snap_conn.execute('DELETE FROM products')
+        _snap_conn.execute('DELETE FROM product_eans')
+        _snap_conn.commit()
+    finally:
+        _snap_conn.close()
+
     yield base_url
     # Server thread is daemonised; nothing else to clean up.
 
@@ -212,6 +234,20 @@ def reset_db(app_server):
     finally:
         src.close()
         dst.close()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_scroll_sentinel(reset_db):
+    """Reset the scroll-product module sentinel so each test recreates its 55 products."""
+    import sys
+    for key in list(sys.modules):
+        if 'test_infinite_scroll' in key:
+            mod = sys.modules[key]
+            if hasattr(mod, '_SCROLL_PRODUCTS_CREATED'):
+                mod._SCROLL_PRODUCTS_CREATED = False
+                if hasattr(mod, '_SCROLL_PRODUCT_NAMES'):
+                    mod._SCROLL_PRODUCT_NAMES = []
     yield
 
 
