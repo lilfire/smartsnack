@@ -38,13 +38,23 @@ class TestOcrProviderSelectBrowser:
         """The OCR provider dropdown should be visible."""
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
-        # On desktop the native select is hidden and replaced by a custom dropdown.
-        # Accept either the custom trigger button or the native select (mobile).
-        ocr_trigger = page.locator(
-            ".custom-select-wrap:has(#ocr-provider-select) .custom-select-trigger"
+        # On desktop upgradeSelect() wraps the native select in .custom-select-wrap and
+        # hides it with CSS, exposing .custom-select-trigger instead.  On mobile the
+        # native select is shown directly.  Use wait_for_function to avoid Playwright
+        # strict-mode failures from or_() when both elements exist in the DOM at once.
+        page.wait_for_function(
+            """() => {
+                const sel = document.getElementById('ocr-provider-select');
+                if (!sel) return false;
+                const wrap = sel.closest('.custom-select-wrap');
+                if (wrap) {
+                    const trigger = wrap.querySelector('.custom-select-trigger');
+                    return !!(trigger && trigger.offsetParent !== null);
+                }
+                return sel.offsetParent !== null;
+            }""",
+            timeout=5000,
         )
-        ocr_native = page.locator("#ocr-provider-select")
-        expect(ocr_trigger.or_(ocr_native)).to_be_visible()
 
     def test_tesseract_is_default(self, page):
         """Tesseract should be selected by default."""
