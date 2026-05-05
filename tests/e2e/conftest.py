@@ -227,13 +227,20 @@ def reset_db(app_server):
 
 @pytest.fixture(autouse=True)
 def _reset_scroll_sentinel(reset_db):
-    """Reset module-level sentinel so each test recreates its 55 scroll products."""
-    try:
-        import tests.e2e.test_infinite_scroll as tis
-        tis._SCROLL_PRODUCTS_CREATED = False
-        tis._SCROLL_PRODUCT_NAMES = []
-    except (ImportError, AttributeError):
-        pass
+    """Reset module-level sentinel so each test recreates its 55 scroll products.
+
+    Uses sys.modules scan instead of a direct import because pytest registers
+    test_infinite_scroll.py under the key "test_infinite_scroll", not under
+    "tests.e2e.test_infinite_scroll". A direct import creates a shadow copy
+    under the dotted key, leaving the real sentinel unchanged.
+    """
+    for key in list(sys.modules):
+        if "test_infinite_scroll" in key:
+            mod = sys.modules[key]
+            if hasattr(mod, "_SCROLL_PRODUCTS_CREATED"):
+                mod._SCROLL_PRODUCTS_CREATED = False
+                if hasattr(mod, "_SCROLL_PRODUCT_NAMES"):
+                    mod._SCROLL_PRODUCT_NAMES = []
     yield
 
 
