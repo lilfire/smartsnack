@@ -249,9 +249,12 @@ def test_off_review_submit_calls_api_and_closes_modal(page):
             body=json.dumps({"ok": True}),
         )
 
-    page.route("**/api/off/add-product", _add_product_handler)
-
+    # Open the review modal first; _register_and_accept_off_prompt also
+    # installs a route handler for /api/off/add-product.  Register our
+    # capturing handler AFTER it so that Playwright's LIFO route ordering
+    # ensures our handler is invoked when Submit is clicked.
     _register_and_accept_off_prompt(page)
+    page.route("**/api/off/add-product", _add_product_handler)
 
     review_bg = page.locator("#off-add-review-bg")
     expect(review_bg).to_be_visible(timeout=5000)
