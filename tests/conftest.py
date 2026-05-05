@@ -25,12 +25,22 @@ def _patch_db_path(monkeypatch, db_file):
 
 
 @pytest.fixture(autouse=True)
+def _reset_scoring_caches():
+    """Reset module-level scoring caches between tests to prevent cross-test pollution."""
+    import services.product_scoring as ps
+    ps.invalidate_scoring_cache()
+    yield
+    ps.invalidate_scoring_cache()
+
+
+@pytest.fixture(autouse=True)
 def _env_setup(request, tmp_path, monkeypatch):
     """Set up environment for every test: temp DB path and secret key.
 
     Skipped for e2e tests, which manage their own server and database.
     """
-    if "e2e" in str(request.fspath):
+    import pathlib
+    if "e2e" in pathlib.Path(str(request.fspath)).parts:
         return
     db_file = str(tmp_path / "test.sqlite")
     monkeypatch.setenv("SMARTSNACK_SECRET_KEY", "test-secret-key-for-unit-tests")
@@ -130,7 +140,8 @@ def translations_dir(request, tmp_path, monkeypatch):
 
     Skipped for e2e tests, which manage their own setup.
     """
-    if "e2e" in str(request.fspath):
+    import pathlib
+    if "e2e" in pathlib.Path(str(request.fspath)).parts:
         return None
     import config
 

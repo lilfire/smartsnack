@@ -3,8 +3,8 @@
 from flask import Blueprint, jsonify
 
 from helpers import _require_json, _check_api_key
-from config import _MAX_PASSWORD_LEN
-from services import settings_service
+from config import _MAX_PASSWORD_LEN, OFF_SUPPORTED_LANGUAGES
+from services import settings_service, ocr_service
 
 bp = Blueprint("settings", __name__)
 
@@ -66,7 +66,45 @@ def set_off_credentials():
 
 @bp.route("/api/settings/ocr")
 def get_ocr_settings():
-    return jsonify(settings_service.get_ocr_settings())
+    current = settings_service.get_ocr_backend()
+    backends = ocr_service.get_available_backends()
+    return jsonify({"current_backend": current, "available_backends": backends})
+
+
+@bp.route("/api/settings/off-languages")
+def get_off_languages():
+    return jsonify({"languages": OFF_SUPPORTED_LANGUAGES})
+
+
+@bp.route("/api/settings/off-language-priority")
+def get_off_language_priority():
+    priority = settings_service.get_off_language_priority()
+    return jsonify({"priority": priority})
+
+
+@bp.route("/api/settings/off-language-priority", methods=["PUT"])
+def set_off_language_priority():
+    try:
+        data = _require_json()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    priority = data.get("priority")
+    if not isinstance(priority, list):
+        return jsonify({"error": "priority must be a list"}), 400
+    if not priority:
+        return jsonify({"error": "priority must not be empty"}), 400
+    if not all(isinstance(item, str) and item.strip() for item in priority):
+        return jsonify({"error": "priority must be a list of non-empty strings"}), 400
+    # Deduplicate preserving order
+    seen = set()
+    deduped = []
+    for item in priority:
+        item = item.strip()
+        if item not in seen:
+            seen.add(item)
+            deduped.append(item)
+    settings_service.set_off_language_priority(deduped)
+    return jsonify({"priority": deduped})
 
 
 @bp.route("/api/settings/ocr", methods=["PUT"])
@@ -75,11 +113,15 @@ def set_ocr_settings():
         data = _require_json()
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    provider = data.get("provider", "easyocr")
-    model = data.get("model", "")
-    fallback = bool(data.get("fallback_to_tesseract", False))
-    try:
-        settings_service.set_ocr_settings(provider, model, fallback)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
-    return jsonify({"ok": True})
+    backend_id = data.get("backend", "")
+    if not backend_id:
+        return jsonify({"error": "backend is required"}), 400
+    from config import OCR_BACKENDS
+    if backend_id not in OCR_BACKENDS:
+        return jsonify({"error": f"Unrecognized OCR backend '{backend_id}'"}), 400
+    # Check availability before storing
+    backends = {b["id"]: b for b in ocr_service.get_available_backends()}
+    if not backends[backend_id]["available"]:
+        return jsonify({"error": f"Backend '{backend_id}' is not available (missing API key)"}), 400
+    settings_service.set_ocr_backend(backend_id)
+    return jsonify({"ok": True, "backend": backend_id})

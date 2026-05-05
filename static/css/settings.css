@@ -623,6 +623,20 @@
   display: none;
 }
 
+/* ── Settings: Radio Labels (OCR backend selection) ── */
+.settings-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.settings-radio-label.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .form-section {
   font-size: 10px;
   font-weight: 600;
@@ -633,4 +647,65 @@
   padding-top: 8px;
   margin: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Settings: OFF Language Priority ────────────── */
+.off-lang-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.off-lang-item + .off-lang-item {
+  margin-top: 4px;
+}
+
+.off-lang-code {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e8e6e3;
+  min-width: 28px;
+  font-family: 'Space Mono', monospace;
+}
+
+.off-lang-name {
+  flex: 1;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── OCR fallback transition ────────────────────── */
+#ocr-fallback-wrapper {
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+#ocr-fallback-wrapper.visible {
+  max-height: 60px;
+  opacity: 1;
+}
+
+/* ── Settings: Score-weighting scope (per-category) ───── */
+.weights-scope-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 6px;
+  flex-wrap: wrap;
+}
+.weights-scope-row .field-label {
+  margin: 0;
+}
+.weights-scope-row .field-select {
+  min-width: 220px;
+  flex: 0 1 240px;
+}
+.weights-scope-hint {
+  margin: 0 0 14px;
+  font-style: italic;
 }

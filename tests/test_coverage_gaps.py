@@ -94,14 +94,14 @@ class TestBackupBlueprintApiKey:
 class TestBackupBlueprintErrors:
     def test_restore_oserror_returns_500(self, client):
         """Lines 45-47: OSError during restore returns 500."""
-        with patch("services.backup_service.restore_backup", side_effect=OSError("disk fail")):
+        with patch("services.backup_core.restore_backup", side_effect=OSError("disk fail")):
             resp = client.post("/api/restore", json={"products": []})
             assert resp.status_code == 500
             assert "Restore failed" in resp.get_json()["error"]
 
     def test_restore_runtime_error_returns_500(self, client):
         """Lines 45-47: RuntimeError during restore returns 500."""
-        with patch("services.backup_service.restore_backup", side_effect=RuntimeError("fail")):
+        with patch("services.backup_core.restore_backup", side_effect=RuntimeError("fail")):
             resp = client.post("/api/restore", json={"products": []})
             assert resp.status_code == 500
 
@@ -112,7 +112,7 @@ class TestBackupBlueprintErrors:
 
     def test_import_oserror_returns_500(self, client):
         """Lines 69-71: OSError during import returns 500."""
-        with patch("services.backup_service.import_products", side_effect=OSError("disk")):
+        with patch("services.import_service.import_products", side_effect=OSError("disk")):
             resp = client.post("/api/import", json={"products": []})
             assert resp.status_code == 500
             assert "Import failed" in resp.get_json()["error"]
@@ -194,21 +194,21 @@ class TestCategoriesBlueprintEdgeCases:
 class TestOptFloatEdgeCases:
     def test_invalid_string_raises(self):
         """Lines 94-95: non-numeric string raises ValueError."""
-        from services.backup_service import _opt_float
+        from services.backup_core import _opt_float
 
         with pytest.raises(ValueError, match="Invalid numeric"):
             _opt_float("not_a_number")
 
     def test_nan_raises(self):
         """Line 97: NaN raises ValueError."""
-        from services.backup_service import _opt_float
+        from services.backup_core import _opt_float
 
         with pytest.raises(ValueError, match="Non-finite"):
             _opt_float(float("nan"))
 
     def test_inf_raises(self):
         """Line 97: Infinity raises ValueError."""
-        from services.backup_service import _opt_float
+        from services.backup_core import _opt_float
 
         with pytest.raises(ValueError, match="Non-finite"):
             _opt_float(float("inf"))
@@ -220,15 +220,21 @@ class TestOverwriteProduct:
 
         db.execute(
             INSERT_WITH_IMAGE_SQL,
-            (cat, name, ean, "", "", "", "", None, None, None, None, None,
+            (cat, name, "", "", "", "", None, None, None, None, None,
              None, None, None, None, None, None, None, None, None, None, None, ""),
         )
+        pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if ean:
+            db.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (pid, ean),
+            )
         db.commit()
-        return db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        return pid
 
     def test_overwrite_all_fields(self, app_ctx, db, seed_category):
         """Lines 112-148: overwrite replaces all fields including flags."""
-        from services.backup_service import _overwrite_product
+        from services.import_service import _overwrite_product
 
         pid = self._insert_product(db, "Overwrite Test", ean="OW123")
         cur = db.cursor()
@@ -253,7 +259,7 @@ class TestOverwriteProduct:
 
     def test_overwrite_text_too_long(self, app_ctx, db, seed_category):
         """Line 117: text field exceeding max length raises ValueError."""
-        from services.backup_service import _overwrite_product
+        from services.import_service import _overwrite_product
 
         pid = self._insert_product(db, "Long Text Test")
         cur = db.cursor()
@@ -267,10 +273,15 @@ class TestMergeProduct:
 
         db.execute(
             INSERT_WITH_IMAGE_SQL,
-            (cat, name, ean, brand, "", "", "", None, None, None, None, None,
+            (cat, name, brand, "", "", "", None, None, None, None, None,
              None, None, None, None, None, None, None, None, None, None, None, ""),
         )
         pid = db.execute("SELECT last_insert_rowid()").fetchone()[0]
+        if ean:
+            db.execute(
+                "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
+                (pid, ean),
+            )
         if synced:
             db.execute(
                 "INSERT OR IGNORE INTO product_flags (product_id, flag) VALUES (?, 'is_synced_with_off')",
@@ -281,7 +292,7 @@ class TestMergeProduct:
 
     def test_merge_text_too_long(self, app_ctx, db, seed_category):
         """Line 164: merge raises ValueError for too-long text."""
-        from services.backup_service import _merge_product
+        from services.import_service import _merge_product
 
         pid = self._insert_product(db, "Merge Long")
         cur = db.cursor()
@@ -290,7 +301,7 @@ class TestMergeProduct:
 
     def test_merge_numeric_fields(self, app_ctx, db, seed_category):
         """Lines 197-199: merge handles numeric fields via _opt_float."""
-        from services.backup_service import _merge_product
+        from services.import_service import _merge_product
 
         pid = self._insert_product(db, "Merge Numeric", ean="MN001")
         cur = db.cursor()
@@ -306,7 +317,7 @@ class TestMergeProduct:
 
     def test_merge_image_fill_empty(self, app_ctx, db, seed_category):
         """Lines 214-217: merge fills image when existing is empty."""
-        from services.backup_service import _merge_product
+        from services.import_service import _merge_product
 
         pid = self._insert_product(db, "Merge Img")
         cur = db.cursor()
@@ -321,7 +332,7 @@ class TestMergeProduct:
 
     def test_merge_image_imported_wins(self, app_ctx, db, seed_category):
         """Lines 214-217: merge replaces image when imported wins."""
-        from services.backup_service import _merge_product
+        from services.import_service import _merge_product
 
         pid = self._insert_product(db, "Merge Img2", synced=False)
         # Set existing image
@@ -341,7 +352,7 @@ class TestMergeProduct:
 class TestRestoreProteinQualityEdgeCases:
     def test_pq_with_label_fallback_name(self, app_ctx, db):
         """Lines 451-455: protein quality entry with no name, using label as fallback."""
-        from services.backup_service import _restore_protein_quality
+        from services.backup_core import _restore_protein_quality
 
         cur = db.cursor()
         pending = _restore_protein_quality(
@@ -356,7 +367,7 @@ class TestRestoreProteinQualityEdgeCases:
 
     def test_pq_with_keywords_fallback_name(self, app_ctx, db):
         """Lines 451-455: protein quality entry with no name/label, using first keyword."""
-        from services.backup_service import _restore_protein_quality
+        from services.backup_core import _restore_protein_quality
 
         cur = db.cursor()
         _restore_protein_quality(
@@ -371,7 +382,7 @@ class TestRestoreProteinQualityEdgeCases:
 
     def test_pq_legacy_flat_label_and_keywords(self, app_ctx, db, translations_dir):
         """Lines 479-491: legacy format with flat label/keywords fields."""
-        from services.backup_service import _restore_protein_quality
+        from services.backup_core import _restore_protein_quality
 
         cur = db.cursor()
         pending = _restore_protein_quality(
@@ -393,7 +404,7 @@ class TestRestoreProteinQualityEdgeCases:
 
     def test_pq_legacy_keywords_as_list(self, app_ctx, db, translations_dir):
         """Lines 488-496: legacy keywords as list."""
-        from services.backup_service import _restore_protein_quality
+        from services.backup_core import _restore_protein_quality
 
         cur = db.cursor()
         pending = _restore_protein_quality(
@@ -413,7 +424,7 @@ class TestRestoreProteinQualityEdgeCases:
 class TestRestoreFlagDefinitionsEdgeCases:
     def test_empty_name_skipped(self, app_ctx, db, translations_dir):
         """Line 510: flag definition with empty name is skipped."""
-        from services.backup_service import _restore_flag_definitions
+        from services.backup_core import _restore_flag_definitions
 
         cur = db.cursor()
         _restore_flag_definitions(
@@ -426,7 +437,7 @@ class TestRestoreFlagDefinitionsEdgeCases:
 
     def test_invalid_type_defaults_to_user(self, app_ctx, db, translations_dir):
         """Line 512: invalid type defaults to 'user'."""
-        from services.backup_service import _restore_flag_definitions
+        from services.backup_core import _restore_flag_definitions
 
         cur = db.cursor()
         _restore_flag_definitions(
@@ -443,7 +454,7 @@ class TestRestoreFlagDefinitionsEdgeCases:
 class TestRestoreBackupRollback:
     def test_restore_rolls_back_on_error(self, app_ctx, db, translations_dir):
         """Lines 561-564: restore rolls back on exception."""
-        from services.backup_service import restore_backup
+        from services.backup_core import restore_backup
         from db import get_db
 
         before = get_db().execute("SELECT COUNT(*) FROM products").fetchone()[0]
@@ -465,7 +476,7 @@ class TestImportWithCategoriesAndFlags:
 
     def test_import_with_category_translations(self, app_ctx, seed_category):
         """Lines 597-613: import creates categories with translations."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
 
         import_products({
             "categories": [
@@ -486,7 +497,7 @@ class TestImportWithCategoriesAndFlags:
 
     def test_import_with_category_label_legacy(self, app_ctx, seed_category):
         """Lines 604-606: import with legacy label field creates translations for all langs."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
 
         import_products({
             "categories": [
@@ -503,17 +514,24 @@ class TestImportWithCategoriesAndFlags:
 
     def test_import_duplicate_category_ignored(self, app_ctx, seed_category):
         """Line 612: IntegrityError on duplicate category is silently ignored."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
+        from db import get_db
 
+        count_before = get_db().execute(
+            "SELECT COUNT(*) FROM categories WHERE name='Snacks'"
+        ).fetchone()[0]
         import_products({
             "categories": [{"name": "Snacks", "emoji": "🍿"}],
             "products": [],
         })
-        # Should not raise
+        count_after = get_db().execute(
+            "SELECT COUNT(*) FROM categories WHERE name='Snacks'"
+        ).fetchone()[0]
+        assert count_after == count_before  # duplicate was not inserted
 
     def test_import_with_flag_definitions(self, app_ctx, seed_category):
         """Lines 615-630: import creates flag definitions with translations."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
 
         import_products({
             "flag_definitions": [
@@ -534,7 +552,7 @@ class TestImportWithCategoriesAndFlags:
 
     def test_import_duplicate_flag_definition_ignored(self, app_ctx, seed_category):
         """Line 630: IntegrityError on duplicate flag definition is silently ignored."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
         from db import get_db
 
         # First import
@@ -542,15 +560,23 @@ class TestImportWithCategoriesAndFlags:
             "flag_definitions": [{"name": "dup_flag", "type": "user"}],
             "products": [],
         })
-        # Second import — same flag — should not raise
+        count_after_first = get_db().execute(
+            "SELECT COUNT(*) FROM flag_definitions WHERE name='dup_flag'"
+        ).fetchone()[0]
+        # Second import — same flag — should not raise and not duplicate
         import_products({
             "flag_definitions": [{"name": "dup_flag", "type": "user"}],
             "products": [],
         })
+        count_after_second = get_db().execute(
+            "SELECT COUNT(*) FROM flag_definitions WHERE name='dup_flag'"
+        ).fetchone()[0]
+        assert count_after_first == 1
+        assert count_after_second == count_after_first  # no duplicate inserted
 
     def test_import_flag_definition_invalid_type_skipped(self, app_ctx, seed_category):
         """Line 618: flag definition with invalid type is skipped during import."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
         from db import get_db
 
         import_products({
@@ -564,7 +590,7 @@ class TestImportWithCategoriesAndFlags:
 
     def test_import_auto_creates_category_dedup(self, app_ctx, seed_category):
         """Lines 638-654: auto-create category from product type, with dedup."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
         from db import get_db
 
         import_products({
@@ -586,7 +612,7 @@ class TestImportRollback:
 
     def test_import_rolls_back_on_error(self, app_ctx, seed_category):
         """Lines 686-689: import rolls back on exception."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
         from db import get_db
 
         before = get_db().execute("SELECT COUNT(*) FROM products").fetchone()[0]
@@ -602,7 +628,7 @@ class TestImportRollback:
 
     def test_import_invalid_merge_priority_defaults(self, app_ctx, seed_category):
         """Line 587: invalid merge_priority falls back to keep_existing."""
-        from services.backup_service import import_products
+        from services.import_service import import_products
 
         msg = import_products(
             {"products": [{"type": "Snacks", "name": "MP Test"}]},

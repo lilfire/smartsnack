@@ -1,6 +1,6 @@
 [project]
 name = "smartsnack"
-version = "0.10.0"
+version = "0.18.0"
 requires-python = ">=3.10"
 dependencies = [
     "flask==3.1.0",
@@ -21,3 +21,15 @@ e2e = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["blueprints", "services", "app", "config", "db", "helpers", "translations"]
+omit = ["tests/*", "tests/e2e/*"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.",
+]

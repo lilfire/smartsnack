@@ -1,10 +1,11 @@
 // ── Barcode Scanner (all scanner sections) ──────────
-import { state, api, esc, catEmoji, catLabel, safeDataUri, fetchProducts } from './state.js';
+import { state, api, esc, catEmoji, catLabel, safeDataUri, fetchProducts, trapFocus } from './state.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender } from './filters.js';
 import { loadProductImage } from './images.js';
 import { showToast, switchView, loadData } from './products.js';
 import { renderResults } from './render.js';
+import { createTorchButton, checkTorchSupport, resetTorch } from './scanner-torch.js';
 
 let _scanner = null;
 let _scannerCtx = { prefix: null, productId: null };
@@ -37,6 +38,8 @@ function buildScannerUI(headerHtml, hintText, closeFn) {
   hint.className = 'scanner-hint';
   hint.textContent = hintText;
   wrap.appendChild(hint);
+  wrap.appendChild(createTorchButton());
+
   bg.appendChild(wrap);
 
   document.body.appendChild(bg);
@@ -59,7 +62,7 @@ function startScannerHardware(onSuccess, closeFn) {
     ] },
     onSuccess,
     () => {}
-  ).catch((err) => {
+  ).then(() => { setTimeout(checkTorchSupport, 600); }).catch((err) => {
     showToast(t('toast_scanner_load_error'), 'error');
     const videoWrap = document.querySelector('.scanner-video-wrap');
     if (videoWrap) {
@@ -111,17 +114,18 @@ function onBarcodeDetected(code) {
   const productId = _scannerCtx.productId;
   const eanEl = document.getElementById(prefix + '-ean');
   if (eanEl) eanEl.value = code;
-  import('./openfoodfacts.js').then((mod) => { mod.validateOffBtn(prefix); });
+  import('./off-utils.js').then((mod) => { mod.validateOffBtn(prefix); });
 
   closeScanner();
 
   showToast(t('toast_barcode_scanned', { code: code }), 'success');
   setTimeout(() => {
-    import('./openfoodfacts.js').then((mod) => { mod.lookupOFF(prefix, productId); });
+    import('./off-api.js').then((mod) => { mod.lookupOFF(prefix, productId); });
   }, 300);
 }
 
 export function closeScanner() {
+  resetTorch();
   if (_scanner) {
     const s = _scanner;
     _scanner = null;
@@ -174,11 +178,13 @@ async function onSearchScanDetected(code) {
   try {
     if (state.currentView !== 'search') switchView('search');
 
-    const allProducts = await fetchProducts('', []);
-
+    const raw = await fetchProducts(code, []);
+    const products = Array.isArray(raw) ? raw : (raw.products || []);
     let found = null;
-    for (let i = 0; i < allProducts.length; i++) {
-      if (allProducts[i].ean === code) { found = allProducts[i]; break; }
+    if (products.length === 1) {
+      found = products[0];
+    } else if (products.length > 1) {
+      found = products.find((p) => p.ean === code) || null;
     }
 
     if (found) {
@@ -188,7 +194,8 @@ async function onSearchScanDetected(code) {
       state.sortCol = 'total_score';
       state.sortDir = 'desc';
 
-      const filtered = await fetchProducts('', state.currentFilter);
+      const filteredRaw = await fetchProducts('', state.currentFilter);
+      const filtered = Array.isArray(filteredRaw) ? filteredRaw : (filteredRaw.products || []);
       renderResults(filtered, '');
 
       document.getElementById('search-input').value = '';
@@ -259,9 +266,13 @@ export function showScanNotFoundModal(ean) {
   cancelBtn.addEventListener('click', () => { closeScanModal(); });
   actions.appendChild(cancelBtn);
 
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modal);
   document.body.appendChild(bg);
   document.body.style.overflow = 'hidden';
+  trapFocus(bg);
+  regBtn.focus();
 }
 
 export function closeScanModal() {
@@ -275,9 +286,9 @@ export function scanRegisterNew(ean) {
   switchView('register');
   const eanEl = document.getElementById('f-ean');
   if (eanEl) eanEl.value = ean;
-  import('./openfoodfacts.js').then((mod) => {
-    mod.validateOffBtn('f');
-    setTimeout(() => { mod.lookupOFF('f', null, { autoClose: true }); }, 300);
+  Promise.all([import('./off-utils.js'), import('./off-api.js')]).then(([utilsMod, apiMod]) => {
+    utilsMod.validateOffBtn('f');
+    setTimeout(() => { apiMod.lookupOFF('f', null, { autoClose: true }); }, 300);
   });
 }
 
@@ -338,8 +349,11 @@ export function showScanProductPicker(ean) {
   bodyDiv.innerHTML = '<div class="off-modal-empty">\u{1F50D} ' + esc(t('search_placeholder')) + '</div>';
   modal.appendChild(bodyDiv);
 
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modal);
   document.body.appendChild(bg);
+  trapFocus(bg);
   setTimeout(() => { if (searchInput) searchInput.focus(); }, 100);
 }
 
@@ -359,7 +373,8 @@ export async function scanPickerSearch() {
   body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:40px 0"><span class="spinner"></span></div>';
   if (cnt) cnt.textContent = t('scan_searching', { query: query });
   try {
-    const results = await fetchProducts(query, []);
+    const raw = await fetchProducts(query, []);
+    const results = Array.isArray(raw) ? raw : (raw.products || []);
     if (!results.length) {
       body.innerHTML = '<div class="off-modal-empty">' + esc(t('off_no_results_for', { query: query })) + '</div>';
       if (cnt) cnt.textContent = t('off_zero_results');
@@ -460,8 +475,12 @@ export function showScanOffConfirm(ean, productId) {
   skipBtn.addEventListener('click', () => { closeScanOffConfirm(); loadData(); });
   actions.appendChild(skipBtn);
 
+  bg.setAttribute('role', 'dialog');
+  bg.setAttribute('aria-modal', 'true');
   bg.appendChild(modal);
   document.body.appendChild(bg);
+  trapFocus(bg);
+  fetchBtn.focus();
 }
 
 export function closeScanOffConfirm() {
@@ -482,9 +501,9 @@ export async function scanOffFetch(ean, productId) {
   setTimeout(() => {
     const eanEl = document.getElementById('ed-ean');
     if (eanEl) eanEl.value = ean;
-    import('./openfoodfacts.js').then((mod) => {
-      mod.validateOffBtn('ed');
-      setTimeout(() => { mod.lookupOFF('ed', productId); }, 200);
+    Promise.all([import('./off-utils.js'), import('./off-api.js')]).then(([utilsMod, apiMod]) => {
+      utilsMod.validateOffBtn('ed');
+      setTimeout(() => { apiMod.lookupOFF('ed', productId); }, 200);
     });
   }, 300);
 }

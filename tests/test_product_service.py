@@ -8,7 +8,7 @@ class TestLoadWeightConfig:
         from services.product_service import _load_weight_config
 
         cur = db.cursor()
-        enabled_weights, weight_config, enabled_fields = _load_weight_config(cur)
+        enabled_weights, weight_config, enabled_fields, _ = _load_weight_config(cur)
         # taste_score is enabled by default
         assert "taste_score" in enabled_weights
         assert "taste_score" in weight_config
@@ -19,7 +19,7 @@ class TestLoadWeightConfig:
 
         cur = db.cursor()
         # kcal is disabled by default
-        enabled_weights, _, _ = _load_weight_config(cur)
+        enabled_weights, _, _, _ = _load_weight_config(cur)
         assert "kcal" not in enabled_weights
 
 
@@ -166,34 +166,36 @@ class TestListProducts:
         from services.product_service import list_products
 
         result = list_products(None, None)
-        assert len(result) >= 1
-        assert "total_score" in result[0]
-        assert "scores" in result[0]
+        products = result["products"]
+        assert len(products) >= 1
+        assert "total_score" in products[0]
+        assert "scores" in products[0]
 
     def test_search_filter(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products("Popcorn", None)
-        assert len(result) >= 1
-        assert "Popcorn" in result[0]["name"]
+        products = result["products"]
+        assert len(products) >= 1
+        assert "Popcorn" in products[0]["name"]
 
     def test_search_no_match(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products("ZZZZNOTFOUND", None)
-        assert result == []
+        assert result["products"] == []
 
     def test_type_filter(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products(None, "Snacks")
-        assert all(p["type"] == "Snacks" for p in result)
+        assert all(p["type"] == "Snacks" for p in result["products"])
 
     def test_multi_type_filter(self, app_ctx):
         from services.product_service import list_products
 
         result = list_products(None, "Snacks,NonExistent")
-        assert all(p["type"] == "Snacks" for p in result)
+        assert all(p["type"] == "Snacks" for p in result["products"])
 
 
 class TestAddProduct:
@@ -258,8 +260,11 @@ class TestUpdateProduct:
 
     def test_update_numeric_field(self, app_ctx, seed_product):
         from services.product_service import update_product
+        from db import get_db
 
         update_product(seed_product, {"kcal": 500.0})
+        row = get_db().execute("SELECT kcal FROM products WHERE id=?", (seed_product,)).fetchone()
+        assert row["kcal"] == 500.0
 
     def test_invalid_field(self, app_ctx, seed_product):
         from services.product_service import update_product

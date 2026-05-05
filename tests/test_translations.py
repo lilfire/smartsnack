@@ -248,7 +248,7 @@ class TestTranslationKeysUsedInSource:
         """Extract translation keys from data-i18n* attributes in HTML templates."""
         keys = set()
         templates_dir = os.path.join(ROOT_DIR, "templates")
-        attr_re = re.compile(r'data-i18n(?:-(?:html|placeholder|title))?="([a-z_][a-z0-9_]*)"')
+        attr_re = re.compile(r'data-i18n(?:-(?:html|placeholder|title|aria-label))?="([a-z_][a-z0-9_]*)"')
 
         for dirpath, _, filenames in os.walk(templates_dir):
             for filename in filenames:
@@ -297,4 +297,23 @@ class TestTranslationKeysUsedInSource:
         assert not missing, (
             "Translation keys used in source code but missing from all translation files:\n"
             + "\n".join(f"  - {k}" for k in sorted(missing))
+        )
+
+    def test_critical_dynamic_keys_exist(self):
+        """Verify that critical keys constructed at runtime via concatenation are present.
+
+        The static analysis above skips 'bulk_report_' prefix keys because they are built
+        dynamically (e.g. t('bulk_report_' + item.status)).  This test explicitly checks the
+        known status-derived keys so a missing key is caught even though the prefix is excluded.
+        """
+        translation_keys = self._load_all_translation_keys()
+        required = [
+            "bulk_report_skipped",
+            "bulk_report_error",
+            "bulk_report_updated",
+        ]
+        missing = [k for k in required if k not in translation_keys]
+        assert not missing, (
+            "Critical dynamic translation keys missing from all translation files:\n"
+            + "\n".join(f"  - {k}" for k in missing)
         )

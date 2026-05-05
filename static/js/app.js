@@ -1,43 +1,44 @@
 // ── SmartSnack Entry Point ───────────────────────────
 // ES Module entry point — imports all modules and exposes functions to window
 
-import { state, api } from './state.js';
+import { state, api, upgradeSelect, initAllFieldSelects } from './state.js';
 import { initLanguage, changeLanguage, t } from './i18n.js';
 import { toggleFilters, setSort, rerender } from './filters.js';
-import { triggerImageUpload, removeProductImage } from './images.js';
+import { triggerImageUpload, removeProductImage, captureProductImage, clearPendingImage } from './images.js';
 import { renderResults, loadFlagConfig } from './render.js';
 import {
   showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   loadData, switchView, setFilter, toggleExpand,
-  onSearchInput, clearSearch, registerProduct
+  onSearchInput, clearSearch, registerProduct,
+  loadEanManager, addEan, deleteEan, setEanPrimary
 } from './products.js';
 import {
   SCORE_CFG_MAP, weightData,
-  loadSettings, toggleSettingsSection, toggleWeightConfig, removeWeight, addWeightFromDropdown,
+  loadSettings, toggleWeightConfig, removeWeight, addWeightFromDropdown,
   onWeightDirection, onWeightFormula, onWeightMin, onWeightMax, onWeightSlider,
   saveWeights,
-  updateCategoryLabel, addCategory, deleteCategory,
-  addFlag, deleteFlag, updateFlagLabel,
-  autosavePq, deletePq, addPq,
+} from './settings-weights.js';
+import { updateCategoryLabel, addCategory, deleteCategory } from './settings-categories.js';
+import { addFlag, deleteFlag, updateFlagLabel } from './settings-flags.js';
+import { autosavePq, deletePq, addPq } from './settings-pq.js';
+import {
   downloadBackup, handleRestore, handleImport,
-  initRestoreDragDrop,
-  saveOffCredentials,
-  refreshAllFromOff, estimateAllPq
-} from './settings.js';
+  initRestoreDragDrop, toggleSettingsSection, estimateAllPq,
+} from './settings-backup.js';
+import { loadOcrSettings, saveOcrSettings } from './settings-ocr.js';
+import { saveOffCredentials, refreshAllFromOff } from './settings-off.js';
 import {
   openScanner, closeScanner, openSearchScanner,
   closeScanModal, scanRegisterNew, scanUpdateExisting,
   closeScanPicker, scanPickerSearch, scanPickerSelect,
   showScanOffConfirm, closeScanOffConfirm, scanOffFetch
 } from './scanner.js';
-import {
-  validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
-  selectOffResult, estimateProteinQuality, updateEstimateBtn,
-  showOffAddReview, closeOffAddReview, submitToOff
-} from './openfoodfacts.js';
+import { validateOffBtn, estimateProteinQuality, updateEstimateBtn } from './off-utils.js';
+import { lookupOFF } from './off-api.js';
+import { closeOffPicker, offModalSearch, selectOffResult } from './off-picker.js';
+import { showOffAddReview, closeOffAddReview, submitToOff } from './off-review.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
 import { scanIngredients } from './ocr.js';
-import { onOcrProviderChange, saveOcrSettings } from './ocr-settings.js';
 
 // ── Expose functions to window for HTML onclick handlers ──
 Object.assign(window, {
@@ -46,11 +47,12 @@ Object.assign(window, {
   // filters
   toggleFilters, setSort, toggleAdvancedFilters,
   // images
-  triggerImageUpload, removeProductImage,
+  triggerImageUpload, removeProductImage, captureProductImage, clearPendingImage,
   // products
   showToast, startEdit, saveProduct, deleteProduct, unlockEan,
   switchView, setFilter, toggleExpand,
   onSearchInput, clearSearch, registerProduct,
+  loadEanManager, addEan, deleteEan, setEanPrimary,
   rerender,
   // settings — sections
   toggleSettingsSection,
@@ -67,6 +69,8 @@ Object.assign(window, {
   downloadBackup, handleRestore, handleImport,
   // settings — OFF credentials
   saveOffCredentials,
+  // settings — OCR
+  saveOcrSettings,
   // settings — bulk operations
   refreshAllFromOff, estimateAllPq,
   // scanner
@@ -76,8 +80,6 @@ Object.assign(window, {
   scanOffFetch, closeScanOffConfirm,
   // ocr
   scanIngredients,
-  // ocr settings
-  onOcrProviderChange, saveOcrSettings,
   // openfoodfacts
   validateOffBtn, lookupOFF, closeOffPicker, offModalSearch,
   selectOffResult, estimateProteinQuality, updateEstimateBtn,
@@ -116,6 +118,9 @@ document.addEventListener('touchstart', function(e) {
 // ── Init ─────────────────────────────────────────────
 (async function() {
   await initLanguage();
+  initAllFieldSelects();
+  const langSel = document.getElementById('language-select');
+  if (langSel) upgradeSelect(langSel, (val) => changeLanguage(val));
   try {
     const wc = await api('/api/weights');
     weightData.length = 0;

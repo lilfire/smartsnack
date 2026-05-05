@@ -100,7 +100,7 @@ def _get_products(live_url: str) -> list:
         method="GET",
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+        return json.loads(resp.read())["products"]
 
 
 def _reload_and_wait(page) -> None:
@@ -121,14 +121,14 @@ def _reload_and_wait(page) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_backup_api_returns_json(live_url, api_create_product):
+def test_backup_api_returns_json(live_url, api_create_product, unique_name):
     """GET /api/backup should return a JSON object that contains a 'products' list.
 
     Creating at least one product beforehand ensures the database is non-empty
     and that the endpoint exercises its real code path rather than returning a
     trivial empty snapshot.
     """
-    api_create_product(name="BackupApiJsonTest")
+    api_create_product(name=unique_name("BackupApiJsonTest"))
 
     backup = _get_backup(live_url)
 
@@ -143,24 +143,24 @@ def test_backup_api_returns_json(live_url, api_create_product):
     )
 
 
-def test_backup_contains_created_products(live_url, api_create_product):
+def test_backup_contains_created_products(live_url, api_create_product, unique_name):
     """A product created via the API must appear by name in the backup snapshot.
 
     This verifies that ``create_backup`` reads committed database state and
     serialises the product name faithfully.
     """
-    unique_name = "BackupContainsThisProduct_E2E"
-    api_create_product(name=unique_name)
+    product_name = unique_name("BackupContainsThisProduct_E2E")
+    api_create_product(name=product_name)
 
     backup = _get_backup(live_url)
 
     product_names = [p.get("name", "") for p in backup["products"]]
-    assert unique_name in product_names, (
-        f"Expected '{unique_name}' in backup products, found: {product_names}"
+    assert product_name in product_names, (
+        f"Expected {product_name!r} in backup products, found: {product_names}"
     )
 
 
-def test_restore_api(live_url, api_create_product, page):
+def test_restore_api(live_url, api_create_product, page, unique_name):
     """POST /api/restore should replace database contents with the snapshot.
 
     Procedure:
@@ -170,8 +170,8 @@ def test_restore_api(live_url, api_create_product, page):
     4. Verify via GET /api/products that B is absent and A is present.
     5. Reload the browser page to confirm the UI also reflects the restored state.
     """
-    product_a_name = "RestoreKeepMe_E2E"
-    product_b_name = "RestoreRemoveMe_E2E"
+    product_a_name = unique_name("RestoreKeepMe_E2E")
+    product_b_name = unique_name("RestoreRemoveMe_E2E")
 
     api_create_product(name=product_a_name)
 
@@ -181,7 +181,7 @@ def test_restore_api(live_url, api_create_product, page):
     # Ensure product A was captured
     snapshot_names = [p.get("name", "") for p in snapshot["products"]]
     assert product_a_name in snapshot_names, (
-        f"Product A '{product_a_name}' missing from snapshot; names: {snapshot_names}"
+        f"Product A {product_a_name!r} missing from snapshot; names: {snapshot_names}"
     )
 
     # Add product B after the snapshot was taken
@@ -200,16 +200,16 @@ def test_restore_api(live_url, api_create_product, page):
     current_names = [p.get("name", "") for p in current_products]
 
     assert product_b_name not in current_names, (
-        f"Product B '{product_b_name}' should have been removed by restore; "
+        f"Product B {product_b_name!r} should have been removed by restore; "
         f"current products: {current_names}"
     )
     assert product_a_name in current_names, (
-        f"Product A '{product_a_name}' should still exist after restore; "
+        f"Product A {product_a_name!r} should still exist after restore; "
         f"current products: {current_names}"
     )
 
 
-def test_import_api_adds_products(live_url, api_create_product):
+def test_import_api_adds_products(live_url, api_create_product, unique_name):
     """POST /api/import with on_duplicate='skip' should add new products.
 
     A backup is taken to obtain a well-formed product list, then that same
@@ -218,16 +218,16 @@ def test_import_api_adds_products(live_url, api_create_product):
     the endpoint must return a successful response with ``ok=True``.
     Afterwards the products must still be present via GET /api/products.
     """
-    unique_name = "ImportApiAddTest_E2E"
-    api_create_product(name=unique_name)
+    product_name = unique_name("ImportApiAddTest_E2E")
+    api_create_product(name=product_name)
 
     # Build a minimal import body using the product we just created
     backup = _get_backup(live_url)
     products_to_import = [
-        p for p in backup["products"] if p.get("name") == unique_name
+        p for p in backup["products"] if p.get("name") == product_name
     ]
     assert products_to_import, (
-        f"Could not find '{unique_name}' in backup to use as import source"
+        f"Could not find {product_name!r} in backup to use as import source"
     )
 
     import_body = {
@@ -244,25 +244,20 @@ def test_import_api_adds_products(live_url, api_create_product):
     # Confirm the product is still present in the database
     current_products = _get_products(live_url)
     current_names = [p.get("name", "") for p in current_products]
-    assert unique_name in current_names, (
-        f"Expected '{unique_name}' to be present after import, "
+    assert product_name in current_names, (
+        f"Expected {product_name!r} to be present after import, "
         f"but current products are: {current_names}"
     )
 
 
-def test_import_api_new_product_is_added(live_url, api_create_product):
+def test_import_api_new_product_is_added(live_url, api_create_product, unique_name):
     """POST /api/import should insert a product that does not yet exist in the DB.
 
     A completely new product dict (with a name absent from the live database)
     is posted to /api/import.  The endpoint must acknowledge it, and a
     subsequent GET /api/products must list the imported product.
     """
-    new_product_name = "ImportBrandNewProduct_E2E"
-
-    # Confirm the product is not already present (fresh session state)
-    before_names = [p.get("name", "") for p in _get_products(live_url)]
-    # Guard: if somehow the name is already there from a previous run, skip the
-    # creation assertion rather than failing spuriously.
+    new_product_name = unique_name("ImportBrandNewProduct_E2E")
 
     import_body = {
         "products": [
@@ -288,6 +283,6 @@ def test_import_api_new_product_is_added(live_url, api_create_product):
     after_products = _get_products(live_url)
     after_names = [p.get("name", "") for p in after_products]
     assert new_product_name in after_names, (
-        f"Newly imported product '{new_product_name}' not found in GET /api/products. "
-        f"Import message was: '{message}'. Current products: {after_names}"
+        f"Newly imported product {new_product_name!r} not found in GET /api/products. "
+        f"Import message was: {message!r}. Current products: {after_names}"
     )

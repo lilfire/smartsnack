@@ -2,13 +2,21 @@
 
 Starts a live Flask server on a temporary SQLite database so that
 Playwright can drive a real browser against it.
+
+The DB is snapshotted once after init/seed and restored before every
+test (autouse, function-scoped) so that tests are deterministic and
+independent of execution order. A ``unique_name`` fixture is also
+provided to belt-and-suspenders against incidental name collisions
+inside a single test or class.
 """
 
 import os
 import shutil
+import sqlite3
 import sys
 import threading
 import time
+import uuid
 
 import subprocess
 import urllib.request
@@ -36,20 +44,47 @@ def _inject_csrf_header():
     urllib.request.Request.__init__ = _orig_init
 
 
+# Path to the seeded-DB snapshot, populated by ``app_server`` once the
+# Flask server has booted and the schema + seeds have been applied.
+# ``reset_db`` reads this to know what file to restore from.
+_SNAPSHOT_PATH: "str | None" = None
+
+
+_BROWSERS_PATH = "/tmp/ms-playwright"
+
+# Set PLAYWRIGHT_BROWSERS_PATH early so that both the install subprocess
+# and the Playwright library resolve the browser from a writable location
+# rather than /root/.cache which may be inaccessible in agent containers.
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", _BROWSERS_PATH)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _ensure_browsers():
     """Install Playwright Chromium if not already present."""
+    env = {**os.environ, "PLAYWRIGHT_BROWSERS_PATH": _BROWSERS_PATH}
     subprocess.run(
         [sys.executable, "-m", "playwright", "install", "chromium"],
         check=True,
+        env=env,
     )
+
+
+@pytest.fixture(scope="session")
+def browser(launch_browser):
+    """Launch browser, skipping all browser-based tests if unavailable."""
+    try:
+        b = launch_browser()
+    except Exception as exc:
+        pytest.skip(f"Browser unavailable in this environment: {exc}")
+    yield b
+    b.close()
 
 
 @pytest.fixture(scope="session")
 def app_server(tmp_path_factory):
     """Start a live Flask dev server in a background thread.
 
-    Yields the base URL (e.g. ``http://127.0.0.1:<port>``).
+    Yields a dict with ``url``, ``db_file`` and ``snapshot_file``.
     The server is stopped when the session ends.
     """
     db_file = str(tmp_path_factory.mktemp("data") / "e2e.sqlite")
@@ -96,13 +131,24 @@ def app_server(tmp_path_factory):
     # the test server anyway.
     application = create_app()
     application.config["TESTING"] = True
+    application.config["RATELIMIT_ENABLED"] = False
+
+    # Disable rate limiting for e2e tests (limiter is already init'd)
+    from extensions import limiter as _limiter
+    _limiter.enabled = False
 
     # Ensure the translations module uses the temp directory
     import translations as trans_mod
 
     trans_mod.TRANSLATIONS_DIR = trans_dir
 
-    host, port = "127.0.0.1", 5199
+    import socket
+
+    host = "127.0.0.1"
+    # Pick a free port to avoid conflicts with concurrent test runs
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("", 0))
+        port = s.getsockname()[1]
 
     server_thread = threading.Thread(
         target=lambda: application.run(host=host, port=port, use_reloader=False),
@@ -111,8 +157,6 @@ def app_server(tmp_path_factory):
     server_thread.start()
 
     # Wait for server to be ready
-    import urllib.request
-
     base_url = f"http://{host}:{port}"
     for _ in range(50):
         try:
@@ -123,7 +167,73 @@ def app_server(tmp_path_factory):
     else:
         raise RuntimeError("Flask server did not start in time")
 
+    # Snapshot the freshly initialised + seeded DB so that ``reset_db``
+    # can restore it before every test. The snapshot is taken *after*
+    # the server started (so any startup-time mutations are captured).
+    global _SNAPSHOT_PATH
+    snapshot_file = str(tmp_path_factory.mktemp("snapshot") / "snapshot.sqlite")
+    src = sqlite3.connect(db_file)
+    dst = sqlite3.connect(snapshot_file)
+    try:
+        src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
+    _SNAPSHOT_PATH = snapshot_file
+
     yield base_url
+    # Server thread is daemonised; nothing else to clean up.
+
+
+@pytest.fixture(autouse=True)
+def reset_db(app_server):
+    """Restore the e2e SQLite DB to its initial seeded state before each test.
+
+    Uses the SQLite online backup API to atomically overwrite the live
+    database with the snapshot taken at session start. This guarantees:
+    - No leftover products / tags / categories / flags from prior tests
+    - Reference data (score_weights, protein_quality, flag_definitions,
+      user_settings) is restored to defaults
+    - Auto-increment counters are reset
+    - Tests are deterministic and order-independent
+
+    Runs autouse + function-scoped so every test starts with a clean DB.
+    """
+    if _SNAPSHOT_PATH is None or not os.path.exists(_SNAPSHOT_PATH):
+        raise RuntimeError(
+            "DB snapshot was never created — app_server fixture did not "
+            "complete; reset_db cannot proceed."
+        )
+    db_file = os.environ["DB_PATH"]
+    src = sqlite3.connect(_SNAPSHOT_PATH)
+    dst = sqlite3.connect(db_file)
+    try:
+        src.backup(dst)
+    finally:
+        src.close()
+        dst.close()
+    yield
+
+
+@pytest.fixture()
+def unique_name():
+    """Return a callable that produces unique, UUID-suffixed identifiers.
+
+    Use this in any test that creates products, tags, categories, or other
+    named entities by hardcoded literal names. Even though ``reset_db``
+    wipes state between tests, ``unique_name`` keeps names from colliding
+    inside a single test (e.g. when creating two siblings) and protects
+    against accidental cross-test reuse.
+
+    Example:
+        n = unique_name("MergeTarget")  # -> "MergeTarget-3f8a91c2"
+        api_create_product(name=n)
+    """
+    def _unique(prefix: str = "test") -> str:
+        suffix = uuid.uuid4().hex[:8]
+        return f"{prefix}-{suffix}" if prefix else suffix
+
+    return _unique
 
 
 @pytest.fixture()

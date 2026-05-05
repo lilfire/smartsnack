@@ -15,6 +15,13 @@
           </h3>
           <div class="settings-section-body" style="display:none">
             <p class="form-sub" data-i18n="settings_weights_desc">Choose which nutritional values affect the score, and adjust the weighting</p>
+            <div class="weights-scope-row">
+              <label class="field-label" for="weight-scope-select" data-i18n="weights_scope_label">Apply to</label>
+              <select class="field-select" id="weight-scope-select"></select>
+              <button type="button" class="btn-sm btn-blue" id="weight-scope-add" data-i18n="btn_add_category_override">+ Add category override</button>
+              <button type="button" class="btn-sm btn-red" id="weight-scope-delete" style="display:none" data-i18n="btn_delete_category_override">Delete category override</button>
+            </div>
+            <p id="weight-scope-hint" class="form-sub weights-scope-hint"></p>
             <div class="form-fields">
               <div id="weight-items"></div>
             </div>
@@ -89,11 +96,11 @@
               </div>
               <div class="pq-add-nums">
                 <div>
-                  <label class="field-label" for="pq-add-pdcaas">PDCAAS</label>
+                  <label class="field-label" for="pq-add-pdcaas" data-i18n="weight_label_est_pdcaas">PDCAAS</label>
                   <input class="field-input" id="pq-add-pdcaas" type="number" step="0.01" min="0" max="1" placeholder="0.57">
                 </div>
                 <div>
-                  <label class="field-label" for="pq-add-diaas">DIAAS</label>
+                  <label class="field-label" for="pq-add-diaas" data-i18n="weight_label_est_diaas">DIAAS</label>
                   <input class="field-input" id="pq-add-diaas" type="number" step="0.01" min="0" max="1.2" placeholder="0.53">
                 </div>
               </div>
@@ -115,36 +122,6 @@
             <label class="field-label" for="language-select" data-i18n="settings_language">Language</label>
             <select class="field-select" id="language-select" onchange="changeLanguage(this.value)">
             </select>
-          </div>
-        </div>
-        <!-- OCR Settings -->
-        <div>
-          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
-            <span data-i18n="settings_ocr_title">OCR</span>
-            <span class="settings-chevron">&#9660;</span>
-          </h3>
-          <div class="settings-section-body" style="display:none">
-            <p class="form-sub" data-i18n="settings_ocr_desc">Ingredient text recognition settings</p>
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div>
-                <label class="field-label" for="ocr-provider" data-i18n="settings_ocr_provider">Provider</label>
-                <select class="field-select" id="ocr-provider" onchange="onOcrProviderChange()">
-                  <option value="easyocr">EasyOCR</option>
-                  <option value="tesseract">Tesseract</option>
-                </select>
-              </div>
-              <div id="ocr-model-row">
-                <label class="field-label" for="ocr-model" data-i18n="settings_ocr_model">Model</label>
-                <input class="field-input" id="ocr-model" placeholder="e.g. en, no">
-              </div>
-              <div>
-                <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
-                  <input type="checkbox" id="ocr-fallback">
-                  <span data-i18n="settings_ocr_fallback">Fallback to Tesseract on failure</span>
-                </label>
-              </div>
-              <button type="button" class="btn-register" onclick="saveOcrSettings()" data-i18n="btn_save_ocr_settings">Save OCR settings</button>
-            </div>
           </div>
         </div>
         <!-- Open Food Facts -->
@@ -174,6 +151,46 @@
               </div>
               <p id="refresh-off-status" class="form-sub" style="margin-top:6px"></p>
             </div>
+            <hr class="settings-divider">
+            <div>
+              <p class="field-label" data-i18n="off_lang_priority_title">OFF Language Priority</p>
+              <p class="form-sub" data-i18n="off_lang_priority_desc">Choose which languages to use when fetching data from Open Food Facts, in preferred priority order.</p>
+              <div id="off-lang-priority-list" role="list" aria-live="polite" style="margin:8px 0"></div>
+              <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+                <select class="field-select" id="off-lang-add-select" data-searchable="true" style="flex:1"></select>
+                <button type="button" class="btn-register" id="off-lang-add-btn" data-i18n="off_lang_add">Add language</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- OCR -->
+        <div>
+          <h3 class="mono settings-col-title settings-toggle" role="button" tabindex="0" onclick="toggleSettingsSection(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleSettingsSection(this)}" aria-expanded="false">
+            <span data-i18n="settings_ocr_title">OCR</span>
+            <span class="settings-chevron">&#9660;</span>
+          </h3>
+          <div class="settings-section-body" style="display:none">
+            <p class="form-sub" data-i18n="settings_ocr_desc">Velg OCR-leverandør for bildegjenkjenning</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div>
+                <label class="field-label" for="ocr-provider-select" data-i18n="settings_ocr_provider_label">OCR-leverandør</label>
+                <select class="field-select" id="ocr-provider-select">
+                  <option value="tesseract">Tesseract OCR</option>
+                </select>
+              </div>
+              <div id="ocr-model-row" style="display:none">
+                <label class="field-label" for="ocr-model-select" data-i18n="ocr_model_label">Model</label>
+                <select class="field-select" id="ocr-model-select"></select>
+                <input class="field-input" id="ocr-model-input" type="text" style="display:none" placeholder="e.g. google/gemini-2.0-flash-001">
+              </div>
+              <div id="ocr-fallback-wrapper" aria-live="polite">
+                <label class="field-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                  <input type="checkbox" id="ocr-fallback-checkbox">
+                  <span data-i18n="settings_ocr_fallback_label">Bruk Tesseract OCR som reserve</span>
+                </label>
+              </div>
+              <button type="button" class="btn-register" style="margin-top:4px" onclick="saveOcrSettings()" data-i18n="btn_save_ocr_settings">&#128190; Lagre OCR-innstillinger</button>
+            </div>
           </div>
         </div>
         <!-- Database -->
@@ -193,8 +210,8 @@
                 <span data-i18n="restore_drop_text">&#128260; Drop a backup file here, or click to restore</span>
                 <span class="restore-warning" data-i18n="restore_warning">Warning: Restore replaces all existing data</span>
               </div>
-              <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)" aria-label="Restore backup file">
-              <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)" aria-label="Import data file">
+              <input type="file" id="restore-file" accept=".json" style="display:none" onchange="handleRestore(this)" data-i18n-aria-label="aria_restore_file" aria-label="Restore backup file">
+              <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImport(this)" data-i18n-aria-label="aria_import_file" aria-label="Import data file">
               <p class="backup-note" data-i18n="backup_note">Backup exports all products (including images), categories and weights as a JSON file. Import adds products without deleting existing ones. Restore replaces everything.</p>
             </div>
           </div>

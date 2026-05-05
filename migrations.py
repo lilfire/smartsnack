@@ -1,7 +1,70 @@
 """Database migrations tracked in the schema_migrations table.
 
-Each migration is a (name, sql_list) tuple. Add new migrations at the end.
+Each migration entry is (name, steps) where steps is either:
+  list[str]   — SQL statements executed in order
+  callable    — Python function called with (cur,) for complex migrations
+Add new migrations at the end.
 """
+
+
+def _migrate_008_tag_system(cur):
+    """Migrate product_tags from text-based to integer FK schema.
+
+    Detects old schema (tag TEXT column) via PRAGMA table_info.
+    If old schema: renames, creates new tables, migrates data, drops old.
+    If already new schema or no table: creates tags + product_tags with IF NOT EXISTS.
+    Idempotent.
+    """
+    cols = {
+        row[1]
+        for row in cur.execute("PRAGMA table_info(product_tags)").fetchall()
+    }
+    has_old_schema = "tag" in cols
+
+    if has_old_schema:
+        cur.execute("ALTER TABLE product_tags RENAME TO product_tags_old")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            label TEXT    NOT NULL UNIQUE COLLATE NOCASE
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS product_tags (
+            product_id INTEGER NOT NULL,
+            tag_id     INTEGER NOT NULL,
+            PRIMARY KEY (product_id, tag_id),
+            FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id)     REFERENCES tags(id)     ON DELETE CASCADE
+        )
+    """)
+
+    if has_old_schema:
+        cur.execute("""
+            INSERT OR IGNORE INTO tags (label)
+            SELECT DISTINCT LOWER(TRIM(tag)) FROM product_tags_old
+            WHERE TRIM(tag) != ''
+        """)
+        cur.execute("""
+            INSERT OR IGNORE INTO product_tags (product_id, tag_id)
+            SELECT o.product_id, t.id
+            FROM product_tags_old o
+            JOIN tags t ON LOWER(TRIM(o.tag)) = t.label COLLATE NOCASE
+        """)
+        cur.execute("DROP TABLE product_tags_old")
+
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_product_tags_tag_id ON product_tags(tag_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_tags_label ON tags(label COLLATE NOCASE)"
+    )
+
 
 MIGRATIONS = [
     (
@@ -54,6 +117,150 @@ MIGRATIONS = [
             "UPDATE score_weights SET formula_min = 1.0, formula_max = 3.0 WHERE field = 'volume' AND formula = 'direct' AND formula_max = 0",
         ],
     ),
+    (
+        "006_product_eans_table",
+        [
+            """CREATE TABLE IF NOT EXISTS product_eans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+                ean TEXT NOT NULL,
+                is_primary INTEGER NOT NULL DEFAULT 0,
+                UNIQUE(product_id, ean)
+            )""",
+            """INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
+               SELECT id, ean, 1 FROM products WHERE ean != ''""",
+        ],
+    ),
+    (
+        "007_add_fk_indexes",
+        [
+            "CREATE INDEX IF NOT EXISTS idx_product_flags_product_id ON product_flags(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_product_eans_product_id ON product_eans(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_product_tags_product_id ON product_tags(product_id)",
+            "CREATE INDEX IF NOT EXISTS idx_products_type ON products(type)",
+        ],
+    ),
+    (
+        "008_add_synced_with_off_to_product_eans",
+        [
+            "ALTER TABLE product_eans ADD COLUMN synced_with_off INTEGER NOT NULL DEFAULT 0",
+        ],
+    ),
+    (
+        "009_tag_system_reimplementation",
+        _migrate_008_tag_system,
+    ),
+    (
+        "010_backfill_product_eans_from_products_ean",
+        [
+            # Repair products that have a non-empty products.ean but no
+            # corresponding product_eans row. This drift can occur after
+            # restoring a backup created before product_eans existed in the
+            # backup format: restore_backup() does DELETE FROM products which
+            # cascades-deletes product_eans, then re-inserts only into
+            # products. Idempotent: NOT EXISTS ensures we only touch missing
+            # rows.
+            """INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary)
+               SELECT id, ean, 1
+               FROM products p
+               WHERE p.ean IS NOT NULL AND p.ean != ''
+                 AND NOT EXISTS (
+                   SELECT 1 FROM product_eans pe WHERE pe.product_id = p.id
+                 )""",
+            # Mark backfilled rows as synced_with_off=1 if the product has the
+            # is_synced_with_off flag, so they behave the same as products
+            # that were freshly added via OFF.
+            """UPDATE product_eans
+               SET synced_with_off = 1
+               WHERE is_primary = 1
+                 AND synced_with_off = 0
+                 AND EXISTS (
+                   SELECT 1 FROM product_flags pf
+                   WHERE pf.product_id = product_eans.product_id
+                     AND pf.flag = 'is_synced_with_off'
+                 )""",
+        ],
+    ),
+    (
+        "011_add_collagen_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('collagen', 0.08, 0.09)",
+        ],
+    ),
+    (
+        "012_add_pistachio_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('pistachio', 0.73, 0.65)",
+        ],
+    ),
+    (
+        "013_add_dates_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('dates', 0.30, 0.25)",
+        ],
+    ),
+    (
+        "014_add_jackfruit_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('jackfruit', 0.45, 0.40)",
+        ],
+    ),
+    (
+        "015_add_plantain_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('plantain', 0.35, 0.30)",
+        ],
+    ),
+    (
+        "016_add_tomato_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('tomato', 0.48, 0.42)",
+        ],
+    ),
+    (
+        "017_add_bell_pepper_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('bell_pepper', 0.45, 0.38)",
+        ],
+    ),
+    (
+        "018_add_mustard_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('mustard', 0.75, 0.70)",
+        ],
+    ),
+    (
+        "019_add_cocoa_protein_source",
+        [
+            "INSERT OR IGNORE INTO protein_quality (name, pdcaas, diaas) "
+            "VALUES ('cocoa', 0.55, 0.48)",
+        ],
+    ),
+    (
+        "020_category_score_weights",
+        [
+            """CREATE TABLE IF NOT EXISTS category_score_weights (
+                category TEXT NOT NULL,
+                field TEXT NOT NULL,
+                enabled INTEGER,
+                weight REAL,
+                direction TEXT,
+                formula TEXT,
+                formula_min REAL,
+                formula_max REAL,
+                PRIMARY KEY (category, field),
+                FOREIGN KEY (category) REFERENCES categories(name) ON DELETE CASCADE
+            )""",
+        ],
+    ),
 ]
 
 
@@ -67,9 +274,12 @@ def run_migrations(cur):
     applied = {
         r[0] for r in cur.execute("SELECT name FROM schema_migrations").fetchall()
     }
-    for name, statements in MIGRATIONS:
+    for name, steps in MIGRATIONS:
         if name in applied:
             continue
-        for sql in statements:
-            cur.execute(sql)
+        if callable(steps):
+            steps(cur)
+        else:
+            for sql in steps:
+                cur.execute(sql)
         cur.execute("INSERT INTO schema_migrations (name) VALUES (?)", (name,))

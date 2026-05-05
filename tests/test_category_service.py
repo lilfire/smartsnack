@@ -22,6 +22,21 @@ class TestListCategories:
         snacks = next(c for c in cats if c["name"] == "Snacks")
         assert snacks["count"] >= 1
 
+    def test_has_weight_overrides_flag(self, app_ctx, translations_dir):
+        from services.category_service import add_category, list_categories
+        from services.category_weight_service import update_category_weights
+
+        add_category("WithOverride", "Med override", "⚙️")
+        add_category("NoOverride", "Uten override", "🚫")
+        update_category_weights(
+            "WithOverride",
+            [{"field": "sugar", "is_overridden": True, "weight": 50}],
+        )
+        cats = {c["name"]: c for c in list_categories()}
+        assert cats["WithOverride"]["has_weight_overrides"] is True
+        assert cats["NoOverride"]["has_weight_overrides"] is False
+        assert cats["Snacks"]["has_weight_overrides"] is False
+
 
 class TestAddCategory:
     def test_valid_add(self, app_ctx, translations_dir):
@@ -72,8 +87,10 @@ class TestUpdateCategory:
 
     def test_update_label(self, app_ctx, translations_dir):
         from services.category_service import update_category
+        from translations import _t, _category_key
 
         update_category("Snacks", "Snackser", "")
+        assert _t(_category_key("Snacks")) == "Snackser"
 
     def test_nothing_to_update(self, app_ctx, translations_dir):
         from services.category_service import update_category

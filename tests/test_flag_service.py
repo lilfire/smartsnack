@@ -232,10 +232,11 @@ class TestUpdateFlagLabel:
 
     def test_newly_added_flag_can_be_updated(self, app_ctx, translations_dir):
         from services.flag_service import add_flag, update_flag_label
+        from translations import _t, _flag_key
 
         add_flag("is_seasonal", "Seasonal")
-        # Should not raise
         update_flag_label("is_seasonal", "Sesongvare")
+        assert _t(_flag_key("is_seasonal")) == "Sesongvare"
 
 
 class TestDeleteFlag:

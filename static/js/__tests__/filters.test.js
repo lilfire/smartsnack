@@ -298,6 +298,23 @@ describe('buildFilters', () => {
     expect(pills[0].className).not.toContain('active'); // All not active
     expect(pills[1].className).toContain('active'); // Dairy active
   });
+
+  it('does not accumulate click listeners across multiple rebuilds', () => {
+    window.setFilter = vi.fn();
+    state.cachedStats = { total: 5, type_counts: { dairy: 3 } };
+    state.categories = [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }];
+    state.currentFilter = [];
+
+    buildFilters();
+    buildFilters();
+    buildFilters();
+
+    const allBtn = document.getElementById('filter-row').querySelector('button');
+    allBtn.click();
+
+    expect(window.setFilter).toHaveBeenCalledTimes(1);
+    delete window.setFilter;
+  });
 });
 
 describe('updateFilterToggle', () => {
@@ -380,6 +397,97 @@ describe('toggleFilters', () => {
     expect(row.classList.contains('open')).toBe(false);
     expect(tog.classList.contains('open')).toBe(false);
   });
+
+  it('sets aria-expanded true when opening', () => {
+    const row = document.createElement('div');
+    row.id = 'filter-row';
+    const tog = document.createElement('div');
+    tog.id = 'filter-toggle';
+    document.body.appendChild(row);
+    document.body.appendChild(tog);
+
+    toggleFilters();
+    expect(tog.getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('sets aria-expanded false when closing', () => {
+    const row = document.createElement('div');
+    row.id = 'filter-row';
+    row.classList.add('open');
+    const tog = document.createElement('div');
+    tog.id = 'filter-toggle';
+    tog.classList.add('open');
+    document.body.appendChild(row);
+    document.body.appendChild(tog);
+
+    toggleFilters();
+    expect(tog.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('handles missing filter-row gracefully', () => {
+    const tog = document.createElement('div');
+    tog.id = 'filter-toggle';
+    document.body.appendChild(tog);
+    expect(() => toggleFilters()).not.toThrow();
+  });
+});
+
+describe('buildFilters overflow/scrollable', () => {
+  beforeEach(() => {
+    const row = document.createElement('div');
+    row.id = 'filter-row';
+    document.body.appendChild(row);
+    const tog = document.createElement('div');
+    tog.id = 'filter-toggle';
+    document.body.appendChild(tog);
+    const label = document.createElement('span');
+    label.id = 'filter-toggle-label';
+    document.body.appendChild(label);
+  });
+
+  it('renders all categories without clipping when many categories exist', () => {
+    const manyCats = Array.from({ length: 20 }, (_, i) => ({
+      name: `cat${i}`,
+      emoji: '🍎',
+      label: `Category ${i}`,
+    }));
+    state.cachedStats = {
+      total: 100,
+      type_counts: Object.fromEntries(manyCats.map((c) => [c.name, 5])),
+    };
+    state.categories = manyCats;
+    buildFilters();
+    const pills = document.getElementById('filter-row').querySelectorAll('button');
+    // All button + 20 categories = 21 pills — all must be rendered
+    expect(pills.length).toBe(21);
+  });
+
+  it('adds open class to filter-row when toggled, enabling scrollable state', () => {
+    const row = document.getElementById('filter-row');
+    const tog = document.getElementById('filter-toggle');
+    toggleFilters();
+    expect(row.classList.contains('open')).toBe(true);
+    expect(tog.classList.contains('open')).toBe(true);
+  });
+
+  it('renders uncategorized pill alongside many categories', () => {
+    const manyCats = Array.from({ length: 15 }, (_, i) => ({
+      name: `cat${i}`,
+      emoji: '🍕',
+      label: `Cat ${i}`,
+    }));
+    state.cachedStats = {
+      total: 90,
+      type_counts: { ...Object.fromEntries(manyCats.map((c) => [c.name, 5])), '': 3 },
+    };
+    state.categories = manyCats;
+    buildFilters();
+    const pills = document.getElementById('filter-row').querySelectorAll('button');
+    // All + 15 categories + uncategorized = 17
+    expect(pills.length).toBe(17);
+    const texts = Array.from(pills).map((p) => p.textContent);
+    expect(texts.some((t) => t.includes('uncategorized'))).toBe(true);
+  });
 });
 
 describe('buildTypeSelect', () => {
@@ -422,7 +530,7 @@ describe('buildTypeSelect', () => {
 describe('rerender', () => {
   it('calls renderResults via dynamic import', async () => {
     const mockRenderResults = vi.fn();
-    // Intercept the dynamic import by mocking it at module level
+    vi.resetModules();
     vi.doMock('../render.js', () => ({ renderResults: mockRenderResults }));
 
     const searchInput = document.createElement('input');
@@ -434,29 +542,34 @@ describe('rerender', () => {
     rerender();
 
     // Wait for the dynamic import promise to resolve
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockRenderResults).toHaveBeenCalledWith(state.cachedResults, 'query');
+    await vi.waitFor(() => {
+      expect(mockRenderResults).toHaveBeenCalledWith(state.cachedResults, 'query');
+    }, { timeout: 500 });
   });
 
   it('uses empty string when search-input not present', async () => {
     const mockRenderResults = vi.fn();
+    vi.resetModules();
     vi.doMock('../render.js', () => ({ renderResults: mockRenderResults }));
 
     document.body.innerHTML = '';
     state.cachedResults = [];
 
     rerender();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(mockRenderResults).toHaveBeenCalledWith([], '');
+    await vi.waitFor(() => {
+      expect(mockRenderResults).toHaveBeenCalledWith([], '');
+    }, { timeout: 500 });
   });
 
   it('catches and logs error when dynamic import fails', async () => {
+    vi.resetModules();
     vi.doMock('../render.js', () => { throw new Error('module load failure'); });
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     rerender();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(errorSpy).toHaveBeenCalledWith('Failed to load render module:', expect.any(Error));
+    await vi.waitFor(() => {
+      expect(errorSpy).toHaveBeenCalledWith('Failed to load render module:', expect.any(Error));
+    }, { timeout: 500 });
     errorSpy.mockRestore();
   });
 });

@@ -1,9 +1,17 @@
 // ── Product CRUD & Registration ─────────────────────
-import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus } from './state.js';
+import { state, api, fetchProducts, fetchStats, NUTRI_IDS, showConfirmModal, showToast, upgradeSelect, announceStatus, trapFocus, esc } from './state.js';
+import { initInfiniteScroll, teardownInfiniteScroll } from './scroll.js';
 import { t } from './i18n.js';
 import { buildFilters, rerender, buildTypeSelect } from './filters.js';
 import { renderResults, getFlagConfig } from './render.js';
-import { isValidEan, showEditDuplicateModal, showMergeConflictModal, showDuplicateMergeModal, showOffAddReview } from './openfoodfacts.js';
+import { isValidEan } from './off-utils.js';
+import { showEditDuplicateModal, showMergeConflictModal, showScanDuplicateModal } from './off-conflicts.js';
+import { showDuplicateMergeModal } from './off-duplicates.js';
+import { showOffAddReview } from './off-review.js';
+import { initTagInput, getTagsForSave } from './tags.js';
+import { loadEanManager } from './ean-manager.js';
+import { clearPendingImage } from './images.js';
+export { loadEanManager, addEan, deleteEan, setEanPrimary, unsyncEan } from './ean-manager.js';
 
 // Re-export showToast so existing importers continue to work
 export { showToast };
@@ -40,14 +48,36 @@ function collectFormFields(prefix) {
       if (cb && cb.checked) acc.push(f);
       return acc;
     }, []),
+    ...(prefix === 'ed' ? { tagIds: getTagsForSave() } : {}),
   };
 }
 
-export function startEdit(id) { state.editingId = id; rerender(); }
+export function startEdit(id) {
+  state.editingId = id;
+  rerender();
+  requestAnimationFrame(() => {
+    const form = document.querySelector('.edit-form');
+    if (form) {
+      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const firstInput = form.querySelector('#ed-name');
+      if (firstInput) firstInput.focus();
+    }
+  });
+}
 
 export async function saveProduct(id) {
   const data = collectFormFields('ed');
-  if (window._pendingOFFSync) { data.from_off = true; window._pendingOFFSync = null; }
+  if (window._pendingOFFSync) {
+    data.from_off = true;
+    window._pendingOFFSync = null;
+    // If the OFF fetch targeted a specific (possibly non-primary) EAN, pass
+    // it through so the backend marks THAT row as synced without swapping
+    // which EAN is primary.
+    if (window._pendingOFFEan) {
+      data.from_off_ean = window._pendingOFFEan;
+      window._pendingOFFEan = null;
+    }
+  }
   const offAppliedFields = window._offAppliedFields; window._offAppliedFields = null;
   if (!data.name) { showToast(t('toast_name_required'), 'error'); return; }
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
@@ -136,10 +166,13 @@ export async function saveProduct(id) {
 export async function unlockEan(id) {
   try {
     await api('/api/products/' + id + '/unsync', { method: 'POST' });
-    // Update cached product to remove the flag
     const p = state.cachedResults.find(x => x.id === id);
     if (p) p.flags = (p.flags || []).filter(f => f !== 'is_synced_with_off');
-    rerender();
+    const mgr = document.getElementById('ean-manager-' + id);
+    if (mgr) mgr.dataset.locked = '0';
+    const unlockBtn = document.querySelector('[data-action="unlock-ean"][data-id="' + id + '"]');
+    if (unlockBtn) unlockBtn.style.display = 'none';
+    await loadEanManager(id, false);
     showToast(t('toast_ean_unlocked'), 'success');
   } catch (e) {
     console.error(e);
@@ -147,27 +180,71 @@ export async function unlockEan(id) {
   }
 }
 
+let _pendingDelete = null;
+
 export async function deleteProduct(id, name) {
   if (!name) {
     const product = state.cachedResults && state.cachedResults.find((p) => p.id === id);
     name = product ? product.name : '';
   }
   if (!await showConfirmModal('\u{1F5D1}', name, t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'), true)) return;
-  try {
-    await api('/api/products/' + id, { method: 'DELETE' });
-    delete state.imageCache[id];
-    state.expandedId = null;
-    state.editingId = null;
-    showToast(t('toast_product_deleted', { name: name }), 'success');
-    loadData();
-  } catch(e) {
-    console.error(e);
-    showToast(t('toast_network_error'), 'error');
-  }
+
+  // Cancel any previous pending delete
+  if (_pendingDelete) { clearTimeout(_pendingDelete.timer); _pendingDelete = null; }
+
+  // Cache the product data for undo
+  const cachedProduct = state.cachedResults && state.cachedResults.find((p) => p.id === id);
+  const cachedImage = state.imageCache[id];
+
+  // Remove from UI immediately
+  state.cachedResults = (state.cachedResults || []).filter((p) => p.id !== id);
+  delete state.imageCache[id];
+  state.expandedId = null;
+  state.editingId = null;
+  rerender();
+
+  // Schedule actual delete after 5 seconds
+  var pending = {
+    timer: setTimeout(async () => {
+      _pendingDelete = null;
+      try {
+        await api('/api/products/' + id, { method: 'DELETE' });
+      } catch(e) {
+        console.error(e);
+        showToast(t('toast_network_error'), 'error');
+        // Restore on failure
+        if (cachedProduct) { state.cachedResults.push(cachedProduct); }
+        if (cachedImage) { state.imageCache[id] = cachedImage; }
+        loadData();
+      }
+    }, 5000)
+  };
+  _pendingDelete = pending;
+
+  showToast(t('toast_product_deleted', { name: name }), 'success', {
+    duration: 5000,
+    onUndo: function() {
+      if (_pendingDelete === pending) {
+        clearTimeout(pending.timer);
+        _pendingDelete = null;
+      }
+      // Restore product to cached results
+      if (cachedProduct) { state.cachedResults.push(cachedProduct); }
+      if (cachedImage) { state.imageCache[id] = cachedImage; }
+      rerender();
+      showToast(t('toast_delete_undone'), 'info');
+    }
+  });
 }
 
 export async function loadData() {
   try {
+    // Reset pagination for fresh load
+    teardownInfiniteScroll();
+    state.pagination.offset = 0;
+    state.pagination.total = null;
+    state.pagination.inFlight = false;
+
     await fetchStats();
     buildFilters();
     const statsEl = document.getElementById('stats-line');
@@ -176,9 +253,35 @@ export async function loadData() {
     upgradeSelect(document.getElementById('f-volume'));
     const searchInputEl = document.getElementById('search-input');
     const search = state.currentView === 'search' && searchInputEl ? searchInputEl.value.trim() : '';
-    const results = await fetchProducts(search, state.currentFilter);
+    const data = await fetchProducts(search, state.currentFilter, {
+      limit: state.pagination.pageSize,
+      offset: 0,
+    });
+    // Handle {products, total} response or plain array (backend compat)
+    const results = Array.isArray(data) ? data : (data.products || []);
+    const total = Array.isArray(data) ? null : (data.total != null ? data.total : null);
+    if (total !== null) state.pagination.total = total;
+    state.pagination.offset = results.length > 0 ? state.pagination.pageSize : 0;
     renderResults(results, search);
+    requestAnimationFrame(() => {
+      if (search && results.length > 0) {
+        const rowEl = document.querySelector('.table-row[data-product-id]');
+        if (rowEl) {
+          rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          rowEl.classList.add('scan-highlight');
+          setTimeout(() => { rowEl.classList.remove('scan-highlight'); }, 5000);
+        }
+      }
+    });
     announceStatus(t('stats_line', { total: results.length, types: state.cachedStats.types }));
+    // Set up infinite scroll if more results may exist
+    const allLoaded = total !== null && results.length >= total;
+    if (!allLoaded) {
+      initInfiniteScroll(() => {
+        const si = document.getElementById('search-input');
+        return state.currentView === 'search' && si ? si.value.trim() : '';
+      });
+    }
   } catch (e) {
     console.error(e);
     showToast(t('toast_load_error'), 'error');
@@ -186,6 +289,8 @@ export async function loadData() {
 }
 
 export function switchView(v) {
+  teardownInfiniteScroll();
+  state.cachedResults = [];
   state.currentView = v;
   state.expandedId = null;
   state.editingId = null;
@@ -194,7 +299,7 @@ export function switchView(v) {
   document.getElementById('view-register').style.display = v === 'register' ? '' : 'none';
   document.getElementById('view-settings').style.display = v === 'settings' ? '' : 'none';
   if (v === 'settings') {
-    import('./settings.js').then((mod) => { mod.loadSettings(); });
+    import('./settings-weights.js').then((mod) => { mod.loadSettings(); });
   } else {
     loadData();
   }
@@ -209,6 +314,7 @@ export function setFilter(f) {
     if (i >= 0) state.currentFilter.splice(i, 1);
     else state.currentFilter.push(f);
   }
+  state.cachedResults = [];
   buildFilters();
   loadData();
 }
@@ -226,6 +332,7 @@ export function onSearchInput() {
   document.getElementById('search-clear').classList.toggle('visible', v.length > 0);
   state.expandedId = null;
   state.editingId = null;
+  state.cachedResults = [];
   clearTimeout(state.searchTimeout);
   state.searchTimeout = setTimeout(loadData, 250);
 }
@@ -237,50 +344,6 @@ export function clearSearch() {
   state.editingId = null;
   loadData();
   document.getElementById('search-input').focus();
-}
-
-function _showDuplicateModal(duplicate) {
-  return new Promise((resolve) => {
-    const bg = document.createElement('div');
-    bg.className = 'scan-modal-bg';
-    bg.setAttribute('role', 'dialog');
-    bg.setAttribute('aria-modal', 'true');
-    const modal = document.createElement('div');
-    modal.className = 'scan-modal';
-    const iconDiv = document.createElement('div');
-    iconDiv.className = 'scan-modal-icon';
-    iconDiv.textContent = '\u26A0\uFE0F';
-    modal.appendChild(iconDiv);
-    const h3 = document.createElement('h3');
-    h3.textContent = t('duplicate_found_title');
-    modal.appendChild(h3);
-    const pEl = document.createElement('p');
-    const msgKey = duplicate.is_synced_with_off ? 'duplicate_found_synced' : 'duplicate_found_unsynced';
-    pEl.textContent = t(msgKey, { match_type: duplicate.match_type, name: duplicate.name });
-    modal.appendChild(pEl);
-    const actions = document.createElement('div');
-    actions.className = 'scan-modal-actions';
-    if (!duplicate.is_synced_with_off) {
-      const mergeBtn = document.createElement('button');
-      mergeBtn.className = 'scan-modal-btn-register confirm-yes';
-      mergeBtn.textContent = t('duplicate_action_merge');
-      mergeBtn.addEventListener('click', () => { bg.remove(); resolve('overwrite'); });
-      actions.appendChild(mergeBtn);
-      const createBtn = document.createElement('button');
-      createBtn.className = 'scan-modal-btn-register';
-      createBtn.textContent = t('duplicate_action_create_new');
-      createBtn.addEventListener('click', () => { bg.remove(); resolve('create_new'); });
-      actions.appendChild(createBtn);
-    }
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = duplicate.is_synced_with_off ? 'scan-modal-btn-register confirm-yes' : 'scan-modal-btn-cancel confirm-no';
-    cancelBtn.textContent = duplicate.is_synced_with_off ? t('btn_ok') : t('btn_cancel');
-    cancelBtn.addEventListener('click', () => { bg.remove(); resolve('cancel'); });
-    actions.appendChild(cancelBtn);
-    modal.appendChild(actions);
-    bg.appendChild(modal);
-    document.body.appendChild(bg);
-  });
 }
 
 async function _submitProduct(body, on_duplicate) {
@@ -332,10 +395,10 @@ export async function registerProduct() {
         const dup = e.data.duplicate;
         if (dup.is_synced_with_off) {
           // Synced with OFF — show info-only modal, no merge allowed
-          await _showDuplicateModal(dup);
+          await showScanDuplicateModal(dup);
           return;
         }
-        const choice = await _showDuplicateModal(dup);
+        const choice = await showScanDuplicateModal(dup);
         if (choice === 'cancel') { return; }
         if (choice === 'overwrite') {
           result = await _submitProduct(body, 'overwrite');
@@ -359,7 +422,7 @@ export async function registerProduct() {
         t('btn_yes'), t('btn_no')
       );
       if (wantsOff) {
-        await showOffAddReview(ean, 'f');
+        await showOffAddReview(ean, 'f', newProductId);
       }
     }
     document.getElementById('f-name').value = '';
@@ -374,8 +437,9 @@ export async function registerProduct() {
     if (pqw) pqw.style.display = 'none';
     const pqr = document.getElementById('f-pq-result');
     if (pqr) pqr.style.display = 'none';
+    clearPendingImage('f');
     // Lazy import to avoid circular dep
-    import('./openfoodfacts.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
+    import('./off-utils.js').then((mod) => { mod.validateOffBtn('f'); }).catch(() => {});
     NUTRI_IDS.forEach((id) => { document.getElementById('f-' + id).value = ''; });
     document.getElementById('f-volume').value = '';
     upgradeSelect(document.getElementById('f-volume'));

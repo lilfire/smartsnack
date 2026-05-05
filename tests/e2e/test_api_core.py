@@ -70,21 +70,20 @@ def test_health_endpoint(live_url):
 # ---------------------------------------------------------------------------
 
 
-def test_products_api_list(live_url, api_create_product):
+def test_products_api_list(live_url, api_create_product, unique_name):
     """GET /api/products returns a list that includes freshly created products."""
-    api_create_product(name="ListApiProduct1")
-    api_create_product(name="ListApiProduct2")
+    n1 = unique_name("ListApiProduct1")
+    n2 = unique_name("ListApiProduct2")
+    api_create_product(name=n1)
+    api_create_product(name=n2)
 
     data = _get(f"{live_url}/api/products")
 
-    assert isinstance(data, list), f"Expected a list, got {type(data).__name__}"
-    names = {p["name"] for p in data}
-    assert "ListApiProduct1" in names, (
-        f"'ListApiProduct1' not found in response names: {names}"
-    )
-    assert "ListApiProduct2" in names, (
-        f"'ListApiProduct2' not found in response names: {names}"
-    )
+    products = data["products"]
+    assert isinstance(products, list), f"Expected a list, got {type(products).__name__}"
+    names = {p["name"] for p in products}
+    assert n1 in names, f"{n1!r} not found in response names: {names}"
+    assert n2 in names, f"{n2!r} not found in response names: {names}"
 
 
 # ---------------------------------------------------------------------------
@@ -92,20 +91,24 @@ def test_products_api_list(live_url, api_create_product):
 # ---------------------------------------------------------------------------
 
 
-def test_products_api_search(live_url, api_create_product):
+def test_products_api_search(live_url, api_create_product, unique_name):
     """GET /api/products?search= returns only products whose name matches."""
-    api_create_product(name="UniqueNameXYZAlpha")
-    api_create_product(name="TotallyDifferentBeta")
+    match_prefix = unique_name("UniqueNameXYZ")
+    match_name = f"{match_prefix}-Alpha"
+    other_name = unique_name("TotallyDifferentBeta")
+    api_create_product(name=match_name)
+    api_create_product(name=other_name)
 
-    data = _get(f"{live_url}/api/products?search=UniqueNameXYZ")
+    data = _get(f"{live_url}/api/products?search={match_prefix}")
 
-    assert isinstance(data, list), f"Expected a list, got {type(data).__name__}"
-    names = [p["name"] for p in data]
-    assert all("UniqueNameXYZ" in n for n in names), (
+    products = data["products"]
+    assert isinstance(products, list), f"Expected a list, got {type(products).__name__}"
+    names = [p["name"] for p in products]
+    assert all(match_prefix in n for n in names), (
         f"Search results contain non-matching products: {names}"
     )
-    assert "TotallyDifferentBeta" not in names, (
-        "'TotallyDifferentBeta' should not appear in search results for 'UniqueNameXYZ'"
+    assert other_name not in names, (
+        f"{other_name!r} should not appear in search results for {match_prefix!r}"
     )
 
 
@@ -114,18 +117,21 @@ def test_products_api_search(live_url, api_create_product):
 # ---------------------------------------------------------------------------
 
 
-def test_products_api_type_filter(live_url, api_create_product):
+def test_products_api_type_filter(live_url, api_create_product, unique_name):
     """GET /api/products?type=Snacks returns only products in that category."""
-    api_create_product(name="TypeFilterSnack1", category="Snacks")
-    api_create_product(name="TypeFilterSnack2", category="Snacks")
+    n1 = unique_name("TypeFilterSnack1")
+    n2 = unique_name("TypeFilterSnack2")
+    api_create_product(name=n1, category="Snacks")
+    api_create_product(name=n2, category="Snacks")
 
     data = _get(f"{live_url}/api/products?type=Snacks")
 
-    assert isinstance(data, list), f"Expected a list, got {type(data).__name__}"
-    assert len(data) >= 2, (
-        f"Expected at least 2 Snacks products, got {len(data)}"
+    products = data["products"]
+    assert isinstance(products, list), f"Expected a list, got {type(products).__name__}"
+    assert len(products) >= 2, (
+        f"Expected at least 2 Snacks products, got {len(products)}"
     )
-    for product in data:
+    for product in products:
         assert product.get("type") == "Snacks", (
             f"Product {product.get('name')!r} has type {product.get('type')!r}, "
             f"expected 'Snacks'"
@@ -137,29 +143,29 @@ def test_products_api_type_filter(live_url, api_create_product):
 # ---------------------------------------------------------------------------
 
 
-def test_products_api_update(live_url, api_create_product):
+def test_products_api_update(live_url, api_create_product, unique_name):
     """PUT /api/products/<id> updates the product name and the change is visible."""
-    created = api_create_product(name="UpdateOriginalName")
+    original_name = unique_name("UpdateOriginalName")
+    new_name = unique_name("UpdatedNameAfterPut")
+    created = api_create_product(name=original_name)
     pid = created["id"]
 
     result = _put(
         f"{live_url}/api/products/{pid}",
-        {
-            "name": "UpdatedNameAfterPut",
-        },
+        {"name": new_name},
     )
 
     assert result.get("ok") is True, (
         f"PUT did not return ok=True: {result}"
     )
 
-    all_products = _get(f"{live_url}/api/products")
+    all_products = _get(f"{live_url}/api/products")["products"]
     names = {p["name"] for p in all_products}
-    assert "UpdatedNameAfterPut" in names, (
-        f"Updated name not found in product list: {names}"
+    assert new_name in names, (
+        f"Updated name {new_name!r} not found in product list: {names}"
     )
-    assert "UpdateOriginalName" not in names, (
-        f"Old name still present after update: {names}"
+    assert original_name not in names, (
+        f"Old name {original_name!r} still present after update: {names}"
     )
 
 
@@ -168,16 +174,17 @@ def test_products_api_update(live_url, api_create_product):
 # ---------------------------------------------------------------------------
 
 
-def test_products_api_delete(live_url, api_create_product):
+def test_products_api_delete(live_url, api_create_product, unique_name):
     """DELETE /api/products/<id> removes the product from subsequent GET responses."""
-    created = api_create_product(name="DeleteMeApiProduct")
+    name = unique_name("DeleteMeApiProduct")
+    created = api_create_product(name=name)
     pid = created["id"]
 
     # Verify it exists before deletion
-    before = _get(f"{live_url}/api/products")
+    before = _get(f"{live_url}/api/products")["products"]
     names_before = {p["name"] for p in before}
-    assert "DeleteMeApiProduct" in names_before, (
-        "Product was not found before deletion attempt"
+    assert name in names_before, (
+        f"Product {name!r} was not found before deletion attempt"
     )
 
     result = _delete(f"{live_url}/api/products/{pid}")
@@ -186,10 +193,10 @@ def test_products_api_delete(live_url, api_create_product):
         f"DELETE did not return ok=True: {result}"
     )
 
-    after = _get(f"{live_url}/api/products")
+    after = _get(f"{live_url}/api/products")["products"]
     names_after = {p["name"] for p in after}
-    assert "DeleteMeApiProduct" not in names_after, (
-        "Deleted product still appears in GET /api/products response"
+    assert name not in names_after, (
+        f"Deleted product {name!r} still appears in GET /api/products response"
     )
 
 
