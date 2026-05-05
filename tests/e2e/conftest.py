@@ -240,12 +240,14 @@ def reset_db(app_server):
 @pytest.fixture(autouse=True)
 def _reset_scroll_sentinel(reset_db):
     """Reset the scroll-product module sentinel so each test recreates its 55 products."""
-    try:
-        import tests.e2e.test_infinite_scroll as tis
-        tis._SCROLL_PRODUCTS_CREATED = False
-        tis._SCROLL_PRODUCT_NAMES = []
-    except (ImportError, AttributeError):
-        pass
+    import sys
+    for key in list(sys.modules):
+        if 'test_infinite_scroll' in key:
+            mod = sys.modules[key]
+            if hasattr(mod, '_SCROLL_PRODUCTS_CREATED'):
+                mod._SCROLL_PRODUCTS_CREATED = False
+                if hasattr(mod, '_SCROLL_PRODUCT_NAMES'):
+                    mod._SCROLL_PRODUCT_NAMES = []
     yield
 
 
