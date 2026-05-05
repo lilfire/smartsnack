@@ -46,12 +46,12 @@ def _reload_and_wait(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
     # The start-edit button is in .expanded (sibling of .table-row), use page scope
     edit_btn = page.locator("[data-action='start-edit']").first
-    expect(edit_btn).to_be_visible(timeout=3000)
+    expect(edit_btn).to_be_visible(timeout=5000)
     edit_btn.click()
-    page.wait_for_timeout(500)
+    # Wait for the edit form DOM element to appear rather than a fixed sleep
+    page.wait_for_selector(".edit-form", state="attached", timeout=5000)
 
 
 # ===========================================================================
