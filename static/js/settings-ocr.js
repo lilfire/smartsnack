@@ -51,10 +51,6 @@ function _updateOcrModelSelector(providerKey, selectedModel) {
       selectEl.appendChild(opt);
     });
     selectEl.value = (selectedModel && models.includes(selectedModel)) ? selectedModel : models[0];
-    // Refresh the custom dropdown wrapper so its trigger and option list reflect
-    // the new model set — otherwise the wrapper (created at app init when the
-    // native select was empty) shows an empty dropdown.
-    upgradeSelect(selectEl);
   }
 }
 
