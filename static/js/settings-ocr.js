@@ -1,5 +1,5 @@
 // ── Settings: OCR Provider and Settings ──────────────
-import { api, showToast, upgradeSelect } from './state.js';
+import { api, showToast } from './state.js';
 import { t } from './i18n.js';
 
 // Cache of provider key → models list (populated by loadOcrProviders)
@@ -86,11 +86,6 @@ export async function loadOcrProviders() {
     }
     showToast(t('toast_ocr_settings_error'), 'error');
   }
-  // The custom dropdown's _pick() handler assigns sel.value programmatically and
-  // does NOT dispatch a 'change' event, so sel.onchange never fires on desktop.
-  // Pass the same handler as the upgradeSelect callback so the model row updates
-  // when the user picks a provider via the custom dropdown.
-  upgradeSelect(sel, _onProviderChange);
 }
 
 export async function loadOcrSettings() {
@@ -101,8 +96,6 @@ export async function loadOcrSettings() {
     const data = await api('/api/ocr/settings');
     sel.value = data.provider || 'tesseract';
     if (cb) cb.checked = !!data.fallback_to_tesseract;
-    // Refresh the custom dropdown trigger text after the programmatic value change.
-    upgradeSelect(sel);
     _updateOcrFallbackVisibility();
     const savedModels = data.models || {};
     _updateOcrModelSelector(sel.value, savedModels[sel.value] || null);

@@ -120,7 +120,7 @@ document.addEventListener('touchstart', function(e) {
   await initLanguage();
   initAllFieldSelects();
   const langSel = document.getElementById('language-select');
-  if (langSel) upgradeSelect(langSel, (val) => changeLanguage(val));
+  if (langSel) langSel.onchange = () => changeLanguage(langSel.value);
   try {
     const wc = await api('/api/weights');
     weightData.length = 0;

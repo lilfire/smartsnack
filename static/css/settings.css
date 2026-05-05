@@ -678,16 +678,9 @@
   color: rgba(255, 255, 255, 0.5);
 }
 
-/* ── OCR fallback transition ────────────────────── */
+/* ── OCR fallback wrapper ─────────────────────────── */
 #ocr-fallback-wrapper {
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  transition: max-height 0.3s ease, opacity 0.3s ease;
-}
-#ocr-fallback-wrapper.visible {
-  max-height: 60px;
-  opacity: 1;
+  /* Always visible and interactable regardless of selected provider */
 }
 
 /* ── Settings: Score-weighting scope (per-category) ───── */
