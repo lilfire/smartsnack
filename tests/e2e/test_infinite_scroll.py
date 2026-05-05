@@ -3,9 +3,9 @@
 Validates that products beyond the first page load correctly when the user
 scrolls to the bottom, and that the scroll loader indicator behaves properly.
 
-A single shared fixture creates 55 products once so that all scroll-related
-assertions run against the same data set without re-creating products per
-test (which is slow and causes accumulation across the shared-session DB).
+Each test creates 55 products fresh because the autouse ``reset_db`` fixture
+restores the database snapshot before every test, so a module-level creation
+flag would cause tests 2-5 to run against an empty database.
 """
 
 import pytest
@@ -32,28 +32,21 @@ def _scroll_to_bottom(page):
 
 
 # ---------------------------------------------------------------------------
-# Session-scoped product creation so all tests share one batch of products
+# Per-test product creation
 # ---------------------------------------------------------------------------
-
-# We use a module-level flag so the products are created once for the whole
-# module.  We cannot use a session fixture here because api_create_product is
-# function-scoped, so we create the data inside the first test that needs it
-# via a module-level sentinel.
-
-_SCROLL_PRODUCTS_CREATED = False
-_SCROLL_PRODUCT_NAMES: list[str] = []
 
 
 def _ensure_scroll_products(api_create_product) -> list[str]:
-    """Create 55 uniquely-named products if not already done this session."""
-    global _SCROLL_PRODUCTS_CREATED, _SCROLL_PRODUCT_NAMES
-    if not _SCROLL_PRODUCTS_CREATED:
-        names = [f"InfScroll_{i:03d}" for i in range(55)]
-        for name in names:
-            api_create_product(name=name)
-        _SCROLL_PRODUCT_NAMES = names
-        _SCROLL_PRODUCTS_CREATED = True
-    return _SCROLL_PRODUCT_NAMES
+    """Create 55 uniquely-named products for the current test.
+
+    Called at the start of each scroll test.  Because reset_db restores the
+    database snapshot before every test, products must be (re-)created each
+    time rather than relying on a module-level sentinel.
+    """
+    names = [f"InfScroll_{i:03d}" for i in range(55)]
+    for name in names:
+        api_create_product(name=name)
+    return names
 
 
 # ---------------------------------------------------------------------------
