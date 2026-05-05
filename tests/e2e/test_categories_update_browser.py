@@ -20,6 +20,13 @@ def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
     page.wait_for_timeout(600)
+    # Reload categories explicitly for fresh data after the section opens
+    if key == "settings_categories_title":
+        page.evaluate("() => { if (typeof loadCategories === 'function') loadCategories(); }")
+        page.wait_for_function(
+            "() => document.querySelectorAll('#cat-list .cat-item').length > 0",
+            timeout=8000,
+        )
 
 
 class TestCategoryListBrowser:

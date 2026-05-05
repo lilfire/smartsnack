@@ -388,6 +388,14 @@ export function renderResults(results, search) {
     }
   }, { signal: _resultsAbort.signal });
 
+  // Enter key on product rows expands them (accessibility)
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const row = e.target.closest('.table-row[data-product-id]');
+    if (!row || e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('input')) return;
+    window.toggleExpand(parseInt(row.dataset.productId, 10));
+  }, { signal: _resultsAbort.signal });
+
   // Attach input handlers for validation
   const edName = document.getElementById('ed-name');
   const edIngredients = document.getElementById('ed-ingredients');

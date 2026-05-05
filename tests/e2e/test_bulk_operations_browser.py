@@ -49,6 +49,8 @@ class TestBulkRefreshOffBrowser:
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        # Confirm the refresh options modal (button.confirm-yes = "Start" button)
+        page.locator("button.confirm-yes").click()
 
         progress = page.locator("#refresh-off-progress")
         expect(progress).to_be_visible(timeout=5000)
@@ -61,6 +63,8 @@ class TestBulkRefreshOffBrowser:
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        # Confirm the refresh options modal
+        page.locator("button.confirm-yes").click()
         status = page.locator("#refresh-off-status")
         expect(status).to_be_visible(timeout=10000)
 
@@ -72,9 +76,11 @@ class TestBulkRefreshOffBrowser:
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        # Confirm the refresh options modal
+        page.locator("button.confirm-yes").click()
         bar = page.locator("#refresh-off-bar")
 
-        # Wait for bar to have some width (indicating progress)
+        # Wait for bar to have some width (indicating progress started or completed)
         page.wait_for_function(
             """() => {
                 const bar = document.getElementById('refresh-off-bar');

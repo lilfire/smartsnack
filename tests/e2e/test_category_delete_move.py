@@ -38,6 +38,8 @@ def _open_categories_section(page):
                 }
             }
         }
+        // Reload categories to guarantee fresh data regardless of prior load timing
+        if (typeof loadCategories === 'function') loadCategories();
     }""")
     # Wait for loadCategories() to populate the list (at least one .cat-item)
     page.wait_for_function(

@@ -14,6 +14,7 @@ vi.mock('../state.js', () => {
     categories: [],
     imageCache: {},
     advancedFilters: null,
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,

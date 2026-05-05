@@ -47,10 +47,11 @@ def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
     page.wait_for_timeout(300)
-    edit_btn = row.locator("[data-action='start-edit']")
+    # The start-edit button is in .expanded (sibling of .table-row), use page scope
+    edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(500)
 
 
 # ===========================================================================

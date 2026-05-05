@@ -96,6 +96,7 @@ vi.mock('../settings-weights.js', () => ({
   saveWeights: vi.fn(),
 }));
 vi.mock('../settings-categories.js', () => ({
+  loadCategories: vi.fn(),
   updateCategoryLabel: vi.fn(),
   addCategory: vi.fn(),
   deleteCategory: vi.fn(),
@@ -203,7 +204,7 @@ describe('app.js', () => {
       'toggleWeightConfig', 'removeWeight', 'addWeightFromDropdown',
       'onWeightDirection', 'onWeightFormula', 'onWeightMin', 'onWeightMax', 'onWeightSlider',
       // settings — categories
-      'updateCategoryLabel', 'addCategory', 'deleteCategory',
+      'loadCategories', 'updateCategoryLabel', 'addCategory', 'deleteCategory',
       // settings — flags
       'addFlag', 'deleteFlag', 'updateFlagLabel',
       // settings — protein quality

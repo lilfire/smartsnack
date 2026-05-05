@@ -19,15 +19,23 @@ export async function loadCategories() {
     let h = '';
     cats.forEach((c) => {
       h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
-        + '<input class="cat-item-label-input" data-cat-name="' + esc(c.name) + '" value="' + esc(c.label) + '" title="' + t('label_display_name') + '">'
+        + '<span class="cat-item-label-input" data-cat-name="' + esc(c.name) + '" contenteditable="true" spellcheck="false" tabindex="0" role="textbox" aria-label="' + t('label_display_name') + '">' + esc(c.label) + '</span>'
         + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
         + '<button class="btn-sm btn-red" data-action="delete-cat" data-cat-name="' + esc(c.name) + '" data-cat-label="' + esc(c.label) + '" data-cat-count="' + c.count + '">&#128465;</button></div>';
     });
     list.innerHTML = h;
-    // Attach change handlers to label inputs
-    list.querySelectorAll('input.cat-item-label-input[data-cat-name]').forEach((inp) => {
-      inp.addEventListener('change', () => {
-        updateCategoryLabel(inp.dataset.catName, inp.value);
+    // Attach change handlers to label spans (contenteditable)
+    list.querySelectorAll('span.cat-item-label-input[data-cat-name]').forEach((span) => {
+      span.addEventListener('blur', () => {
+        updateCategoryLabel(span.dataset.catName, span.textContent.trim());
+      });
+      span.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); span.blur(); }
+      });
+      span.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain').replace(/[\r\n]+/g, ' ');
+        document.execCommand('insertText', false, text);
       });
     });
     // Attach click handlers to delete buttons
@@ -86,7 +94,7 @@ export async function addCategory() {
     showToast(t('toast_category_added', { name: label }), 'success');
     await fetchStats();
     updateStatsLine();
-    loadCategories();
+    await loadCategories();
     refreshScopeSelect();
   } catch(e) {
     console.error(e);
