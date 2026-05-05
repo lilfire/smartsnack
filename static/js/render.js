@@ -106,7 +106,7 @@ window.addEventListener('resize', () => {
 
 export function renderResults(results, search) {
   state.cachedResults = results;
-  const displayTotal = (!search && state.pagination.total !== null)
+  const displayTotal = (!search && state.pagination?.total != null)
     ? state.pagination.total
     : results.length;
   document.getElementById('result-count').textContent = search
