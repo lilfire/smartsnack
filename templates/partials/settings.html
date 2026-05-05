@@ -120,7 +120,7 @@
           <div class="settings-section-body" style="display:none">
             <p class="form-sub" data-i18n="settings_language_desc">Choose display language for the app</p>
             <label class="field-label" for="language-select" data-i18n="settings_language">Language</label>
-            <select class="field-select" id="language-select" onchange="changeLanguage(this.value)">
+            <select class="field-select" id="language-select" data-no-custom-select="true" onchange="changeLanguage(this.value)">
             </select>
           </div>
         </div>
@@ -174,7 +174,7 @@
             <div style="display:flex;flex-direction:column;gap:10px">
               <div>
                 <label class="field-label" for="ocr-provider-select" data-i18n="settings_ocr_provider_label">OCR-leverandør</label>
-                <select class="field-select" id="ocr-provider-select">
+                <select class="field-select" id="ocr-provider-select" data-no-custom-select="true">
                   <option value="tesseract">Tesseract OCR</option>
                 </select>
               </div>

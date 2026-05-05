@@ -168,9 +168,8 @@ export function renderResults(results, search) {
         h += '<span class="cell-right">' + fmtCell(c.key, p[c.key]) + '</span>';
       }
     }
-    h += '</div>';
     if (state.expandedId === p.id) {
-      h += '<div class="expanded"><div class="expanded-top">'
+      h += '<div class="expanded" style="grid-column:1/-1"><div class="expanded-top">'
         + '<div class="expanded-img-section">'
         + '<div class="expanded-img-area" data-action="' + (hasImg ? 'view-image' : 'change-image') + '" data-id="' + p.id + '">'
         + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" alt="' + esc(p.name) + '" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
@@ -319,6 +318,7 @@ export function renderResults(results, search) {
       }
       h += '</div>';
     }
+    h += '</div>';
   });
   h += '</div>';
   container.innerHTML = h;

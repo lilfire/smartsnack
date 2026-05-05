@@ -249,9 +249,12 @@ def test_off_review_submit_calls_api_and_closes_modal(page):
             body=json.dumps({"ok": True}),
         )
 
-    page.route("**/api/off/add-product", _add_product_handler)
-
+    # Open the review modal.  _register_and_accept_off_prompt also installs
+    # a route handler for /api/off/add-product.  Unroute that handler first
+    # so only our capturing handler intercepts the Submit POST.
     _register_and_accept_off_prompt(page)
+    page.unroute("**/api/off/add-product")
+    page.route("**/api/off/add-product", _add_product_handler)
 
     review_bg = page.locator("#off-add-review-bg")
     expect(review_bg).to_be_visible(timeout=5000)

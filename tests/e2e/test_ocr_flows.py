@@ -8,7 +8,7 @@ unittest.mock.patch, which does not work across process boundaries.
 """
 
 import json
-import base64
+import re
 
 import pytest
 from playwright.sync_api import expect
@@ -18,17 +18,9 @@ from playwright.sync_api import expect
 # Helpers
 # ---------------------------------------------------------------------------
 
-# Minimal 1×1 white JPEG, base64-encoded, as raw bytes for a fake file.
-_TINY_JPEG_B64 = (
-    "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8U"
-    "HRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgN"
-    "DRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy"
-    "MjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAABgUE/8QAIhAA"
-    "AgIBBAMAAAAAAAAAAAAAAQIDBAUREiExQf/EABQBAQAAAAAAAAAAAAAAAAAAAAD/xAAUEQEA"
-    "AAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCwc52yqt2pJrK3lxb3Lf8AUk5YIr3wOp"
-    "Fftjf6oAA/9k="
-)
-_TINY_JPEG_BYTES = base64.b64decode(_TINY_JPEG_B64)
+# Minimal JPEG (SOI + EOI markers). All OCR API calls are intercepted via
+# page.route() so the actual file content doesn't need to be a real image.
+_TINY_JPEG_BYTES = b'\xff\xd8\xff\xd9'
 
 
 def _go_to_register(page):
@@ -172,7 +164,7 @@ def test_ocr_ingredients_error_toast_on_no_text(page, tmp_path):
 
     # An error toast must appear.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
-    expect(page.locator("#toast.show")).to_have_class(lambda cls: "error" in cls, timeout=5000)
+    expect(page.locator("#toast.show")).to_have_class(re.compile(r"error"), timeout=5000)
 
 
 # ---------------------------------------------------------------------------

@@ -74,7 +74,7 @@ export async function loadSettings() {
         });
       } catch(e) { showToast(t('toast_load_error'), 'error'); }
       langSelect.value = getCurrentLang();
-      upgradeSelect(langSelect, (val) => { changeLanguage(val); });
+      langSelect.onchange = () => changeLanguage(langSelect.value);
     }
     loadCategories();
     initEmojiPicker(document.getElementById('cat-emoji-trigger'), document.getElementById('cat-emoji'));

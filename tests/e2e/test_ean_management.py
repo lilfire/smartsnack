@@ -17,7 +17,8 @@ from playwright.sync_api import expect
 
 
 def _reload_and_wait(page):
-    page.reload()
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_selector("#results-container", state="attached", timeout=10000)
     page.wait_for_function(
         "() => !document.querySelector('#results-container .loading')",
         timeout=10000,
@@ -30,9 +31,12 @@ def _expand_and_edit(page, product_name):
     row.first.click()
     page.wait_for_timeout(300)
 
+    # [data-action='start-edit'] lives in the sibling .expanded div, not
+    # inside .table-row, so use a page-scoped locator.
     edit_btn = page.locator("[data-action='start-edit']").first
     edit_btn.click()
-    page.wait_for_timeout(500)
+    # Wait for the edit form to be present instead of a fixed delay.
+    page.wait_for_selector(".edit-form", state="visible", timeout=5000)
 
 
 def _post_json(live_url, path, payload):

@@ -44,7 +44,9 @@ def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
     page.wait_for_timeout(300)
-    edit_btn = row.locator("[data-action='start-edit']")
+    # Use page-scoped locator: after re-render the expanded section may not
+    # resolve correctly via a row-scoped locator.
+    edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
     page.wait_for_timeout(300)

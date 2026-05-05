@@ -655,6 +655,10 @@ class TestDeleteEanBlueprint:
         resp = client.delete(f"/api/products/{pid}/eans/{ean_id}")
         assert resp.status_code == 400
         assert resp.get_json()["error"] == "cannot_delete_only_ean"
+        eans_after = client.get(f"/api/products/{pid}/eans").get_json()
+        assert len(eans_after) == 1
+        assert eans_after[0]["id"] == ean_id
+        assert eans_after[0]["ean"] == "11111111"
 
     def test_unknown_ean_id_returns_404(self, client):
         pid = _add_product(client, name="BPUnknownEan", ean="11111111")

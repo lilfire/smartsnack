@@ -320,41 +320,25 @@ describe('Model selector switching', () => {
   });
 });
 
-// ── Custom dropdown integration ──────────────────────
-// Regression: the custom dropdown wrapper from upgradeSelect() assigns
-// sel.value programmatically and does NOT dispatch a 'change' event. The
-// onSelect callback passed to upgradeSelect must therefore update both the
-// fallback visibility AND the model row, and the wrapper around the model
-// <select> must be refreshed after the native options are repopulated —
-// otherwise the model dropdown stays hidden until the next page load and
-// shows up empty.
-describe('Custom dropdown wrapper integration', () => {
-  it('updates model row when provider is picked via the custom dropdown (no change event)', async () => {
-    const { upgradeSelect } = await import('../state.js');
-
+// ── Native select integration ──────────────────────
+// The provider and model selects use native onchange handlers (no custom
+// dropdown wrapper) so that Playwright's select_option and to_be_visible
+// work correctly in headless Chromium.
+describe('Native select integration', () => {
+  it('updates model row when provider is changed via native change event', async () => {
     api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
     await loadOcrProviders();
 
     api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
     await loadOcrSettings();
 
-    // Find the onSelect callback that loadOcrProviders passed to upgradeSelect
-    // for the provider <select>. This is the function _pick() invokes when the
-    // user picks an option in the custom dropdown.
     const providerSel = document.getElementById('ocr-provider-select');
-    const upgradeCall = upgradeSelect.mock.calls
-      .filter((c) => c[0] === providerSel && typeof c[1] === 'function')
-      .pop();
-    expect(upgradeCall).toBeDefined();
-    const onSelect = upgradeCall[1];
-
-    // Simulate the custom dropdown picking gemini: _pick assigns the value
-    // directly and then invokes the callback (no change event dispatched).
-    providerSel.value = 'gemini';
-    onSelect('gemini');
-
     const modelRow = document.getElementById('ocr-model-row');
     const modelSelect = document.getElementById('ocr-model-select');
+
+    // Switch to gemini via native change event (the mechanism now used)
+    providerSel.value = 'gemini';
+    providerSel.dispatchEvent(new Event('change'));
 
     // Model row must become visible
     expect(modelRow.style.display).not.toBe('none');
@@ -363,9 +347,7 @@ describe('Custom dropdown wrapper integration', () => {
     expect(options).toContain('gemini-2.0-flash');
   });
 
-  it('refreshes the custom dropdown wrapper for the model select after populating options', async () => {
-    const { upgradeSelect } = await import('../state.js');
-
+  it('populates model select options after loading settings', async () => {
     api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
     await loadOcrProviders();
 
@@ -373,11 +355,8 @@ describe('Custom dropdown wrapper integration', () => {
     await loadOcrSettings();
 
     const modelSelect = document.getElementById('ocr-model-select');
-    // upgradeSelect must have been called with the model <select> so the
-    // custom wrapper picks up the freshly-appended <option> elements rather
-    // than displaying an empty list.
-    const wasUpgraded = upgradeSelect.mock.calls.some((c) => c[0] === modelSelect);
-    expect(wasUpgraded).toBe(true);
+    // Model select must have options populated by loadOcrSettings
+    expect(modelSelect.options.length).toBeGreaterThan(0);
   });
 });
 
