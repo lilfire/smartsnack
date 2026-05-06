@@ -1,5 +1,5 @@
 // ── Settings: Category Management ───────────────────
-import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal, showToast } from './state.js';
+import { state, api, esc, fetchStats, showConfirmModal, showToast } from './state.js';
 import { t } from './i18n.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
 import { refreshScopeSelect } from './settings-weights.js';
@@ -152,7 +152,6 @@ export async function deleteCategory(name, label, count) {
 
     bg.appendChild(modal);
     document.body.appendChild(bg);
-    upgradeSelect(sel);
 
     function close() { bg.remove(); }
     cancelBtn.onclick = close;
