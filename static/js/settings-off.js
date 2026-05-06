@@ -148,7 +148,8 @@ function _connectRefreshStream() {
   const status = document.getElementById('refresh-off-status');
 
   if (btn) btn.disabled = true;
-  if (progressWrap) progressWrap.style.display = '';
+  if (progressWrap) progressWrap.style.display = 'block';
+  if (status) status.textContent = t('bulk_running');
 
   if (_refreshEvtSource) _refreshEvtSource.close();
   _refreshEvtSource = new EventSource('/api/bulk/refresh-off/stream');
