@@ -116,6 +116,9 @@ def test_add_pq_entry_appears_in_list(page):
     page.locator("#pq-add-pdcaas").fill("0.85")
     page.locator("#pq-add-diaas").fill("0.90")
 
+    # Capture card count before adding.
+    initial_count = page.locator("#pq-list .pq-card").count()
+
     add_btn = page.locator("[data-i18n='btn_add_protein_source']")
     expect(add_btn.first).to_be_visible(timeout=3000)
     add_btn.first.click()
@@ -124,10 +127,9 @@ def test_add_pq_entry_appears_in_list(page):
     # Toast must appear.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
 
-    # The new entry must appear in the list.
-    expect(page.locator("#pq-list")).to_contain_text(
-        "E2E Test Protein Source", timeout=5000
-    )
+    # A new card must be added to the list (PQ labels are stored in input values,
+    # not text nodes, so we verify by card count increase instead).
+    expect(page.locator("#pq-list .pq-card")).to_have_count(initial_count + 1, timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -194,8 +196,8 @@ def test_delete_pq_entry_cancel_keeps_entry(page, live_url):
     cancel_btn.click()
     page.wait_for_timeout(400)
 
-    # Entry must still be in the list.
-    expect(page.locator("#pq-list")).to_contain_text("E2E Cancel Del PQ", timeout=3000)
+    # Entry must still be in the list — verify via the delete button keyed by pq_id.
+    expect(page.locator(f"[data-action='delete-pq'][data-pq-id='{pq_id}']")).to_be_visible(timeout=3000)
 
 
 # ---------------------------------------------------------------------------
