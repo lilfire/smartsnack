@@ -13,6 +13,14 @@ export function initTagInput(existingTags) {
   }
   _renderPills();
   _setupAddTagButton();
+  const field = document.getElementById('tag-field-ed');
+  if (field && !field.dataset.tagClickBound) {
+    field.dataset.tagClickBound = '1';
+    field.addEventListener('click', (e) => {
+      if (e.target.closest('.tag-remove')) return;
+      _openModal();
+    });
+  }
 }
 
 export function getTagsForSave() {
@@ -108,6 +116,7 @@ function _clearHighlight(list) {
 }
 
 function _openModal() {
+  if (document.getElementById('tag-modal-overlay')) return;
   const overlay = document.createElement('div');
   overlay.id = 'tag-modal-overlay';
   overlay.className = 'tag-modal-overlay';
