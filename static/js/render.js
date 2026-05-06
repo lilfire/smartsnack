@@ -339,8 +339,8 @@ export function renderResults(results, search) {
         window.setSort(target.dataset.col);
         break;
       case 'toggle-expand': {
-        // Don't expand if clicking inside expanded area or on buttons
-        if (e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
+        // Don't expand if clicking on buttons or other interactive actions
+        if (e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
         const rowId = target.dataset.productId ? parseInt(target.dataset.productId, 10) : id;
         window.toggleExpand(rowId);
       }
@@ -383,6 +383,14 @@ export function renderResults(results, search) {
         window.estimateProteinQuality('ed');
         break;
     }
+  }, { signal: _resultsAbort.signal });
+
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const row = e.target.closest('.table-row[data-action="toggle-expand"]');
+    if (!row) return;
+    const rowId = row.dataset.productId ? parseInt(row.dataset.productId, 10) : null;
+    if (rowId) window.toggleExpand(rowId);
   }, { signal: _resultsAbort.signal });
 
   // Attach input handlers for validation
