@@ -59,6 +59,10 @@ function _setupAddTagButton() {
   btn.setAttribute('aria-haspopup', 'dialog');
   btn.addEventListener('click', _openModal);
   field.appendChild(btn);
+  // Clicking anywhere on the field (not on pill or button) opens the modal
+  field.addEventListener('click', (e) => {
+    if (!e.target.closest('button') && !e.target.closest('.tag-pill')) _openModal();
+  });
 }
 
 async function _fetchSuggestions(q, list, input, onSelect) {
