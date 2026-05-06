@@ -483,6 +483,18 @@ class TestCheckDuplicateForEdit:
         assert result is None
         assert a_synced is False
 
+    def test_name_match_detected_when_product_has_ean(self, app_ctx, seed_product):
+        # When editing a product that has an EAN and renaming it to match another
+        # product's name, the name duplicate must still be detected.
+        from services.product_service import check_duplicate_for_edit, add_product
+
+        other = add_product({"type": "Snacks", "name": "Edited Product", "ean": "7000000000099"})
+        # Rename other's name to match seed_product ("Classic Popcorn") — EAN differs
+        result, _ = check_duplicate_for_edit(other["id"], "7000000000099", "Classic Popcorn")
+        assert result is not None
+        assert result["match_type"] == "name"
+        assert result["id"] == seed_product
+
     def test_returns_a_synced_status(self, app_ctx, seed_product):
         from services.product_service import check_duplicate_for_edit, add_product, set_system_flag
 

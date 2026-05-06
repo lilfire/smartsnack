@@ -106,9 +106,12 @@ window.addEventListener('resize', () => {
 
 export function renderResults(results, search) {
   state.cachedResults = results;
+  const displayTotal = (!search && state.pagination && state.pagination.total != null)
+    ? state.pagination.total
+    : results.length;
   document.getElementById('result-count').textContent = search
     ? (results.length !== 1 ? t('result_count_search_plural', { count: results.length, query: search }) : t('result_count_search', { count: results.length, query: search }))
-    : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
+    : (displayTotal !== 1 ? t('result_count_plural', { count: displayTotal }) : t('result_count', { count: displayTotal }));
   const container = document.getElementById('results-container');
   if (!results.length) {
     // Clean up any existing delegation listener — prevents ghost handlers when
@@ -326,6 +329,15 @@ export function renderResults(results, search) {
   // Abort previous delegated listeners to avoid duplicate handlers
   if (_resultsAbort) _resultsAbort.abort();
   _resultsAbort = new AbortController();
+
+  // Keyboard: Enter on a focused .table-row expands it (same as click)
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const row = e.target.closest('.table-row[data-action="toggle-expand"]');
+    if (!row) return;
+    const rowId = row.dataset.productId ? parseInt(row.dataset.productId, 10) : null;
+    if (rowId) window.toggleExpand(rowId);
+  }, { signal: _resultsAbort.signal });
 
   // Attach all event handlers via delegation instead of inline onclick
   container.addEventListener('click', (e) => {
