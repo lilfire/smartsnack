@@ -73,7 +73,9 @@ class TestCategoryAddBrowser:
         page.wait_for_timeout(500)
 
         cat_list = page.locator("#cat-list")
-        expect(cat_list).to_contain_text("Persist Category")
+        # Category labels live in <input value="..."> not text nodes; the internal
+        # name (key) is rendered as visible text in <span class="cat-item-key">.
+        expect(cat_list).to_contain_text("e2e_persist_cat")
 
     def test_category_available_in_register(self, page):
         """An added category should be selectable in the registration form."""

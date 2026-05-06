@@ -110,7 +110,9 @@ def test_add_category_creates_item_in_list(page):
     add_btn.first.click()
     page.wait_for_timeout(800)
 
-    expect(page.locator("#cat-list")).to_contain_text("E2E Add Cat", timeout=5000)
+    # Category labels live in <input value="..."> not text nodes; the internal
+    # name (key) is rendered as visible text in <span class="cat-item-key">.
+    expect(page.locator("#cat-list")).to_contain_text("e2e_add_cat_test", timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -159,8 +161,8 @@ def test_delete_empty_category_cancel_keeps_category(page, live_url):
     page.locator("button.confirm-no").click()
     page.wait_for_timeout(400)
 
-    # Category must still appear in the list.
-    expect(page.locator("#cat-list")).to_contain_text("E2E Cancel Del Cat", timeout=3000)
+    # Category must still appear in the list (key is visible text; label is in an input value).
+    expect(page.locator("#cat-list")).to_contain_text("e2e_cancel_del_cat", timeout=3000)
 
 
 # ---------------------------------------------------------------------------
@@ -240,8 +242,8 @@ def test_move_modal_cancel_preserves_category(page, live_url, api_create_product
     # Modal must be gone.
     expect(move_modal).to_be_hidden(timeout=3000)
 
-    # Category must still exist in the list.
-    expect(page.locator("#cat-list")).to_contain_text("E2E Move Cancel", timeout=3000)
+    # Category must still exist in the list (key is visible text; label is in an input value).
+    expect(page.locator("#cat-list")).to_contain_text("e2e_move_cancel", timeout=3000)
 
 
 def test_move_and_delete_shows_success_toast(page, live_url, api_create_product):
