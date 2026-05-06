@@ -130,9 +130,16 @@ def test_duplicate_modal_has_action_buttons(page, api_create_product):
 
 
 def test_edit_duplicate_detection(page, api_create_product):
-    """Editing a product name to match another should trigger duplicate detection."""
-    api_create_product(name="EditDupOrigA", ean="4444444444448")
-    api_create_product(name="EditDupTargetA", ean="5555555555559")
+    """Editing a product name to match another should trigger duplicate detection.
+
+    The backend's check-duplicate endpoint matches by EAN first; the name match
+    only fires when the input EAN is empty (see ``_find_duplicate`` in
+    ``services/product_duplicate.py``). Both products are therefore created
+    without EANs so that editing the second to match the first's name triggers
+    a name-based duplicate match and surfaces the merge dialog.
+    """
+    api_create_product(name="EditDupOrigA")
+    api_create_product(name="EditDupTargetA")
     _reload_and_wait(page)
 
     # Expand and edit the second product
@@ -167,9 +174,23 @@ def test_edit_duplicate_detection(page, api_create_product):
 
 
 def test_merge_conflict_shows_conflicting_fields(page, api_create_product):
-    """The merge conflict modal should display conflicting fields for resolution."""
-    api_create_product(name="ConflictA", brand="BrandAlpha", kcal=100)
-    api_create_product(name="ConflictA", brand="BrandBeta", kcal=200)
+    """The merge conflict modal should display conflicting fields for resolution.
+
+    The API rejects a second create with a duplicate name+empty EAN (HTTP 409
+    via ``_find_duplicate``). To set up the merge-conflict scenario we pass
+    ``on_duplicate="allow_duplicate"`` to bypass the create-time check (see
+    ``services/product_crud.py:add_product``) so two products can share the
+    same name with conflicting field values. Editing one of them then triggers
+    name-based duplicate detection on save and surfaces the conflict modal.
+    """
+    api_create_product(
+        name="ConflictA", brand="BrandAlpha", kcal=100,
+        on_duplicate="allow_duplicate",
+    )
+    api_create_product(
+        name="ConflictA", brand="BrandBeta", kcal=200,
+        on_duplicate="allow_duplicate",
+    )
     _reload_and_wait(page)
 
     # Expand the second product and edit to trigger merge
