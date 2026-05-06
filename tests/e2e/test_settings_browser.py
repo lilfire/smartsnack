@@ -52,12 +52,13 @@ def _api_put(live_url, path, payload):
 class TestOffLanguagePriorityBrowser:
     """Test OFF language priority management in the settings UI."""
 
-    def test_off_section_shows_language_priority(self, page):
+    def test_off_section_shows_language_priority(self, page, live_url):
         """The OFF section should display the language priority list."""
+        _api_put(live_url, "/api/settings/off-language-priority", {"priority": ["no"]})
         _go_to_settings(page)
         _open_section(page, "settings_off_title")
         expect(page.locator("#off-lang-priority-list")).to_be_visible()
-        expect(page.locator("#off-lang-add-select")).to_be_visible()
+        expect(page.locator(".custom-select-wrap:has(#off-lang-add-select) .custom-select-trigger")).to_be_visible()
         expect(page.locator("#off-lang-add-btn")).to_be_visible()
 
     def test_add_language_to_priority(self, page, live_url):
@@ -70,7 +71,7 @@ class TestOffLanguagePriorityBrowser:
 
         # The add-select dropdown should have options
         add_select = page.locator("#off-lang-add-select")
-        expect(add_select).to_be_visible()
+        expect(page.locator(".custom-select-wrap:has(#off-lang-add-select) .custom-select-trigger")).to_be_visible()
 
         # Select 'en' from the dropdown and click add
         add_select.select_option("en")
