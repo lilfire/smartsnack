@@ -61,6 +61,9 @@ class TestPqAddBrowser:
         _go_to_settings(page)
         _open_section(page, "settings_pq_title")
 
+        # Capture card count before adding.
+        initial_count = page.locator("#pq-list .pq-card").count()
+
         page.locator("#pq-add-label").fill("E2E Soy")
         page.locator("#pq-add-kw").fill("soy, soybean")
         page.locator("#pq-add-pdcaas").fill("0.91")
@@ -69,8 +72,8 @@ class TestPqAddBrowser:
         page.locator("button[data-i18n='btn_add_protein_source']").click()
         page.wait_for_timeout(500)
 
-        pq_list = page.locator("#pq-list")
-        expect(pq_list).to_contain_text("E2E Soy")
+        # A new card must be added (PQ labels live in input values, not text nodes).
+        expect(page.locator("#pq-list .pq-card")).to_have_count(initial_count + 1, timeout=5000)
 
 
 class TestPqScoreFields:
