@@ -69,41 +69,43 @@ def _call_scanner_fn(page, fn_name, *args):
 def test_scan_button_exists_on_register(page):
     """The scan barcode button must be present on the register form DOM."""
     _go_to_register(page)
-    scan_btn = page.locator("[data-i18n-title='btn_scan_title']")
+    scan_btn = page.locator("[data-i18n-aria-label='btn_scan_title']")
     expect(scan_btn).to_be_attached()
 
 
 def test_scan_button_exists_on_search(page):
     """The scan barcode button must be present on the search view DOM."""
     _go_to_search(page)
-    scan_btn = page.locator("[data-i18n-title='search_scan_title']")
+    scan_btn = page.locator("[data-i18n-aria-label='search_scan_title']")
     expect(scan_btn).to_be_attached()
 
 
 def test_scan_button_register_has_title_attribute(page):
-    """The register-view scan button must carry a data-i18n-title attribute
-    so the i18n system can set a meaningful tooltip."""
+    """The register-view scan button must expose an accessible label via
+    data-i18n-aria-label / aria-label so the i18n system can set a meaningful
+    accessible name."""
     _go_to_register(page)
-    scan_btn = page.locator("[data-i18n-title='btn_scan_title']")
+    scan_btn = page.locator("[data-i18n-aria-label='btn_scan_title']")
     expect(scan_btn).to_be_attached()
 
-    i18n_title = scan_btn.get_attribute("data-i18n-title")
-    title = scan_btn.get_attribute("title")
-    assert (i18n_title is not None) or (title is not None), (
-        "Scan button must have a data-i18n-title or title attribute for accessibility"
+    i18n_aria_label = scan_btn.get_attribute("data-i18n-aria-label")
+    aria_label = scan_btn.get_attribute("aria-label")
+    assert (i18n_aria_label is not None) or (aria_label is not None), (
+        "Scan button must have a data-i18n-aria-label or aria-label attribute for accessibility"
     )
 
 
 def test_scan_button_search_has_title_attribute(page):
-    """The search-view scan button must carry a data-i18n-title attribute."""
+    """The search-view scan button must expose an accessible label via
+    data-i18n-aria-label / aria-label."""
     _go_to_search(page)
-    scan_btn = page.locator("[data-i18n-title='search_scan_title']")
+    scan_btn = page.locator("[data-i18n-aria-label='search_scan_title']")
     expect(scan_btn).to_be_attached()
 
-    i18n_title = scan_btn.get_attribute("data-i18n-title")
-    title = scan_btn.get_attribute("title")
-    assert (i18n_title is not None) or (title is not None), (
-        "Search scan button must have a data-i18n-title or title attribute"
+    i18n_aria_label = scan_btn.get_attribute("data-i18n-aria-label")
+    aria_label = scan_btn.get_attribute("aria-label")
+    assert (i18n_aria_label is not None) or (aria_label is not None), (
+        "Search scan button must have a data-i18n-aria-label or aria-label attribute"
     )
 
 
