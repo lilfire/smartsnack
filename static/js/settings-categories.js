@@ -1,5 +1,5 @@
 // ── Settings: Category Management ───────────────────
-import { state, api, esc, fetchStats, upgradeSelect, showConfirmModal, showToast } from './state.js';
+import { state, api, esc, fetchStats, showConfirmModal, showToast } from './state.js';
 import { t } from './i18n.js';
 import { initEmojiPicker, resetEmojiPicker } from './emoji-picker.js';
 import { refreshScopeSelect } from './settings-weights.js';
@@ -19,6 +19,7 @@ export async function loadCategories() {
     let h = '';
     cats.forEach((c) => {
       h += '<div class="cat-item"><span class="cat-item-emoji cat-item-emoji-edit" data-cat="' + esc(c.name) + '" title="' + t('label_change_emoji') + '">' + esc(c.emoji) + '</span>'
+        + '<span class="cat-item-label">' + esc(c.label) + '</span>'
         + '<input class="cat-item-label-input" data-cat-name="' + esc(c.name) + '" value="' + esc(c.label) + '" title="' + t('label_display_name') + '">'
         + '<span class="cat-item-key">' + esc(c.name) + '</span><span class="cat-item-count">' + c.count + ' prod.</span>'
         + '<button class="btn-sm btn-red" data-action="delete-cat" data-cat-name="' + esc(c.name) + '" data-cat-label="' + esc(c.label) + '" data-cat-count="' + c.count + '">&#128465;</button></div>';
@@ -152,7 +153,6 @@ export async function deleteCategory(name, label, count) {
 
     bg.appendChild(modal);
     document.body.appendChild(bg);
-    upgradeSelect(sel);
 
     function close() { bg.remove(); }
     cancelBtn.onclick = close;
