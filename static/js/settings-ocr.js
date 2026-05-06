@@ -1,5 +1,5 @@
 // ── Settings: OCR Provider and Settings ──────────────
-import { api, showToast, upgradeSelect } from './state.js';
+import { api, showToast } from './state.js';
 import { t } from './i18n.js';
 
 // Cache of provider key → models list (populated by loadOcrProviders)
@@ -64,7 +64,6 @@ function _onProviderChange() {
 export async function loadOcrProviders() {
   const sel = document.getElementById('ocr-provider-select');
   if (!sel) return;
-  upgradeSelect(sel, (_v) => { _onProviderChange(); });
   sel.addEventListener('change', _onProviderChange);
   try {
     const data = await api('/api/ocr/providers');
