@@ -179,8 +179,8 @@ def test_delete_user_flag_cancel_keeps_flag(page, live_url):
     cancel_btn.click()
     page.wait_for_timeout(400)
 
-    # Flag must still be in the list.
-    expect(page.locator("#flag-list")).to_contain_text("E2E Cancel Delete", timeout=3000)
+    # Flag must still be in the list (check by name, which is rendered as visible span text).
+    expect(page.locator("#flag-list")).to_contain_text("is_e2e_cancel_del", timeout=3000)
 
 
 # ---------------------------------------------------------------------------
