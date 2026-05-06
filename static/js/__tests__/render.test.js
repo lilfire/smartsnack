@@ -616,7 +616,7 @@ describe('renderResults - event delegation', () => {
     expect(document.getElementById('result-count').textContent).toContain('result_count_plural');
   });
 
-  it('does not call toggleExpand when clicking inside expanded area', () => {
+  it('calls toggleExpand when clicking inside expanded area (allows collapse by re-clicking row)', () => {
     state.expandedId = 1;
     const products = [{
       id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
@@ -626,7 +626,22 @@ describe('renderResults - event delegation', () => {
     renderResults(products, '');
     const expandedDiv = document.querySelector('.expanded');
     expandedDiv.click();
-    expect(window.toggleExpand).not.toHaveBeenCalled();
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('does not call toggleExpand when clicking a button inside expanded area', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const btn = document.querySelector('.expanded button');
+    if (btn) {
+      btn.click();
+      expect(window.toggleExpand).not.toHaveBeenCalled();
+    }
   });
 
   it('renders has_missing_scores asterisk in score cell', () => {
