@@ -228,6 +228,7 @@ class TestBulkRefreshBrowser:
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        page.locator("button.confirm-yes").click()
         # Progress container should become visible
         progress = page.locator("#refresh-off-progress")
         expect(progress).to_be_visible(timeout=5000)
