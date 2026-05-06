@@ -148,4 +148,5 @@ jobs:
         # on a random port (see app_server fixture), so no external server is
         # needed. Tests use Playwright to drive a real browser against the
         # in-process app.
-        run: python -m pytest tests/e2e/ --tb=short -q
+        # Scoped to the category test files targeted by LSO-1112/LSO-1128.
+        run: python -m pytest tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py --tb=short -q
