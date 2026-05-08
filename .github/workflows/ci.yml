@@ -154,12 +154,17 @@ jobs:
         # Paperclip issue LSO-1160 "Expand E2E CI scope to all tests/e2e/ files").
         #
         # INCLUDED (verified green in CI):
-        #   - tests/e2e/test_categories_update_browser.py
-        #   - tests/e2e/test_category_delete_move.py
+        #   - tests/e2e/test_backup.py                       (LSO-1161)
+        #   - tests/e2e/test_backup_errors.py                (LSO-1161)
+        #   - tests/e2e/test_backup_restore.py               (LSO-1161)
+        #   - tests/e2e/test_backup_restore_ui.py            (LSO-1161)
+        #   - tests/e2e/test_categories_update_browser.py    (LSO-1112/LSO-1128)
+        #   - tests/e2e/test_category_delete_move.py         (LSO-1112/LSO-1128)
+        #   - tests/e2e/test_delete_undo.py                  (LSO-1161)
         #
         # EXCLUDED (pending per-file verification — full per-file table in LSO-1160):
-        #   - 72 files in tests/e2e/ — see LSO-1160 for the canonical list and
+        #   - 67 files in tests/e2e/ — see LSO-1160 for the canonical list and
         #     each file's blocking LSO (where one is known).
         #   - LSO-1039 (category move modal, 5 failures) is the only known
         #     active blocker; remaining files just need per-file verification.
-        run: python -m pytest tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py --tb=short -q
+        run: python -m pytest tests/e2e/test_backup.py tests/e2e/test_backup_errors.py tests/e2e/test_backup_restore.py tests/e2e/test_backup_restore_ui.py tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py tests/e2e/test_delete_undo.py --tb=short -q
