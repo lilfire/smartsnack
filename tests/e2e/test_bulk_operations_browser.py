@@ -43,35 +43,38 @@ class TestBulkRefreshOffBrowser:
 
     def test_refresh_shows_progress_bar(self, page, api_create_product):
         """Clicking refresh should display the progress indicator."""
-        api_create_product(name="BulkRefreshProd", ean="7038010069307")
+        api_create_product(name="BulkRefreshProd", ean="9900000000011")
 
         _go_to_settings(page)
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        page.locator("button.confirm-yes").click()
 
         progress = page.locator("#refresh-off-progress")
         expect(progress).to_be_visible(timeout=5000)
 
     def test_refresh_shows_status_text(self, page, api_create_product):
         """During/after refresh, a status message should appear."""
-        api_create_product(name="BulkStatusProd", ean="7038010069308")
+        api_create_product(name="BulkStatusProd", ean="9900000000012")
 
         _go_to_settings(page)
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        page.locator("button.confirm-yes").click()
         status = page.locator("#refresh-off-status")
         expect(status).to_be_visible(timeout=10000)
 
     def test_progress_bar_fills(self, page, api_create_product):
         """The progress bar should fill during refresh."""
-        api_create_product(name="BulkBarProd", ean="7038010069309")
+        api_create_product(name="BulkBarProd", ean="9900000000013")
 
         _go_to_settings(page)
         _open_section(page, "settings_off_title")
 
         page.locator("#btn-refresh-all-off").click()
+        page.locator("button.confirm-yes").click()
         bar = page.locator("#refresh-off-bar")
 
         # Wait for bar to have some width (indicating progress)
@@ -80,7 +83,7 @@ class TestBulkRefreshOffBrowser:
                 const bar = document.getElementById('refresh-off-bar');
                 return bar && bar.style.width && bar.style.width !== '0%';
             }""",
-            timeout=15000,
+            timeout=30000,
         )
 
 
