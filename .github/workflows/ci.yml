@@ -168,13 +168,13 @@ jobs:
         #   - tests/e2e/test_scanner_ui.py                   (LSO-1162)
         #   - tests/e2e/test_tag_management.py               (LSO-1163)
         #   - tests/e2e/test_tags_crud.py                    (LSO-1163)
-        #   - tests/e2e/test_tags_crud_browser.py            (LSO-1163)
         #   - tests/e2e/test_tags_suggestions.py             (LSO-1163)
-        #   - tests/e2e/test_tags_suggestions_browser.py     (LSO-1163)
         #
         # EXCLUDED (pending per-file verification — full per-file table in LSO-1160):
-        #   - 57 files in tests/e2e/ — see LSO-1160 for the canonical list and
+        #   - 59 files in tests/e2e/ — see LSO-1160 for the canonical list and
         #     each file's blocking LSO (where one is known).
-        #   - LSO-1039 (category move modal, 5 failures) is the only known
-        #     active blocker; remaining files just need per-file verification.
-        run: python -m pytest tests/e2e/test_backup.py tests/e2e/test_backup_errors.py tests/e2e/test_backup_restore.py tests/e2e/test_backup_restore_ui.py tests/e2e/test_barcode_scanner.py tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py tests/e2e/test_delete_undo.py tests/e2e/test_ean_management.py tests/e2e/test_eans.py tests/e2e/test_eans_browser.py tests/e2e/test_scanner_ui.py tests/e2e/test_tag_management.py tests/e2e/test_tags_crud.py tests/e2e/test_tags_crud_browser.py tests/e2e/test_tags_suggestions.py tests/e2e/test_tags_suggestions_browser.py --tb=short -q
+        #   - LSO-1039 (category move modal, 5 failures) and LSO-1179
+        #     (create-new-tag-via-modal — test_tags_crud_browser.py and
+        #     test_tags_suggestions_browser.py) are the known active blockers;
+        #     remaining files just need per-file verification.
+        run: python -m pytest tests/e2e/test_backup.py tests/e2e/test_backup_errors.py tests/e2e/test_backup_restore.py tests/e2e/test_backup_restore_ui.py tests/e2e/test_barcode_scanner.py tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py tests/e2e/test_delete_undo.py tests/e2e/test_ean_management.py tests/e2e/test_eans.py tests/e2e/test_eans_browser.py tests/e2e/test_scanner_ui.py tests/e2e/test_tag_management.py tests/e2e/test_tags_crud.py tests/e2e/test_tags_suggestions.py --tb=short -q
