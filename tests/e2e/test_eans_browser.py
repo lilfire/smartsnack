@@ -63,7 +63,7 @@ class TestEanDisplayBrowser:
 
     def test_ean_field_visible_in_edit(self, page, api_create_product):
         """The EAN field should be visible when editing a product."""
-        api_create_product(name="EanFieldProd", ean="7038010069307")
+        api_create_product(name="EanFieldProd", ean="9900000000001")
         _reload_and_wait(page)
 
         _open_edit_form(page, "EanFieldProd")
@@ -72,13 +72,13 @@ class TestEanDisplayBrowser:
 
     def test_ean_value_displayed(self, page, api_create_product):
         """The EAN value should be shown when editing a product with an EAN."""
-        api_create_product(name="EanValProd", ean="7038010069307")
+        api_create_product(name="EanValProd", ean="9900000000002")
         _reload_and_wait(page)
 
         _open_edit_form(page, "EanValProd")
         # EAN should appear somewhere in the edit form
         form_area = page.locator(".table-row:has-text('EanValProd')").first
-        expect(form_area).to_contain_text("7038010069307")
+        expect(form_area).to_contain_text("9900000000002")
 
 
 # ===========================================================================
