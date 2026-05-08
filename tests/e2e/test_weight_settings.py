@@ -224,13 +224,13 @@ def test_add_category_override_button_opens_picker_modal(page):
     page.wait_for_timeout(500)
 
     # Either a modal appeared, or a toast appeared — both are valid outcomes.
-    # Wait up to 3 s for either selector to become visible in the DOM.
+    # Both elements use position:fixed, so offsetParent is always null;
+    # check DOM presence / show class instead.
     appeared = page.wait_for_function(
         """() => {
             const modal = document.querySelector('.scan-modal-bg');
             const toast = document.querySelector('#toast.show');
-            return (modal && modal.offsetParent !== null)
-                || (toast && toast.offsetParent !== null);
+            return !!modal || !!toast;
         }""",
         timeout=3000,
     )
