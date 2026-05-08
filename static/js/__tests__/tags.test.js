@@ -184,6 +184,14 @@ describe('Add Tag button', () => {
     removeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.getElementById('tag-modal-overlay')).toBeNull();
   });
+
+  it('field click calls stopPropagation to block toggle-expand bubbling', () => {
+    initTagInput([]);
+    const event = new MouseEvent('click', { bubbles: true });
+    const stopSpy = vi.spyOn(event, 'stopPropagation');
+    document.getElementById('tag-field-ed').dispatchEvent(event);
+    expect(stopSpy).toHaveBeenCalled();
+  });
 });
 
 // ── modal cancel / close ─────────────────────────────────────────────────────
