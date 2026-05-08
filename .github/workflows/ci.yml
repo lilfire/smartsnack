@@ -158,13 +158,18 @@ jobs:
         #   - tests/e2e/test_backup_errors.py                (LSO-1161)
         #   - tests/e2e/test_backup_restore.py               (LSO-1161)
         #   - tests/e2e/test_backup_restore_ui.py            (LSO-1161)
+        #   - tests/e2e/test_barcode_scanner.py              (LSO-1162)
         #   - tests/e2e/test_categories_update_browser.py    (LSO-1112/LSO-1128)
         #   - tests/e2e/test_category_delete_move.py         (LSO-1112/LSO-1128)
         #   - tests/e2e/test_delete_undo.py                  (LSO-1161)
+        #   - tests/e2e/test_ean_management.py               (LSO-1162)
+        #   - tests/e2e/test_eans.py                         (LSO-1162)
+        #   - tests/e2e/test_eans_browser.py                 (LSO-1162)
+        #   - tests/e2e/test_scanner_ui.py                   (LSO-1162)
         #
         # EXCLUDED (pending per-file verification — full per-file table in LSO-1160):
-        #   - 67 files in tests/e2e/ — see LSO-1160 for the canonical list and
+        #   - 62 files in tests/e2e/ — see LSO-1160 for the canonical list and
         #     each file's blocking LSO (where one is known).
         #   - LSO-1039 (category move modal, 5 failures) is the only known
         #     active blocker; remaining files just need per-file verification.
-        run: python -m pytest tests/e2e/test_backup.py tests/e2e/test_backup_errors.py tests/e2e/test_backup_restore.py tests/e2e/test_backup_restore_ui.py tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py tests/e2e/test_delete_undo.py --tb=short -q
+        run: python -m pytest tests/e2e/test_backup.py tests/e2e/test_backup_errors.py tests/e2e/test_backup_restore.py tests/e2e/test_backup_restore_ui.py tests/e2e/test_barcode_scanner.py tests/e2e/test_categories_update_browser.py tests/e2e/test_category_delete_move.py tests/e2e/test_delete_undo.py tests/e2e/test_ean_management.py tests/e2e/test_eans.py tests/e2e/test_eans_browser.py tests/e2e/test_scanner_ui.py --tb=short -q
