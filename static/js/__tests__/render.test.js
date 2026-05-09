@@ -1286,6 +1286,109 @@ describe('renderResults - additional branch coverage', () => {
   });
 });
 
+describe('renderResults - keyboard accessibility', () => {
+  beforeEach(() => {
+    const count = document.createElement('div');
+    count.id = 'result-count';
+    document.body.appendChild(count);
+    const container = document.createElement('div');
+    container.id = 'results-container';
+    document.body.appendChild(container);
+    window.setSort = vi.fn();
+    window.toggleExpand = vi.fn();
+    window.triggerImageUpload = vi.fn();
+    window.saveProduct = vi.fn();
+    window.startEdit = vi.fn();
+    window.removeProductImage = vi.fn();
+    window.deleteProduct = vi.fn();
+    window.openScanner = vi.fn();
+    window.lookupOFF = vi.fn();
+    window.estimateProteinQuality = vi.fn();
+    window.switchView = vi.fn();
+    window.validateOffBtn = vi.fn();
+    window.updateEstimateBtn = vi.fn();
+  });
+
+  it('table-row has tabindex="0" and role="button"', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    expect(row.getAttribute('tabindex')).toBe('0');
+    expect(row.getAttribute('role')).toBe('button');
+  });
+
+  it('table-row has aria-label set to product name', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    expect(row.getAttribute('aria-label')).toBe('Milk');
+  });
+
+  it('Enter key on table-row triggers toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const row = document.querySelector('.table-row');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(event, 'target', { value: row, writable: false });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('Space key on table-row triggers toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
+    Object.defineProperty(event, 'target', { value: row, writable: false });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('other keys on table-row do not trigger toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    Object.defineProperty(event, 'target', { value: row, writable: false });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
+  it('Enter key inside expanded area does not trigger toggleExpand', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const expandedDiv = document.querySelector('.expanded');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(event, 'target', { value: expandedDiv, writable: false });
+    expandedDiv.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
+  it('Enter key on a button inside a row does not trigger toggleExpand', () => {
+    state.expandedId = 1;
+    state.editingId = null;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const btn = document.querySelector('[data-action="start-edit"]');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(event, 'target', { value: btn, writable: false });
+    btn.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+});
+
 describe('volumeLabel edge case', () => {
   it('returns raw value for unknown volume values', () => {
     // volumeLabel is not exported, but we can test it through fmtCell

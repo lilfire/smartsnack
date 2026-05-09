@@ -5,12 +5,12 @@ Tests:
 - Settings toggles have aria-expanded with a valid value ('true' or 'false')
 - The #toast element has role='status' and aria-live
 - The tag modal has role='dialog'
-- Product table rows have role='row' and aria-label
+- Product table rows have role='button' and tabindex='0'
+- Product table rows respond to Enter and Space key (keyboard expand)
 - #result-count has role='status' or aria-live
 - aria-live regions exist on the page
 - Register form has associated labels or aria-label for key inputs
 - Keyboard navigation moves focus between register form fields
-- Product rows respond to Enter key (keyboard expand)
 """
 
 from playwright.sync_api import expect
@@ -60,7 +60,6 @@ def test_nav_tabs_are_keyboard_focusable(page):
     for i in range(count):
         btn = nav_tabs.nth(i)
         tag = btn.evaluate("el => el.tagName.toLowerCase()")
-        # Native <button> elements are inherently focusable; tabindex must not be -1
         tabindex = btn.get_attribute("tabindex")
         assert tag == "button" or (tabindex is not None and int(tabindex) >= 0), (
             f"Nav tab {i} is not keyboard-focusable: tag={tag}, tabindex={tabindex}"
@@ -83,22 +82,55 @@ def test_tab_navigates_register_form_fields(page):
 
 
 def test_product_row_responds_to_enter_key(page, api_create_product):
-    """Pressing Enter on a focused product row must expand it."""
-    api_create_product(name="KeyboardExpandProd")
+    """Pressing Enter on a focused .table-row should expand the product details."""
+    api_create_product(name="EnterKeyTestProduct")
     _reload_and_wait(page)
+    page.wait_for_selector(".table-row", timeout=10000)
 
-    row = page.locator(".table-row", has_text="KeyboardExpandProd").first
-    expect(row).to_be_visible(timeout=8000)
-    row.scroll_into_view_if_needed()
+    row = page.locator(".table-row").first
     row.focus()
-    page.wait_for_function(
-        "() => document.activeElement?.classList?.contains('table-row')",
-        timeout=2000,
-    )
-    page.keyboard.press("Enter")
+    expect(row).to_be_focused()
+    row.press("Enter")
 
-    expanded = page.locator(".expanded")
-    expect(expanded.first).to_be_visible(timeout=8000)
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
+
+
+def test_product_row_responds_to_space_key(page, api_create_product):
+    """Pressing Space on a focused .table-row should expand the product details."""
+    api_create_product(name="SpaceKeyTestProduct")
+    _reload_and_wait(page)
+    page.wait_for_selector(".table-row", timeout=10000)
+
+    row = page.locator(".table-row").first
+    row.focus()
+    expect(row).to_be_focused()
+    row.press("Space")
+
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
+
+
+def test_product_row_has_tabindex(page, api_create_product):
+    """Product rows should be keyboard-focusable via tabindex=0."""
+    api_create_product(name="TabindexTestProduct")
+    _reload_and_wait(page)
+    page.wait_for_selector(".table-row", timeout=10000)
+
+    row = page.locator(".table-row").first
+    expect(row).to_have_attribute("tabindex", "0")
+    expect(row).to_have_attribute("role", "button")
+
+
+def test_product_row_click_still_expands(page, api_create_product):
+    """Clicking a .table-row should still expand the product details (no regression)."""
+    api_create_product(name="ClickRegressionProduct")
+    _reload_and_wait(page)
+    page.wait_for_selector(".table-row", timeout=10000)
+
+    row = page.locator(".table-row").first
+    name_span = row.locator(".prod-name").first
+    name_span.click()
+
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
 
 def test_click_row_again_collapses_expanded(page, api_create_product):
@@ -145,7 +177,6 @@ def test_toast_has_role_status(page):
 
 def test_toast_has_aria_live_attribute(page):
     """The #toast element must have an aria-live attribute (set in toast.html or via JS)."""
-    # toast.html sets aria-live="polite" initially; state.js may override to "assertive"
     toast = page.locator("#toast")
     expect(toast).to_be_attached()
     aria_live = toast.get_attribute("aria-live")
@@ -187,8 +218,8 @@ def test_result_count_has_accessible_role(page, api_create_product):
     )
 
 
-def test_product_rows_have_role_row(page, api_create_product):
-    """Product table rows must have role='row' for screen reader table semantics."""
+def test_product_rows_have_role_button(page, api_create_product):
+    """Product table rows must have role='button' for keyboard interaction semantics."""
     api_create_product(name="RowRoleProd")
     _reload_and_wait(page)
 
@@ -198,8 +229,8 @@ def test_product_rows_have_role_row(page, api_create_product):
 
     first_row = rows.first
     role = first_row.get_attribute("role")
-    assert role == "row", (
-        f"Expected product row to have role='row', got: {role!r}"
+    assert role == "button", (
+        f"Expected product row to have role='button', got: {role!r}"
     )
 
 

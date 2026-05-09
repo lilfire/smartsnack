@@ -157,7 +157,7 @@ export function renderResults(results, search) {
       prodName = p.name;
     }
     const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
-    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="row" aria-label="' + esc(p.name) + '">'
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="button" aria-label="' + esc(prodName) + '">'
       + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
       + '<div class="prod-meta">' + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
@@ -398,10 +398,12 @@ export function renderResults(results, search) {
   }, { signal: _resultsAbort.signal });
 
   container.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    const row = e.target.closest('.table-row[data-action="toggle-expand"]');
-    if (!row) return;
-    const rowId = row.dataset.productId ? parseInt(row.dataset.productId, 10) : null;
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action="toggle-expand"]');
+    if (!target) return;
+    e.preventDefault();
+    if (e.target.closest('.expanded') || e.target.closest('button')) return;
+    const rowId = target.dataset.productId ? parseInt(target.dataset.productId, 10) : null;
     if (rowId) window.toggleExpand(rowId);
   }, { signal: _resultsAbort.signal });
 
