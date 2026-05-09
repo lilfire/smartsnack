@@ -330,15 +330,6 @@ export function renderResults(results, search) {
   if (_resultsAbort) _resultsAbort.abort();
   _resultsAbort = new AbortController();
 
-  // Keyboard: Enter on a focused .table-row expands it (same as click)
-  container.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter') return;
-    const row = e.target.closest('.table-row[data-action="toggle-expand"]');
-    if (!row) return;
-    const rowId = row.dataset.productId ? parseInt(row.dataset.productId, 10) : null;
-    if (rowId) window.toggleExpand(rowId);
-  }, { signal: _resultsAbort.signal });
-
   // Attach all event handlers via delegation instead of inline onclick
   container.addEventListener('click', (e) => {
     const target = e.target.closest('[data-action]');
