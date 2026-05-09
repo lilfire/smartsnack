@@ -222,65 +222,38 @@ class TestCategoryValidation:
             pass
 
     def test_delete_only_category(self, page, live_url):
-        """Deleting the last remaining category shows toast_cannot_delete_only_category."""
+        """Deleting the last remaining category shows toast_cannot_delete_only_category.
+
+        Relies on the ``reset_db`` autouse fixture (conftest) which restores
+        the DB to its initial seeded state before every test.  The seed DB
+        contains exactly one category ("Snacks") and no products, so no
+        manual cleanup is needed and prior-test contamination is impossible.
+        """
         t = _load_translations()
-
-        # Get current categories
-        req = urllib.request.Request(
-            f"{live_url}/api/categories",
-            headers={"X-Requested-With": "SmartSnack"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            categories = json.loads(resp.read())
-
-        # Delete all but one category (best-effort)
-        for cat in categories[1:]:
-            try:
-                req = urllib.request.Request(
-                    f"{live_url}/api/categories/{cat['name']}?move_to={categories[0]['name']}",
-                    headers={"X-Requested-With": "SmartSnack"},
-                    method="DELETE",
-                )
-                urllib.request.urlopen(req, timeout=5)
-            except urllib.error.HTTPError:
-                pass
-
-        # Reload so the UI reflects the post-cleanup DB state before navigating.
-        page.reload(wait_until="domcontentloaded")
-        page.wait_for_function(
-            "() => !document.querySelector('#results-container .loading')",
-            timeout=10000,
-        )
 
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
 
-        # Wait for delete button (proves the section rendered with data).
+        # reset_db guarantees exactly 1 category ("Snacks" seed) and 0 products.
         page.wait_for_selector("[data-action='delete-cat']", state="visible", timeout=5000)
-
-        # Guard: cleanup must have left exactly 1 category.
         btn_count = page.locator("[data-action='delete-cat']").count()
         assert btn_count == 1, (
-            f"Expected exactly 1 delete button after cleanup, got {btn_count} — "
-            "prior-test contamination suspected"
+            f"Expected exactly 1 delete button (reset_db should guarantee the "
+            f"seed state), got {btn_count}. Check that reset_db ran correctly."
         )
 
         delete_btn = page.locator("[data-action='delete-cat']").first
         delete_btn.click()
         page.wait_for_timeout(300)
 
-        # If a cat-move modal appeared, cleanup failed — cancel and fail clearly.
+        # With only one category there is nowhere to move products — the
+        # cat-move modal must NOT appear.
         cat_move_modal = page.locator(".scan-modal-bg")
-        if cat_move_modal.is_visible():
-            cancel_btn = page.locator(".scan-modal-bg .scan-modal button:last-child")
-            if cancel_btn.is_visible():
-                cancel_btn.click()
-            assert False, (
-                "cat-move modal appeared — cleanup did not reduce to 1 category; "
-                "prior-test contamination"
-            )
+        assert not cat_move_modal.is_visible(), (
+            "cat-move modal appeared unexpectedly when deleting the only category"
+        )
 
-        # Confirm the deletion attempt if a confirm dialog appeared.
+        # A plain confirm dialog may appear; dismiss it.
         confirm = page.locator(".confirm-yes")
         if confirm.is_visible():
             confirm.click()
