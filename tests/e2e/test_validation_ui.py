@@ -221,69 +221,44 @@ class TestCategoryValidation:
         except urllib.error.HTTPError:
             pass
 
-    def test_delete_only_category(self, page, live_url):
-        """Deleting the last remaining category shows toast_cannot_delete_only_category."""
+    def test_delete_only_category(self, page, live_url, api_create_product):
+        """Deleting the last remaining category shows toast_cannot_delete_only_category.
+
+        The JS delete path that shows this toast only fires when the category
+        has products (count > 0) AND there are no other categories to move
+        them to.  We seed one product via api_create_product so we hit that
+        path.  reset_db guarantees exactly 1 category ("Snacks"), so
+        ``others.length == 0`` and the toast fires without the cat-move modal.
+        """
         t = _load_translations()
 
-        # Get current categories
-        req = urllib.request.Request(
-            f"{live_url}/api/categories",
-            headers={"X-Requested-With": "SmartSnack"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            categories = json.loads(resp.read())
-
-        # Delete all but one category (best-effort)
-        for cat in categories[1:]:
-            try:
-                req = urllib.request.Request(
-                    f"{live_url}/api/categories/{cat['name']}?move_to={categories[0]['name']}",
-                    headers={"X-Requested-With": "SmartSnack"},
-                    method="DELETE",
-                )
-                urllib.request.urlopen(req, timeout=5)
-            except urllib.error.HTTPError:
-                pass
-
-        # Reload so the UI reflects the post-cleanup DB state before navigating.
-        page.reload(wait_until="domcontentloaded")
-        page.wait_for_function(
-            "() => !document.querySelector('#results-container .loading')",
-            timeout=10000,
-        )
+        # Seed one product so the category has count > 0.  The "has products"
+        # delete path checks for other categories; finding none, it shows
+        # toast_cannot_delete_only_category and returns without a modal.
+        api_create_product(name="OnlyCategory_TestProduct")
 
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
 
-        # Wait for delete button (proves the section rendered with data).
+        # reset_db guarantees exactly 1 category ("Snacks" seed).
         page.wait_for_selector("[data-action='delete-cat']", state="visible", timeout=5000)
-
-        # Guard: cleanup must have left exactly 1 category.
         btn_count = page.locator("[data-action='delete-cat']").count()
         assert btn_count == 1, (
-            f"Expected exactly 1 delete button after cleanup, got {btn_count} — "
-            "prior-test contamination suspected"
+            f"Expected exactly 1 delete button (reset_db should guarantee the "
+            f"seed state), got {btn_count}. Check that reset_db ran correctly."
         )
 
         delete_btn = page.locator("[data-action='delete-cat']").first
         delete_btn.click()
         page.wait_for_timeout(300)
 
-        # If a cat-move modal appeared, cleanup failed — cancel and fail clearly.
-        cat_move_modal = page.locator(".scan-modal-bg")
-        if cat_move_modal.is_visible():
-            cancel_btn = page.locator(".scan-modal-bg .scan-modal button:last-child")
-            if cancel_btn.is_visible():
-                cancel_btn.click()
-            assert False, (
-                "cat-move modal appeared — cleanup did not reduce to 1 category; "
-                "prior-test contamination"
-            )
-
-        # Confirm the deletion attempt if a confirm dialog appeared.
-        confirm = page.locator(".confirm-yes")
-        if confirm.is_visible():
-            confirm.click()
+        # With only one category there is nowhere to move products — the
+        # cat-move modal must NOT appear.  Use the unique .cat-move-modal-bg
+        # class (not .scan-modal-bg, which is also used by confirm dialogs).
+        cat_move_modal = page.locator(".cat-move-modal-bg")
+        assert not cat_move_modal.is_visible(), (
+            "cat-move modal appeared unexpectedly when deleting the only category"
+        )
 
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
