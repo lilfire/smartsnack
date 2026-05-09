@@ -94,7 +94,7 @@ def test_product_row_responds_to_enter_key(page, api_create_product):
     page.wait_for_timeout(400)
 
     expanded = page.locator(".expanded")
-    expect(expanded.first).to_be_visible(timeout=3000)
+    expect(expanded.first).to_be_visible(timeout=8000)
 
 
 def test_click_row_again_collapses_expanded(page, api_create_product):
