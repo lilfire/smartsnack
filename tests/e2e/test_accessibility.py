@@ -88,13 +88,17 @@ def test_product_row_responds_to_enter_key(page, api_create_product):
     _reload_and_wait(page)
 
     row = page.locator(".table-row", has_text="KeyboardExpandProd").first
+    expect(row).to_be_visible(timeout=8000)
+    row.scroll_into_view_if_needed()
     row.focus()
-    page.wait_for_timeout(150)
-    row.press("Enter")
-    page.wait_for_timeout(400)
+    page.wait_for_function(
+        "() => document.activeElement?.classList?.contains('table-row')",
+        timeout=2000,
+    )
+    page.keyboard.press("Enter")
 
     expanded = page.locator(".expanded")
-    expect(expanded.first).to_be_visible(timeout=3000)
+    expect(expanded.first).to_be_visible(timeout=8000)
 
 
 def test_click_row_again_collapses_expanded(page, api_create_product):
