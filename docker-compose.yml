@@ -15,6 +15,7 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
       - LLM_API_KEY=${LLM_API_KEY:-}  # legacy fallback
+      - APP_VERSION_SUFFIX=${APP_VERSION_SUFFIX:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
