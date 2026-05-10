@@ -101,7 +101,7 @@ class TestOcrIngredientTranslationE2E:
                 f"{live_url}/api/ocr/ingredients", {"image": image_b64}
             )
             assert status == 200
-            assert data["text"] == "sugar, flour, butter"
+            assert data["text"] == "sugar, flour, butter."
             assert captured_kwargs.get("language") == "en"
         finally:
             if original is not None:
@@ -131,7 +131,7 @@ class TestOcrIngredientTranslationE2E:
                 f"{live_url}/api/ocr/ingredients", {"image": image_b64}
             )
             assert status == 200
-            assert data["text"] == "sukker, mel, smor"
+            assert data["text"] == "sukker, mel, smor."
             assert captured_kwargs.get("language") == "no"
         finally:
             if original is not None:

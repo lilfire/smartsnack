@@ -330,7 +330,7 @@ class TestOcrDispatchUsesSelectedBackend:
                 f"{live_url}/api/ocr/ingredients", {"image": image_b64}
             )
             assert status == 200
-            assert data["text"] == "claude result"
+            assert data["text"] == "claude result."
             mock_cv.assert_called_once()
         finally:
             ocr_service._PROVIDERS["claude_vision"] = original
