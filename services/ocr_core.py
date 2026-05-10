@@ -5,7 +5,11 @@ import os
 import re
 
 from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
-from services.ocr_backends import _NUTRITION_PROMPT
+from services.ocr_backends import (
+    _NUTRITION_PROMPT,
+    ensure_trailing_period,
+    looks_like_llm_refusal,
+)
 from services.ocr_backends.tesseract import _extract_tesseract
 from services.ocr_backends.claude import _extract_claude_vision
 from services.ocr_backends.gemini import _extract_gemini
@@ -200,6 +204,17 @@ def dispatch_ocr(image_base64, prompt=None):
         kwargs["language"] = lang
     text = provider_fn(image_bytes, raw, mime_type, **kwargs)
 
+    if backend_id != DEFAULT_OCR_BACKEND and looks_like_llm_refusal(text):
+        logger.warning(
+            "Vision backend '%s' returned a conversational response instead "
+            "of an ingredient list; treating as no_text. First 80 chars: %r",
+            backend_id, (text or "")[:80],
+        )
+        text = ""
+
+    if backend_id != DEFAULT_OCR_BACKEND:
+        text = ensure_trailing_period(text)
+
     return {"text": text, "provider": provider_name, "fallback": fallback}
 
 
@@ -264,6 +279,17 @@ def dispatch_ocr_bytes(image_bytes, prompt=None):
     if lang:
         kwargs["language"] = lang
     text = provider_fn(image_bytes, raw_b64, mime_type, **kwargs)
+
+    if backend_id != DEFAULT_OCR_BACKEND and looks_like_llm_refusal(text):
+        logger.warning(
+            "Vision backend '%s' returned a conversational response instead "
+            "of an ingredient list; treating as no_text. First 80 chars: %r",
+            backend_id, (text or "")[:80],
+        )
+        text = ""
+
+    if backend_id != DEFAULT_OCR_BACKEND:
+        text = ensure_trailing_period(text)
 
     return {"text": text, "provider": provider_name, "fallback": fallback}
 

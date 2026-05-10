@@ -92,6 +92,138 @@ class TestBuildIngredientPrompt:
             prompt = build_ingredient_prompt(lang)
             assert "empty string" in prompt
 
+    def test_all_prompts_forbid_apologetic_prose(self):
+        """The empty-string rule must be reinforced with an explicit prohibition
+        on apologies and clarification prose. Regression test for vision LLMs
+        replying with 'I'm happy to help, but I don't see...' instead of an
+        empty string."""
+        from services.ocr_backends import build_ingredient_prompt
+        for lang in [None, "no", "en", "se"]:
+            prompt = build_ingredient_prompt(lang)
+            assert "Do NOT explain, apologize" in prompt
+
+    def test_all_prompts_call_out_conversational_examples(self):
+        """The prompt should explicitly list refusal phrases so the model
+        recognizes them as forbidden output."""
+        from services.ocr_backends import build_ingredient_prompt
+        for lang in [None, "no", "en", "se"]:
+            prompt = build_ingredient_prompt(lang)
+            assert "I'm happy to help" in prompt
+            assert "I don't see" in prompt
+            assert "Please provide" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_specify_single_comma_separated_line(self, lang):
+        """Output must be one comma-separated line — matches DB format."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "single line" in prompt
+        assert "separated by commas" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_require_allergen_caps(self, lang):
+        """Allergen ALL-CAPS rule must be present along with the canonical
+        Norwegian allergen roots used in the SmartSnack DB."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "ALL CAPS" in prompt
+        for allergen in ("MELK", "HVETE", "GLUTEN", "SOYA", "EGG", "MYSE", "PEANØTT"):
+            assert allergen in prompt, f"missing allergen root {allergen!r}"
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_warn_against_capitalizing_derived_words(self, lang):
+        """Regression guard: the prompt must explicitly tell the model NOT
+        to capitalize words like 'melkesyre' that merely contain allergen
+        letters but are not themselves allergens."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "melkesyre" in prompt
+        assert "Do NOT capitalize" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_specify_decimal_comma(self, lang):
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "(0,4%)" in prompt
+        assert "comma as the decimal" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_preserve_e_numbers(self, lang):
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "E270" in prompt
+        assert "Preserve E-numbers" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_specify_trace_warning_format(self, lang):
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "Kan inneholde spor av" in prompt
+        assert "May contain traces of" in prompt
+        assert "Kan innehålla spår av" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_require_trailing_period(self, lang):
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "End the entire output with a single period" in prompt
+
+    @pytest.mark.parametrize("lang", [None, "no", "en", "se"])
+    def test_all_prompts_include_fewshot_example(self, lang):
+        """A worked example anchors the format more reliably than rules alone."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        # Sentinels from the canonical example
+        assert "Linsemel (37%)" in prompt
+        assert "MYSEPULVER (fra MELK)" in prompt
+        assert "Kan inneholde spor av HVETE, RUG, BYGG og HAVRE." in prompt
+
+
+# ---------------------------------------------------------------------------
+# ensure_trailing_period
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureTrailingPeriod:
+    """Safety-net helper that aligns OCR output with the DB convention of a
+    trailing period on every ingredient string."""
+
+    def test_appends_period_when_missing(self):
+        from services.ocr_backends import ensure_trailing_period
+        assert ensure_trailing_period("Sukker, mel, vann") == "Sukker, mel, vann."
+
+    def test_does_not_double_period(self):
+        from services.ocr_backends import ensure_trailing_period
+        assert ensure_trailing_period("Sukker, mel, vann.") == "Sukker, mel, vann."
+
+    @pytest.mark.parametrize("punct", [".", "!", "?"])
+    def test_preserves_terminal_punctuation(self, punct):
+        from services.ocr_backends import ensure_trailing_period
+        text = f"Sukker, mel, vann{punct}"
+        assert ensure_trailing_period(text) == text
+
+    def test_strips_trailing_whitespace_before_period(self):
+        from services.ocr_backends import ensure_trailing_period
+        assert ensure_trailing_period("Sukker, mel  \n") == "Sukker, mel."
+
+    def test_empty_string_stays_empty(self):
+        """Empty must remain empty so the no-text error path still fires."""
+        from services.ocr_backends import ensure_trailing_period
+        assert ensure_trailing_period("") == ""
+
+    def test_whitespace_only_returns_empty(self):
+        from services.ocr_backends import ensure_trailing_period
+        assert ensure_trailing_period("   \n\t") == ""
+
+    def test_none_returns_empty(self):
+        from services.ocr_backends import ensure_trailing_period
+        assert ensure_trailing_period(None) == ""  # type: ignore[arg-type]
+
+    def test_preserves_trace_warning_period(self):
+        from services.ocr_backends import ensure_trailing_period
+        text = "Sukker, mel. Kan inneholde spor av HVETE, RUG og BYGG."
+        assert ensure_trailing_period(text) == text
+
     # --- Translation vs no-translation prompt content validation ---
 
     def test_empty_string_language_returns_default_task(self):
@@ -124,12 +256,18 @@ class TestBuildIngredientPrompt:
         first_line = prompt.split("\n")[0]
         assert "Extract ONLY" not in first_line
 
-    def test_no_translation_prompt_does_not_contain_language_names(self):
-        """The default (no-language) prompt must not mention any specific language."""
+    def test_no_translation_prompt_has_no_translation_directive(self):
+        """The default (no-language) prompt must not tell the model to
+        translate to a specific target language. Language names may still
+        appear inside shared formatting templates (e.g. trace-warning
+        examples), so we assert against the directive phrasing rather
+        than against the bare language names."""
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt()
         for name in ("Norwegian", "English", "Swedish"):
-            assert name not in prompt
+            assert f"translate every ingredient into {name}" not in prompt
+            assert f"Always output in {name}" not in prompt
+            assert f"output in {name} regardless" not in prompt
 
     @pytest.mark.parametrize("lang", ["no", "en", "se"])
     def test_translation_prompt_would_catch_conflicting_instructions(self, lang):
@@ -364,7 +502,9 @@ class TestDispatchOcrPassesLanguage:
             from services.ocr_core import dispatch_ocr
             result = dispatch_ocr(_b64(img))
 
-        assert result["text"] == "sugar"
+        # Vision backend output gets a trailing period applied by the
+        # dispatch layer to match the SmartSnack DB convention.
+        assert result["text"] == "sugar."
         call_kwargs = mock_cls.return_value.messages.create.call_args
         msgs = call_kwargs[1]["messages"]
         text_content = msgs[0]["content"][1]["text"]
@@ -413,3 +553,99 @@ class TestDispatchOcrBytesPassesLanguage:
             from services.ocr_core import dispatch_ocr_bytes
             result = dispatch_ocr_bytes(img)
         assert result["text"] == "mel"
+
+
+# ---------------------------------------------------------------------------
+# dispatch_ocr safety net for conversational LLM responses
+# ---------------------------------------------------------------------------
+
+
+class TestDispatchOcrConversationalGuard:
+    """When a vision LLM ignores the empty-string rule and replies with prose
+    (e.g. "I'm happy to help, but I don't see an image..."), the dispatch
+    layer must convert the response into empty text so the blueprint surfaces
+    error_type='no_text' and the frontend shows the no-text toast."""
+
+    _REFUSAL_TEXT = (
+        "I'm happy to help, but I don't see an image of a food label. "
+        "Please provide the image, and I'll extract the ingredient list "
+        "and translate it into Norwegian (Bokmål) according to the rules."
+    )
+
+    def test_dispatch_ocr_bytes_strips_claude_refusal(self):
+        img = _tiny_png_bytes()
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text=self._REFUSAL_TEXT)]
+        )
+
+        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True), \
+             patch("services.settings_service.get_language", return_value="no", autospec=True), \
+             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
+             patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
+            from services.ocr_core import dispatch_ocr_bytes
+            result = dispatch_ocr_bytes(img)
+
+        assert result["text"] == ""
+        assert result["provider"]
+        assert result["fallback"] is False
+
+    def test_dispatch_ocr_strips_claude_refusal(self):
+        img = _tiny_png_bytes()
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text=self._REFUSAL_TEXT)]
+        )
+
+        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True), \
+             patch("services.settings_service.get_language", return_value="no", autospec=True), \
+             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
+             patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
+            from services.ocr_core import dispatch_ocr
+            result = dispatch_ocr(_b64(img))
+
+        assert result["text"] == ""
+
+    def test_dispatch_ocr_passes_real_ingredient_list_unchanged(self):
+        """Sanity check: ingredient lists must not be mistaken for refusals.
+        The dispatch layer adds a trailing period to match the SmartSnack
+        DB convention but otherwise leaves the text alone."""
+        img = _tiny_png_bytes()
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="Sukker, mel, vann, salt")]
+        )
+
+        with patch("services.settings_service.get_ocr_backend", return_value="claude_vision", autospec=True), \
+             patch("services.settings_service.get_language", return_value="no", autospec=True), \
+             patch("services.ocr_settings_service.get_model_for_provider", side_effect=RuntimeError, autospec=True), \
+             patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}), \
+             patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
+            from services.ocr_core import dispatch_ocr_bytes
+            result = dispatch_ocr_bytes(img)
+
+        assert result["text"] == "Sukker, mel, vann, salt."
+
+    def test_dispatch_ocr_tesseract_skips_refusal_check(self):
+        """Tesseract returns raw OCR text and must not be filtered, even if
+        the OCR happens to contain a marker phrase."""
+        img = _tiny_png_bytes()
+        # Contrived OCR output that contains a marker substring but came
+        # from local Tesseract, which never produces conversational text.
+        mock_data = {
+            "text": ["Please", "provide", "fresh", "milk"],
+            "conf": [90, 90, 90, 90],
+            "left": [0, 50, 100, 150],
+            "top": [0, 0, 0, 0],
+            "width": [40, 50, 40, 40],
+            "height": [10, 10, 10, 10],
+        }
+        with patch("services.settings_service.get_ocr_backend", return_value="tesseract", autospec=True), \
+             patch("pytesseract.image_to_data", return_value=mock_data, autospec=True), \
+             patch("pytesseract.Output", new_callable=lambda: type("O", (), {"DICT": "dict"})):
+            from services.ocr_core import dispatch_ocr_bytes
+            result = dispatch_ocr_bytes(img)
+        assert "Please" in result["text"]
+        assert result["text"] != ""

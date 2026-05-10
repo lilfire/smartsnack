@@ -186,5 +186,5 @@ class TestGemini20FlashModelFormat:
                 result = dispatch_ocr(_make_tiny_png_b64())
 
         validate_ocr_dispatch_result(result)
-        assert result["text"] == "mel, sukker"
+        assert result["text"] == "mel, sukker."
         assert "gemini" in result["provider"].lower() or result["provider"] != ""

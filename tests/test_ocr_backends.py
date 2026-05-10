@@ -444,3 +444,67 @@ class TestOcrApiMockShapes:
     def test_claude_rejects_empty_content(self):
         with pytest.raises(AssertionError, match="Non-empty"):
             validate_claude_response_shape({"content": []})
+
+
+# ── looks_like_llm_refusal ────────────────────────────────────────────────────
+
+
+class TestLooksLikeLlmRefusal:
+    """The conversational-response detector that protects users from vision
+    LLMs ignoring the prompt's empty-string rule for unreadable labels."""
+
+    def test_real_claude_refusal_is_detected(self):
+        """The exact response that triggered the original bug report."""
+        from services.ocr_backends import looks_like_llm_refusal
+        text = (
+            "I'm happy to help, but I don't see an image of a food label. "
+            "Please provide the image, and I'll extract the ingredient list "
+            "and translate it into Norwegian (Bokmål) according to the rules."
+        )
+        assert looks_like_llm_refusal(text) is True
+
+    @pytest.mark.parametrize("text", [
+        "I'm happy to help, but I need a clearer image.",
+        "I'd be happy to help once you share the photo.",
+        "Sorry, I can't see the ingredients in this image.",
+        "I'm sorry, the image is too blurry to read.",
+        "Unfortunately, the image is unreadable.",
+        "I'm unable to read the ingredient list from this image.",
+        "I cannot see any text on this label.",
+        "Please provide a clearer image of the label.",
+        "Could you share a higher-resolution photo?",
+        "I don't see an ingredient list in this image.",
+        "No ingredient list is visible in the picture.",
+        "The image appears to be blurry.",
+        "This appears to be a photo of something else.",
+    ])
+    def test_conversational_responses_detected(self, text):
+        from services.ocr_backends import looks_like_llm_refusal
+        assert looks_like_llm_refusal(text) is True
+
+    def test_mixed_case_marker_is_detected(self):
+        """Detection is case-insensitive."""
+        from services.ocr_backends import looks_like_llm_refusal
+        assert looks_like_llm_refusal("I'M HAPPY TO HELP, BUT...") is True
+
+    @pytest.mark.parametrize("text", [
+        "Sukker, mel, vann, salt, gjær",
+        "Hvetemel, sukker (15%), vann, palmeolje, salt",
+        "Salt",
+        "Vann, sukker, sitronsyre (E330), naturlige aromaer",
+        "Wheat flour, water, yeast, salt",
+        "Mjölk, socker, kakao, vaniljarom",
+    ])
+    def test_real_ingredient_lists_pass_through(self, text):
+        from services.ocr_backends import looks_like_llm_refusal
+        assert looks_like_llm_refusal(text) is False
+
+    @pytest.mark.parametrize("text", ["", "   ", "\n\n"])
+    def test_empty_or_whitespace_returns_false(self, text):
+        from services.ocr_backends import looks_like_llm_refusal
+        assert looks_like_llm_refusal(text) is False
+
+    def test_none_returns_false(self):
+        """Defensive: provider wrappers may pass through None on edge cases."""
+        from services.ocr_backends import looks_like_llm_refusal
+        assert looks_like_llm_refusal(None) is False  # type: ignore[arg-type]
