@@ -47,6 +47,12 @@ _REFUSAL_PHRASES = (
     "I'm happy to help",
 )
 
+_REQUIRED_TRANSLATION_KEYS = (
+    "decimal_separator",
+    "allergen_terms",
+    "trace_notice_template",
+)
+
 
 def cleanup_ingredients(raw_text: str, lang: str = "no") -> dict:
     """Clean up raw OCR ingredient text using the Anthropic LLM.
@@ -55,7 +61,7 @@ def cleanup_ingredients(raw_text: str, lang: str = "no") -> dict:
       - ``text``: cleaned text (or raw_text on skip/error)
       - ``llm_cleanup_skipped``: True if the LLM call was skipped or failed
     """
-    if not raw_text:
+    if not raw_text or not raw_text.strip():
         return {"text": "", "llm_cleanup_skipped": True}
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -67,6 +73,9 @@ def cleanup_ingredients(raw_text: str, lang: str = "no") -> dict:
         with open(trans_file, "r", encoding="utf-8") as f:
             trans = json.load(f)
     except Exception:
+        return {"text": raw_text, "llm_cleanup_skipped": True}
+
+    if any(k not in trans for k in _REQUIRED_TRANSLATION_KEYS):
         return {"text": raw_text, "llm_cleanup_skipped": True}
 
     user_message = (
