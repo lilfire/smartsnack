@@ -74,23 +74,37 @@ _BASE_RULES_NO_TRANSLATION = (
 )
 
 _BASE_RULES_WITH_TRANSLATION = (
-    "- Translate ALL ingredient names to {lang_name}. "
-    "The label may be written in any language -- always output in {lang_name} regardless of the source language.\n"
-    "- Do NOT output any text in the original label language. Every ingredient name must be translated.\n"
-    "- E-numbers (e.g. E471, E150d) and standard additive codes may be kept as-is if no common {lang_name} name exists.\n"
-    "- Do NOT include the section header. Strip any leading label word such as "
-    '"INGREDIENSER", "INGREDIENTS", "ZUTATEN", "INGREDIENTS", "AINESOSAT", '
-    '"SKLADNIKI", or any similar word that introduces the ingredient section.\n'
+    "- Translate EVERY word in the ingredient list into {lang_name}, "
+    "including all text inside parentheses, brackets, and after commas. "
+    "The label may be written in any language — always output exclusively "
+    "in {lang_name}.\n"
+    "- Parenthetical content (text inside round brackets) is part of the "
+    "ingredient description and MUST be translated, not left in the source "
+    "language. Example of WRONG output: `Beriket mel (harina de trigo)`. "
+    "Example of CORRECT output: `Beriket hvetemel (hvetemel)` or simply "
+    "`Beriket hvetemel` if the parenthetical is redundant after translation.\n"
+    "- Do NOT output any word in a language other than {lang_name}. "
+    "This includes text inside parentheses, subcategory notes, and "
+    "additive descriptions.\n"
+    "- E-numbers (e.g. E471, E150d) and FD&C color codes (e.g. FD&C Red 40, "
+    "FD&C Blue 1) may be kept as-is. Their surrounding descriptions must "
+    "still be in {lang_name}.\n"
+    "- Do NOT include the section header. Strip any leading label word such "
+    'as "INGREDIENSER", "INGREDIENTS", "ZUTATEN", "AINESOSAT", "SKŁADNIKI", '
+    "or any similar word that introduces the ingredient section.\n"
     "- Do NOT prefix the output with phrases like "
     '"The ingredient text is:", "The label reads:", or similar.\n'
-    "- Do NOT rephrase, summarize, or paraphrase. Translate the ingredient names and output the list only.\n"
-    "- If you cannot read or do not see an ingredient list in the image, output "
-    "an empty string. Do NOT explain, apologize, ask for clarification, or write "
-    "any prose.\n"
+    "- Do NOT rephrase or summarize. Translate faithfully and output the "
+    "list only.\n"
+    "- If no ingredient list is visible in the image, output an empty string. "
+    "Do NOT explain, apologize, ask for clarification, or write any prose.\n"
     "- Never output sentences such as \"I'm happy to help\", \"I don't see\", "
     "\"Please provide\", or any other conversational reply. The only allowed "
     "outputs are the translated ingredient list or an empty string.\n"
     + _FORMATTING_RULES + "\n"
+    "- Self-check before responding: scan your output for any non-{lang_name} "
+    "words (including inside parentheses). Translate any you find, then "
+    "return the final result.\n"
     "- Output nothing except the formatted, translated ingredient list."
 )
 
@@ -119,8 +133,9 @@ def build_ingredient_prompt(language: str | None = None) -> str:
     if lang_name:
         task = (
             f"You are reading a food label image. The label may be written in any language.\n\n"
-            f"Your task: Extract the ingredient list and translate every ingredient into {lang_name}. "
-            f"Always output in {lang_name}, regardless of what language the original label is written in.\n\n"
+            f"Your task: Extract the ingredient list and translate EVERY word into "
+            f"{lang_name}. Your entire output must be in {lang_name} only — including "
+            f"text in parentheses and after commas.\n\n"
             f"Rules:\n"
         )
         rules = _BASE_RULES_WITH_TRANSLATION.replace("{lang_name}", lang_name)
