@@ -485,5 +485,5 @@ class TestBlueprintFormatConversion:
                     )
 
         data = resp.get_json()
-        # Same response shape as any other format — no extra fields
-        assert set(data.keys()) == {"text", "provider", "fallback"}
+        # Response includes LLM cleanup status in addition to OCR fields
+        assert set(data.keys()) == {"text", "provider", "fallback", "llm_cleanup_skipped"}
