@@ -117,6 +117,35 @@ def test_build_prompt_mixed_spanish_parentheticals_in_prompt(ingredient_text):
     assert "ALL text" in prompt or "entire output must be" in prompt
 
 
+@pytest.mark.parametrize("ingredient_text", [
+    "palm油",
+    "palmolje (palm油)",
+    "Styrke, palm油, maltodekstrin",
+])
+def test_build_prompt_cjk_characters_covered(ingredient_text):
+    """Regression for board report 2026-05-11: CJK characters (e.g. Chinese 油)
+    embedded in ingredient names must be caught by the language-purity rule.
+    The prompt must explicitly list non-Latin scripts so LLMs don't treat
+    embedded CJK as acceptable."""
+    prompt = svc._build_prompt(ingredient_text, "no")
+    assert ingredient_text in prompt
+    # Prompt must explicitly cover non-Latin scripts
+    assert "Chinese" in prompt or "漢字" in prompt or "non-Latin" in prompt
+
+
+def test_build_prompt_cjk_wrong_example_present():
+    """The prompt must include the palm油 WRONG example so the model recognises
+    the exact failure pattern reported by the board."""
+    prompt = svc._build_prompt("palmolje", "no")
+    assert "palm油" in prompt
+
+
+def test_build_prompt_cjk_self_check_covers_non_latin():
+    """Self-check instruction must explicitly mention non-Latin / CJK scripts."""
+    prompt = svc._build_prompt("sukker", "no")
+    assert "Chinese" in prompt or "non-Latin" in prompt or "CJK" in prompt.upper()
+
+
 def test_build_prompt_pure_source_language():
     """Full Spanish input must be included in a prompt that requests complete translation."""
     text = "Azúcar, agua, sal, harina de trigo, aceite de palma"
