@@ -300,8 +300,26 @@ class TestEnsureTrailingPeriod:
         """Translation rules should require all ingredients to be translated."""
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt(lang)
-        # Strengthened rule: covers any foreign language, not just "original label language"
-        assert "Do NOT output any word in a language other than" in prompt
+        # Strengthened rule: covers any word, character, or script (including CJK)
+        assert "Do NOT output any word" in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_rules_explicitly_cover_non_latin_scripts(self, lang):
+        """Regression for board report 2026-05-11: LLM hallucinated Chinese char 油
+        into 'palm油' when translating German 'Palmöl'. The prompt must explicitly
+        prohibit non-Latin scripts (Chinese, Japanese, Korean, etc.) to prevent
+        the model from using CJK characters as shorthand for translated concepts."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "Chinese" in prompt or "non-Latin" in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_translation_prompt_includes_cjk_wrong_example(self, lang):
+        """The palm油 WRONG example must be present so the model recognises the
+        exact hallucination pattern (Chinese char fused into a Latin word)."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt(lang)
+        assert "palm油" in prompt
 
     def test_backward_compat_alias_is_set(self):
         import services.ocr_backends as mod
