@@ -53,12 +53,91 @@ def test_build_prompt_structure():
     prompt = svc._build_prompt("sugar", "no")
     assert "Rules:" in prompt
     assert "Ingredients:" in prompt
-    assert "Return only the translated ingredients text" in prompt
+    # Hardened prompt: stronger language-purity rule replaces old "Return only..."
+    assert "entire output must be in" in prompt
 
 
 def test_build_prompt_unknown_lang_uses_code():
     prompt = svc._build_prompt("sugar", "fr")
     assert "fr" in prompt
+
+
+# ---------------------------------------------------------------------------
+# _build_prompt() — hardened rules (LSO-1211 regression coverage)
+# ---------------------------------------------------------------------------
+
+def test_build_prompt_parenthetical_translation_rule():
+    """Regression for LSO-1210: prompt must explicitly require translating parenthetical content."""
+    prompt = svc._build_prompt("Beriket mel (harina de trigo)", "no")
+    assert "parentheses" in prompt.lower() or "parenthetical" in prompt.lower()
+    assert "translated" in prompt.lower()
+
+
+def test_build_prompt_fixes_partial_translation_passthrough():
+    """Fix for the dangerous 'if already in target language, return as-is' rule.
+
+    The old rule would pass through partially-translated text without fixing
+    Spanish fragments. The new rule must trigger re-translation when ANY word
+    is in a different language.
+    """
+    prompt = svc._build_prompt("Beriket mel (harina de trigo)", "no")
+    assert "any word" in prompt.lower() or "different language" in prompt.lower()
+
+
+def test_build_prompt_has_self_check():
+    """Prompt must include a self-check instruction to catch missed foreign words."""
+    prompt = svc._build_prompt("sugar", "no")
+    assert "self-check" in prompt.lower() or "scan it for" in prompt.lower()
+
+
+@pytest.mark.parametrize("lang,expected_name", [
+    ("no", "Norwegian"),
+    ("en", "English"),
+    ("se", "Swedish"),
+])
+def test_build_prompt_all_supported_languages(lang, expected_name):
+    """Each supported target language must produce a prompt with the resolved language name."""
+    prompt = svc._build_prompt("sugar, water", lang)
+    assert expected_name in prompt
+    assert "{lang_name}" not in prompt
+
+
+@pytest.mark.parametrize("ingredient_text", [
+    "Beriket mel (harina de trigo)",
+    "natriumklorid (sal yodada)",
+    "vannfri melkesyre (ácido cítrico)",
+    "aluminiumsilikat (FD&C Laca Alumínica Azul 1)",
+])
+def test_build_prompt_mixed_spanish_parentheticals_in_prompt(ingredient_text):
+    """Exact regression cases from LSO-1210: the text is included in the prompt
+    and the prompt instructs translation of ALL text (not just main terms).
+    """
+    prompt = svc._build_prompt(ingredient_text, "no")
+    assert ingredient_text in prompt
+    assert "ALL text" in prompt or "entire output must be" in prompt
+
+
+def test_build_prompt_pure_source_language():
+    """Full Spanish input must be included in a prompt that requests complete translation."""
+    text = "Azúcar, agua, sal, harina de trigo, aceite de palma"
+    prompt = svc._build_prompt(text, "no")
+    assert text in prompt
+    assert "Norwegian" in prompt
+
+
+def test_build_prompt_already_translated_condition():
+    """The new 'already-in-language' rule must require EVERY SINGLE word to be in
+    the target language before allowing pass-through — mixed input must be re-translated.
+    """
+    prompt = svc._build_prompt("Sukker, vann, salt", "no")
+    assert "every single word" in prompt.lower() or "already correctly" in prompt.lower()
+
+
+def test_build_prompt_empty_input_is_in_prompt():
+    """Empty input is allowed through by translate_ingredients before calling _build_prompt;
+    when called directly, empty string appears in the Ingredients section."""
+    prompt = svc._build_prompt("", "no")
+    assert "Ingredients:\n" in prompt
 
 
 # ---------------------------------------------------------------------------

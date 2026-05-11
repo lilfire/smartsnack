@@ -244,8 +244,8 @@ class TestEnsureTrailingPeriod:
     def test_translation_prompt_contains_translate_directive(self, lang, expected_name):
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt(lang)
-        assert f"translate every ingredient into {expected_name}" in prompt.lower() or \
-               f"always output in {expected_name}" in prompt
+        # Task header says "translate EVERY word into {lang_name}"
+        assert "EVERY word" in prompt and expected_name in prompt
 
     @pytest.mark.parametrize("lang", ["no", "en", "se"])
     def test_translation_prompt_task_header_does_not_say_extract_only(self, lang):
@@ -300,7 +300,8 @@ class TestEnsureTrailingPeriod:
         """Translation rules should require all ingredients to be translated."""
         from services.ocr_backends import build_ingredient_prompt
         prompt = build_ingredient_prompt(lang)
-        assert "Do NOT output any text in the original label language" in prompt
+        # Strengthened rule: covers any foreign language, not just "original label language"
+        assert "Do NOT output any word in a language other than" in prompt
 
     def test_backward_compat_alias_is_set(self):
         import services.ocr_backends as mod
