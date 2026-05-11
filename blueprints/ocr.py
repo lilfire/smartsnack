@@ -4,7 +4,7 @@ from flask import Blueprint, jsonify
 
 from extensions import limiter
 from helpers import _require_json
-from services import ocr_service
+from services import ocr_service, llm_cleanup_service
 
 bp = Blueprint("ocr", __name__)
 
@@ -21,6 +21,8 @@ def ocr_ingredients():
     if not image:
         return jsonify({"error": "No image provided"}), 400
 
+    lang = data.get("lang", "no")
+
     try:
         text = ocr_service.extract_text(image)
     except ValueError as e:
@@ -29,6 +31,7 @@ def ocr_ingredients():
         return jsonify({"error": "OCR processing failed"}), 500
 
     if not text:
-        return jsonify({"text": "", "error": "No text found in image"}), 200
+        return jsonify({"text": "", "llm_cleanup_skipped": True, "error": "No text found in image"}), 200
 
-    return jsonify({"text": text})
+    result = llm_cleanup_service.cleanup_ingredients(text, lang)
+    return jsonify({"text": result["text"], "llm_cleanup_skipped": result["llm_cleanup_skipped"]})

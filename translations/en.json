@@ -672,5 +672,8 @@
   "hint_ean": "8-13 digits",
   "toast_uploading": "Uploading...",
   "aria_select_emoji": "Select emoji",
-  "saved": "Saved"
+  "saved": "Saved",
+  "decimal_separator": ".",
+  "allergen_terms": "MILK, EGG, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, LUPIN, SULPHITES, SULPHUR DIOXIDE",
+  "trace_notice_template": "May contain traces of {items}."
 }

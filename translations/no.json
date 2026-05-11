@@ -672,5 +672,8 @@
   "hint_ean": "8-13 siffer",
   "toast_uploading": "Laster opp...",
   "aria_select_emoji": "Velg emoji",
-  "saved": "Lagret"
+  "saved": "Lagret",
+  "decimal_separator": ",",
+  "allergen_terms": "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, LUPIN, SULFITTER, SVOVELDIOKSID",
+  "trace_notice_template": "Kan inneholde spor av {items}."
 }

@@ -8,6 +8,7 @@ services:
       - smartsnack-data:/data
     environment:
       - SMARTSNACK_SECRET_KEY=${SMARTSNACK_SECRET_KEY:?Set SMARTSNACK_SECRET_KEY in .env or environment}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]

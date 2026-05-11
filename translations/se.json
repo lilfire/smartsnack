@@ -672,5 +672,8 @@
   "hint_ean": "8-13 siffror",
   "toast_uploading": "Laddar upp...",
   "aria_select_emoji": "Välj emoji",
-  "saved": "Sparat"
+  "saved": "Sparat",
+  "decimal_separator": ",",
+  "allergen_terms": "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, LUPIN, SULFITER, SVAVELDIOXID",
+  "trace_notice_template": "Kan innehålla spår av {items}."
 }
