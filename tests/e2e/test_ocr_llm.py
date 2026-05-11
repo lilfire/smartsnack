@@ -17,12 +17,18 @@ _TINY_PNG = base64.b64encode(
     b"\x00\x01\x01\x00\x05\x18\xd8N\x00\x00\x00\x00IEND\xaeB`\x82"
 ).decode()
 
+_OCR_RESULT = {"text": "linser, solsikkeolje, paprika", "provider": "tesseract", "fallback": False}
+
+
+def _ocr_result(text):
+    return {"text": text, "provider": "tesseract", "fallback": False}
+
 
 @pytest.fixture()
 def _mock_ocr(monkeypatch):
-    """Patch ocr_service.extract_text to return a fixed string."""
+    """Patch ocr_service.dispatch_ocr to return a fixed OCR result dict."""
     def _factory(text="linser, solsikkeolje, paprika"):
-        return patch("services.ocr_service.extract_text", return_value=text)
+        return patch("services.ocr_service.dispatch_ocr", return_value=_ocr_result(text))
     return _factory
 
 
@@ -96,7 +102,7 @@ class TestOcrIngredientsEndpoint:
         assert resp.status_code == 400
 
     def test_no_text_in_image_returns_llm_cleanup_skipped(self, client):
-        with patch("services.ocr_service.extract_text", return_value=""):
+        with patch("services.ocr_service.dispatch_ocr", return_value=_ocr_result("")):
             resp = client.post("/api/ocr/ingredients", json={"image": _TINY_PNG})
         assert resp.status_code == 200
         data = resp.get_json()
@@ -104,14 +110,14 @@ class TestOcrIngredientsEndpoint:
         assert data["llm_cleanup_skipped"] is True
 
     def test_ocr_value_error_returns_400(self, client):
-        with patch("services.ocr_service.extract_text", side_effect=ValueError("Invalid base64 data")):
+        with patch("services.ocr_service.dispatch_ocr", side_effect=ValueError("Invalid base64 data")):
             resp = client.post("/api/ocr/ingredients", json={"image": _TINY_PNG})
         assert resp.status_code == 400
         data = resp.get_json()
         assert "error" in data
 
     def test_ocr_exception_returns_500(self, client):
-        with patch("services.ocr_service.extract_text", side_effect=RuntimeError("OCR crash")):
+        with patch("services.ocr_service.dispatch_ocr", side_effect=RuntimeError("OCR crash")):
             resp = client.post("/api/ocr/ingredients", json={"image": _TINY_PNG})
         assert resp.status_code == 500
 
@@ -126,3 +132,12 @@ class TestOcrIngredientsEndpoint:
         )
         assert resp.status_code == 400
         assert "error" in resp.get_json()
+
+    def test_response_includes_provider_and_fallback(self, client, _mock_ocr, _mock_llm):
+        with _mock_ocr(), _mock_llm():
+            resp = client.post("/api/ocr/ingredients", json={"image": _TINY_PNG})
+        data = resp.get_json()
+        assert "provider" in data
+        assert "fallback" in data
+        assert data["provider"] == "tesseract"
+        assert data["fallback"] is False

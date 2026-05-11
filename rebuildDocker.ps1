@@ -10,6 +10,8 @@ Write-Host "Stopping containers..." -ForegroundColor Cyan
 docker-compose down
 
 Write-Host "Rebuilding and starting containers..." -ForegroundColor Cyan
+$env:DOCKER_BUILDKIT = "1"
+$env:COMPOSE_DOCKER_CLI_BUILD = "1"
 docker-compose up --build -d
 
 if ($LASTEXITCODE -eq 0) {

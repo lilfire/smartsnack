@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { state, NUTRI_IDS, catEmoji, catLabel, esc, safeDataUri, fmtNum, showToast, api, fetchProducts, fetchStats, showConfirmModal, upgradeSelect } from '../state.js';
+import { state, NUTRI_IDS, catEmoji, catLabel, esc, safeDataUri, fmtNum, showToast, api, fetchProducts, fetchStats, showConfirmModal, upgradeSelect, initAllFieldSelects } from '../state.js';
 
 // jsdom does not implement scrollIntoView
 if (!Element.prototype.scrollIntoView) {
@@ -701,6 +701,41 @@ describe('showToast - additional branches', () => {
     vi.advanceTimersByTime(3000);
     expect(toastEl.classList.contains('show')).toBe(false);
   });
+
+  it('renders title and message when opts.title is set', () => {
+    showToast('Message body', 'info', { title: 'My Title' });
+    expect(toastEl.querySelector('.toast-title').textContent).toBe('My Title');
+    expect(toastEl.querySelector('.toast-message').textContent).toBe('Message body');
+  });
+
+  it('renders undo button when opts.onUndo is provided', () => {
+    showToast('Deleted item', 'success', { onUndo: vi.fn() });
+    expect(toastEl.querySelector('.toast-undo')).not.toBeNull();
+  });
+
+  it('calls onUndo and hides toast when undo button is clicked', () => {
+    const onUndo = vi.fn();
+    showToast('Deleted item', 'success', { onUndo });
+    const undoBtn = toastEl.querySelector('.toast-undo');
+    undoBtn.click();
+    expect(onUndo).toHaveBeenCalled();
+    expect(toastEl.classList.contains('show')).toBe(false);
+  });
+
+  it('respects custom duration from opts', () => {
+    showToast('Msg', 'info', { duration: 5000 });
+    vi.advanceTimersByTime(3000);
+    expect(toastEl.classList.contains('show')).toBe(true);
+    vi.advanceTimersByTime(2000);
+    expect(toastEl.classList.contains('show')).toBe(false);
+  });
+
+  it('clears the timer when close button is clicked', () => {
+    showToast('Msg', 'info');
+    const closeBtn = toastEl.querySelector('.toast-close');
+    closeBtn.click();
+    expect(toastEl.classList.contains('show')).toBe(false);
+  });
 });
 
 describe('api - additional branches', () => {
@@ -745,5 +780,291 @@ describe('fetchProducts - additional branches', () => {
     const url = global.fetch.mock.calls[0][0];
     expect(url).toContain('filters=sugar%3C10');
     state.advancedFilters = null;
+  });
+});
+
+describe('upgradeSelect - searchable select', () => {
+  let parent, sel;
+
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
+    parent = document.createElement('div');
+    document.body.appendChild(parent);
+    sel = document.createElement('select');
+    sel.dataset.searchable = 'true';
+    ['Apple', 'Banana', 'Cherry'].forEach((name, i) => {
+      const o = document.createElement('option');
+      o.value = name.toLowerCase();
+      o.textContent = name;
+      sel.appendChild(o);
+    });
+    parent.appendChild(sel);
+  });
+
+  afterEach(() => {
+    parent.remove();
+  });
+
+  it('creates a search input for searchable selects', () => {
+    upgradeSelect(sel);
+    expect(parent.querySelector('.custom-select-search')).not.toBeNull();
+  });
+
+  it('filters options based on search input', () => {
+    upgradeSelect(sel);
+    const searchInput = parent.querySelector('.custom-select-search');
+    searchInput.value = 'ban';
+    searchInput.dispatchEvent(new Event('input'));
+    const visible = Array.from(parent.querySelectorAll('.custom-select-option'))
+      .filter((o) => o.style.display !== 'none');
+    expect(visible.length).toBe(1);
+    expect(visible[0].textContent).toBe('Banana');
+  });
+
+  it('shows all options when search is cleared', () => {
+    upgradeSelect(sel);
+    const searchInput = parent.querySelector('.custom-select-search');
+    searchInput.value = 'ban';
+    searchInput.dispatchEvent(new Event('input'));
+    searchInput.value = '';
+    searchInput.dispatchEvent(new Event('input'));
+    const visible = Array.from(parent.querySelectorAll('.custom-select-option'))
+      .filter((o) => o.style.display !== 'none');
+    expect(visible.length).toBe(3);
+  });
+
+  it('search input click does not close the dropdown', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    const searchInput = parent.querySelector('.custom-select-search');
+    trigger.click();
+    expect(wrap.classList.contains('open')).toBe(true);
+    searchInput.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(true);
+  });
+
+  it('Escape in search input closes the dropdown', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    const searchInput = parent.querySelector('.custom-select-search');
+    trigger.click();
+    searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(false);
+  });
+
+  it('typing a character opens dropdown and populates search', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    const searchInput = parent.querySelector('.custom-select-search');
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(true);
+    expect(searchInput.value).toBe('b');
+  });
+
+  it('ctrl+key does not open via char key path', () => {
+    upgradeSelect(sel);
+    const wrap = parent.querySelector('.custom-select-wrap');
+    const trigger = parent.querySelector('.custom-select-trigger');
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', ctrlKey: true, bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(false);
+  });
+
+  it('focuses search input when trigger opens dropdown', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const searchInput = parent.querySelector('.custom-select-search');
+    const focusSpy = vi.spyOn(searchInput, 'focus');
+    trigger.click();
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it('focuses search input when ArrowDown opens dropdown', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const searchInput = parent.querySelector('.custom-select-search');
+    const focusSpy = vi.spyOn(searchInput, 'focus');
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(focusSpy).toHaveBeenCalled();
+  });
+
+  it('clears search input on close', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    const searchInput = parent.querySelector('.custom-select-search');
+    trigger.click();
+    searchInput.value = 'ban';
+    searchInput.dispatchEvent(new Event('input'));
+    // Close via Escape on trigger
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    expect(wrap.classList.contains('open')).toBe(false);
+    expect(searchInput.value).toBe('');
+  });
+
+  it('clears search input when _closeAllCustomSelects is called for another select', () => {
+    upgradeSelect(sel);
+    const trigger = parent.querySelector('.custom-select-trigger');
+    const wrap = parent.querySelector('.custom-select-wrap');
+    const searchInput = parent.querySelector('.custom-select-search');
+
+    trigger.click();
+    searchInput.value = 'ban';
+
+    // Create a second plain select and open it — triggers _closeAllCustomSelects(wrap2)
+    const parent2 = document.createElement('div');
+    document.body.appendChild(parent2);
+    const sel2 = document.createElement('select');
+    const o = document.createElement('option');
+    o.value = 'x';
+    o.textContent = 'X';
+    sel2.appendChild(o);
+    parent2.appendChild(sel2);
+    upgradeSelect(sel2);
+    const trigger2 = parent2.querySelector('.custom-select-trigger');
+    trigger2.click(); // This closes the first select via _closeAllCustomSelects
+
+    expect(wrap.classList.contains('open')).toBe(false);
+    expect(searchInput.value).toBe('');
+    parent2.remove();
+  });
+
+  it('hides optgroup headers when all their options are hidden', () => {
+    const grpSel = document.createElement('select');
+    grpSel.dataset.searchable = 'true';
+    const grp = document.createElement('optgroup');
+    grp.label = 'Fruits';
+    ['Apple', 'Apricot'].forEach((name) => {
+      const o = document.createElement('option');
+      o.value = name.toLowerCase();
+      o.textContent = name;
+      grp.appendChild(o);
+    });
+    grpSel.appendChild(grp);
+    parent.appendChild(grpSel);
+    upgradeSelect(grpSel);
+
+    const searchInputs = parent.querySelectorAll('.custom-select-search');
+    const searchInput = searchInputs[searchInputs.length - 1];
+    searchInput.value = 'xyz';
+    searchInput.dispatchEvent(new Event('input'));
+
+    const groups = parent.querySelectorAll('.custom-select-group');
+    expect(groups.length).toBeGreaterThan(0);
+    // All group options hidden → group header should be hidden too
+    expect(groups[0].style.display).toBe('none');
+  });
+
+  it('keeps optgroup header visible when some of its options match', () => {
+    const grpSel = document.createElement('select');
+    grpSel.dataset.searchable = 'true';
+    const grp = document.createElement('optgroup');
+    grp.label = 'Fruits';
+    ['Apple', 'Banana'].forEach((name) => {
+      const o = document.createElement('option');
+      o.value = name.toLowerCase();
+      o.textContent = name;
+      grp.appendChild(o);
+    });
+    grpSel.appendChild(grp);
+    parent.appendChild(grpSel);
+    upgradeSelect(grpSel);
+
+    const searchInputs = parent.querySelectorAll('.custom-select-search');
+    const searchInput = searchInputs[searchInputs.length - 1];
+    // Search for 'app' — matches Apple but not Banana
+    searchInput.value = 'app';
+    searchInput.dispatchEvent(new Event('input'));
+
+    const groups = parent.querySelectorAll('.custom-select-group');
+    expect(groups.length).toBeGreaterThan(0);
+    // Some options visible → group header should remain visible
+    expect(groups[0].style.display).toBe('');
+  });
+
+  it('mobile path still registers onSelect callback', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 320, writable: true, configurable: true });
+    const cb = vi.fn();
+    upgradeSelect(sel, cb);
+    sel.value = 'banana';
+    sel.dispatchEvent(new Event('change'));
+    expect(cb).toHaveBeenCalledWith('banana');
+  });
+});
+
+describe('initAllFieldSelects', () => {
+  beforeEach(() => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, configurable: true, value: 1024 });
+    document.body.innerHTML = '';
+  });
+
+  it('upgrades field-select elements not in excluded contexts', () => {
+    const container = document.createElement('div');
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    sel.innerHTML = '<option value="a">A</option>';
+    container.appendChild(sel);
+    document.body.appendChild(container);
+
+    initAllFieldSelects();
+    expect(container.querySelector('.custom-select-wrap')).not.toBeNull();
+  });
+
+  it('skips selects inside .adv-row', () => {
+    const row = document.createElement('div');
+    row.className = 'adv-row';
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    row.appendChild(sel);
+    document.body.appendChild(row);
+
+    initAllFieldSelects();
+    expect(row.querySelector('.custom-select-wrap')).toBeNull();
+  });
+
+  it('skips selects inside .wc-row', () => {
+    const row = document.createElement('div');
+    row.className = 'wc-row';
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    row.appendChild(sel);
+    document.body.appendChild(row);
+
+    initAllFieldSelects();
+    expect(row.querySelector('.custom-select-wrap')).toBeNull();
+  });
+
+  it('skips selects inside .edit-grid', () => {
+    const grid = document.createElement('div');
+    grid.className = 'edit-grid';
+    const sel = document.createElement('select');
+    sel.className = 'field-select';
+    grid.appendChild(sel);
+    document.body.appendChild(grid);
+
+    initAllFieldSelects();
+    expect(grid.querySelector('.custom-select-wrap')).toBeNull();
+  });
+
+  it('accepts a root element to scope the query', () => {
+    const outside = document.createElement('div');
+    const outSel = document.createElement('select');
+    outSel.className = 'field-select';
+    outSel.innerHTML = '<option value="x">X</option>';
+    outside.appendChild(outSel);
+    document.body.appendChild(outside);
+
+    const inside = document.createElement('div');
+    const inSel = document.createElement('select');
+    inSel.className = 'field-select';
+    inSel.innerHTML = '<option value="y">Y</option>';
+    inside.appendChild(inSel);
+    document.body.appendChild(inside);
+
+    initAllFieldSelects(inside);
+    expect(inside.querySelector('.custom-select-wrap')).not.toBeNull();
+    expect(outside.querySelector('.custom-select-wrap')).toBeNull();
   });
 });

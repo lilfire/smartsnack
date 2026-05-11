@@ -13,7 +13,7 @@ bp = Blueprint("proxy", __name__)
 
 
 @bp.route("/api/proxy-image")
-@limiter.limit("30 per minute")
+@limiter.limit("300 per minute")
 def proxy_image():
     url = request.args.get("url", "")
     try:

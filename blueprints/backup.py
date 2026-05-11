@@ -8,7 +8,7 @@ from flask import Blueprint, jsonify, request, Response
 
 from extensions import limiter
 from helpers import _require_json, _check_api_key
-from services import backup_service
+from services import backup_core, import_service
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ def backup_db():
     if denied:
         return denied
     include_images = request.args.get("images", "true").lower() == "true"
-    payload = backup_service.create_backup(include_images=include_images)
+    payload = backup_core.create_backup(include_images=include_images)
     json_str = json.dumps(payload, ensure_ascii=False, indent=2)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return Response(
@@ -42,7 +42,7 @@ def restore_db():
         return denied
     try:
         data = _require_json()
-        message = backup_service.restore_backup(data)
+        message = backup_core.restore_backup(data)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     except (OSError, RuntimeError):
@@ -62,7 +62,7 @@ def import_products():
         match_criteria = data.pop("match_criteria", "both")
         on_duplicate = data.pop("on_duplicate", "skip")
         merge_priority = data.pop("merge_priority", "keep_existing")
-        message = backup_service.import_products(
+        message = import_service.import_products(
             data,
             match_criteria=match_criteria,
             on_duplicate=on_duplicate,

@@ -1,6 +1,7 @@
 """Flask application factory and entry point for SmartSnack."""
 
 import logging
+import os
 import sys
 
 from flask import Flask, jsonify, request
@@ -31,6 +32,11 @@ def create_app() -> Flask:
     limiter.init_app(app)
 
     register_blueprints(app)
+
+    if not os.environ.get("SMARTSNACK_API_KEY"):
+        logger.warning(
+            "SMARTSNACK_API_KEY is not set — backup/restore/import endpoints are publicly accessible"
+        )
 
     @app.before_request
     def csrf_protect():

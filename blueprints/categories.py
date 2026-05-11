@@ -5,6 +5,7 @@ from flask import Blueprint, jsonify, request
 from exceptions import ConflictError
 from helpers import _require_json, _validate_category_name
 from services import category_service
+from services import category_weight_service
 
 bp = Blueprint("categories", __name__)
 
@@ -59,3 +60,29 @@ def delete_category(name):
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "message": "Category deleted", "moved": count or 0})
+
+
+@bp.route("/api/categories/<name>/weights")
+def get_category_weights(name):
+    err = _validate_category_name(name)
+    if err:
+        return jsonify({"error": err}), 400
+    result = category_weight_service.get_category_weights(name)
+    if result is None:
+        return jsonify({"error": "Category not found"}), 404
+    return jsonify(result)
+
+
+@bp.route("/api/categories/<name>/weights", methods=["PUT"])
+def update_category_weights(name):
+    err = _validate_category_name(name)
+    if err:
+        return jsonify({"error": err}), 400
+    try:
+        data = _require_json()
+        category_weight_service.update_category_weights(name, data)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify({"ok": True})

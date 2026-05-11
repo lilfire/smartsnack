@@ -138,7 +138,7 @@ def _load_protein_quality_table() -> list:
     table = []
     for r in rows:
         keywords = _pq_all_keywords(r["name"])
-        patterns = [re.compile(r"\b" + re.escape(kw) + r"\b") for kw in keywords]
+        patterns = [re.compile(r"\b" + re.escape(kw.lower()) + r"\b") for kw in keywords]
         table.append((r["name"], patterns, r["pdcaas"], r["diaas"]))
     return table
 

@@ -4,6 +4,123 @@ All notable changes to SmartSnack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+# 
+
+## [0.18.0] - 2026-04-27
+
+### Added
+
+- Per-category score-weight overrides: any field's enabled state, weight, direction, formula, and formula min/max can now be overridden for a specific category, replacing the global value for products in that category. Overrides are *exclusive* — once a category has any override row, only the override-enabled fields are scored for its products, and an override can enable a field that's globally disabled. Implemented as a new `category_score_weights` table (migration `020_category_score_weights`) keyed on `(category, field)` with a foreign key to `categories(name)` on cascade delete
+- New service `services/category_weight_service.py` with `get_category_weights` (returns the full field list with effective values and an `is_overridden` flag, falling back to global defaults for non-overridden fields) and `update_category_weights` (upserts override rows where `is_overridden=true`, deletes them where `is_overridden=false`, validates direction/formula/weight bounds, and invalidates the scoring cache)
+- `GET /api/categories/<name>/weights` and `PUT /api/categories/<name>/weights` endpoints exposing per-category overrides, with category-name validation and 404 for unknown categories
+- "Apply to" scope selector in Settings → Score weighting that switches the weights editor between Global and any individual category, reusing the same row UI for both scopes (in category scope, the "active" rows are the overridden ones; un-overridden fields appear in the add-dropdown)
+- "+ Add category override" picker modal listing only categories that don't yet have overrides; selecting one switches the editor into that category's scope
+- "Delete category override" button that clears every override for the active category in a single PUT (with a confirmation modal and success toast), then drops the editor back to Global
+- Per-row trash button in category scope for removing a single field's override (sends `is_overridden=false` for that row)
+- Translated hint paragraph under the scope row explaining global vs per-category scope
+- `has_weight_overrides` flag on every `GET /api/categories` entry, computed from `SELECT DISTINCT category FROM category_score_weights`, so the scope dropdown only lists categories that actually have overrides
+- Localized `label` and `desc` on each row of `GET /api/categories/<name>/weights`, matching the global `/api/weights` shape so the same renderer covers both scopes
+- 11 new translation keys per language (Norwegian, English, Swedish): `weights_scope_label`, `weights_scope_global`, `weights_scope_hint_global`, `weights_scope_hint_category`, `btn_add_override`, `btn_remove_override`, `btn_add_category_override`, `btn_delete_category_override`, `add_category_override_title`, `add_category_override_hint`, `confirm_delete_category_override`, `toast_category_override_deleted`, `toast_no_categories_without_overrides`
+- Backend tests in `tests/test_category_weight_service.py` and `tests/test_category_service.py`; frontend tests in `static/js/__tests__/settings-weights.test.js` covering scope dropdown population, scope change, add/remove in category scope, picker modal, and the saveWeights branch
+
+### Changed
+
+- Scoring weight cache (`_weight_cache`, `_range_cache`) is now keyed on SQLite's `PRAGMA data_version` instead of a 30-second TTL, so any Gunicorn worker that didn't handle the write still detects it on the next read and reloads from the DB. `invalidate_scoring_cache` now only clears the local process's caches — cross-worker invalidation is handled automatically by the data_version key
+- `_load_weight_config` now returns weight entries for the *union* of globally-enabled and override-enabled fields, with each entry carrying a `globally_enabled` flag. `_score_product` uses that flag together with the category's override rows to gate per-product scoring, supporting both exclusive-mode (category has overrides) and inherit-mode (no overrides → fall back to globals)
+- Category CRUD (add, rename, emoji change, delete, reassign) now calls `refreshScopeSelect()` so the override scope dropdown stays in sync without a full settings reload
+
+## [0.17.0] - 2026-04-26
+
+### Changed
+
+- EAN storage migrated to `product_eans` as the single source of truth: `PRODUCT_COLS_NO_IMAGE` selects `ean` via subquery against the primary row in `product_eans`, and `INSERT_FIELDS` no longer writes to `products.ean`
+- Bulk OFF refresh now reads EANs by joining `product_eans` (`is_primary = 1`) instead of filtering on `products.ean`; the search-by-name phase now selects products with `NOT EXISTS` against `product_eans` rather than empty-string `ean`
+- OFF refresh writes a matched EAN into `product_eans` (with sync flag updated) instead of updating `products.ean` directly
+- Backup export reads `ean` via `product_eans` subquery; backup restore inserts the EAN into `product_eans` after creating the product row
+- Import overwrite/merge paths sync EAN through `product_eans` directly (insert-or-update primary row) instead of relying on a `products.ean` write
+- Duplicate lookup (`_find_duplicate`) now joins `product_eans` for EAN matching, and import lookups search by EAN through `product_eans`
+- `add_ean` endpoint is idempotent: posting an EAN that already belongs to the product returns the existing record with HTTP 200 instead of 409, surfacing `already_exists: true`
+- Search scanner first-pass match accepts both the legacy `p.ean` field and the `p.eans` array, so scans resolve regardless of which shape the API returned
+- `update_product` no longer accepts `ean` as a direct column update; the EAN path runs against `product_eans`, and an `ean`-only payload is now considered a valid (non-empty) update
+
+### Added
+
+- SQLite triggers `trg_ean_insert_sync`, `trg_ean_update_sync`, and `trg_ean_delete_sync` keep `products.ean` aligned with the primary `product_eans` row on every insert, update, and delete
+- Startup repair routine `_repair_ean_mismatches` runs after migrations and corrects any rows where `products.ean` drifted from the primary `product_eans` value
+- `merge_products` transfers all EANs from the source product into the target as non-primary rows before deletion, so secondary EANs survive a merge
+- EAN dual-storage regression test suite covering trigger behavior, repair, and the OFF/import/backup/merge paths
+- Backend coverage additions: direct unit tests for `product_crud`, `product_filters`, `product_duplicate`, scoring quality formulas, schema migrations, stats service, and service coverage gaps
+- Frontend coverage additions: tests for scanner torch, advanced state, scroll, EAN manager UX, settings-OFF, products pagination, render, and tags modules
+
+### Removed
+
+- `ean` from `ALL_PRODUCT_FIELDS`, `_TEXT_FIELD_LIMITS`, `COMPLETENESS_FIELDS`, and the `TEXT_FIELDS` comment — EAN is no longer treated as a product column for validation, completeness scoring, or text-field limits
+- `_sync_primary_ean` helper from `services/product_crud.py` — superseded by triggers, the startup repair pass, and inline sync calls in `update_product` and `import_service`
+
+### Fixed
+
+- EAN drift between `products.ean` and `product_eans` after edits, imports, merges, and OFF refresh — enforced at the schema level by triggers and at startup by the repair pass
+- Import path raising `AttributeError` when an imported product had `ean: null` instead of an empty string
+- Stale EAN left in `product_eans` after an import overwrite changed the EAN value
+- Scanner missing matches when the product API returned only the legacy `ean` field without an `eans` array
+
+### Added
+
+- OCR nutrition autofill: scan a nutrition label to auto-populate per-100g fields on the product registration form
+- Product image upload to Open Food Facts when submitting a new product, with local record marked as synced
+
+## [0.15.0] - 2026-04-10
+
+### Added
+
+- Product image capture and preview on the registration form
+- Collagen as a recognized protein source
+- 20+ new protein source keywords: pistachio, dates, jackfruit, plantain, tomato, bell pepper, mustard, cocoa, and expanded Norwegian compound keywords for meat, dairy, wheat, milk, and chickpea ingredients
+
+### Changed
+
+- Self-hosted fonts and vendor JavaScript to remove all external CDN dependencies
+- OFF language dropdown is now searchable with language names translated to current UI language
+- OFF language priority now applies to product name and ingredients sync
+
+### Fixed
+
+- OFF language priority dropdown not aligned with backend API contract
+- OFF language dropdown missing CSS styling and language names
+- Empty OFF language dropdown after dynamic population
+- Cramped OFF refresh report modal layout on desktop
+
+## [0.14.0] - 2026-04-10
+
+### Added
+
+- Tag system with shared tag entities, CRUD API, chips UI with autocomplete/suggestions, and per-product assignment
+- Multi-backend OCR: 6 providers (Tesseract, Claude Vision, Gemini, GPT-4 Vision, OpenRouter, Groq) with per-provider model selection
+- OCR settings UI for choosing provider, model, and fallback preference
+- Per-EAN management: products can have multiple EANs, each with independent OFF sync tracking, add/delete, set-primary, and per-EAN OFF fetch/unlock
+- Pagination with limit/offset on product list API and infinite scroll on frontend
+- OFF language priority: configurable language preference order for Open Food Facts data fetching
+- Flashlight/torch toggle button for barcode scanner on mobile
+- Structured OCR error responses with categorized error types (token limit, quota, timeout, invalid image, no text)
+- Rate limiting via Flask-Limiter (200/min global, 10/min on OCR endpoint)
+- GitHub Actions CI: pytest + coverage, vitest + coverage, Docker build, smoke test, and branch name enforcement
+- `.env.example` with all supported environment variables
+- Tag and EAN data included in backup/restore with legacy fallback support
+- 50+ new translation keys for tags, OCR, EAN management, and OFF language settings
+
+### Changed
+
+- Product list API now returns `{products, total}` instead of a flat array
+- Tag schema reimplemented from text-based tags to integer FK schema (tags + product_tags tables)
+- OCR service redesigned with provider registry and automatic fallback to Tesseract
+
+### Refactored
+
+- Product service split into focused modules: product_crud, product_eans, product_scoring, product_filters, product_duplicate
+- Backup service split into backup_core and import_service
+- `openfoodfacts.js` split into 6 modules: off-api, off-conflicts, off-duplicates, off-picker, off-review, off-utils
+- `settings.js` split into 7 modules: settings-backup, settings-categories, settings-flags, settings-ocr, settings-off, settings-pq, settings-weights
+
 ## [0.13.0] - 2026-03-23
 
 ### Changed

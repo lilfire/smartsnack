@@ -1,5 +1,10 @@
 """Tests for services/bulk_service.py — refresh status and PQ estimation."""
 
+from tests.mock_shape_validator import (
+    validate_refresh_status_response,
+    validate_pq_estimation_response,
+)
+
 
 class TestGetRefreshStatus:
     def test_returns_dict(self, app_ctx):
@@ -63,6 +68,12 @@ class TestGetRefreshStatus:
         r2 = get_refresh_status()
         # Each call returns a fresh dict, not the same object
         assert r1 is not r2
+
+    def test_response_shape_is_valid(self, app_ctx):
+        from services.bulk_service import get_refresh_status
+
+        result = get_refresh_status()
+        validate_refresh_status_response(result)
 
 
 class TestEstimateAllPq:
@@ -177,3 +188,9 @@ class TestEstimateAllPq:
         assert isinstance(result["total"], int) and result["total"] >= 0
         assert isinstance(result["updated"], int) and result["updated"] >= 0
         assert isinstance(result["skipped"], int) and result["skipped"] >= 0
+
+    def test_response_shape_is_valid(self, app_ctx):
+        from services.bulk_service import estimate_all_pq
+
+        result = estimate_all_pq()
+        validate_pq_estimation_response(result)

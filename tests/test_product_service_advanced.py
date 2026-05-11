@@ -287,8 +287,8 @@ class TestComputeCompleteness:
     def test_empty_string_not_counted(self):
         from services.product_service import _compute_completeness
 
-        p_empty = {"ean": ""}
-        p_filled = {"ean": "12345678"}
+        p_empty = {"brand": ""}
+        p_filled = {"brand": "TestBrand"}
         assert _compute_completeness(p_empty) < _compute_completeness(p_filled)
 
     def test_none_value_not_counted(self):
@@ -442,11 +442,31 @@ class TestConditionToSql:
         assert "NOT EXISTS" in sql
         assert param == "is_discontinued"
 
+    def test_text_field_not_contains(self):
+        from services.product_service import _condition_to_sql
+
+        sql, param = _condition_to_sql("name", "!contains", "popcorn", "NOT_LIKE")
+        assert "NOT LIKE" in sql
+        assert "%popcorn%" in param
+
+    def test_text_field_not_contains_escapes_percent(self):
+        from services.product_service import _condition_to_sql
+
+        sql, param = _condition_to_sql("name", "!contains", "100%corn", "NOT_LIKE")
+        assert "NOT LIKE" in sql
+        assert "\\%" in param
+
     def test_numeric_contains_raises(self):
         from services.product_service import _condition_to_sql
 
         with pytest.raises(ValueError, match="not valid for numeric"):
             _condition_to_sql("kcal", "contains", "foo", "LIKE")
+
+    def test_numeric_not_contains_raises(self):
+        from services.product_service import _condition_to_sql
+
+        with pytest.raises(ValueError, match="not valid for numeric"):
+            _condition_to_sql("kcal", "!contains", "foo", "NOT_LIKE")
 
     def test_non_numeric_value_raises(self):
         from services.product_service import _condition_to_sql
@@ -636,7 +656,7 @@ class TestParseAdvancedFilters:
             }
         )
         sql, params, post = _parse_advanced_filters(filters)
-        assert sql == "" or sql is not None
+        assert sql == ""  # total_score is a computed field — goes to post-filter, not SQL
         assert post is not None
         assert post["field"] == "total_score"
 
@@ -842,8 +862,8 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert len(result) >= 1
-        assert all(p["kcal"] >= 400 for p in result)
+        assert len(result["products"]) >= 1
+        assert all(p["kcal"] >= 400 for p in result["products"])
 
     def test_filter_excludes_products(self, app_ctx, seed_product):
         from services.product_service import list_products
@@ -856,7 +876,7 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert all(p.get("kcal", 0) < 10 for p in result)
+        assert all(p.get("kcal", 0) < 10 for p in result["products"])
 
     def test_filter_by_name_contains(self, app_ctx, seed_product):
         from services.product_service import list_products
@@ -868,8 +888,8 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert len(result) >= 1
-        assert all("popcorn" in p["name"].lower() for p in result)
+        assert len(result["products"]) >= 1
+        assert all("popcorn" in p["name"].lower() for p in result["products"])
 
     def test_filter_by_total_score_uses_post_filter(self, app_ctx, seed_product):
         from services.product_service import list_products
@@ -883,7 +903,7 @@ class TestListProductsAdvancedFilters:
         )
         result_filtered = list_products(None, None, advanced_filters=filters)
         result_all = list_products(None, None)
-        assert len(result_filtered) == len(result_all)
+        assert len(result_filtered["products"]) == len(result_all["products"])
 
     def test_invalid_filters_json_raises(self, app_ctx):
         from services.product_service import list_products
@@ -910,7 +930,7 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert any(seed_product == p["id"] for p in result)
+        assert any(seed_product == p["id"] for p in result["products"])
 
     def test_filter_by_flag_false_excludes_flagged(self, app_ctx, seed_product, db):
         from services.product_service import list_products
@@ -930,7 +950,7 @@ class TestListProductsAdvancedFilters:
             }
         )
         result = list_products(None, None, advanced_filters=filters)
-        assert all(p["id"] != seed_product for p in result)
+        assert all(p["id"] != seed_product for p in result["products"])
 
 
 # ---------------------------------------------------------------------------

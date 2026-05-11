@@ -31,6 +31,13 @@
   color: rgba(255, 255, 255, 0.6);
 }
 
+.th-sort:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: 2px;
+  border-radius: 3px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
 .th-sort.th-active {
   color: #E8B84B;
 }
@@ -51,14 +58,22 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   cursor: pointer;
   transition: background 0.15s;
+  border-left: 2px solid transparent;
 }
 
 .table-row:hover {
   background: rgba(232, 184, 75, 0.03);
+  border-left-color: rgba(232, 184, 75, 0.4);
 }
 
 .table-row:active {
   background: rgba(232, 184, 75, 0.06);
+}
+
+.table-row:focus-visible {
+  outline: 2px solid rgba(232, 184, 75, 0.6);
+  outline-offset: -2px;
+  border-radius: 4px;
 }
 
 .prod-cat {
@@ -70,7 +85,7 @@
 }
 
 .prod-cat-label {
-  font-size: 7px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
   font-family: 'Space Mono', monospace;
   text-transform: uppercase;

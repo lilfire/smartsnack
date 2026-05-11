@@ -1,0 +1,14 @@
+.git
+.github
+.claude
+__pycache__
+*.pyc
+*.sqlite
+tests/
+e2e/
+node_modules/
+*.md
+.env
+.gitignore
+vitest.config.*
+package*.json

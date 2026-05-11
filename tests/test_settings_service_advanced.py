@@ -21,6 +21,7 @@ class TestLegacyXorDecrypt:
         from services.settings_service import _decrypt
 
         secret = "test-secret-key-for-unit-tests"
+        monkeypatch.setenv("SMARTSNACK_SECRET_KEY", secret)
         legacy_encrypted = self._xor_encrypt("legacy_password", secret)
         result = _decrypt(legacy_encrypted)
         assert result == "legacy_password"
@@ -30,6 +31,7 @@ class TestLegacyXorDecrypt:
         from services.settings_service import _decrypt
 
         secret = "test-secret-key-for-unit-tests"
+        monkeypatch.setenv("SMARTSNACK_SECRET_KEY", secret)
         legacy_encrypted = self._xor_encrypt("migrate_me", secret)
 
         # Store legacy value in DB

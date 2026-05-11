@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
+vi.mock('../scroll.js', () => ({
+  initInfiniteScroll: vi.fn(),
+  teardownInfiniteScroll: vi.fn(),
+  showScrollLoader: vi.fn(),
+  hideScrollLoader: vi.fn(),
+}));
+
 vi.mock('../state.js', () => {
   const _state = {
     currentView: 'search',
@@ -16,6 +23,7 @@ vi.mock('../state.js', () => {
     sortDir: 'desc',
     categories: [],
     imageCache: {},
+    pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
   };
   return {
     state: _state,
@@ -27,6 +35,7 @@ vi.mock('../state.js', () => {
     showToast: vi.fn(),
     upgradeSelect: vi.fn(),
     announceStatus: vi.fn(),
+    trapFocus: vi.fn(() => vi.fn()),
   };
 });
 
@@ -49,23 +58,45 @@ vi.mock('../render.js', () => ({
   getFlagConfig: vi.fn(() => ({})),
 }));
 
-vi.mock('../settings.js', () => ({
+vi.mock('../settings-weights.js', () => ({
   loadSettings: vi.fn(),
 }));
 
-vi.mock('../openfoodfacts.js', () => ({
+vi.mock('../off-utils.js', () => ({
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
   validateOffBtn: vi.fn(),
-  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-conflicts.js', () => ({
   showMergeConflictModal: vi.fn(),
   showEditDuplicateModal: vi.fn(),
+  showScanDuplicateModal: vi.fn(),
+}));
+vi.mock('../off-duplicates.js', () => ({
+  showDuplicateMergeModal: vi.fn(),
+}));
+vi.mock('../off-review.js', () => ({
+  showOffAddReview: vi.fn(),
+  closeOffAddReview: vi.fn(),
+  submitToOff: vi.fn(),
 }));
 
-import { startEdit, saveProduct, deleteProduct, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
+vi.mock('../images.js', () => ({
+  clearPendingImage: vi.fn(),
+  triggerImageUpload: vi.fn(),
+  removeProductImage: vi.fn(),
+  captureProductImage: vi.fn(),
+  resizeImage: vi.fn(),
+  loadProductImage: vi.fn(),
+  viewProductImage: vi.fn(),
+}));
+
+import { startEdit, saveProduct, deleteProduct, unlockEan, setFilter, toggleExpand, switchView, onSearchInput, clearSearch, registerProduct, loadData } from '../products.js';
 import { state, api, showConfirmModal, showToast, fetchStats, fetchProducts } from '../state.js';
+import { showScanDuplicateModal } from '../off-conflicts.js';
 import { rerender } from '../filters.js';
 import { renderResults, getFlagConfig } from '../render.js';
-import { showDuplicateMergeModal } from '../openfoodfacts.js';
+import { showDuplicateMergeModal } from '../off-duplicates.js';
+import { initInfiniteScroll } from '../scroll.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -74,6 +105,7 @@ beforeEach(() => {
   state.currentFilter = [];
   state.expandedId = null;
   state.editingId = null;
+  state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
   state.cachedResults = [
     { id: 1, name: 'Milk', type: 'dairy' },
     { id: 2, name: 'Bread', type: 'bakery' },
@@ -99,6 +131,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.clearAllTimers();
   vi.useRealTimers();
   document.body.innerHTML = '';
 });
@@ -108,6 +141,36 @@ describe('startEdit', () => {
     startEdit(42);
     expect(state.editingId).toBe(42);
     expect(rerender).toHaveBeenCalled();
+  });
+
+  it('scrolls edit form into view and focuses first input after rerender', () => {
+    const form = document.createElement('div');
+    form.className = 'edit-form';
+    const input = document.createElement('input');
+    input.id = 'ed-name';
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    const scrollIntoViewMock = vi.fn();
+    form.scrollIntoView = scrollIntoViewMock;
+    const focusMock = vi.fn();
+    input.focus = focusMock;
+
+    startEdit(99);
+    vi.runAllTicks();
+    // flush requestAnimationFrame
+    vi.runAllTimers();
+
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest' });
+    expect(focusMock).toHaveBeenCalled();
+  });
+
+  it('does not throw if edit form is absent after rerender', () => {
+    // No .edit-form in DOM
+    expect(() => {
+      startEdit(7);
+      vi.runAllTimers();
+    }).not.toThrow();
   });
 });
 
@@ -173,28 +236,73 @@ describe('saveProduct', () => {
     await saveProduct(1);
     expect(api).toHaveBeenCalled();
   });
+
+  it('forwards from_off and from_off_ean when a per-row OFF fetch targeted a secondary', async () => {
+    // Simulate state left behind by ean-manager._fetchEanOff: hidden #ed-ean
+    // remains on the primary, while the targeted EAN is stashed on window.
+    document.getElementById('ed-ean').value = '1111111111111'; // primary
+    window._pendingOFFSync = true;
+    window._pendingOFFEan = '2222222222222'; // the fetched secondary
+    api.mockResolvedValueOnce({});
+
+    await saveProduct(1);
+
+    const putCall = api.mock.calls.find((c) => c[0] === '/api/products/1');
+    expect(putCall).toBeDefined();
+    const body = JSON.parse(putCall[1].body);
+    expect(body.ean).toBe('1111111111111');
+    expect(body.from_off).toBe(true);
+    expect(body.from_off_ean).toBe('2222222222222');
+    expect(window._pendingOFFSync).toBeNull();
+    expect(window._pendingOFFEan).toBeNull();
+  });
+
+  it('omits from_off_ean when no per-row fetch targeted a specific EAN', async () => {
+    document.getElementById('ed-ean').value = '1111111111111';
+    window._pendingOFFSync = true;
+    window._pendingOFFEan = null;
+    api.mockResolvedValueOnce({});
+
+    await saveProduct(1);
+
+    const putCall = api.mock.calls.find((c) => c[0] === '/api/products/1');
+    const body = JSON.parse(putCall[1].body);
+    expect(body.from_off).toBe(true);
+    expect('from_off_ean' in body).toBe(false);
+  });
 });
 
 describe('deleteProduct', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+
   it('deletes product after confirmation', async () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(showConfirmModal).toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_deleted'), 'success', expect.objectContaining({ onUndo: expect.any(Function) }));
+    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(0);
     expect(api).toHaveBeenCalledWith('/api/products/1', { method: 'DELETE' });
-    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_deleted'), 'success');
   });
 
   it('does nothing when confirmation cancelled', async () => {
     showConfirmModal.mockResolvedValue(false);
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(api).not.toHaveBeenCalled();
   });
 
   it('looks up name from cachedResults when not provided', async () => {
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1);
+    const promise = deleteProduct(1);
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(showConfirmModal).toHaveBeenCalledWith(expect.any(String), 'Milk', expect.any(String), expect.any(String), expect.any(String), true);
   });
 
@@ -202,10 +310,52 @@ describe('deleteProduct', () => {
     state.imageCache[1] = 'data:image/png;base64,abc';
     showConfirmModal.mockResolvedValue(true);
     api.mockResolvedValueOnce({});
-    await deleteProduct(1, 'Milk');
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
     expect(state.imageCache[1]).toBeUndefined();
     expect(state.expandedId).toBeNull();
     expect(state.editingId).toBeNull();
+  });
+
+  it('shows network error on API failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    showConfirmModal.mockResolvedValue(true);
+    api.mockReset();
+    api.mockImplementation(() => Promise.reject(new Error('network fail')));
+    showToast.mockClear();
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+    await vi.runAllTimersAsync();
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    api.mockReset();
+    api.mockResolvedValue({});
+    console.error.mockRestore();
+  });
+
+  it('executes onUndo callback to restore deleted product', async () => {
+    state.cachedResults = [{ id: 1, name: 'Milk' }];
+    showConfirmModal.mockResolvedValue(true);
+
+    const promise = deleteProduct(1, 'Milk');
+    await vi.advanceTimersByTimeAsync(0);
+    await promise;
+
+    // Grab the onUndo callback from the showToast mock
+    const toastCall = showToast.mock.calls.find((c) => c[1] === 'success' && c[2] && c[2].onUndo);
+    expect(toastCall).toBeTruthy();
+    const { onUndo } = toastCall[2];
+
+    // Product should be removed from cachedResults before undo
+    expect(state.cachedResults.find((p) => p.id === 1)).toBeUndefined();
+
+    // Invoke the undo
+    onUndo();
+
+    // Product should be restored
+    expect(state.cachedResults.find((p) => p.id === 1)).toBeTruthy();
+    expect(showToast).toHaveBeenCalledWith('toast_delete_undone', 'info');
   });
 });
 
@@ -440,16 +590,111 @@ describe('loadData', () => {
     expect(showToast).toHaveBeenCalledWith('toast_load_error', 'error');
     console.error.mockRestore();
   });
-});
 
-describe('deleteProduct error path', () => {
-  it('shows network error on API failure', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    showConfirmModal.mockResolvedValue(true);
-    api.mockRejectedValueOnce(new Error('network fail'));
-    await deleteProduct(1, 'Milk');
-    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
-    console.error.mockRestore();
+  it('passes a search getter to initInfiniteScroll when more results may exist', async () => {
+    fetchProducts.mockResolvedValue({ products: [{ id: 1 }], total: 100 });
+    state.currentView = 'search';
+
+    // Add a search input so the getter can read it
+    if (!document.getElementById('search-input')) {
+      const si = document.createElement('input');
+      si.id = 'search-input';
+      si.value = 'oat';
+      document.body.appendChild(si);
+    } else {
+      document.getElementById('search-input').value = 'oat';
+    }
+
+    await loadData();
+
+    // initInfiniteScroll should have been called with a function
+    expect(initInfiniteScroll).toHaveBeenCalledWith(expect.any(Function));
+
+    // Invoke the callback to cover lines 258-259
+    const getSearch = initInfiniteScroll.mock.calls[initInfiniteScroll.mock.calls.length - 1][0];
+    const result = getSearch();
+    expect(result).toBe('oat');
+  });
+
+  it('search getter returns empty string when view is not search', async () => {
+    fetchProducts.mockResolvedValue({ products: [{ id: 1 }], total: 100 });
+    state.currentView = 'register'; // not search view
+
+    await loadData();
+
+    const getSearch = initInfiniteScroll.mock.calls[initInfiniteScroll.mock.calls.length - 1][0];
+    const result = getSearch();
+    expect(result).toBe('');
+  });
+
+  it('scrolls and highlights first result row when search has results', async () => {
+    document.getElementById('search-input').value = 'milk';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'table-row';
+    rowEl.dataset.productId = '1';
+    rowEl.scrollIntoView = vi.fn();
+    document.body.appendChild(rowEl);
+
+    await loadData();
+    // Advance past rAF (~16ms) but not past the 5000ms highlight removal timer
+    vi.advanceTimersByTime(20);
+
+    expect(rowEl.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
+    expect(rowEl.classList.contains('scan-highlight')).toBe(true);
+
+    vi.advanceTimersByTime(5000);
+    expect(rowEl.classList.contains('scan-highlight')).toBe(false);
+  });
+
+  it('does not scroll or highlight when search is empty', async () => {
+    document.getElementById('search-input').value = '';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'table-row';
+    rowEl.dataset.productId = '1';
+    rowEl.scrollIntoView = vi.fn();
+    document.body.appendChild(rowEl);
+
+    await loadData();
+    vi.advanceTimersByTime(20);
+
+    expect(rowEl.scrollIntoView).not.toHaveBeenCalled();
+    expect(rowEl.classList.contains('scan-highlight')).toBe(false);
+  });
+
+  it('does not scroll or highlight when results are empty', async () => {
+    document.getElementById('search-input').value = 'milk';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([]);
+
+    const rowEl = document.createElement('div');
+    rowEl.className = 'table-row';
+    rowEl.dataset.productId = '1';
+    rowEl.scrollIntoView = vi.fn();
+    document.body.appendChild(rowEl);
+
+    await loadData();
+    vi.advanceTimersByTime(20);
+
+    expect(rowEl.scrollIntoView).not.toHaveBeenCalled();
+    expect(rowEl.classList.contains('scan-highlight')).toBe(false);
+  });
+
+  it('does not throw when no .table-row is in the DOM', async () => {
+    document.getElementById('search-input').value = 'milk';
+    state.currentView = 'search';
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+    // No .table-row element added to DOM
+
+    await expect(async () => {
+      await loadData();
+      vi.advanceTimersByTime(20);
+    }).not.toThrow();
   });
 });
 
@@ -741,14 +986,8 @@ describe('registerProduct advanced paths', () => {
     dupError.status = 409;
     dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: true } };
     api.mockRejectedValueOnce(dupError);
-    const registerPromise = registerProduct();
-    // Wait for microtasks so the modal is appended to DOM
-    await vi.advanceTimersByTimeAsync(0);
-    // For synced duplicates, only the OK button is shown (confirm-yes class)
-    const okBtn = document.querySelector('.scan-modal-btn-register.confirm-yes');
-    expect(okBtn).not.toBeNull();
-    okBtn.click();
-    await registerPromise;
+    vi.mocked(showScanDuplicateModal).mockResolvedValueOnce('cancel');
+    await registerProduct();
     // Should not call api again (no merge/create), button re-enabled
     const btn = document.getElementById('btn-submit');
     expect(btn.disabled).toBe(false);
@@ -779,13 +1018,9 @@ describe('registerProduct advanced paths', () => {
     dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: false } };
     api.mockRejectedValueOnce(dupError);
     api.mockResolvedValueOnce({ id: 5 }); // overwrite result
+    vi.mocked(showScanDuplicateModal).mockResolvedValueOnce('overwrite');
 
-    const registerPromise = registerProduct();
-    await vi.advanceTimersByTimeAsync(0);
-    // Click the merge/overwrite button (first button with confirm-yes class)
-    const mergeBtn = document.querySelector('.scan-modal-btn-register.confirm-yes');
-    if (mergeBtn) mergeBtn.click();
-    await registerPromise;
+    await registerProduct();
     expect(api).toHaveBeenCalledWith('/api/products', expect.objectContaining({
       method: 'POST',
       body: expect.stringContaining('"on_duplicate":"overwrite"'),
@@ -922,5 +1157,152 @@ describe('collectFormFields with flags', () => {
     expect(body.flags).toContain('vegan');
     expect(body.flags).not.toContain('organic');
     expect(body.flags).not.toContain('computed_flag');
+  });
+});
+
+describe('unlockEan', () => {
+  beforeEach(() => {
+    state.cachedResults = [{ id: 1, name: 'Milk', flags: ['is_synced_with_off'] }];
+    state.imageCache = {};
+  });
+
+  it('calls unsync API and shows success toast', async () => {
+    api.mockResolvedValueOnce({});
+    await unlockEan(1);
+    expect(api).toHaveBeenCalledWith('/api/products/1/unsync', { method: 'POST' });
+    expect(showToast).toHaveBeenCalledWith('toast_ean_unlocked', 'success');
+  });
+
+  it('removes is_synced_with_off flag from cached product', async () => {
+    api.mockResolvedValueOnce({});
+    await unlockEan(1);
+    expect(state.cachedResults[0].flags).not.toContain('is_synced_with_off');
+  });
+
+  it('handles product not in cachedResults gracefully', async () => {
+    api.mockResolvedValueOnce({});
+    await unlockEan(999); // ID not in cachedResults
+    expect(showToast).toHaveBeenCalledWith('toast_ean_unlocked', 'success');
+  });
+
+  it('shows error toast on API failure', async () => {
+    api.mockRejectedValueOnce(new Error('network error'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await unlockEan(1);
+    expect(showToast).toHaveBeenCalledWith('toast_network_error', 'error');
+    console.error.mockRestore();
+  });
+
+  it('handles product with no flags array', async () => {
+    state.cachedResults = [{ id: 1, name: 'Milk' }]; // no flags property
+    api.mockResolvedValueOnce({});
+    await unlockEan(1);
+    expect(showToast).toHaveBeenCalledWith('toast_ean_unlocked', 'success');
+  });
+});
+
+describe('registerProduct - OFF prompt branches', () => {
+  let showOffAddReview;
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    const offReview = await import('../off-review.js');
+    showOffAddReview = offReview.showOffAddReview;
+
+    const fields = [
+      { tag: 'input', id: 'f-name', value: 'Product With EAN' },
+      { tag: 'select', id: 'f-type', value: 'dairy' },
+      { tag: 'input', id: 'f-ean', value: '1234567890123' },
+      { tag: 'input', id: 'f-brand', value: '' },
+      { tag: 'input', id: 'f-stores', value: '' },
+      { tag: 'textarea', id: 'f-ingredients', value: '' },
+      { tag: 'input', id: 'f-taste_note', value: '' },
+      { tag: 'input', id: 'f-smak', value: '3' },
+      { tag: 'input', id: 'f-kcal', value: '' },
+      { tag: 'input', id: 'f-energy_kj', value: '' },
+      { tag: 'input', id: 'f-fat', value: '' },
+      { tag: 'input', id: 'f-saturated_fat', value: '' },
+      { tag: 'input', id: 'f-carbs', value: '' },
+      { tag: 'input', id: 'f-sugar', value: '' },
+      { tag: 'input', id: 'f-protein', value: '' },
+      { tag: 'input', id: 'f-fiber', value: '' },
+      { tag: 'input', id: 'f-salt', value: '' },
+      { tag: 'input', id: 'f-weight', value: '' },
+      { tag: 'input', id: 'f-portion', value: '' },
+      { tag: 'select', id: 'f-volume', value: '' },
+      { tag: 'input', id: 'f-price', value: '' },
+      { tag: 'input', id: 'f-est_pdcaas', value: '' },
+      { tag: 'input', id: 'f-est_diaas', value: '' },
+      { tag: 'button', id: 'btn-submit', value: '' },
+      { tag: 'span', id: 'smak-val', value: '' },
+      { tag: 'input', id: 'search-input', value: '' },
+      { tag: 'span', id: 'search-clear', value: '' },
+    ];
+    fields.forEach(({ tag, id, value }) => {
+      if (!document.getElementById(id)) {
+        const el = document.createElement(tag);
+        el.id = id;
+        el.value = value;
+        if (tag === 'span') el.textContent = value;
+        document.body.appendChild(el);
+      }
+    });
+    ['search', 'register', 'settings'].forEach((v) => {
+      if (!document.querySelector(`.nav-tab[data-view="${v}"]`)) {
+        const tab = document.createElement('div');
+        tab.className = 'nav-tab';
+        tab.dataset.view = v;
+        document.body.appendChild(tab);
+      }
+    });
+    window._pendingOFFSync = false;
+    window._pendingImage = null;
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    window._pendingOFFSync = false;
+    window._pendingImage = null;
+  });
+
+  it('asks about OFF when EAN present and not from_off, user accepts', async () => {
+    api.mockResolvedValueOnce({ id: 42 });
+    showConfirmModal.mockResolvedValueOnce(true); // wantsOff = true
+    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+
+    const p = registerProduct();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+
+    expect(showOffAddReview).toHaveBeenCalledWith('1234567890123', 'f', 42);
+  });
+
+  it('does not call showOffAddReview when user declines OFF prompt', async () => {
+    api.mockResolvedValueOnce({ id: 42 });
+    showConfirmModal.mockResolvedValueOnce(false); // wantsOff = false
+    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+
+    const p = registerProduct();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+
+    expect(showOffAddReview).not.toHaveBeenCalled();
+  });
+
+  it('does not show OFF prompt when registered from_off', async () => {
+    window._pendingOFFSync = true;
+    api.mockResolvedValueOnce({ id: 42 });
+    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
+    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+
+    const p = registerProduct();
+    await vi.advanceTimersByTimeAsync(0);
+    await p;
+
+    // showConfirmModal may be called for other reasons but showOffAddReview should not
+    expect(showOffAddReview).not.toHaveBeenCalled();
   });
 });

@@ -2,16 +2,26 @@
 import { state, esc, catLabel, upgradeSelect } from './state.js';
 import { t } from './i18n.js';
 
+// AbortController for filter button listeners — aborted and replaced on each rebuild
+// to prevent listener accumulation across multiple buildFilters() calls.
+let _filtersAbort = null;
+
 export function buildFilters() {
   if (!state.cachedStats) return;
   const row = document.getElementById('filter-row');
   if (!row) return;
+
+  // Abort previous listeners before rebuilding to prevent accumulation
+  if (_filtersAbort) _filtersAbort.abort();
+  _filtersAbort = new AbortController();
+  const { signal } = _filtersAbort;
+
   // Build filter pills using DOM to avoid XSS from category names in onclick
   row.innerHTML = '';
   const allBtn = document.createElement('button');
   allBtn.className = 'pill' + (state.currentFilter.length === 0 ? ' active' : '');
   allBtn.textContent = t('filter_all') + ' (' + state.cachedStats.total + ')';
-  allBtn.addEventListener('click', () => window.setFilter('all'));
+  allBtn.addEventListener('click', () => window.setFilter('all'), { signal });
   row.appendChild(allBtn);
 
   state.categories.forEach((c) => {
@@ -20,7 +30,7 @@ export function buildFilters() {
     const btn = document.createElement('button');
     btn.className = 'pill' + (active ? ' active' : '');
     btn.textContent = c.emoji + ' ' + c.label + ' (' + n + ')';
-    btn.addEventListener('click', () => window.setFilter(c.name));
+    btn.addEventListener('click', () => window.setFilter(c.name), { signal });
     row.appendChild(btn);
   });
 
@@ -31,7 +41,7 @@ export function buildFilters() {
     const btn = document.createElement('button');
     btn.className = 'pill' + (active ? ' active' : '');
     btn.textContent = '\u{1F4E6} ' + t('uncategorized') + ' (' + uncatCount + ')';
-    btn.addEventListener('click', () => window.setFilter(''));
+    btn.addEventListener('click', () => window.setFilter(''), { signal });
     row.appendChild(btn);
   }
   updateFilterToggle();

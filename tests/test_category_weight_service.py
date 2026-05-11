@@ -1,0 +1,559 @@
+"""Tests for services/category_weight_service.py and related blueprint routes."""
+
+import pytest
+
+
+class TestGetCategoryWeights:
+    def test_returns_none_for_unknown_category(self, app_ctx):
+        from services.category_weight_service import get_category_weights
+
+        assert get_category_weights("NonExistent") is None
+
+    def test_returns_list_for_existing_category(self, app_ctx, seed_category):
+        from services.category_weight_service import get_category_weights
+        from config import SCORE_CONFIG
+
+        result = get_category_weights(seed_category)
+        assert isinstance(result, list)
+        assert len(result) == len(SCORE_CONFIG)
+
+    def test_all_entries_have_required_keys(self, app_ctx, seed_category):
+        from services.category_weight_service import get_category_weights
+
+        result = get_category_weights(seed_category)
+        for entry in result:
+            assert "field" in entry
+            assert "label" in entry
+            assert "desc" in entry
+            assert "enabled" in entry
+            assert "weight" in entry
+            assert "direction" in entry
+            assert "formula" in entry
+            assert "formula_min" in entry
+            assert "formula_max" in entry
+            assert "is_overridden" in entry
+            assert isinstance(entry["label"], str) and entry["label"]
+
+    def test_no_overrides_returns_is_overridden_false(self, app_ctx, seed_category):
+        from services.category_weight_service import get_category_weights
+
+        result = get_category_weights(seed_category)
+        for entry in result:
+            assert entry["is_overridden"] is False
+
+    def test_override_appears_as_is_overridden_true(self, app_ctx, seed_category, db):
+        from services.category_weight_service import get_category_weights, update_category_weights
+
+        update_category_weights(
+            seed_category,
+            [{"field": "kcal", "enabled": True, "weight": 200.0,
+              "direction": "lower", "formula": "minmax",
+              "formula_min": 0, "formula_max": 0, "is_overridden": True}],
+        )
+        result = get_category_weights(seed_category)
+        kcal = next(e for e in result if e["field"] == "kcal")
+        assert kcal["is_overridden"] is True
+        assert kcal["weight"] == 200.0
+        assert kcal["enabled"] is True
+
+    def test_global_value_used_when_not_overridden(self, app_ctx, seed_category):
+        from services.category_weight_service import get_category_weights
+        from services.weight_service import get_weights
+
+        global_weights = {w["field"]: w for w in get_weights()}
+        result = get_category_weights(seed_category)
+        taste = next(e for e in result if e["field"] == "taste_score")
+        g = global_weights["taste_score"]
+        assert taste["enabled"] == g["enabled"]
+        assert taste["weight"] == g["weight"]
+
+
+class TestUpdateCategoryWeights:
+    def test_raises_for_non_list(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+
+        with pytest.raises(ValueError, match="Expected array"):
+            update_category_weights(seed_category, "not a list")
+
+    def test_raises_for_unknown_category(self, app_ctx):
+        from services.category_weight_service import update_category_weights
+
+        with pytest.raises(LookupError):
+            update_category_weights("DoesNotExist", [])
+
+    def test_raises_for_invalid_field(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+
+        with pytest.raises(ValueError, match="Invalid field"):
+            update_category_weights(
+                seed_category,
+                [{"field": "not_a_real_field", "is_overridden": True}],
+            )
+
+    def test_raises_for_invalid_direction(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+
+        with pytest.raises(ValueError, match="Invalid direction"):
+            update_category_weights(
+                seed_category,
+                [{"field": "kcal", "direction": "sideways", "is_overridden": True}],
+            )
+
+    def test_raises_for_invalid_formula(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+
+        with pytest.raises(ValueError, match="Invalid formula"):
+            update_category_weights(
+                seed_category,
+                [{"field": "kcal", "formula": "magic", "is_overridden": True}],
+            )
+
+    def test_raises_for_weight_out_of_range(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+
+        with pytest.raises(ValueError, match="Weight must be between"):
+            update_category_weights(
+                seed_category,
+                [{"field": "kcal", "weight": 9999, "is_overridden": True}],
+            )
+
+    def test_upsert_creates_override(self, app_ctx, seed_category, db):
+        from services.category_weight_service import update_category_weights
+
+        update_category_weights(
+            seed_category,
+            [{"field": "protein", "enabled": True, "weight": 150.0,
+              "direction": "higher", "formula": "minmax",
+              "formula_min": 0, "formula_max": 0, "is_overridden": True}],
+        )
+        row = db.execute(
+            "SELECT * FROM category_score_weights WHERE category=? AND field=?",
+            (seed_category, "protein"),
+        ).fetchone()
+        assert row is not None
+        assert row["weight"] == 150.0
+
+    def test_delete_removes_override(self, app_ctx, seed_category, db):
+        from services.category_weight_service import update_category_weights
+
+        update_category_weights(
+            seed_category,
+            [{"field": "protein", "enabled": True, "weight": 150.0,
+              "direction": "higher", "formula": "minmax",
+              "formula_min": 0, "formula_max": 0, "is_overridden": True}],
+        )
+        update_category_weights(
+            seed_category,
+            [{"field": "protein", "is_overridden": False}],
+        )
+        row = db.execute(
+            "SELECT * FROM category_score_weights WHERE category=? AND field=?",
+            (seed_category, "protein"),
+        ).fetchone()
+        assert row is None
+
+    def test_empty_list_is_noop(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+        from db import get_db
+
+        count_before = get_db().execute(
+            "SELECT COUNT(*) FROM category_score_weights WHERE category=?", (seed_category,)
+        ).fetchone()[0]
+        update_category_weights(seed_category, [])
+        count_after = get_db().execute(
+            "SELECT COUNT(*) FROM category_score_weights WHERE category=?", (seed_category,)
+        ).fetchone()[0]
+        assert count_after == count_before
+
+    def test_invalidates_scoring_cache(self, app_ctx, seed_category):
+        from services.category_weight_service import update_category_weights
+        import services.product_scoring as ps
+
+        ps._weight_cache = ("dummy",)
+        update_category_weights(seed_category, [])
+        assert ps._weight_cache is None
+
+    def test_cache_reloads_after_external_db_write(self, app_ctx, db, seed_category):
+        """Simulate the multi-worker case: another worker writes to the DB
+        without calling invalidate_scoring_cache(). The next _load_weight_config
+        on this worker must detect the change via PRAGMA data_version and re-read.
+
+        Without this, Gunicorn's non-writer worker keeps serving stale scores
+        after a category override is saved.
+        """
+        import sqlite3
+        from config import DB_PATH
+        from services.product_scoring import _load_weight_config
+        import services.product_scoring as ps
+
+        cur = db.cursor()
+        first = _load_weight_config(cur)
+        assert ps._weight_cache is first
+        cached_overrides = first[3]
+        assert (seed_category, "fiber") not in cached_overrides
+
+        # Write from a *different* connection — represents another Gunicorn worker.
+        # PRAGMA data_version on `db` will only reflect writes from other connections.
+        other = sqlite3.connect(DB_PATH)
+        try:
+            other.execute(
+                "INSERT INTO category_score_weights "
+                "(category, field, enabled, weight, direction, formula, formula_min, formula_max) "
+                "VALUES (?, 'fiber', 1, 100.0, 'higher', 'minmax', 0, 0)",
+                (seed_category,),
+            )
+            other.commit()
+        finally:
+            other.close()
+
+        second = _load_weight_config(cur)
+        assert second is not first, "cache must reload after a cross-connection write"
+        assert (seed_category, "fiber") in second[3]
+
+
+class TestCategoryWeightsBlueprintGet:
+    def test_404_for_missing_category(self, client):
+        resp = client.get("/api/categories/NonExistent/weights")
+        assert resp.status_code == 404
+
+    def test_200_for_existing_category(self, client):
+        resp = client.get("/api/categories/Snacks/weights")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert isinstance(data, list)
+        assert len(data) > 0
+
+    def test_response_has_is_overridden(self, client):
+        resp = client.get("/api/categories/Snacks/weights")
+        data = resp.get_json()
+        for entry in data:
+            assert "is_overridden" in entry
+
+    def test_400_for_invalid_name(self, client):
+        resp = client.get("/api/categories/\x00bad/weights")
+        assert resp.status_code == 400
+
+
+class TestCategoryWeightsBlueprintPut:
+    def test_400_for_non_json(self, client):
+        resp = client.put(
+            "/api/categories/Snacks/weights",
+            data="not json",
+            content_type="text/plain",
+        )
+        assert resp.status_code == 400
+
+    def test_400_for_invalid_field(self, client):
+        resp = client.put(
+            "/api/categories/Snacks/weights",
+            json=[{"field": "bad_field", "is_overridden": True}],
+        )
+        assert resp.status_code == 400
+
+    def test_404_for_unknown_category(self, client):
+        resp = client.put(
+            "/api/categories/NonExistent/weights",
+            json=[{"field": "kcal", "is_overridden": False}],
+        )
+        assert resp.status_code == 404
+
+    def test_200_on_valid_override(self, client):
+        resp = client.put(
+            "/api/categories/Snacks/weights",
+            json=[
+                {
+                    "field": "kcal",
+                    "enabled": True,
+                    "weight": 200.0,
+                    "direction": "lower",
+                    "formula": "minmax",
+                    "formula_min": 0,
+                    "formula_max": 0,
+                    "is_overridden": True,
+                }
+            ],
+        )
+        assert resp.status_code == 200
+        assert resp.get_json()["ok"] is True
+
+    def test_roundtrip_get_after_put(self, client):
+        client.put(
+            "/api/categories/Snacks/weights",
+            json=[
+                {
+                    "field": "sugar",
+                    "enabled": True,
+                    "weight": 75.0,
+                    "direction": "lower",
+                    "formula": "minmax",
+                    "formula_min": 0,
+                    "formula_max": 0,
+                    "is_overridden": True,
+                }
+            ],
+        )
+        resp = client.get("/api/categories/Snacks/weights")
+        data = resp.get_json()
+        sugar = next(e for e in data if e["field"] == "sugar")
+        assert sugar["is_overridden"] is True
+        assert sugar["weight"] == 75.0
+
+
+class TestScoringWithCategoryOverrides:
+    def test_category_override_affects_score(self, app_ctx, db, seed_category):
+        from services.product_scoring import _score_product
+
+        enabled_weights = {"kcal": 100.0}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        enabled_fields = ["kcal"]
+        category_overrides = {
+            (seed_category, "kcal"): {
+                "enabled": 1,
+                "weight": 200.0,
+                "direction": None,
+                "formula": None,
+                "formula_min": None,
+                "formula_max": None,
+            }
+        }
+        p = {"type": seed_category, "kcal": 100.0}
+        _score_product(p, enabled_fields, enabled_weights, weight_config, {}, category_overrides)
+        assert p["scores"]["kcal"] > 0
+
+    def test_override_disabled_skips_field(self, app_ctx, seed_category):
+        from services.product_scoring import _score_product
+
+        enabled_weights = {"kcal": 100.0}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        enabled_fields = ["kcal"]
+        category_overrides = {
+            (seed_category, "kcal"): {
+                "enabled": 0,
+                "weight": None,
+                "direction": None,
+                "formula": None,
+                "formula_min": None,
+                "formula_max": None,
+            }
+        }
+        p = {"type": seed_category, "kcal": 100.0}
+        _score_product(p, enabled_fields, enabled_weights, weight_config, {}, category_overrides)
+        assert "kcal" not in p["scores"]
+        assert p["total_score"] == 0
+
+    def test_no_override_uses_global(self, app_ctx, seed_category):
+        from services.product_scoring import _score_product
+
+        enabled_weights = {"kcal": 100.0}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        p = {"type": seed_category, "kcal": 100.0}
+        _score_product(p, ["kcal"], enabled_weights, weight_config, {}, {})
+        assert "kcal" in p["scores"]
+
+    def test_override_enabled_includes_field(self, app_ctx, seed_category):
+        """A field with category override enabled=1 is included in scoring."""
+        from services.product_scoring import _score_product
+
+        enabled_weights = {"kcal": 100.0}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        enabled_fields = ["kcal"]
+        category_overrides = {
+            (seed_category, "kcal"): {
+                "enabled": 1,
+                "weight": None,
+                "direction": None,
+                "formula": None,
+                "formula_min": None,
+                "formula_max": None,
+            }
+        }
+        p = {"type": seed_category, "kcal": 100.0}
+        _score_product(p, enabled_fields, enabled_weights, weight_config, {}, category_overrides)
+        assert "kcal" in p["scores"]
+        assert p["total_score"] > 0
+
+    def test_override_weight_uses_exact_value(self, app_ctx, seed_category):
+        """Category weight override value is used in score calculation."""
+        from services.product_scoring import _score_product
+
+        global_weight = 100.0
+        override_weight = 200.0
+        enabled_weights = {"kcal": global_weight}
+        weight_config = {
+            "kcal": {
+                "direction": "lower",
+                "formula": "direct",
+                "formula_min": 0,
+                "formula_max": 500,
+            }
+        }
+        enabled_fields = ["kcal"]
+
+        # Score with global weight
+        p_global = {"type": seed_category, "kcal": 100.0}
+        _score_product(p_global, enabled_fields, enabled_weights, weight_config, {}, {})
+
+        # Score with category override weight
+        category_overrides = {
+            (seed_category, "kcal"): {
+                "enabled": 1,
+                "weight": override_weight,
+                "direction": None,
+                "formula": None,
+                "formula_min": None,
+                "formula_max": None,
+            }
+        }
+        p_override = {"type": seed_category, "kcal": 100.0}
+        _score_product(p_override, enabled_fields, enabled_weights, weight_config, {}, category_overrides)
+
+        # Override weight is 2x global, so the score should be 2x
+        assert p_override["scores"]["kcal"] == p_global["scores"]["kcal"] * 2
+
+
+class TestCategoryOverrideEndToEnd:
+    """End-to-end coverage: configure overrides via the service and score via list_products.
+
+    Regression: a category override that enables a globally-disabled field must
+    actually affect scoring (previously it was silently ignored because
+    _score_product only iterated over globally-enabled fields).
+    """
+
+    def _disable_all_global_weights(self, db):
+        """Force every global weight off so override-driven scoring is unambiguous."""
+        db.execute("UPDATE score_weights SET enabled = 0")
+        db.commit()
+
+    def _seed_product(self, db, category, **fields):
+        cols = ["type", "name"] + list(fields.keys())
+        vals = [category, "Test Product"] + list(fields.values())
+        placeholders = ",".join("?" * len(cols))
+        db.execute(
+            f"INSERT INTO products ({','.join(cols)}) VALUES ({placeholders})",
+            vals,
+        )
+        db.commit()
+
+    def test_override_enables_globally_disabled_field(self, app_ctx, db, seed_category):
+        from services.category_weight_service import update_category_weights
+        from services.product_crud import list_products
+
+        self._disable_all_global_weights(db)
+        # Two products in the seed_category with different fiber values so minmax
+        # produces a non-zero range.
+        self._seed_product(db, seed_category, fiber=2.0)
+        self._seed_product(db, seed_category, fiber=20.0)
+
+        update_category_weights(
+            seed_category,
+            [{
+                "field": "fiber", "enabled": True, "weight": 100.0,
+                "direction": "higher", "formula": "minmax",
+                "formula_min": 0, "formula_max": 0, "is_overridden": True,
+            }],
+        )
+
+        result = list_products(None, seed_category)
+        scored = [p for p in result["products"] if p["scores"]]
+        assert scored, "category override on a globally-disabled field must produce scores"
+        for p in scored:
+            assert "fiber" in p["scores"]
+
+    def test_override_replaces_global_enabled_set(self, app_ctx, db, seed_category):
+        """Category overrides are exclusive: when a category has any override,
+        ONLY the overridden fields are scored for products in that category —
+        globally-enabled fields are ignored.
+        """
+        from services.category_weight_service import update_category_weights
+        from services.product_crud import list_products
+
+        # Globals: enable kcal and protein.
+        db.execute(
+            "UPDATE score_weights SET enabled = 1, weight = 100 "
+            "WHERE field IN ('kcal', 'protein')"
+        )
+        db.execute(
+            "UPDATE score_weights SET enabled = 0 "
+            "WHERE field NOT IN ('kcal', 'protein')"
+        )
+        db.commit()
+        # Seed two products with full data so minmax produces a non-zero range.
+        self._seed_product(db, seed_category, kcal=100.0, protein=10.0, fiber=2.0)
+        self._seed_product(db, seed_category, kcal=400.0, protein=30.0, fiber=20.0)
+
+        update_category_weights(
+            seed_category,
+            [{
+                "field": "fiber", "enabled": True, "weight": 100.0,
+                "direction": "higher", "formula": "minmax",
+                "formula_min": 0, "formula_max": 0, "is_overridden": True,
+            }],
+        )
+
+        result = list_products(None, seed_category)
+        scored = [p for p in result["products"] if p["scores"]]
+        assert scored, "fiber override must produce scores"
+        for p in scored:
+            assert set(p["scores"].keys()) == {"fiber"}, (
+                "exclusive mode: only the overridden field should score, "
+                f"got {sorted(p['scores'].keys())}"
+            )
+
+    def test_override_does_not_leak_into_other_categories(
+        self, app_ctx, db, seed_category
+    ):
+        from services.category_weight_service import update_category_weights
+        from services.product_crud import list_products
+
+        self._disable_all_global_weights(db)
+        db.execute(
+            "INSERT INTO categories (name, emoji) VALUES (?, ?)",
+            ("OtherCat", "\U0001f4e6"),
+        )
+        db.commit()
+        self._seed_product(db, seed_category, fiber=2.0)
+        self._seed_product(db, seed_category, fiber=20.0)
+        self._seed_product(db, "OtherCat", fiber=5.0)
+        self._seed_product(db, "OtherCat", fiber=15.0)
+
+        update_category_weights(
+            seed_category,
+            [{
+                "field": "fiber", "enabled": True, "weight": 100.0,
+                "direction": "higher", "formula": "minmax",
+                "formula_min": 0, "formula_max": 0, "is_overridden": True,
+            }],
+        )
+
+        other_result = list_products(None, "OtherCat")
+        for p in other_result["products"]:
+            assert "fiber" not in p["scores"]
+            assert p["total_score"] == 0

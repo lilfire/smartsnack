@@ -8,7 +8,7 @@ if [ ! -f /app/certs/cert.pem ]; then
   openssl req -x509 -newkey rsa:2048 \
     -keyout /app/certs/key.pem \
     -out /app/certs/cert.pem \
-    -days 3650 -nodes \
+    -days 365 -nodes \
     -subj "/CN=smartsnack" 2>/dev/null
   echo "Certificate generated."
 fi
