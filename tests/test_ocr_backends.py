@@ -90,8 +90,25 @@ class TestOpenAI:
             _extract_openai(img, _b64(img), "image/png")
             call_kwargs = mock_cls.return_value.chat.completions.create.call_args
             msgs = call_kwargs[1]["messages"] if call_kwargs[1] else call_kwargs[0][0]
-            url = msgs[0]["content"][0]["image_url"]["url"]
+            # system is msgs[0], user is msgs[1]
+            url = msgs[1]["content"][0]["image_url"]["url"]
             assert url.startswith("data:image/png;base64,")
+
+    def test_system_message_contains_hardened_prompt(self, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+        img = _tiny_png_bytes()
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
+        )
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
+            from services.ocr_backends.openai import _extract_openai
+            from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
+            _extract_openai(img, _b64(img))
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
+            msgs = call_kwargs[1]["messages"]
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == _HARDENED_SYSTEM_PROMPT
 
     def test_empty_choices_returns_empty_string(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -158,6 +175,23 @@ class TestOpenRouter:
         with pytest.raises(ValueError, match="API key required"):
             _extract_openrouter(b"data", "b64")
 
+    def test_system_message_contains_hardened_prompt(self, monkeypatch):
+        monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
+        img = _tiny_png_bytes()
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
+        )
+        with patch("openai.OpenAI") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
+            from services.ocr_backends.openrouter import _extract_openrouter
+            from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
+            _extract_openrouter(img, _b64(img))
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
+            msgs = call_kwargs[1]["messages"]
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == _HARDENED_SYSTEM_PROMPT
+        assert "Phase 1" in msgs[0]["content"]
+
 
 # ── Groq ──────────────────────────────────────────────────────────────────────
 
@@ -204,6 +238,22 @@ class TestGroq:
         from services.ocr_backends.groq import _extract_groq
         with pytest.raises(ValueError, match="API key required"):
             _extract_groq(b"data", "b64")
+
+    def test_system_message_contains_hardened_prompt(self, monkeypatch):
+        monkeypatch.setenv("GROQ_API_KEY", "groq-key")
+        img = _tiny_png_bytes()
+        mock_response = types.SimpleNamespace(
+            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
+        )
+        with patch("groq.Groq") as mock_cls:
+            mock_cls.return_value.chat.completions.create.return_value = mock_response
+            from services.ocr_backends.groq import _extract_groq
+            from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
+            _extract_groq(img, _b64(img))
+            call_kwargs = mock_cls.return_value.chat.completions.create.call_args
+            msgs = call_kwargs[1]["messages"]
+        assert msgs[0]["role"] == "system"
+        assert msgs[0]["content"] == _HARDENED_SYSTEM_PROMPT
 
 
 # ── Claude ────────────────────────────────────────────────────────────────────
@@ -267,6 +317,23 @@ class TestClaude:
         with pytest.raises(ValueError, match="API key required"):
             _extract_claude_vision(b"data", "b64")
 
+    def test_system_prompt_is_sent(self, monkeypatch):
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
+        img = _tiny_png_bytes()
+        mock_message = types.SimpleNamespace(
+            content=[types.SimpleNamespace(text="ok")]
+        )
+        with patch("anthropic.Anthropic") as mock_cls:
+            mock_cls.return_value.messages.create.return_value = mock_message
+            from services.ocr_backends.claude import _extract_claude_vision
+            from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
+            _extract_claude_vision(img, _b64(img))
+            call_kwargs = mock_cls.return_value.messages.create.call_args
+            system_param = call_kwargs[1].get("system", "")
+        assert system_param == _HARDENED_SYSTEM_PROMPT
+        assert "Phase 1" in system_param
+        assert "Phase 2" in system_param
+
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 
@@ -321,6 +388,21 @@ class TestGemini:
         from services.ocr_backends.gemini import _extract_gemini
         with pytest.raises(ValueError, match="API key required"):
             _extract_gemini(b"data", "b64")
+
+    def test_system_instruction_contains_hardened_prompt(self, monkeypatch):
+        monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
+        img = _tiny_png_bytes()
+        mock_response = types.SimpleNamespace(text="text")
+        with patch("google.genai.Client", autospec=True) as mock_cls:
+            mock_cls.return_value.models.generate_content.return_value = mock_response
+            from services.ocr_backends.gemini import _extract_gemini
+            from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
+            _extract_gemini(img, _b64(img))
+            call_kwargs = mock_cls.return_value.models.generate_content.call_args
+            config = call_kwargs[1].get("config", {})
+        assert config.get("system_instruction") == _HARDENED_SYSTEM_PROMPT
+        assert "Phase 1" in config["system_instruction"]
+        assert "Phase 2" in config["system_instruction"]
 
 
 # ── Tesseract ─────────────────────────────────────────────────────────────────

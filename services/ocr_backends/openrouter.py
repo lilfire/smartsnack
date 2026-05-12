@@ -1,14 +1,7 @@
 """OpenRouter Vision OCR backend."""
 import os
 
-from . import _get_api_key, build_ingredient_prompt
-
-_OPENROUTER_SYSTEM_PROMPT = (
-    "You are a precise food label reader. Your only job is to extract the exact "
-    "ingredient list from a food label image. Output the raw ingredient text as it "
-    "appears on the label — no commentary, no formatting changes, no summaries. "
-    "If no ingredient list is visible, output an empty string."
-)
+from . import _get_api_key, _HARDENED_SYSTEM_PROMPT, build_ingredient_prompt
 
 
 _DEFAULT_MODEL = "google/gemini-2.0-flash-001"
@@ -37,7 +30,7 @@ def _extract_openrouter(image_bytes, image_b64, mime_type="image/jpeg", model=No
     user_prompt = prompt or ingredient_prompt
     messages = []
     if not prompt:
-        messages.append({"role": "system", "content": _OPENROUTER_SYSTEM_PROMPT})
+        messages.append({"role": "system", "content": _HARDENED_SYSTEM_PROMPT})
     messages.append(
         {
             "role": "user",

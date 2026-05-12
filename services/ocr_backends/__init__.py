@@ -1,116 +1,87 @@
 """Shared utilities for OCR backend modules."""
 import os
 
-_LANGUAGE_NAMES = {
-    "no": "Norwegian (Bokmål)",
-    "en": "English",
-    "se": "Swedish",
-}
-
-# Shared formatting rules. The SmartSnack database stores each ingredient
-# string in a canonical shape (single comma-separated line, allergens in
-# ALL CAPS, Norwegian decimal comma, trailing period, "may contain traces"
-# warning at the end). Vision models follow this format much more reliably
-# when the rules are spelled out and a concrete example is shown — see
-# ``_FEWSHOT_EXAMPLE`` below.
-_FORMATTING_RULES = (
-    "- Output the ingredient list as a single line, with ingredients separated by commas.\n"
-    "- Capitalize allergens in ALL CAPS — including any compound that contains them. "
-    "Common allergen roots: MELK, MYSE, FLØTE, RØMME, OST, LAKTOSE, KASEIN, "
-    "EGG, EGGE, HVETE, BYGG, RUG, HAVRE, GLUTEN, SPELT, SOYA, SESAM, LUPIN, "
-    "PEANØTT, NØTT, MANDEL, HASSEL, CASHEW, VALNØTT, PARANØTT, PEKAN, "
-    "PISTASJ, MAKADAMIA, FISK, SKALLDYR, KREPSDYR, BLØTDYR, SELLERI, "
-    "SENNEP, SULFITT. Examples: HVETEMEL, HVETEGLUTEN, MYSEPROTEIN, "
-    "MELKEPROTEINKONSENTRAT, SOYALECITIN, HELMELKPULVER, EGGEHVITEPULVER, "
-    "PEANØTTBITER, HASSELNØTTER, NATRIUMMETABISULFITT.\n"
-    "- Do NOT capitalize derived chemicals or unrelated words that merely contain "
-    "those letters (e.g. \"melkesyre\", \"eggehvit\" inside a product name). "
-    "Capitalize only when the word itself names an allergenic ingredient.\n"
-    "- Use parentheses for sub-ingredients, e.g. \"krydderblanding (sukker, "
-    "salt, paprika, MYSEPULVER (fra MELK), gjærekstrakt)\".\n"
-    "- Preserve percentages from the label and use a comma as the decimal "
-    "separator: write \"(15%)\", \"(0,4%)\", \"4,4%\" — never \"0.4%\".\n"
-    "- Preserve E-numbers exactly as printed on the label (e.g. \"E270\", "
-    "\"E 330\", \"E471\", \"E150d\"). Do NOT translate or expand them.\n"
-    "- If the label includes a \"may contain traces\" notice, place it at "
-    "the end as one sentence with the trace allergens in ALL CAPS — "
-    "Norwegian: \"Kan inneholde spor av X, Y og Z.\"; English: \"May "
-    "contain traces of X, Y and Z.\"; Swedish: \"Kan innehålla spår av "
-    "X, Y och Z.\"\n"
-    "- End the entire output with a single period."
+_HARDENED_SYSTEM_PROMPT = (
+    "You are a food label specialist. Your job is to extract and clean up the\n"
+    "ingredient list for a single target language from raw OCR text that may\n"
+    "contain packaging text in multiple languages.\n"
+    "\n"
+    "## Phase 1 — Isolate the target-language section\n"
+    "\n"
+    "The target language is stated in the user message. European food products\n"
+    "frequently carry identical ingredient lists repeated in multiple languages.\n"
+    "Identify section boundaries by looking for these ingredient-header keywords:\n"
+    "\n"
+    "  Norwegian (no):  INGREDIENSER, Ingredienser, Innhold, INNHOLD\n"
+    "  English (en):    INGREDIENTS, Ingredients\n"
+    "  Swedish (sv):    INGREDIENSER, INNEHÅLL, Innehåll\n"
+    "  German (de):     ZUTATEN, Zutaten, ZUTATENLISTE\n"
+    "  Polish (pl):     SKŁADNIKI, Składniki\n"
+    "  French (fr):     INGRÉDIENTS, Ingrédients\n"
+    "  Dutch (nl):      INGREDIËNTEN, Ingrediënten\n"
+    "  Spanish (es):    INGREDIENTES, Ingredientes\n"
+    "  Italian (it):    INGREDIENTI, Ingredienti\n"
+    "\n"
+    "Find the ingredient block whose header matches the target language. Extract\n"
+    "only the text between that header and the next section header (or end of text).\n"
+    "If no explicit header is found, identify the correct block by language\n"
+    "recognition (vocabulary, diacritics, common function words).\n"
+    "\n"
+    "CRITICAL: Do not let any word, phrase, or fragment from a different-language\n"
+    "section appear in your output. If you notice your output contains words from\n"
+    "multiple languages, discard it and restart Phase 1.\n"
+    "\n"
+    "## Phase 2 — Normalise the isolated text\n"
+    "\n"
+    "Apply every rule below to the isolated target-language text only:\n"
+    "\n"
+    "1.  Output ONLY the cleaned ingredient list. No preamble, no explanation,\n"
+    "    no headers, no extra sentences.\n"
+    "2.  Format as a single comma-separated line.\n"
+    "3.  The user message provides a list of allergen terms for the target language.\n"
+    "    Every occurrence of those terms — or compound words that contain them\n"
+    "    (e.g. HVETEMEL, SOYALESITIN, MJØLKPULVER) — must be written in ALL CAPS,\n"
+    "    including inside sub-ingredient parentheses.\n"
+    "4.  Use the decimal separator for the target language as specified in the user\n"
+    "    message (comma or dot).\n"
+    "5.  Preserve E-numbers exactly as printed: E270, E150d, E471, E904a.\n"
+    "    Never expand, rephrase, or remove them.\n"
+    "6.  Sub-ingredients go in parentheses immediately after their parent ingredient:\n"
+    "    krydderblanding (sukker, salt, paprika, MYSEPULVER (fra MELK))\n"
+    "7.  Preserve percentages from the label: solsikkeolje (30%).\n"
+    "8.  The trace-allergen notice belongs at the very end. The exact phrasing is\n"
+    "    supplied in the user message. Write it as the final sentence, ending with\n"
+    "    a period.\n"
+    "9.  The list ends with exactly one period.\n"
+    "10. Strip any ingredient-section headers (e.g. \"INGREDIENSER:\", \"Ingredients:\",\n"
+    "    \"Innhold:\", \"INNÄLL:\") — they must not appear in the output.\n"
+    "11. Strip any nutrition-table values that leaked into the OCR text.\n"
+    "12. Strip brand names, trademark notices, weight declarations, and barcodes.\n"
+    "13. If the target-language section is not found or the input does not resemble\n"
+    "    an ingredient list at all, return an empty string — nothing else.\n"
 )
 
-# One-shot example showing every formatting rule applied at once. Models
-# match the format much more reliably when given a worked example than
-# when given rules alone. Norwegian is used because it is the dominant
-# label language for this app.
-_FEWSHOT_EXAMPLE = (
-    "\n\nExample of correctly formatted output (use as a style reference, "
-    "do NOT copy these ingredients into your response):\n"
-    "Linsemel (37%), maismel, rismel, solsikke-/rapsolje, krydderblanding "
-    "(sukker, salt, paprika, MYSEPULVER (fra MELK), gjærekstrakt, "
-    "syrer (melkesyre, sitronsyre)), potetstivelse, salt, "
-    "surhetsregulerende middel (E270). Kan inneholde spor av HVETE, "
-    "RUG, BYGG og HAVRE."
+# Norwegian allergen terms (SmartSnack default language)
+_ALLERGENS_NO = (
+    "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, "
+    "PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, "
+    "LUPIN, SULFITTER, SVOVELDIOKSID"
 )
+_TRACE_TEMPLATE_NO = "Kan inneholde spor av {items}."
 
-_BASE_RULES_NO_TRANSLATION = (
-    "- Return the ingredient list text exactly as it appears on the label, in its original language.\n"
-    "- Do NOT include the section header. Strip any leading label word such as "
-    '"INGREDIENSER", "INGREDIENTS", "ZUTATEN", "INGREDIENTS", "AINESOSAT", '
-    '"SKLADNIKI", or any similar word that introduces the ingredient section.\n'
-    "- Do NOT prefix the output with phrases like "
-    '"The ingredient text is:", "The label reads:", or similar.\n'
-    "- Do NOT rephrase, summarize, paraphrase, or add any text that is not "
-    "part of the ingredient list itself.\n"
-    "- If you cannot read or do not see an ingredient list in the image, output "
-    "an empty string. Do NOT explain, apologize, ask for clarification, or write "
-    "any prose.\n"
-    "- Never output sentences such as \"I'm happy to help\", \"I don't see\", "
-    "\"Please provide\", or any other conversational reply. The only allowed "
-    "outputs are the ingredient list or an empty string.\n"
-    + _FORMATTING_RULES + "\n"
-    "- Output nothing except the formatted ingredient list text."
+_ALLERGENS_EN = (
+    "MILK, EGGS, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, "
+    "PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, "
+    "LUPIN, SULPHITES, SULPHUR DIOXIDE"
 )
+_TRACE_TEMPLATE_EN = "May contain traces of {items}."
 
-_BASE_RULES_WITH_TRANSLATION = (
-    "- Translate EVERY word in the ingredient list into {lang_name}, "
-    "including all text inside parentheses, brackets, and after commas. "
-    "The label may be written in any language — always output exclusively "
-    "in {lang_name}.\n"
-    "- Parenthetical content (text inside round brackets) is part of the "
-    "ingredient description and MUST be translated, not left in the source "
-    "language. Example of WRONG output: `Beriket mel (harina de trigo)`. "
-    "Example of CORRECT output: `Beriket hvetemel (hvetemel)` or simply "
-    "`Beriket hvetemel` if the parenthetical is redundant after translation.\n"
-    "- Do NOT output any word, character, or script that is not {lang_name}. "
-    "This includes text inside parentheses, subcategory notes, additive "
-    "descriptions, and embedded non-Latin characters such as Chinese (漢字), "
-    "Japanese (仮名), Korean (한글), Arabic, Cyrillic, and similar scripts. "
-    "Example of WRONG output: `palm油` (Chinese character fused into word). "
-    "Example of CORRECT output: `palmolje`.\n"
-    "- E-numbers (e.g. E471, E150d) and FD&C color codes (e.g. FD&C Red 40, "
-    "FD&C Blue 1) may be kept as-is. Their surrounding descriptions must "
-    "still be in {lang_name}.\n"
-    "- Do NOT include the section header. Strip any leading label word such "
-    'as "INGREDIENSER", "INGREDIENTS", "ZUTATEN", "AINESOSAT", "SKŁADNIKI", '
-    "or any similar word that introduces the ingredient section.\n"
-    "- Do NOT prefix the output with phrases like "
-    '"The ingredient text is:", "The label reads:", or similar.\n'
-    "- Do NOT rephrase or summarize. Translate faithfully and output the "
-    "list only.\n"
-    "- If no ingredient list is visible in the image, output an empty string. "
-    "Do NOT explain, apologize, ask for clarification, or write any prose.\n"
-    "- Never output sentences such as \"I'm happy to help\", \"I don't see\", "
-    "\"Please provide\", or any other conversational reply. The only allowed "
-    "outputs are the translated ingredient list or an empty string.\n"
-    + _FORMATTING_RULES + "\n"
-    "- Self-check before responding: scan your output for any non-{lang_name} "
-    "words or characters — including inside parentheses and any embedded "
-    "non-Latin script characters (Chinese, Japanese, Korean, Arabic, Cyrillic, "
-    "etc.). Translate every such word or character before returning.\n"
-    "- Output nothing except the formatted, translated ingredient list."
+_ALLERGENS_SE = (
+    "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, "
+    "JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, "
+    "LUPIN, SULFITER, SVAVELDIOXID"
 )
+_TRACE_TEMPLATE_SE = "Kan innehålla spår av {items}."
 
 _NUTRITION_PROMPT = (
     "Extract the per-100g nutrition values from this food label image. "
@@ -132,24 +103,39 @@ _NUTRITION_PROMPT = (
 
 
 def build_ingredient_prompt(language: str | None = None) -> str:
-    """Return the ingredient extraction prompt, optionally with a translation instruction."""
-    lang_name = _LANGUAGE_NAMES.get(language or "") if language else None
-    if lang_name:
-        task = (
-            f"You are reading a food label image. The label may be written in any language.\n\n"
-            f"Your task: Extract the ingredient list and translate EVERY word into "
-            f"{lang_name}. Your entire output must be in {lang_name} only — including "
-            f"text in parentheses and after commas.\n\n"
-            f"Rules:\n"
+    """Return the structured user message for ingredient extraction.
+
+    Tells the vision LLM the target language, allergen terms, decimal separator,
+    and trace-notice template. The system prompt (_HARDENED_SYSTEM_PROMPT)
+    carries all normalisation rules.
+
+    Falls back to Norwegian for None, empty string, or unknown language codes.
+    """
+    lang = (language or "").strip() or "no"
+    if lang not in ("no", "en", "se"):
+        lang = "no"
+
+    if lang == "en":
+        return (
+            "Language: English\n"
+            f"Allergen terms: {_ALLERGENS_EN}\n"
+            "Decimal separator: dot\n"
+            f"Trace notice template: {_TRACE_TEMPLATE_EN}\n"
         )
-        rules = _BASE_RULES_WITH_TRANSLATION.replace("{lang_name}", lang_name)
-    else:
-        task = (
-            "You are reading a food label image. Extract ONLY the ingredient list.\n\n"
-            "Rules:\n"
+    if lang == "se":
+        return (
+            "Language: Swedish\n"
+            f"Allergen terms: {_ALLERGENS_SE}\n"
+            "Decimal separator: comma\n"
+            f"Trace notice template: {_TRACE_TEMPLATE_SE}\n"
         )
-        rules = _BASE_RULES_NO_TRANSLATION
-    return task + rules + _FEWSHOT_EXAMPLE
+    # Default: Norwegian
+    return (
+        "Language: Norwegian\n"
+        f"Allergen terms: {_ALLERGENS_NO}\n"
+        "Decimal separator: comma\n"
+        f"Trace notice template: {_TRACE_TEMPLATE_NO}\n"
+    )
 
 
 # Backward-compatible alias

@@ -1281,7 +1281,8 @@ class TestMimeTypeExtraction:
 
         call_args = mock_cls.return_value.chat.completions.create.call_args
         messages = call_args[1]["messages"]
-        image_url = messages[0]["content"][0]["image_url"]["url"]
+        # system is messages[0], user is messages[1]
+        image_url = messages[1]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/jpeg;base64,")
 
     def test_png_data_uri_passes_correct_mime_to_openai(self):
@@ -1302,7 +1303,8 @@ class TestMimeTypeExtraction:
 
         call_args = mock_cls.return_value.chat.completions.create.call_args
         messages = call_args[1]["messages"]
-        image_url = messages[0]["content"][0]["image_url"]["url"]
+        # system is messages[0], user is messages[1]
+        image_url = messages[1]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/png;base64,")
 
     def test_jpeg_data_uri_passes_correct_media_type_to_claude(self):
@@ -1417,7 +1419,8 @@ class TestMagicByteFallback:
 
         call_args = mock_cls.return_value.chat.completions.create.call_args
         messages = call_args[1]["messages"]
-        image_url = messages[0]["content"][0]["image_url"]["url"]
+        # system is messages[0], user is messages[1]
+        image_url = messages[1]["content"][0]["image_url"]["url"]
         assert image_url.startswith("data:image/jpeg;base64,")
 
 

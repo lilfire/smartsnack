@@ -4,7 +4,7 @@ import logging
 
 from PIL import Image
 
-from . import _get_api_key, build_ingredient_prompt
+from . import _get_api_key, _HARDENED_SYSTEM_PROMPT, build_ingredient_prompt
 
 logger = logging.getLogger("services.ocr_service")
 
@@ -91,6 +91,7 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None, p
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model=model or _DEFAULT_MODEL,
+        config={"system_instruction": _HARDENED_SYSTEM_PROMPT},
         contents=[
             {
                 "parts": [
