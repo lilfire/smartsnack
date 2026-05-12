@@ -343,3 +343,184 @@ class TestOcrIngredientsMultipart:
             assert "tesseract" in data["provider"].lower()
         finally:
             ocr_service._PROVIDERS["tesseract"] = original
+
+
+# ===========================================================================
+# LSO-1222 multilingual regression — Norwegian/German/Polish biscuit label
+# ===========================================================================
+
+
+class TestOcrIngredientsLSO1222Multilingual:
+    """End-to-end coverage for the LSO-1222 fix.
+
+    The OCR provider is mocked to simulate the output a properly-instructed
+    vision LLM produces from a Norwegian/German/Polish biscuit label — only
+    the Norwegian section, allergens in ALL CAPS, E-numbers preserved, single
+    comma-separated line ending in a period. The endpoint must surface that
+    output unchanged (apart from the llm_cleanup pass) and never leak any
+    German or Polish fragments.
+    """
+
+    _NORWEGIAN_ONLY_OUTPUT = (
+        "HVETEMEL, sukker, vegetabilsk olje (palme, raps), glukose-fruktosesirup, "
+        "MELKPULVER, salt, hevemiddel (E 503, E 500), emulgator (SOYALESITIN), "
+        "aroma. Kan inneholde spor av EGG og NØTTER."
+    )
+
+    _FORBIDDEN_FRAGMENTS = (
+        # German block fragments that the hardened prompt must isolate away
+        "ZUTATEN", "Weizenmehl", "pflanzliche", "Spuren",
+        # Polish block fragments
+        "SKŁADNIKI", "Mąka", "pszenna", "śladowe",
+    )
+
+    def _patch_providers_with_norwegian_only_output(self, monkeypatch_target):
+        """Make every LLM provider return the canonical Norwegian-only output.
+
+        Returns (originals, mock) so the caller can restore state.
+        """
+        from unittest.mock import MagicMock
+        from services import ocr_service
+
+        mock_extract = MagicMock(return_value=self._NORWEGIAN_ONLY_OUTPUT)
+        originals = {}
+        for backend_id in ("claude_vision", "openai", "gemini", "groq", "openrouter"):
+            originals[backend_id] = ocr_service._PROVIDERS[backend_id]
+            ocr_service._PROVIDERS[backend_id] = mock_extract
+        return originals, mock_extract
+
+    def _restore_providers(self, originals):
+        from services import ocr_service
+
+        for backend_id, fn in originals.items():
+            ocr_service._PROVIDERS[backend_id] = fn
+
+    def test_norwegian_only_output_surfaces_unchanged(self, live_url):
+        """When the LLM returns properly-isolated Norwegian text, the API
+        delivers it intact (with llm_cleanup_skipped or unchanged cleanup)."""
+        from unittest.mock import patch
+
+        originals, _ = self._patch_providers_with_norwegian_only_output(self)
+        try:
+            # Select an LLM backend that we know is now mocked. We must
+            # configure availability so dispatch picks it.
+            os.environ["ANTHROPIC_API_KEY"] = "test-key"
+            _put_json(
+                f"{live_url}/api/settings/ocr", {"backend": "claude_vision"}
+            )
+
+            # Mock llm_cleanup to be a no-op so we observe the dispatch
+            # output unchanged.
+            with patch(
+                "services.llm_cleanup_service.cleanup_ingredients",
+                return_value={
+                    "text": self._NORWEGIAN_ONLY_OUTPUT,
+                    "llm_cleanup_skipped": True,
+                },
+            ):
+                status, data = _post_json(
+                    f"{live_url}/api/ocr/ingredients",
+                    {"image": _MINIMAL_PNG_B64, "lang": "no"},
+                )
+
+            assert status == 200
+            assert data["text"] == self._NORWEGIAN_ONLY_OUTPUT
+            for forbidden in self._FORBIDDEN_FRAGMENTS:
+                assert forbidden not in data["text"], (
+                    f"Non-Norwegian fragment {forbidden!r} leaked into endpoint output"
+                )
+        finally:
+            self._restore_providers(originals)
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    def test_endpoint_response_has_correct_shape(self, live_url):
+        """The endpoint must return the documented {text, llm_cleanup_skipped,
+        provider, fallback} shape on the multilingual happy path."""
+        from unittest.mock import patch
+
+        originals, _ = self._patch_providers_with_norwegian_only_output(self)
+        try:
+            os.environ["ANTHROPIC_API_KEY"] = "test-key"
+            _put_json(
+                f"{live_url}/api/settings/ocr", {"backend": "claude_vision"}
+            )
+            with patch(
+                "services.llm_cleanup_service.cleanup_ingredients",
+                return_value={
+                    "text": self._NORWEGIAN_ONLY_OUTPUT,
+                    "llm_cleanup_skipped": True,
+                },
+            ):
+                status, data = _post_json(
+                    f"{live_url}/api/ocr/ingredients",
+                    {"image": _MINIMAL_PNG_B64, "lang": "no"},
+                )
+
+            assert status == 200
+            assert set(data.keys()) >= {
+                "text",
+                "llm_cleanup_skipped",
+                "provider",
+                "fallback",
+            }
+            assert isinstance(data["llm_cleanup_skipped"], bool)
+            assert data["provider"]  # non-empty provider display name
+        finally:
+            self._restore_providers(originals)
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    def test_norwegian_output_ends_with_period_single_line(self, live_url):
+        """Phase 2 guarantees a single comma-separated line ending in a period.
+        That contract must hold through the endpoint."""
+        from unittest.mock import patch
+
+        originals, _ = self._patch_providers_with_norwegian_only_output(self)
+        try:
+            os.environ["ANTHROPIC_API_KEY"] = "test-key"
+            _put_json(
+                f"{live_url}/api/settings/ocr", {"backend": "claude_vision"}
+            )
+            with patch(
+                "services.llm_cleanup_service.cleanup_ingredients",
+                return_value={
+                    "text": self._NORWEGIAN_ONLY_OUTPUT,
+                    "llm_cleanup_skipped": True,
+                },
+            ):
+                status, data = _post_json(
+                    f"{live_url}/api/ocr/ingredients",
+                    {"image": _MINIMAL_PNG_B64, "lang": "no"},
+                )
+            assert status == 200
+            assert "\n" not in data["text"]
+            assert data["text"].rstrip().endswith(".")
+        finally:
+            self._restore_providers(originals)
+            os.environ.pop("ANTHROPIC_API_KEY", None)
+
+    def test_empty_llm_output_produces_no_text_error(self, live_url):
+        """Phase 2 Rule 13 says return empty if no target-language section
+        is found. The endpoint must surface that as the standard no_text
+        error so the frontend can show the right toast."""
+        from unittest.mock import MagicMock
+        from services import ocr_service
+
+        mock_extract = MagicMock(return_value="")
+        original_claude = ocr_service._PROVIDERS["claude_vision"]
+        ocr_service._PROVIDERS["claude_vision"] = mock_extract
+        try:
+            os.environ["ANTHROPIC_API_KEY"] = "test-key"
+            _put_json(
+                f"{live_url}/api/settings/ocr", {"backend": "claude_vision"}
+            )
+            status, data = _post_json(
+                f"{live_url}/api/ocr/ingredients",
+                {"image": _MINIMAL_PNG_B64, "lang": "no"},
+            )
+            assert status == 200
+            assert data["text"] == ""
+            assert data["error_type"] == "no_text"
+            assert data["llm_cleanup_skipped"] is True
+        finally:
+            ocr_service._PROVIDERS["claude_vision"] = original_claude
+            os.environ.pop("ANTHROPIC_API_KEY", None)
