@@ -1,5 +1,5 @@
 """Groq Vision OCR backend."""
-from . import _get_api_key, build_ingredient_prompt
+from . import _get_api_key, _HARDENED_SYSTEM_PROMPT, build_ingredient_prompt
 
 _DEFAULT_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 
@@ -19,6 +19,7 @@ def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None, pro
         model=model or _DEFAULT_MODEL,
         max_tokens=1024,
         messages=[
+            {"role": "system", "content": _HARDENED_SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": [
@@ -33,7 +34,7 @@ def _extract_groq(image_bytes, image_b64, mime_type="image/png", model=None, pro
                         "text": prompt or build_ingredient_prompt(language),
                     },
                 ],
-            }
+            },
         ],
     )
     content = response.choices[0].message.content if response.choices else ""

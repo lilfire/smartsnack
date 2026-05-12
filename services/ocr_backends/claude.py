@@ -1,5 +1,5 @@
 """Claude Vision OCR backend."""
-from . import _get_api_key, build_ingredient_prompt
+from . import _get_api_key, _HARDENED_SYSTEM_PROMPT, build_ingredient_prompt
 
 _DEFAULT_MODEL = "claude-sonnet-4-20250514"
 
@@ -18,6 +18,7 @@ def _extract_claude_vision(image_bytes, image_b64, mime_type="image/png", model=
     message = client.messages.create(
         model=model or _DEFAULT_MODEL,
         max_tokens=1024,
+        system=_HARDENED_SYSTEM_PROMPT,
         messages=[
             {
                 "role": "user",
