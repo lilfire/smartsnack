@@ -190,7 +190,7 @@ class TestOpenRouter:
             msgs = call_kwargs[1]["messages"]
         assert msgs[0]["role"] == "system"
         assert msgs[0]["content"] == _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in msgs[0]["content"]
+        assert "INTERNAL STEP 1" in msgs[0]["content"]
 
 
 # ── Groq ──────────────────────────────────────────────────────────────────────
@@ -331,8 +331,8 @@ class TestClaude:
             call_kwargs = mock_cls.return_value.messages.create.call_args
             system_param = call_kwargs[1].get("system", "")
         assert system_param == _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in system_param
-        assert "Phase 2" in system_param
+        assert "INTERNAL STEP 1" in system_param
+        assert "INTERNAL STEP 2" in system_param
 
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
@@ -401,8 +401,8 @@ class TestGemini:
             call_kwargs = mock_cls.return_value.models.generate_content.call_args
             config = call_kwargs[1].get("config", {})
         assert config.get("system_instruction") == _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in config["system_instruction"]
-        assert "Phase 2" in config["system_instruction"]
+        assert "INTERNAL STEP 1" in config["system_instruction"]
+        assert "INTERNAL STEP 2" in config["system_instruction"]
 
 
 # ── Tesseract ─────────────────────────────────────────────────────────────────

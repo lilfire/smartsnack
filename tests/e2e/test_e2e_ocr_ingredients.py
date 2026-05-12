@@ -369,9 +369,11 @@ class TestOcrIngredientsLSO1222Multilingual:
 
     _FORBIDDEN_FRAGMENTS = (
         # German block fragments that the hardened prompt must isolate away
-        "ZUTATEN", "Weizenmehl", "pflanzliche", "Spuren",
+        "ZUTATEN", "ZUCKER", "WEIZENMEHL", "Weizenmehl", "pflanzliche", "Spuren",
         # Polish block fragments
-        "SKŁADNIKI", "Mąka", "pszenna", "śladowe",
+        "SKLADNIKI", "Mąka", "pszenna", "śladowe",
+        # Italian block fragments
+        "AGENTI LEVITANTI", "INGREDIENTI", "KARBONATDI SODIO",
     )
 
     def _patch_providers_with_norwegian_only_output(self, monkeypatch_target):
