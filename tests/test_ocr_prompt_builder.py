@@ -35,11 +35,11 @@ class TestHardenedSystemPrompt:
 
     def test_contains_phase_1(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in _HARDENED_SYSTEM_PROMPT
+        assert "INTERNAL STEP 1" in _HARDENED_SYSTEM_PROMPT
 
     def test_contains_phase_2(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
-        assert "Phase 2" in _HARDENED_SYSTEM_PROMPT
+        assert "INTERNAL STEP 2" in _HARDENED_SYSTEM_PROMPT
 
     def test_contains_header_strip_rule(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
@@ -269,8 +269,8 @@ class TestBuildIngredientPrompt:
 
     def test_system_prompt_phase1_and_phase2(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in _HARDENED_SYSTEM_PROMPT
-        assert "Phase 2" in _HARDENED_SYSTEM_PROMPT
+        assert "INTERNAL STEP 1" in _HARDENED_SYSTEM_PROMPT
+        assert "INTERNAL STEP 2" in _HARDENED_SYSTEM_PROMPT
 
 
 # ---------------------------------------------------------------------------
@@ -372,8 +372,8 @@ class TestClaudeLanguageParam:
             call_kwargs = mock_cls.return_value.messages.create.call_args
             system_param = call_kwargs[1].get("system", "")
         assert system_param == _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in system_param
-        assert "Phase 2" in system_param
+        assert "INTERNAL STEP 1" in system_param
+        assert "INTERNAL STEP 2" in system_param
 
 
 class TestGroqLanguageParam:
@@ -506,7 +506,7 @@ class TestOpenRouterLanguageParam:
             system_msg = msgs[0]
         assert system_msg["role"] == "system"
         assert system_msg["content"] == _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in system_msg["content"]
+        assert "INTERNAL STEP 1" in system_msg["content"]
 
 
 class TestGeminiLanguageParam:
@@ -535,7 +535,7 @@ class TestGeminiLanguageParam:
             call_kwargs = mock_cls.return_value.models.generate_content.call_args
             config = call_kwargs[1].get("config", {})
         assert config.get("system_instruction") == _HARDENED_SYSTEM_PROMPT
-        assert "Phase 1" in config["system_instruction"]
+        assert "INTERNAL STEP 1" in config["system_instruction"]
 
 
 # ---------------------------------------------------------------------------
