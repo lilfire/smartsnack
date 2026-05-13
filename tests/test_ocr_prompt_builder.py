@@ -43,9 +43,8 @@ class TestHardenedSystemPrompt:
 
     def test_contains_header_strip_rule(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
-        assert "INGREDIENSER" in _HARDENED_SYSTEM_PROMPT
-        assert "INGREDIENTS" in _HARDENED_SYSTEM_PROMPT
-        assert "ZUTATEN" in _HARDENED_SYSTEM_PROMPT
+        # LSO-1234: language-agnostic prompt strips headings generically.
+        assert "Strip ingredient-section headings" in _HARDENED_SYSTEM_PROMPT
 
     def test_contains_empty_string_rule(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
@@ -259,9 +258,8 @@ class TestBuildIngredientPrompt:
 
     def test_system_prompt_contains_header_strip_rule(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
-        assert "INGREDIENSER" in _HARDENED_SYSTEM_PROMPT
-        assert "INGREDIENTS" in _HARDENED_SYSTEM_PROMPT
-        assert "ZUTATEN" in _HARDENED_SYSTEM_PROMPT
+        # LSO-1234: language-agnostic prompt strips headings generically.
+        assert "Strip ingredient-section headings" in _HARDENED_SYSTEM_PROMPT
 
     def test_system_prompt_contains_empty_string_rule(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
