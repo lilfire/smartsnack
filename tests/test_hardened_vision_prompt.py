@@ -107,50 +107,27 @@ class TestHardenedSystemPromptPhase1:
         """The cross-contamination rule is the heart of the LSO-1222 fix."""
         assert "Cross-language contamination" in _HARDENED_SYSTEM_PROMPT
         assert "Discard" in _HARDENED_SYSTEM_PROMPT
-        assert "Do NOT restart" in _HARDENED_SYSTEM_PROMPT
+        assert "do not restart" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_1_fallback_to_language_recognition(self):
-        """If no explicit header is found, INTERNAL STEP 1 must fall back to
-        vocabulary recognition."""
-        assert "vocabulary recognition" in _HARDENED_SYSTEM_PROMPT.replace("\n", " ")
+        """INTERNAL STEP 1 must use the model's language knowledge to find
+        ingredient headings rather than relying on pre-listed keywords."""
+        assert "vocabulary of the target language" in _HARDENED_SYSTEM_PROMPT
 
-    @pytest.mark.parametrize(
-        "header",
-        [
-            # Norwegian (target language for SmartSnack default)
-            "INGREDIENSER",
-            "Ingredienser",
-            "Innhold",
-            "INNHOLD",
-            # English
-            "INGREDIENTS",
-            "Ingredients",
-            # Swedish (ASCII form — OCR may not capture special chars)
-            "INNEHALL",
-            "Innehall",
-            # German (LSO-1222 bug case)
-            "ZUTATEN",
-            "Zutaten",
-            "ZUTATENLISTE",
-            # Polish (ASCII form)
-            "SKLADNIKI",
-            "Skladniki",
-            # French (uses same ASCII form as English)
-            "INGREDIENTES",
-            "Ingredientes",
-            # Dutch (ASCII form)
-            "INGREDIENTEN",
-            "Ingredienten",
-            # Spanish
-            "INGREDIENTES",
-            "Ingredientes",
-            # Italian
-            "INGREDIENTI",
-            "Ingredienti",
-        ],
-    )
-    def test_phase_1_header_keyword_is_listed(self, header):
-        assert header in _HARDENED_SYSTEM_PROMPT
+    def test_phase_1_language_agnostic_no_hardcoded_keywords(self):
+        """LSO-1234: the prompt must NOT hardcode language-specific ingredient
+        heading keywords. The model should use its own language knowledge."""
+        assert "without relying on any pre-listed keywords" in _HARDENED_SYSTEM_PROMPT
+
+    def test_phase_1_finds_target_language_section_first(self):
+        """INTERNAL STEP 1 must first search for the target-language section
+        before falling back to other languages (path B)."""
+        assert "search for the target-language ingredient section" in _HARDENED_SYSTEM_PROMPT
+
+    def test_phase_1_translate_fallback_path_described(self):
+        """If no target-language section exists, Step 1 must instruct the
+        model to find an ingredient list in any other language (path B)."""
+        assert "search for an ingredient list in any" in _HARDENED_SYSTEM_PROMPT
 
 
 class TestHardenedSystemPromptPhase2:
@@ -164,11 +141,9 @@ class TestHardenedSystemPromptPhase2:
 
     def test_phase_2_allergen_all_caps_rule(self):
         assert "ALL CAPS" in _HARDENED_SYSTEM_PROMPT
-        # Compound-word rule example must be present so the model
-        # understands HVETEMEL, SOYALESITIN, MJOLKPULVER are also capitalised.
-        assert "HVETEMEL" in _HARDENED_SYSTEM_PROMPT
-        assert "SOYALESITIN" in _HARDENED_SYSTEM_PROMPT
-        assert "MJOLKPULVER" in _HARDENED_SYSTEM_PROMPT
+        # LSO-1234: compound-word rule must mention compound words generically
+        # (no language-specific examples in the language-agnostic prompt).
+        assert "compound words containing them" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_decimal_separator_rule(self):
         assert "decimal separator" in _HARDENED_SYSTEM_PROMPT.lower()
@@ -183,25 +158,23 @@ class TestHardenedSystemPromptPhase2:
     def test_phase_2_sub_ingredient_rule(self):
         assert "Sub-ingredients" in _HARDENED_SYSTEM_PROMPT
         assert "parentheses" in _HARDENED_SYSTEM_PROMPT
-        # The worked example must show nested allergen capitalisation.
-        assert "krydderblanding" in _HARDENED_SYSTEM_PROMPT
-        assert "MYSEPULVER" in _HARDENED_SYSTEM_PROMPT
-        assert "MELK" in _HARDENED_SYSTEM_PROMPT
+        # LSO-1234: language-agnostic prompt has no Norwegian-specific examples.
+        assert "immediately after their parent ingredient" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_percentage_rule(self):
         assert "Preserve percentages" in _HARDENED_SYSTEM_PROMPT
-        assert "30%" in _HARDENED_SYSTEM_PROMPT
+        # LSO-1234: language-agnostic prompt has no language-specific examples.
 
     def test_phase_2_trace_allergen_rule(self):
         assert "trace-allergen notice" in _HARDENED_SYSTEM_PROMPT
-        assert "phrasing from the user message" in _HARDENED_SYSTEM_PROMPT
+        assert "from the user message" in _HARDENED_SYSTEM_PROMPT
         assert "final sentence" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_one_period_rule(self):
         assert "exactly one period" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_strip_headers_rule(self):
-        assert "Strip ingredient-section headers" in _HARDENED_SYSTEM_PROMPT
+        assert "Strip ingredient-section headings" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_strip_nutrition_rule(self):
         assert "Strip nutrition-table values" in _HARDENED_SYSTEM_PROMPT
