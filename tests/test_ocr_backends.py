@@ -659,41 +659,33 @@ class TestTranslateFallbackPromptContract:
             f"Required marker {marker!r} missing from _HARDENED_SYSTEM_PROMPT."
         )
 
-    def test_per_language_user_messages_share_identical_closing_line(self):
-        """LSO-1234: the closing instruction in build_ingredient_prompt must
-        be the same language-agnostic line for every supported language. If
-        a language-specific closing slips in, the per-language prompts will
-        diverge and the contract will weaken for that language."""
+    def test_per_language_user_messages_share_common_closing_suffix(self):
+        """LSO-1248: each per-language prompt ends with the same language-agnostic
+        tail clause. The language-specific native name may precede it (that is the
+        LSO-1248 fix), but the closing statement about empty-string / no-reasoning
+        must be identical across languages."""
         from services.ocr_backends import build_ingredient_prompt
 
-        no_prompt = build_ingredient_prompt("no")
-        en_prompt = build_ingredient_prompt("en")
-        se_prompt = build_ingredient_prompt("se")
-
-        # The closing line is the last non-empty line of each prompt.
-        def _closing_line(prompt: str) -> str:
-            return [ln for ln in prompt.splitlines() if ln.strip()][-1]
-
-        no_close = _closing_line(no_prompt)
-        en_close = _closing_line(en_prompt)
-        se_close = _closing_line(se_prompt)
-
-        assert no_close == en_close == se_close, (
-            "Per-language prompts must end with the identical language-agnostic "
-            f"closing line.\nno: {no_close!r}\nen: {en_close!r}\nse: {se_close!r}"
+        _COMMON_SUFFIX = (
+            "Return an empty string only if no readable ingredient list exists anywhere on the label. "
+            "Do not output reasoning, explanations, or step labels."
         )
+        for lang in ("no", "en", "se"):
+            prompt = build_ingredient_prompt(lang)
+            assert prompt.rstrip().endswith(_COMMON_SUFFIX), (
+                f"build_ingredient_prompt({lang!r}) does not end with the shared "
+                f"language-agnostic closing clause."
+            )
 
-    def test_closing_line_describes_translate_fallback(self):
-        """The shared closing line must spell out the (A) extract / (B)
-        translate / (C) empty contract in plain prose so the model has the
-        instruction reinforced in the user message too."""
+    def test_prompt_describes_extract_and_translate_fallback(self):
+        """The user message must spell out the (A) extract / (B) translate /
+        (C) empty contract so the model has the instruction in the user turn too."""
         from services.ocr_backends import build_ingredient_prompt
 
-        prompt = build_ingredient_prompt("no")
-        closing = [ln for ln in prompt.splitlines() if ln.strip()][-1].lower()
-        assert "extracted if that language is present" in closing
-        assert "translated from another language if not" in closing
-        assert "empty string only if no readable ingredient list" in closing
+        prompt = build_ingredient_prompt("no").lower()
+        assert "if the target language is present extract that section" in prompt
+        assert "translate the most readable section" in prompt
+        assert "empty string only if no readable ingredient list" in prompt
 
 
 class TestChineseLabelRegression:
@@ -1089,6 +1081,61 @@ class TestBuildIngredientPrompt:
 
         prompts = {lang: build_ingredient_prompt(lang) for lang in ("no", "en", "se")}
         assert len(set(prompts.values())) == 3, "All language prompts must be unique"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tests — build_ingredient_prompt native language name (LSO-1248)
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestBuildIngredientPromptNativeName:
+    """LSO-1248: build_ingredient_prompt must embed the native language name
+    from translations/{code}.json alongside the code so the LLM cannot
+    misinterpret bare ISO codes (e.g. 'no' as English negation, 'se' as Sami).
+    Tests read from the JSON files — never bake in literals like 'Norsk'."""
+
+    def _read_lang_label(self, code: str) -> str:
+        import json, os
+        from config import TRANSLATIONS_DIR
+        path = os.path.join(TRANSLATIONS_DIR, f"{code}.json")
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)["lang_label"]
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_prompt_contains_lang_label_from_json(self, lang):
+        """Native name read from the JSON file must appear in the prompt."""
+        from services.ocr_backends import build_ingredient_prompt
+        label = self._read_lang_label(lang)
+        prompt = build_ingredient_prompt(lang)
+        assert label in prompt, (
+            f"build_ingredient_prompt({lang!r}) must contain native name "
+            f"{label!r} from translations/{lang}.json"
+        )
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_prompt_contains_both_code_and_native_name(self, lang):
+        """Both the ISO code and the native name must be in the prompt."""
+        from services.ocr_backends import build_ingredient_prompt
+        label = self._read_lang_label(lang)
+        prompt = build_ingredient_prompt(lang)
+        assert lang in prompt
+        assert label in prompt
+
+    def test_unknown_code_fallback_contains_code_not_native_name(self):
+        """An unknown code ('xx') has no translations file; the prompt must
+        contain the bare code and must not crash."""
+        from services.ocr_backends import build_ingredient_prompt
+        prompt = build_ingredient_prompt("xx")
+        assert "xx" in prompt
+        assert "Language: xx" in prompt
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_language_line_format_is_name_then_code(self, lang):
+        """First line must be 'Language: <native_name> (<code>)'."""
+        from services.ocr_backends import build_ingredient_prompt
+        label = self._read_lang_label(lang)
+        first_line = build_ingredient_prompt(lang).splitlines()[0]
+        assert first_line == f"Language: {label} ({lang})"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
