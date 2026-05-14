@@ -1,20 +1,17 @@
-"""LSO-1227: tests for the hardened two-phase vision LLM prompt.
+"""LSO-1243: tests for the hardened vision LLM prompt (language-agnostic).
 
-The hardened prompt (LSO-1224 / LSO-1226, PR #422) is designed to isolate
-the target-language ingredient block from multilingual food labels. These
-tests cover the gaps not already exercised by ``test_ocr_prompt_builder``
-and ``test_ocr_backends``:
+The hardened prompt is designed to isolate the target-language ingredient
+block from multilingual food labels. These tests cover:
 
-* Full allergen-list coverage for every supported language
-* Header keywords for every language the prompt enumerates
-* Phase-1 and Phase-2 rule statements (CRITICAL isolation, sub-ingredients,
-  percentages, trace notice, etc.)
-* A regression simulating the LSO-1222 Norwegian/German/Polish biscuit label:
-  the LLM is mocked to return a properly-isolated Norwegian output and the
-  dispatch layer is asserted to deliver it intact end-to-end.
-* Edge cases: single-language input, missing header, empty / unrecognisable
-  input, unknown language.
-* Tesseract behaviour is unchanged by the hardened-prompt work.
+* Phase-1 and Phase-2 rule statements in the system prompt
+* build_ingredient_prompt: contains the language identifier, no vocab lists
+* Cross-backend system-prompt parity (all 5 backends send the same prompt)
+* Regression simulating the LSO-1222 Norwegian/German/Polish biscuit label
+* Edge cases: empty input, conversational refusals, None/unknown language
+* Tesseract backend unchanged by vision-prompt work
+
+Design rule (LSO-1243): no language-specific strings (allergen vocab, decimal
+separators, trace templates) may appear in code or tests.
 """
 from __future__ import annotations
 
@@ -28,12 +25,6 @@ from PIL import Image
 
 from services.ocr_backends import (
     _HARDENED_SYSTEM_PROMPT,
-    _ALLERGENS_NO,
-    _ALLERGENS_EN,
-    _ALLERGENS_SE,
-    _TRACE_TEMPLATE_NO,
-    _TRACE_TEMPLATE_EN,
-    _TRACE_TEMPLATE_SE,
     build_ingredient_prompt,
 )
 
@@ -54,17 +45,14 @@ def _b64(data: bytes) -> str:
 
 
 # Canonical Norwegian output for the LSO-1222 biscuit example. Real models
-# may vary phrasing slightly but this is the shape the hardened prompt is
-# designed to drive them toward — Norwegian only, ALL CAPS allergens,
-# E-numbers preserved, single comma-separated line ending with a period.
+# may vary phrasing slightly but this is the shape the hardened prompt drives
+# toward — Norwegian only, ALL CAPS allergens, E-numbers preserved, single
+# comma-separated line ending with a period.
 _LSO_1222_EXPECTED_NORWEGIAN = (
-    "HVETEmel, sukker, vegetabilsk olje (palme, raps), glukose-fruktosesirup, "
-    "MELKpulver, salt, hevemiddel (E 503, E 500), salt, emulgator (SOYAlesitin), "
+    "HVETEMEL, sukker, vegetabilsk olje (palme, raps), glukose-fruktosesirup, "
+    "MELKPULVER, salt, hevemiddel (E 503, E 500), salt, emulgator (SOYALESITIN), "
     "aroma. Kan inneholde spor av EGG og NØTTER."
-).replace("HVETEmel", "HVETEMEL").replace("MELKpulver", "MELKPULVER").replace(
-    "SOYAlesitin", "SOYALESITIN"
 )
-
 
 # Words and phrases that must NEVER appear in Norwegian output for the
 # LSO-1222 biscuit example (these come from the German and Polish blocks).
@@ -98,8 +86,6 @@ class TestHardenedSystemPromptPhase1:
         assert "INTERNAL STEP 1" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_1_mentions_target_language(self):
-        # The very first instruction of INTERNAL STEP 1 is to look for the target
-        # language stated in the user message.
         before_step2 = _HARDENED_SYSTEM_PROMPT.split("INTERNAL STEP 2")[0]
         assert "target language" in before_step2.lower()
 
@@ -115,8 +101,8 @@ class TestHardenedSystemPromptPhase1:
         assert "vocabulary of the target language" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_1_language_agnostic_no_hardcoded_keywords(self):
-        """LSO-1234: the prompt must NOT hardcode language-specific ingredient
-        heading keywords. The model should use its own language knowledge."""
+        """The prompt must NOT hardcode language-specific ingredient heading
+        keywords. The model should use its own language knowledge."""
         assert "without relying on any pre-listed keywords" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_1_finds_target_language_section_first(self):
@@ -141,12 +127,20 @@ class TestHardenedSystemPromptPhase2:
 
     def test_phase_2_allergen_all_caps_rule(self):
         assert "ALL CAPS" in _HARDENED_SYSTEM_PROMPT
-        # LSO-1234: compound-word rule must mention compound words generically
-        # (no language-specific examples in the language-agnostic prompt).
-        assert "compound words containing them" in _HARDENED_SYSTEM_PROMPT
+        assert "compound words" in _HARDENED_SYSTEM_PROMPT
+
+    def test_phase_2_allergen_uses_model_language_knowledge(self):
+        """LSO-1243: the system prompt must instruct the model to apply its own
+        language knowledge for allergen identification — no pre-listed vocab."""
+        assert "language knowledge" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_decimal_separator_rule(self):
         assert "decimal separator" in _HARDENED_SYSTEM_PROMPT.lower()
+
+    def test_phase_2_decimal_separator_standard_in_target_language(self):
+        """LSO-1243: decimal separator must be derived from target-language
+        knowledge, not from a config table supplied in the user message."""
+        assert "standard in the target language" in _HARDENED_SYSTEM_PROMPT
 
     @pytest.mark.parametrize("e_number", ["E270", "E150d", "E471", "E904a"])
     def test_phase_2_e_number_examples(self, e_number):
@@ -158,17 +152,17 @@ class TestHardenedSystemPromptPhase2:
     def test_phase_2_sub_ingredient_rule(self):
         assert "Sub-ingredients" in _HARDENED_SYSTEM_PROMPT
         assert "parentheses" in _HARDENED_SYSTEM_PROMPT
-        # LSO-1234: language-agnostic prompt has no Norwegian-specific examples.
         assert "immediately after their parent ingredient" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_percentage_rule(self):
         assert "Preserve percentages" in _HARDENED_SYSTEM_PROMPT
-        # LSO-1234: language-agnostic prompt has no language-specific examples.
 
     def test_phase_2_trace_allergen_rule(self):
         assert "trace-allergen notice" in _HARDENED_SYSTEM_PROMPT
-        assert "from the user message" in _HARDENED_SYSTEM_PROMPT
         assert "final sentence" in _HARDENED_SYSTEM_PROMPT
+        # LSO-1243: trace notice must be phrased from language knowledge,
+        # not from a template supplied in the user message.
+        assert "phrased naturally in the" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_one_period_rule(self):
         assert "exactly one period" in _HARDENED_SYSTEM_PROMPT
@@ -185,134 +179,71 @@ class TestHardenedSystemPromptPhase2:
         assert "barcodes" in _HARDENED_SYSTEM_PROMPT
 
     def test_phase_2_empty_string_rule(self):
-        """Rule 13: if no target-language section is found, return empty."""
+        """Rule 13: if no ingredient list found anywhere, return empty."""
         assert "return an empty string" in _HARDENED_SYSTEM_PROMPT
 
 
 # ===========================================================================
-# 2) build_ingredient_prompt — full allergen coverage per language
+# 2) build_ingredient_prompt — language identifier only, no vocab lists
 # ===========================================================================
 
 
-_ALLERGENS_BY_LANG = {
-    "no": (
-        _ALLERGENS_NO,
-        # Every Norwegian allergen the EU directive recognises
-        [
-            "MELK", "EGG", "HVETE", "RUG", "BYGG", "HAVRE", "GLUTEN",
-            "SOYA", "NØTTER", "PEANØTTER", "SESAM", "FISK", "KREPSDYR",
-            "BLØTDYR", "SENNEP", "SELLERI", "LUPIN", "SULFITTER",
-            "SVOVELDIOKSID",
-        ],
-    ),
-    "en": (
-        _ALLERGENS_EN,
-        [
-            "MILK", "EGGS", "WHEAT", "RYE", "BARLEY", "OATS", "GLUTEN",
-            "SOY", "NUTS", "PEANUTS", "SESAME", "FISH", "CRUSTACEANS",
-            "MOLLUSCS", "MUSTARD", "CELERY", "LUPIN", "SULPHITES",
-            "SULPHUR DIOXIDE",
-        ],
-    ),
-    "se": (
-        _ALLERGENS_SE,
-        [
-            "MJÖLK", "ÄGG", "VETE", "RÅG", "KORN", "HAVRE", "GLUTEN",
-            "SOJA", "NÖTTER", "JORDNÖTTER", "SESAM", "FISK", "KRÄFTDJUR",
-            "BLÖTDJUR", "SENAP", "SELLERI", "LUPIN", "SULFITER",
-            "SVAVELDIOXID",
-        ],
-    ),
-}
-
-
-class TestBuildIngredientPromptAllergenCoverage:
-    """Every regulated allergen must appear in the per-language prompt."""
+class TestBuildIngredientPromptLanguageIdentifier:
+    """build_ingredient_prompt must carry only the language code; the LLM
+    resolves allergen vocab, decimal separator, and trace phrasing itself."""
 
     @pytest.mark.parametrize("lang", ["no", "en", "se"])
-    def test_every_allergen_term_present_in_constant(self, lang):
-        constant, expected = _ALLERGENS_BY_LANG[lang]
-        for term in expected:
-            assert term in constant, (
-                f"Allergen '{term}' missing from _ALLERGENS_{lang.upper()}"
-            )
+    def test_prompt_contains_language_code(self, lang):
+        prompt = build_ingredient_prompt(lang)
+        assert lang in prompt
 
     @pytest.mark.parametrize("lang", ["no", "en", "se"])
-    def test_every_allergen_term_present_in_user_message(self, lang):
-        _, expected = _ALLERGENS_BY_LANG[lang]
+    def test_prompt_starts_with_language_line(self, lang):
         prompt = build_ingredient_prompt(lang)
-        for term in expected:
-            assert term in prompt, (
-                f"Allergen '{term}' missing from build_ingredient_prompt({lang!r})"
-            )
+        assert prompt.startswith("Language:")
 
-    @pytest.mark.parametrize(
-        "lang,trace_template",
-        [
-            ("no", _TRACE_TEMPLATE_NO),
-            ("en", _TRACE_TEMPLATE_EN),
-            ("se", _TRACE_TEMPLATE_SE),
-        ],
-    )
-    def test_trace_template_uses_items_placeholder(self, lang, trace_template):
-        assert "{items}" in trace_template
-        # And the rendered user message includes the template verbatim.
-        assert trace_template in build_ingredient_prompt(lang)
+    def test_none_falls_back_to_default(self):
+        from config import DEFAULT_LANGUAGE
+        prompt = build_ingredient_prompt(None)
+        assert DEFAULT_LANGUAGE in prompt
 
-    @pytest.mark.parametrize(
-        "lang,decimal",
-        [("no", "comma"), ("se", "comma"), ("en", "dot")],
-    )
-    def test_decimal_separator_per_language(self, lang, decimal):
+    def test_empty_string_falls_back_to_default(self):
+        from config import DEFAULT_LANGUAGE
+        prompt = build_ingredient_prompt("")
+        assert DEFAULT_LANGUAGE in prompt
+
+    def test_none_equals_no_arg_call(self):
+        assert build_ingredient_prompt(None) == build_ingredient_prompt()
+
+    def test_empty_equals_no_arg_call(self):
+        assert build_ingredient_prompt("") == build_ingredient_prompt()
+
+    def test_backward_compat_alias_is_set(self):
+        import services.ocr_backends as mod
+        assert hasattr(mod, "_INGREDIENT_PROMPT")
+        assert isinstance(mod._INGREDIENT_PROMPT, str)
+        assert len(mod._INGREDIENT_PROMPT) > 0
+
+    def test_backward_compat_alias_equals_no_language_call(self):
+        import services.ocr_backends as mod
+        assert mod._INGREDIENT_PROMPT == build_ingredient_prompt()
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_prompt_is_non_empty_string(self, lang):
         prompt = build_ingredient_prompt(lang)
-        assert f"Decimal separator: {decimal}" in prompt
+        assert isinstance(prompt, str) and len(prompt) > 0
 
-    @pytest.mark.parametrize(
-        "lang,name",
-        [("no", "Norwegian"), ("en", "English"), ("se", "Swedish")],
-    )
-    def test_language_header_per_language(self, lang, name):
-        assert f"Language: {name}" in build_ingredient_prompt(lang)
-
-
-class TestBuildIngredientPromptDoesNotLeakOtherLanguages:
-    """A given language prompt must not include allergen terms or trace
-    templates from the other supported languages — that would confuse the
-    model into capitalising the wrong words."""
-
-    @pytest.mark.parametrize(
-        "lang,leak",
-        [
-            # Norwegian prompt must not carry English MILK or Swedish MJÖLK
-            ("no", "MILK"),
-            ("no", "MJÖLK"),
-            ("no", "May contain traces of"),
-            ("no", "Kan innehålla spår av"),
-            # English prompt must not carry Norwegian MELK or Swedish MJÖLK
-            ("en", "MELK"),
-            ("en", "MJÖLK"),
-            ("en", "Kan inneholde spor av"),
-            ("en", "Kan innehålla spår av"),
-            # Swedish prompt must not carry Norwegian MELK or English MILK
-            ("se", "MELK"),
-            ("se", "MILK"),
-            ("se", "Kan inneholde spor av"),
-            ("se", "May contain traces of"),
-        ],
-    )
-    def test_no_cross_language_leak(self, lang, leak):
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_different_languages_produce_different_prompts(self, lang):
+        """Each language code must yield a distinct user message."""
+        other_langs = [l for l in ["no", "en", "se"] if l != lang]
         prompt = build_ingredient_prompt(lang)
-        assert leak not in prompt, (
-            f"build_ingredient_prompt({lang!r}) leaked '{leak}' from another language"
-        )
+        for other in other_langs:
+            assert prompt != build_ingredient_prompt(other)
 
 
 # ===========================================================================
 # 3) Cross-backend system-prompt parity
-#
-# All four "real" LLM backends (claude/openai/gemini/groq + openrouter wrapper)
-# must send the SAME hardened system prompt verbatim. A backend that drops
-# or mutates the system prompt would silently revert the LSO-1222 fix.
 # ===========================================================================
 
 
@@ -325,7 +256,6 @@ def _call_claude(monkeypatch):
     with patch("anthropic.Anthropic") as mock_cls:
         mock_cls.return_value.messages.create.return_value = mock_message
         from services.ocr_backends.claude import _extract_claude_vision
-
         _extract_claude_vision(img, _b64(img), language="no")
         return mock_cls.return_value.messages.create.call_args
 
@@ -334,16 +264,11 @@ def _call_openai(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "k")
     img = _tiny_png_bytes()
     mock_response = types.SimpleNamespace(
-        choices=[
-            types.SimpleNamespace(
-                message=types.SimpleNamespace(content="ok")
-            )
-        ]
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
     )
     with patch("openai.OpenAI") as mock_cls:
         mock_cls.return_value.chat.completions.create.return_value = mock_response
         from services.ocr_backends.openai import _extract_openai
-
         _extract_openai(img, _b64(img), language="no")
         return mock_cls.return_value.chat.completions.create.call_args
 
@@ -352,16 +277,11 @@ def _call_groq(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "k")
     img = _tiny_png_bytes()
     mock_response = types.SimpleNamespace(
-        choices=[
-            types.SimpleNamespace(
-                message=types.SimpleNamespace(content="ok")
-            )
-        ]
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
     )
     with patch("groq.Groq") as mock_cls:
         mock_cls.return_value.chat.completions.create.return_value = mock_response
         from services.ocr_backends.groq import _extract_groq
-
         _extract_groq(img, _b64(img), language="no")
         return mock_cls.return_value.chat.completions.create.call_args
 
@@ -370,16 +290,11 @@ def _call_openrouter(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
     img = _tiny_png_bytes()
     mock_response = types.SimpleNamespace(
-        choices=[
-            types.SimpleNamespace(
-                message=types.SimpleNamespace(content="ok")
-            )
-        ]
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
     )
     with patch("openai.OpenAI") as mock_cls:
         mock_cls.return_value.chat.completions.create.return_value = mock_response
         from services.ocr_backends.openrouter import _extract_openrouter
-
         _extract_openrouter(img, _b64(img), language="no")
         return mock_cls.return_value.chat.completions.create.call_args
 
@@ -391,15 +306,12 @@ def _call_gemini(monkeypatch):
     with patch("google.genai.Client", autospec=True) as mock_cls:
         mock_cls.return_value.models.generate_content.return_value = mock_response
         from services.ocr_backends.gemini import _extract_gemini
-
         _extract_gemini(img, _b64(img), language="no")
         return mock_cls.return_value.models.generate_content.call_args
 
 
 class TestAllBackendsSendIdenticalHardenedSystemPrompt:
-    """Verbatim equality is essential — a paraphrased system prompt would
-    not carry the explicit Phase 1 CRITICAL rule and Phase 2 ALL CAPS rule
-    that drive the LSO-1222 fix."""
+    """All 5 LLM backends must send the same hardened system prompt verbatim."""
 
     def test_claude_system_prompt_is_verbatim(self, monkeypatch):
         call = _call_claude(monkeypatch)
@@ -422,62 +334,48 @@ class TestAllBackendsSendIdenticalHardenedSystemPrompt:
 
     def test_gemini_system_instruction_is_verbatim(self, monkeypatch):
         call = _call_gemini(monkeypatch)
-        assert (
-            call.kwargs["config"]["system_instruction"]
-            == _HARDENED_SYSTEM_PROMPT
-        )
+        assert call.kwargs["config"]["system_instruction"] == _HARDENED_SYSTEM_PROMPT
 
 
-class TestAllBackendsSendStructuredUserMessage:
-    """The user message must carry the language line, allergen terms,
-    decimal separator and trace template — that is how the system prompt
-    knows which language to isolate."""
+class TestAllBackendsSendCorrectUserMessage:
+    """The user message must equal build_ingredient_prompt(language) — the
+    language code only. No allergen vocab, decimal tables, or trace templates."""
 
     def _extract_user_text_claude(self, call):
         return call.kwargs["messages"][0]["content"][1]["text"]
 
     def _extract_user_text_openai_style(self, call):
         msgs = call.kwargs["messages"]
-        # system is msgs[0], user is msgs[1] with a list of parts
-        text_parts = [
-            p for p in msgs[1]["content"] if p.get("type") == "text"
-        ]
+        text_parts = [p for p in msgs[1]["content"] if p.get("type") == "text"]
         return text_parts[0]["text"]
 
     def _extract_user_text_gemini(self, call):
         parts = call.kwargs["contents"][0]["parts"]
         return next(p for p in parts if "text" in p)["text"]
 
-    def test_claude_user_message_contains_language_block(self, monkeypatch):
+    def test_claude_user_message_equals_built_prompt(self, monkeypatch):
         text = self._extract_user_text_claude(_call_claude(monkeypatch))
         assert text == build_ingredient_prompt("no")
 
-    def test_openai_user_message_contains_language_block(self, monkeypatch):
+    def test_openai_user_message_equals_built_prompt(self, monkeypatch):
         text = self._extract_user_text_openai_style(_call_openai(monkeypatch))
         assert text == build_ingredient_prompt("no")
 
-    def test_groq_user_message_contains_language_block(self, monkeypatch):
+    def test_groq_user_message_equals_built_prompt(self, monkeypatch):
         text = self._extract_user_text_openai_style(_call_groq(monkeypatch))
         assert text == build_ingredient_prompt("no")
 
-    def test_openrouter_user_message_contains_language_block(self, monkeypatch):
-        text = self._extract_user_text_openai_style(
-            _call_openrouter(monkeypatch)
-        )
+    def test_openrouter_user_message_equals_built_prompt(self, monkeypatch):
+        text = self._extract_user_text_openai_style(_call_openrouter(monkeypatch))
         assert text == build_ingredient_prompt("no")
 
-    def test_gemini_user_message_contains_language_block(self, monkeypatch):
+    def test_gemini_user_message_equals_built_prompt(self, monkeypatch):
         text = self._extract_user_text_gemini(_call_gemini(monkeypatch))
         assert text == build_ingredient_prompt("no")
 
 
 # ===========================================================================
 # 4) Multilingual regression — the LSO-1222 biscuit bug example
-#
-# A real Norwegian/German/Polish biscuit label is supplied to the dispatch
-# layer. The LLM is mocked to return a properly-isolated Norwegian-only
-# output, and we assert the prompt that was sent and the output that came
-# back honour every Phase 1 + Phase 2 rule.
 # ===========================================================================
 
 
@@ -487,12 +385,10 @@ class TestLSO1222MultilingualBiscuitRegression:
 
     def _setup_claude_mock(self, monkeypatch, llm_text):
         from unittest.mock import MagicMock
-
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
         mock_message = types.SimpleNamespace(
             content=[types.SimpleNamespace(text=llm_text)]
         )
-        # Patch settings + Anthropic client + model resolver
         ctx = patch.multiple(
             "services.settings_service",
             get_ocr_backend=MagicMock(return_value="claude_vision"),
@@ -507,7 +403,6 @@ class TestLSO1222MultilingualBiscuitRegression:
 
     def test_dispatch_returns_norwegian_only_output(self, monkeypatch):
         from services.ocr_core import dispatch_ocr_bytes
-
         ctx, ctx2, ctx3, mock_message = self._setup_claude_mock(
             monkeypatch, _LSO_1222_EXPECTED_NORWEGIAN
         )
@@ -515,10 +410,7 @@ class TestLSO1222MultilingualBiscuitRegression:
             mock_cls.return_value.messages.create.return_value = mock_message
             result = dispatch_ocr_bytes(_tiny_png_bytes())
 
-        # The dispatch layer must not touch the well-formed Norwegian text
-        # except to apply the trailing-period convention (already present).
         assert result["text"] == _LSO_1222_EXPECTED_NORWEGIAN
-        # And every Phase 1/2 expectation holds on the output.
         for forbidden in _LSO_1222_FORBIDDEN_NON_NORWEGIAN:
             assert forbidden not in result["text"], (
                 f"Non-Norwegian fragment '{forbidden}' leaked into output"
@@ -526,7 +418,6 @@ class TestLSO1222MultilingualBiscuitRegression:
 
     def test_dispatch_output_has_all_caps_allergens(self, monkeypatch):
         from services.ocr_core import dispatch_ocr_bytes
-
         ctx, ctx2, ctx3, mock_message = self._setup_claude_mock(
             monkeypatch, _LSO_1222_EXPECTED_NORWEGIAN
         )
@@ -534,18 +425,16 @@ class TestLSO1222MultilingualBiscuitRegression:
             mock_cls.return_value.messages.create.return_value = mock_message
             result = dispatch_ocr_bytes(_tiny_png_bytes())
 
-        # Allergen compounds must be ALL CAPS (rule 3 in Phase 2).
+        # Mocked LLM output must pass through with ALL CAPS allergen compounds.
         assert "HVETEMEL" in result["text"]
         assert "MELKPULVER" in result["text"]
         assert "SOYALESITIN" in result["text"]
-        # Lowercase forms must not slip through.
         assert "hvetemel" not in result["text"]
         assert "melkpulver" not in result["text"]
         assert "soyalesitin" not in result["text"]
 
     def test_dispatch_output_preserves_e_numbers(self, monkeypatch):
         from services.ocr_core import dispatch_ocr_bytes
-
         ctx, ctx2, ctx3, mock_message = self._setup_claude_mock(
             monkeypatch, _LSO_1222_EXPECTED_NORWEGIAN
         )
@@ -560,7 +449,6 @@ class TestLSO1222MultilingualBiscuitRegression:
         self, monkeypatch
     ):
         from services.ocr_core import dispatch_ocr_bytes
-
         ctx, ctx2, ctx3, mock_message = self._setup_claude_mock(
             monkeypatch, _LSO_1222_EXPECTED_NORWEGIAN
         )
@@ -568,33 +456,16 @@ class TestLSO1222MultilingualBiscuitRegression:
             mock_cls.return_value.messages.create.return_value = mock_message
             result = dispatch_ocr_bytes(_tiny_png_bytes())
 
-        # No newlines anywhere — this is a single line.
         assert "\n" not in result["text"]
-        # Ends with a period.
         assert result["text"].rstrip().endswith(".")
-        # Uses commas as the separator.
         assert "," in result["text"]
 
-    def test_dispatch_output_contains_trace_notice(self, monkeypatch):
-        from services.ocr_core import dispatch_ocr_bytes
-
-        ctx, ctx2, ctx3, mock_message = self._setup_claude_mock(
-            monkeypatch, _LSO_1222_EXPECTED_NORWEGIAN
-        )
-        with ctx, ctx2, ctx3 as mock_cls:
-            mock_cls.return_value.messages.create.return_value = mock_message
-            result = dispatch_ocr_bytes(_tiny_png_bytes())
-
-        # The Norwegian trace prefix from _TRACE_TEMPLATE_NO must appear.
-        assert "Kan inneholde spor av" in result["text"]
-
-    def test_dispatch_sends_hardened_prompt_and_norwegian_user_message(
+    def test_dispatch_sends_hardened_system_prompt_and_language_user_message(
         self, monkeypatch
     ):
-        """Even if the model misbehaves, we can prove the dispatch layer is
-        feeding it the right instructions."""
+        """Prove the dispatch layer feeds the LLM the right instructions:
+        hardened system prompt + language-code-only user message."""
         from services.ocr_core import dispatch_ocr_bytes
-
         ctx, ctx2, ctx3, mock_message = self._setup_claude_mock(
             monkeypatch, _LSO_1222_EXPECTED_NORWEGIAN
         )
@@ -603,14 +474,11 @@ class TestLSO1222MultilingualBiscuitRegression:
             dispatch_ocr_bytes(_tiny_png_bytes())
             call_kwargs = mock_cls.return_value.messages.create.call_args.kwargs
 
-        # System prompt is the hardened two-phase prompt — verbatim.
         assert call_kwargs["system"] == _HARDENED_SYSTEM_PROMPT
-        # User message carries Norwegian language context + allergens.
         user_text = call_kwargs["messages"][0]["content"][1]["text"]
-        assert "Language: Norwegian" in user_text
-        assert _ALLERGENS_NO in user_text
-        assert _TRACE_TEMPLATE_NO in user_text
-        assert "Decimal separator: comma" in user_text
+        # LSO-1243: user message contains only the language code — no vocab lists.
+        assert user_text == build_ingredient_prompt("no")
+        assert "no" in user_text
 
 
 # ===========================================================================
@@ -622,8 +490,6 @@ class TestHardenedPromptEdgeCases:
     """Behaviour the prompt is designed to drive in pathological inputs."""
 
     def _dispatch_with_claude_response(self, monkeypatch, llm_text, language="no"):
-        """Helper: drive dispatch_ocr_bytes through Claude with a canned LLM
-        response and return the dispatch result."""
         from unittest.mock import MagicMock
         from services.ocr_core import dispatch_ocr_bytes
 
@@ -643,27 +509,20 @@ class TestHardenedPromptEdgeCases:
             return dispatch_ocr_bytes(_tiny_png_bytes())
 
     def test_single_language_label_passes_through_unchanged(self, monkeypatch):
-        """A label that already contains only Norwegian needs no isolation —
-        Phase 1 must accept it and Phase 2 leaves the well-formed output as
-        a single line ending in a period."""
-        text = "HVETEmel, sukker, salt".replace("HVETEmel", "HVETEMEL") + "."
+        text = "HVETEMEL, sukker, salt."
         result = self._dispatch_with_claude_response(monkeypatch, text)
         assert result["text"] == "HVETEMEL, sukker, salt."
 
     def test_empty_input_returns_empty_text_per_rule_13(self, monkeypatch):
-        """Rule 13: if the target-language section is not found or the input
-        is not an ingredient list at all, the LLM returns empty string.
-        The dispatch layer must propagate that as an empty result so the
-        blueprint can surface error_type='no_text'."""
+        """Rule 13: when no readable ingredient list exists, the LLM returns
+        empty string and the dispatch layer propagates it unchanged."""
         result = self._dispatch_with_claude_response(monkeypatch, "")
         assert result["text"] == ""
-        # Provider name is preserved even on empty output.
         assert result["provider"]
 
     def test_conversational_refusal_is_converted_to_empty(self, monkeypatch):
         """If the model ignores Rule 13 and replies with prose, the dispatch
-        layer's looks_like_llm_refusal safety net converts it to empty so
-        the user still sees the no-text toast instead of garbage."""
+        layer's looks_like_llm_refusal safety net converts it to empty."""
         refusal = (
             "I'm sorry, I can't see any ingredient list in this image. "
             "Could you provide a clearer photo?"
@@ -671,12 +530,9 @@ class TestHardenedPromptEdgeCases:
         result = self._dispatch_with_claude_response(monkeypatch, refusal)
         assert result["text"] == ""
 
-    def test_unknown_language_setting_falls_back_to_norwegian_prompt(
-        self, monkeypatch
-    ):
-        """If the user has somehow stored a language code outside no/en/se,
-        the prompt builder defaults to Norwegian. Verifies the dispatch
-        still works and uses the Norwegian user message."""
+    def test_unknown_language_code_is_passed_to_llm(self, monkeypatch):
+        """When settings_service.get_language() returns an unknown code,
+        build_ingredient_prompt passes it through — the LLM handles it."""
         from unittest.mock import MagicMock
         from services.ocr_core import dispatch_ocr_bytes
 
@@ -694,19 +550,19 @@ class TestHardenedPromptEdgeCases:
         ), patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             result = dispatch_ocr_bytes(_tiny_png_bytes())
-            call_kwargs = (
-                mock_cls.return_value.messages.create.call_args.kwargs
-            )
+            call_kwargs = mock_cls.return_value.messages.create.call_args.kwargs
 
         assert result["text"] == "Sukker, mel."
         user_text = call_kwargs["messages"][0]["content"][1]["text"]
-        assert "Language: Norwegian" in user_text
+        # Unknown code is passed through to build_ingredient_prompt
+        assert user_text == build_ingredient_prompt("xx")
 
-    def test_none_language_falls_back_to_norwegian(self, monkeypatch):
-        """When settings_service.get_language() returns None (or raises),
-        the dispatch path must not crash — Norwegian is the safe default."""
+    def test_none_language_falls_back_to_default(self, monkeypatch):
+        """When settings_service.get_language() returns None, the dispatch
+        path must not crash — the default language is the safe fallback."""
         from unittest.mock import MagicMock
         from services.ocr_core import dispatch_ocr_bytes
+        from config import DEFAULT_LANGUAGE
 
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
         mock_message = types.SimpleNamespace(
@@ -722,30 +578,24 @@ class TestHardenedPromptEdgeCases:
         ), patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             result = dispatch_ocr_bytes(_tiny_png_bytes())
-            call_kwargs = (
-                mock_cls.return_value.messages.create.call_args.kwargs
-            )
+            call_kwargs = mock_cls.return_value.messages.create.call_args.kwargs
 
         assert result["text"] == "vann."
         user_text = call_kwargs["messages"][0]["content"][1]["text"]
-        assert "Language: Norwegian" in user_text
+        # None language → default language code in the user message
+        assert DEFAULT_LANGUAGE in user_text
 
     def test_trailing_period_added_if_model_drops_it(self, monkeypatch):
         """Vision models occasionally drop the terminal period. The dispatch
-        layer enforces the DB convention via ensure_trailing_period() and
-        the resulting text must end with exactly one period."""
+        layer enforces the DB convention via ensure_trailing_period()."""
         result = self._dispatch_with_claude_response(
             monkeypatch, "Sukker, mel, vann, salt"
         )
         assert result["text"] == "Sukker, mel, vann, salt."
 
-    def test_label_with_no_recognized_header_can_still_return_norwegian(
-        self, monkeypatch
-    ):
-        """Phase 1 instructs the model to fall back to vocabulary/diacritic
-        recognition. We can't prove the model does this without a real run,
-        but we can prove the dispatch layer happily accepts and forwards a
-        Norwegian-only response that the model produced via fallback."""
+    def test_label_with_no_recognized_header_still_returns_output(self, monkeypatch):
+        """The dispatch layer accepts and forwards a well-formed response
+        regardless of how the model located the ingredient block."""
         text = "Sukker, vann, salt."
         result = self._dispatch_with_claude_response(monkeypatch, text)
         assert result["text"] == "Sukker, vann, salt."
@@ -757,12 +607,10 @@ class TestHardenedPromptEdgeCases:
 
 
 class TestTesseractBackendUnchanged:
-    """The hardened prompt only applies to vision LLM backends. The local
-    tesseract backend must not be sent any prompt and must continue to
-    operate purely on the pixel data."""
+    """The hardened prompt only applies to vision LLM backends. Tesseract
+    must not receive any prompt and must operate purely on pixel data."""
 
     def test_tesseract_extract_signature_does_not_accept_prompt(self):
-        """Smoke test: _extract_tesseract must NOT raise on a basic call."""
         from services.ocr_backends.tesseract import _extract_tesseract
 
         with patch(
@@ -781,18 +629,12 @@ class TestTesseractBackendUnchanged:
         assert "sukker" in result
         assert "mel" in result
 
-    def test_dispatch_tesseract_does_not_pass_language_or_prompt(
-        self, monkeypatch
-    ):
-        """dispatch_ocr_bytes with backend=tesseract must skip the language /
-        model / prompt resolution — that path is exclusive to LLM backends."""
+    def test_dispatch_tesseract_does_not_pass_language_or_prompt(self, monkeypatch):
         from unittest.mock import MagicMock
         from services.ocr_core import dispatch_ocr_bytes
-
-        mock_extract = MagicMock(return_value="vann, sukker")
-        # Intercept the registry entry so we can assert on the call args.
         from services import ocr_core as core
 
+        mock_extract = MagicMock(return_value="vann, sukker")
         original = core._PROVIDERS["tesseract"]
         core._PROVIDERS["tesseract"] = mock_extract
         try:
@@ -806,18 +648,12 @@ class TestTesseractBackendUnchanged:
             core._PROVIDERS["tesseract"] = original
 
         assert result["text"] == "vann, sukker"
-        # tesseract was called with positional (image_bytes, b64, mime_type)
-        # and NO language/prompt/model kwargs.
         _, kwargs = mock_extract.call_args
         assert "language" not in kwargs
         assert "prompt" not in kwargs
         assert "model" not in kwargs
 
-    def test_dispatch_tesseract_does_not_apply_trailing_period(
-        self, monkeypatch
-    ):
-        """ensure_trailing_period() is only applied to LLM backends — the
-        tesseract path is supposed to leave raw OCR output untouched."""
+    def test_dispatch_tesseract_does_not_apply_trailing_period(self, monkeypatch):
         from unittest.mock import MagicMock
         from services.ocr_core import dispatch_ocr_bytes
         from services import ocr_core as core
@@ -835,17 +671,16 @@ class TestTesseractBackendUnchanged:
         finally:
             core._PROVIDERS["tesseract"] = original
 
-        assert result["text"] == "vann sukker"  # NO trailing period added
+        assert result["text"] == "vann sukker"
 
 
 # ===========================================================================
-# 7) Mock shape sanity — Claude response that drives the regression test
+# 7) Mock shape sanity
 # ===========================================================================
 
 
 class TestLso1222CanonicalLlmResponseShape:
-    """Document the LLM response shape the regression test relies on. If
-    the Claude SDK changes its message shape, these tests fail loudly."""
+    """Document the LLM response shape the regression test relies on."""
 
     def test_claude_canonical_response_matches_validator(self):
         from tests.mock_shape_validator import validate_claude_response_shape
@@ -855,5 +690,4 @@ class TestLso1222CanonicalLlmResponseShape:
                 {"type": "text", "text": _LSO_1222_EXPECTED_NORWEGIAN}
             ]
         }
-        # Raises AssertionError if the shape drifts.
         validate_claude_response_shape(canonical)
