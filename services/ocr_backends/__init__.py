@@ -1,5 +1,56 @@
-"""Shared utilities for OCR backend modules."""
+"""Vision-based OCR backends for ingredient extraction.
+
+Exports:
+  _HARDENED_SYSTEM_PROMPT  — language-agnostic 4-step system prompt
+  build_ingredient_prompt  — locale-specific user message for a language code
+  _INGREDIENT_PROMPT       — backward-compat alias (Norwegian defaults)
+  dispatch_ocr             — route to the correct backend
+"""
 import os
+
+_LANGUAGE_CONFIG = {
+    "no": {
+        "name": "Norwegian",
+        "allergen_terms": (
+            "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, "
+            "PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, "
+            "LUPIN, SULFITTER, SVOVELDIOKSID"
+        ),
+        "decimal_sep": ",",
+        "decimal_word": "comma",
+        "trace_template": "Kan inneholde spor av {items}.",
+    },
+    "en": {
+        "name": "English",
+        "allergen_terms": (
+            "MILK, EGGS, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, "
+            "PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, "
+            "LUPIN, SULPHITES, SULPHUR DIOXIDE"
+        ),
+        "decimal_sep": ".",
+        "decimal_word": "dot",
+        "trace_template": "May contain traces of {items}.",
+    },
+    "se": {
+        "name": "Swedish",
+        "allergen_terms": (
+            "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, "
+            "JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, "
+            "LUPIN, SULFITER, SVAVELDIOXID"
+        ),
+        "decimal_sep": ",",
+        "decimal_word": "comma",
+        "trace_template": "Kan innehålla spår av {items}.",
+    },
+}
+
+# Module-level aliases for each language (used by test_hardened_vision_prompt.py)
+_ALLERGENS_NO = _LANGUAGE_CONFIG["no"]["allergen_terms"]
+_TRACE_TEMPLATE_NO = _LANGUAGE_CONFIG["no"]["trace_template"]
+_ALLERGENS_EN = _LANGUAGE_CONFIG["en"]["allergen_terms"]
+_TRACE_TEMPLATE_EN = _LANGUAGE_CONFIG["en"]["trace_template"]
+_ALLERGENS_SE = _LANGUAGE_CONFIG["se"]["allergen_terms"]
+_TRACE_TEMPLATE_SE = _LANGUAGE_CONFIG["se"]["trace_template"]
 
 _HARDENED_SYSTEM_PROMPT = (
     "You are a food label specialist. Your task is to produce a clean, normalised\n"
@@ -99,27 +150,9 @@ _HARDENED_SYSTEM_PROMPT = (
     "  → Output nothing. Zero characters. No explanation.\n"
 )
 
-# Norwegian allergen terms (SmartSnack default language)
-_ALLERGENS_NO = (
-    "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, "
-    "PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, "
-    "LUPIN, SULFITTER, SVOVELDIOKSID"
+_SUPPORTED_BACKENDS = frozenset(
+    ("tesseract", "claude", "openai", "gemini", "groq", "openrouter")
 )
-_TRACE_TEMPLATE_NO = "Kan inneholde spor av {items}."
-
-_ALLERGENS_EN = (
-    "MILK, EGGS, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, "
-    "PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, "
-    "LUPIN, SULPHITES, SULPHUR DIOXIDE"
-)
-_TRACE_TEMPLATE_EN = "May contain traces of {items}."
-
-_ALLERGENS_SE = (
-    "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, "
-    "JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, "
-    "LUPIN, SULFITER, SVAVELDIOXID"
-)
-_TRACE_TEMPLATE_SE = "Kan innehålla spår av {items}."
 
 _NUTRITION_PROMPT = (
     "Extract the per-100g nutrition values from this food label image. "
@@ -140,7 +173,7 @@ _NUTRITION_PROMPT = (
 )
 
 
-def build_ingredient_prompt(language: str | None = None) -> str:
+def build_ingredient_prompt(language: "str | None" = None) -> str:
     """Return the structured user message for ingredient extraction.
 
     Tells the vision LLM the target language, allergen terms, decimal separator,
@@ -153,40 +186,67 @@ def build_ingredient_prompt(language: str | None = None) -> str:
     if lang not in ("no", "en", "se"):
         lang = "no"
 
-    if lang == "en":
-        return (
-            "Language: English\n"
-            f"Allergen terms: {_ALLERGENS_EN}\n"
-            "Decimal separator: dot\n"
-            f"Trace notice template: {_TRACE_TEMPLATE_EN}\n"
-            "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
-        )
-    if lang == "se":
-        return (
-            "Language: Swedish\n"
-            f"Allergen terms: {_ALLERGENS_SE}\n"
-            "Decimal separator: comma\n"
-            f"Trace notice template: {_TRACE_TEMPLATE_SE}\n"
-            "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
-        )
-    # Default: Norwegian
+    cfg = _LANGUAGE_CONFIG[lang]
     return (
-        "Language: Norwegian\n"
-        f"Allergen terms: {_ALLERGENS_NO}\n"
-        "Decimal separator: comma\n"
-        f"Trace notice template: {_TRACE_TEMPLATE_NO}\n"
+        f"Language: {cfg['name']}\n"
+        f"Allergen terms: {cfg['allergen_terms']}\n"
+        f"Decimal separator: {cfg['decimal_word']}\n"
+        f"Trace notice template: {cfg['trace_template']}\n"
         "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
     )
 
 
-# Backward-compatible alias
+# Backward-compat alias — code that references _INGREDIENT_PROMPT still works.
 _INGREDIENT_PROMPT = build_ingredient_prompt()
 
 
+def dispatch_ocr(
+    image_base64: str,
+    backend: str = "tesseract",
+    language: str = "no",
+) -> str:
+    """Route ingredient OCR to the specified backend.
+
+    Args:
+        image_base64: Raw base64 string or data URI (data:image/...;base64,...).
+        backend: One of "tesseract", "claude", "openai", "gemini", "groq",
+                 "openrouter". Defaults to "tesseract".
+        language: Language code for the target output: "no", "en", or "se".
+                  Ignored by the tesseract backend.
+
+    Returns:
+        Extracted ingredient text, or empty string when none found.
+
+    Raises:
+        ValueError: If backend is not recognised.
+        ValueError: If language is not supported (for LLM backends).
+    """
+    if backend not in _SUPPORTED_BACKENDS:
+        raise ValueError(f"Unknown OCR backend: {backend!r}")
+
+    if backend == "tesseract":
+        from .tesseract import extract
+        return extract(image_base64)
+
+    if language not in ("no", "en", "se"):
+        raise ValueError(f"Unsupported language: {language!r}")
+
+    if backend == "claude":
+        from .claude import extract
+    elif backend == "openai":
+        from .openai import extract
+    elif backend == "gemini":
+        from .gemini import extract
+    elif backend == "groq":
+        from .groq import extract
+    else:  # openrouter
+        from .openrouter import extract
+
+    return extract(image_base64, language)  # type: ignore[return-value]
+
+
 # Phrases that indicate a vision LLM refused or asked for clarification
-# instead of returning the ingredient list. Real ingredient lists are
-# comma-separated product names and never contain these markers, so
-# substring matching is safe.
+# instead of returning the ingredient list.
 _CONVERSATIONAL_MARKERS = (
     "i'm happy to help",
     "i'd be happy to help",
@@ -214,13 +274,7 @@ _CONVERSATIONAL_MARKERS = (
 
 
 def ensure_trailing_period(text: str) -> str:
-    """Ensure ingredient text ends with terminal punctuation.
-
-    The SmartSnack DB stores every ingredient string with a trailing period.
-    Vision models occasionally drop it, so the dispatch layer applies this
-    minimal fix-up. Empty input returns empty (so the no-text path still
-    fires). Strings already ending in ``. ! ?`` are left untouched.
-    """
+    """Ensure ingredient text ends with terminal punctuation."""
     if not text:
         return ""
     stripped = text.rstrip()
@@ -232,14 +286,7 @@ def ensure_trailing_period(text: str) -> str:
 
 
 def looks_like_llm_refusal(text: str) -> bool:
-    """Return True if ``text`` looks like a conversational LLM refusal or
-    clarification request rather than an extracted ingredient list.
-
-    Vision models occasionally ignore the prompt's empty-string rule and
-    reply with prose like "I'm happy to help, but I don't see an image of
-    a food label.". The OCR dispatch layer uses this helper as a safety
-    net to convert such responses into the existing no-text error path.
-    """
+    """Return True if text looks like a conversational LLM refusal."""
     if not text:
         return False
     stripped = text.strip().lower()
