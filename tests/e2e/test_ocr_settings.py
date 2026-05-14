@@ -73,7 +73,14 @@ def _clean_ocr_env(app_server):
 
     Saves and restores any pre-existing values so tests don't leak state.
     """
-    keys = ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY"]
+    keys = [
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "GROQ_API_KEY",
+        "LLM_API_KEY",
+    ]
     saved = {k: os.environ.pop(k, None) for k in keys}
     yield
     for k, v in saved.items():
