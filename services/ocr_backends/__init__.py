@@ -1,125 +1,87 @@
-"""Shared utilities for OCR backend modules."""
+"""Vision-based OCR backends for ingredient extraction.
+
+Exports:
+  _HARDENED_SYSTEM_PROMPT  — language-agnostic 4-step system prompt
+  build_ingredient_prompt  — locale-specific user message for a language code
+  _INGREDIENT_PROMPT       — backward-compat alias (Norwegian defaults)
+  dispatch_ocr             — route to the correct backend
+"""
 import os
 
-_HARDENED_SYSTEM_PROMPT = (
-    "You are a food label specialist. Your task is to produce a clean, normalised\n"
-    "ingredient list in the target language from a food-label image.\n"
-    "\n"
-    "══ OUTPUT CONTRACT ══\n"
-    "\n"
-    "Your entire response must be exactly ONE of:\n"
-    "\n"
-    "  (A) A comma-separated ingredient list in the target language, ending with\n"
-    "      a period — when the target-language ingredient section is present in\n"
-    "      the label: extract, clean, and normalise it.\n"
-    "\n"
-    "  (B) A comma-separated ingredient list in the target language, ending with\n"
-    "      a period — when no target-language section is present but an ingredient\n"
-    "      list is readable in another language: translate it into the target\n"
-    "      language, then apply the same normalisation rules.\n"
-    "\n"
-    "  (C) An empty string — only when no readable ingredient list exists anywhere\n"
-    "      on the label (unreadable image, non-food content, blank label, etc.).\n"
-    "\n"
-    "NEVER output reasoning, explanations, apologies, step labels, headings,\n"
-    "markdown, or any text that is not the ingredient list itself.\n"
-    "When returning (C), output ZERO characters — not a space, not a word.\n"
-    "\n"
-    "══ INTERNAL STEP 1 — Find the ingredient section ══\n"
-    "(Do not include any part of this step in your response.)\n"
-    "\n"
-    "The target language is named in the user message. Food labels may print the\n"
-    "ingredient list under headings in several languages, often in columns that OCR\n"
-    "reads as interleaved lines.\n"
-    "\n"
-    "First, search for the target-language ingredient section. Its heading is a word\n"
-    "or short phrase in the target language meaning 'ingredients' or 'contents',\n"
-    "typically printed in all-caps or title case, optionally followed by a colon.\n"
-    "You know the vocabulary of the target language — use that knowledge to\n"
-    "recognise the heading without relying on any pre-listed keywords.\n"
-    "If found, extract that block and proceed to STEP 2 (path A).\n"
-    "\n"
-    "If no target-language section is found, search for an ingredient list in any\n"
-    "other language on the label. Use the same structural cue: a heading meaning\n"
-    "'ingredients' or 'contents' in any language, followed by a list of food items.\n"
-    "Select the most complete readable block and proceed to STEP 3 (path B).\n"
-    "\n"
-    "If no readable ingredient list is found in any language, return an empty string\n"
-    "and stop (path C). Output nothing else.\n"
-    "\n"
-    "══ INTERNAL STEP 2 — Extract and normalise (path A: target language present) ══\n"
-    "(Do not include any part of this step in your response.)\n"
-    "\n"
-    "Cross-language contamination: OCR of multilingual labels often mixes adjacent\n"
-    "language columns into a single block. Discard any word or phrase that does not\n"
-    "belong to the target language — ask yourself whether a native speaker of the\n"
-    "target language would write that word in an ingredient list. If not, discard it.\n"
-    "Remove the foreign fragment and continue; do not restart.\n"
-    "\n"
-    "Apply the normalisation rules in STEP 4 and output the result.\n"
-    "\n"
-    "══ INTERNAL STEP 3 — Translate and normalise (path B: target language absent) ══\n"
-    "(Do not include any part of this step in your response.)\n"
-    "\n"
-    "Translate each ingredient name from the source language into the target language.\n"
-    "Translate ingredient terms, not prose: preserve the list structure, E-numbers,\n"
-    "percentages, and sub-ingredient parentheses. Translate compound ingredient names\n"
-    "as food terms.\n"
-    "\n"
-    "Apply the normalisation rules in STEP 4 and output the result.\n"
-    "\n"
-    "══ INTERNAL STEP 4 — Normalisation rules ══\n"
-    "(Apply after extraction (path A) or translation (path B). Do not include any\n"
-    "part of this step in your response.)\n"
-    "\n"
-    "1.  Output ONLY the cleaned ingredient list. No preamble, no explanation,\n"
-    "    no headers, no extra sentences.\n"
-    "2.  Format as a single comma-separated line.\n"
-    "3.  The user message provides the allergen terms for the target language.\n"
-    "    Every occurrence of those terms — or compound words containing them —\n"
-    "    must be written in ALL CAPS, including inside sub-ingredient parentheses.\n"
-    "4.  Use the decimal separator specified in the user message (comma or dot).\n"
-    "5.  Preserve E-numbers exactly as printed: E270, E150d, E471, E904a.\n"
-    "6.  Sub-ingredients go in parentheses immediately after their parent ingredient.\n"
-    "7.  Preserve percentages from the label.\n"
-    "8.  Append the trace-allergen notice at the very end using the exact phrasing\n"
-    "    from the user message as the final sentence.\n"
-    "9.  The list ends with exactly one period.\n"
-    "10. Strip ingredient-section headings from the output.\n"
-    "11. Strip nutrition-table values, brand names, trademarks, weights, barcodes.\n"
-    "12. Strip allergen-information headings — convert their content into the\n"
-    "    trace-allergen notice format instead.\n"
-    "13. If the extracted or translated block does not resemble an ingredient list,\n"
-    "    return an empty string.\n"
-    "\n"
-    "══ FINAL CHECK — before writing your response ══\n"
-    "Path A or B (found or produced an ingredient list)?\n"
-    "  → Output the cleaned, normalised list ending with a period.\n"
-    "Path C (no readable ingredient list anywhere on the label)?\n"
-    "  → Output nothing. Zero characters. No explanation.\n"
-)
+_LANGUAGE_CONFIG = {
+    "no": {
+        "name": "Norwegian",
+        "allergen_terms": (
+            "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, "
+            "PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, "
+            "LUPIN, SULFITTER, SVOVELDIOKSID"
+        ),
+        "decimal_sep": ",",
+        "trace_template": "Kan inneholde spor av {items}.",
+    },
+    "en": {
+        "name": "English",
+        "allergen_terms": (
+            "MILK, EGGS, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, "
+            "PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, "
+            "LUPIN, SULPHITES, SULPHUR DIOXIDE"
+        ),
+        "decimal_sep": ".",
+        "trace_template": "May contain traces of {items}.",
+    },
+    "se": {
+        "name": "Swedish",
+        "allergen_terms": (
+            "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, "
+            "JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, "
+            "LUPIN, SULFITER, SVAVELDIOXID"
+        ),
+        "decimal_sep": ",",
+        "trace_template": "Kan innehålla spår av {items}.",
+    },
+}
 
-# Norwegian allergen terms (SmartSnack default language)
-_ALLERGENS_NO = (
-    "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, "
-    "PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, "
-    "LUPIN, SULFITTER, SVOVELDIOKSID"
-)
-_TRACE_TEMPLATE_NO = "Kan inneholde spor av {items}."
+# Module-level aliases for each language (used by test_hardened_vision_prompt.py)
+_ALLERGENS_NO = _LANGUAGE_CONFIG["no"]["allergen_terms"]
+_TRACE_TEMPLATE_NO = _LANGUAGE_CONFIG["no"]["trace_template"]
+_ALLERGENS_EN = _LANGUAGE_CONFIG["en"]["allergen_terms"]
+_TRACE_TEMPLATE_EN = _LANGUAGE_CONFIG["en"]["trace_template"]
+_ALLERGENS_SE = _LANGUAGE_CONFIG["se"]["allergen_terms"]
+_TRACE_TEMPLATE_SE = _LANGUAGE_CONFIG["se"]["trace_template"]
 
-_ALLERGENS_EN = (
-    "MILK, EGGS, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, "
-    "PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, "
-    "LUPIN, SULPHITES, SULPHUR DIOXIDE"
-)
-_TRACE_TEMPLATE_EN = "May contain traces of {items}."
+_HARDENED_SYSTEM_PROMPT = """\
+You are a food label OCR specialist. Extract ingredient lists from food product images.
 
-_ALLERGENS_SE = (
-    "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, "
-    "JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, "
-    "LUPIN, SULFITER, SVAVELDIOXID"
+Follow these four steps precisely:
+
+Step 1 — Locate sections
+Scan the image for all text sections. Identify the one that contains the ingredient \
+list (typically labeled with a word meaning "Ingredients" in any language). Ignore all \
+other sections such as nutrition facts, preparation instructions, and marketing text.
+
+Step 2 — Select and translate
+Extract the ingredient list text from the section matching the target language supplied \
+in the user message. If that language section is absent but an ingredient list exists in \
+another language, translate the ingredient list into the target language. If no ingredient \
+list is present anywhere in the image, return an empty string.
+
+Step 3 — Normalise
+- Preserve the original order of ingredients.
+- Use the decimal separator specified in the user message for all numbers.
+- Any allergen term that appears in ALL CAPS in the original text must remain ALL CAPS.
+- Do not add, remove, or reorder ingredients.
+- Expand clearly identifiable abbreviations.
+- Remove duplicate whitespace and fix obvious OCR errors; do not paraphrase.
+
+Step 4 — Output
+Return ONLY the cleaned ingredient list as plain text. No preamble, no section labels, \
+no explanations, no markdown formatting. If no ingredients were found, return an empty \
+string.\
+"""
+
+_SUPPORTED_BACKENDS = frozenset(
+    ("tesseract", "claude", "openai", "gemini", "groq", "openrouter")
 )
-_TRACE_TEMPLATE_SE = "Kan innehålla spår av {items}."
 
 _NUTRITION_PROMPT = (
     "Extract the per-100g nutrition values from this food label image. "
@@ -140,53 +102,72 @@ _NUTRITION_PROMPT = (
 )
 
 
-def build_ingredient_prompt(language: str | None = None) -> str:
-    """Return the structured user message for ingredient extraction.
+def build_ingredient_prompt(language: str) -> str:
+    """Return the user message for ingredient OCR for the given language code.
 
-    Tells the vision LLM the target language, allergen terms, decimal separator,
-    and trace-notice template. The system prompt (_HARDENED_SYSTEM_PROMPT)
-    carries all normalisation rules.
-
-    Falls back to Norwegian for None, empty string, or unknown language codes.
+    Raises:
+        ValueError: If language is not a supported code (no, en, se).
     """
-    lang = (language or "").strip() or "no"
-    if lang not in ("no", "en", "se"):
-        lang = "no"
-
-    if lang == "en":
-        return (
-            "Language: English\n"
-            f"Allergen terms: {_ALLERGENS_EN}\n"
-            "Decimal separator: dot\n"
-            f"Trace notice template: {_TRACE_TEMPLATE_EN}\n"
-            "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
-        )
-    if lang == "se":
-        return (
-            "Language: Swedish\n"
-            f"Allergen terms: {_ALLERGENS_SE}\n"
-            "Decimal separator: comma\n"
-            f"Trace notice template: {_TRACE_TEMPLATE_SE}\n"
-            "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
-        )
-    # Default: Norwegian
+    cfg = _LANGUAGE_CONFIG.get(language)
+    if cfg is None:
+        raise ValueError(f"Unsupported language: {language!r}")
     return (
-        "Language: Norwegian\n"
-        f"Allergen terms: {_ALLERGENS_NO}\n"
-        "Decimal separator: comma\n"
-        f"Trace notice template: {_TRACE_TEMPLATE_NO}\n"
-        "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
+        f"Language: {cfg['name']}\n"
+        f"Allergen terms (ALL CAPS): {cfg['allergen_terms']}\n"
+        f"Decimal separator: {cfg['decimal_sep']}\n"
+        f"Trace notice template: {cfg['trace_template']}\n\n"
+        "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels."
     )
 
 
-# Backward-compatible alias
-_INGREDIENT_PROMPT = build_ingredient_prompt()
+# Backward-compat alias — code that references _INGREDIENT_PROMPT still works.
+_INGREDIENT_PROMPT = build_ingredient_prompt("no")
+
+
+def dispatch_ocr(
+    image_base64: str,
+    backend: str = "tesseract",
+    language: str = "no",
+) -> str:
+    """Route ingredient OCR to the specified backend.
+
+    Args:
+        image_base64: Raw base64 string or data URI (data:image/...;base64,...).
+        backend: One of "tesseract", "claude", "openai", "gemini", "groq",
+                 "openrouter". Defaults to "tesseract".
+        language: Language code for the target output: "no", "en", or "se".
+                  Ignored by the tesseract backend.
+
+    Returns:
+        Extracted ingredient text, or empty string when none found.
+
+    Raises:
+        ValueError: If backend is not recognised.
+        ValueError: If language is not supported (for LLM backends).
+    """
+    if backend not in _SUPPORTED_BACKENDS:
+        raise ValueError(f"Unknown OCR backend: {backend!r}")
+
+    if backend == "tesseract":
+        from .tesseract import extract
+        return extract(image_base64)
+
+    if backend == "claude":
+        from .claude import extract
+    elif backend == "openai":
+        from .openai import extract
+    elif backend == "gemini":
+        from .gemini import extract
+    elif backend == "groq":
+        from .groq import extract
+    else:  # openrouter
+        from .openrouter import extract
+
+    return extract(image_base64, language)  # type: ignore[return-value]
 
 
 # Phrases that indicate a vision LLM refused or asked for clarification
-# instead of returning the ingredient list. Real ingredient lists are
-# comma-separated product names and never contain these markers, so
-# substring matching is safe.
+# instead of returning the ingredient list.
 _CONVERSATIONAL_MARKERS = (
     "i'm happy to help",
     "i'd be happy to help",
@@ -214,13 +195,7 @@ _CONVERSATIONAL_MARKERS = (
 
 
 def ensure_trailing_period(text: str) -> str:
-    """Ensure ingredient text ends with terminal punctuation.
-
-    The SmartSnack DB stores every ingredient string with a trailing period.
-    Vision models occasionally drop it, so the dispatch layer applies this
-    minimal fix-up. Empty input returns empty (so the no-text path still
-    fires). Strings already ending in ``. ! ?`` are left untouched.
-    """
+    """Ensure ingredient text ends with terminal punctuation."""
     if not text:
         return ""
     stripped = text.rstrip()
@@ -232,14 +207,7 @@ def ensure_trailing_period(text: str) -> str:
 
 
 def looks_like_llm_refusal(text: str) -> bool:
-    """Return True if ``text`` looks like a conversational LLM refusal or
-    clarification request rather than an extracted ingredient list.
-
-    Vision models occasionally ignore the prompt's empty-string rule and
-    reply with prose like "I'm happy to help, but I don't see an image of
-    a food label.". The OCR dispatch layer uses this helper as a safety
-    net to convert such responses into the existing no-text error path.
-    """
+    """Return True if text looks like a conversational LLM refusal."""
     if not text:
         return False
     stripped = text.strip().lower()
