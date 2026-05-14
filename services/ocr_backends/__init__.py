@@ -2,13 +2,27 @@
 
 Exports:
   _HARDENED_SYSTEM_PROMPT  — language-agnostic 4-step system prompt
-  build_ingredient_prompt  — user message containing only the language code
+  build_ingredient_prompt  — locale-specific user message for a language code
   _INGREDIENT_PROMPT       — backward-compat alias (default language)
   dispatch_ocr             — route to the correct backend
 """
+import functools
+import json
 import os
 
-from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
+from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE, TRANSLATIONS_DIR
+
+
+@functools.lru_cache(maxsize=None)
+def _get_lang_label(code: str):
+    """Return the native language name from translations/{code}.json, or None on error."""
+    try:
+        path = os.path.join(TRANSLATIONS_DIR, f"{code}.json")
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("lang_label") or None
+    except Exception:
+        return None
 
 _HARDENED_SYSTEM_PROMPT = (
     "You are a food label specialist. Your task is to produce a clean, normalised\n"
@@ -135,17 +149,27 @@ _NUTRITION_PROMPT = (
 def build_ingredient_prompt(language: "str | None" = None) -> str:
     """Return the user message for ingredient extraction.
 
-    Passes only the language code so the LLM resolves allergen vocabulary,
-    decimal separator, and trace-notice phrasing from its own language knowledge.
+    Identifies the target language by native name and ISO code so the LLM
+    unambiguously resolves the output language. Reads lang_label from the
+    translations file; falls back to code-only when the file is unavailable.
     The system prompt (_HARDENED_SYSTEM_PROMPT) carries all normalisation rules.
 
-    Falls back to the default language for None, empty string, or unknown codes.
+    Falls back to the default language for None or empty string.
     """
     lang = (language or "").strip() or DEFAULT_LANGUAGE
+    label = _get_lang_label(lang)
+    if label:
+        lang_ref = label
+        first_line = f"Language: {label} ({lang})"
+    else:
+        lang_ref = f"language code {lang}"
+        first_line = f"Language: {lang}"
     return (
-        f"Language: {lang}\n"
-        "Return the ingredient list for the language stated above — extracted if that language "
-        "is present, or translated from another language if not. "
+        f"{first_line}\n"
+        f"Produce the ingredient list in {lang_ref}. "
+        "The label may be printed in any language; "
+        "if the target language is present extract that section, "
+        f"otherwise translate the most readable section into {lang_ref}. "
         "Return an empty string only if no readable ingredient list exists anywhere on the label. "
         "Do not output reasoning, explanations, or step labels."
     )
