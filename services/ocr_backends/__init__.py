@@ -17,6 +17,7 @@ _LANGUAGE_CONFIG = {
             "LUPIN, SULFITTER, SVOVELDIOKSID"
         ),
         "decimal_sep": ",",
+        "decimal_word": "comma",
         "trace_template": "Kan inneholde spor av {items}.",
     },
     "en": {
@@ -27,6 +28,7 @@ _LANGUAGE_CONFIG = {
             "LUPIN, SULPHITES, SULPHUR DIOXIDE"
         ),
         "decimal_sep": ".",
+        "decimal_word": "dot",
         "trace_template": "May contain traces of {items}.",
     },
     "se": {
@@ -37,6 +39,7 @@ _LANGUAGE_CONFIG = {
             "LUPIN, SULFITER, SVAVELDIOXID"
         ),
         "decimal_sep": ",",
+        "decimal_word": "comma",
         "trace_template": "Kan innehålla spår av {items}.",
     },
 }
@@ -50,50 +53,101 @@ _ALLERGENS_SE = _LANGUAGE_CONFIG["se"]["allergen_terms"]
 _TRACE_TEMPLATE_SE = _LANGUAGE_CONFIG["se"]["trace_template"]
 
 _HARDENED_SYSTEM_PROMPT = (
-    "You are a food-label ingredient extractor. Your sole output is a single plain-text"
-    " ingredient list written in the target language specified in the user message."
-    " Nothing else.\n"
+    "You are a food label specialist. Your task is to produce a clean, normalised\n"
+    "ingredient list in the target language from a food-label image.\n"
     "\n"
-    "INTERNAL STEP 1 — LOCATE INGREDIENT SECTIONS\n"
-    "Scan the label for every ingredient section: a discrete block listing ingredients,"
-    " typically preceded by a header in any language (e.g. \"Ingredients\", \"Zutaten\","
-    " \"Ingrédients\", \"Ingredientes\", \"Ingredienser\", or equivalent in any language)."
-    " Ignore nutritional tables, usage directions, legal disclaimers, marketing copy, and"
-    " cross-contamination disclaimers unless they are a trace notice"
-    " (\"may contain …\" or equivalent).\n"
+    "══ OUTPUT CONTRACT ══\n"
     "\n"
-    "INTERNAL STEP 2 — SELECT SOURCE\n"
-    "A. If an ingredient section written in the target language is present on the label,"
-    " use it. Go to STEP 3.\n"
-    "B. If no target-language section exists but at least one ingredient section in another"
-    " language is present, choose the most complete such section (longest, most detailed)"
-    " and translate it into the target language. Go to STEP 3.\n"
-    "C. If no readable ingredient section exists anywhere on the label, return an empty"
-    " string. Stop.\n"
+    "Your entire response must be exactly ONE of:\n"
     "\n"
-    "INTERNAL STEP 3 — NORMALISE\n"
-    "Apply all of the following to the text selected or translated in STEP 2:\n"
-    "1. Strip any section header from the beginning (e.g. \"Ingredienser:\","
-    " \"Ingrédients:\", \"Ingredients:\", or equivalent in any language).\n"
-    "2. Every allergen term listed in the user message must appear in ALL CAPS wherever it"
-    " occurs in the output. All other text follows sentence-case or source capitalisation.\n"
-    "3. Preserve all E-numbers exactly as written (e.g. E471, E500(i), E322).\n"
-    "4. Use the decimal separator specified in the user message for all percentages"
-    " (e.g. 12,5% or 12.5% depending on the separator).\n"
-    "5. Keep percentage values immediately adjacent to the ingredient they quantify.\n"
-    "6. Preserve sub-ingredient parenthetical groups"
-    " (e.g. Chocolate (sugar, cocoa mass, butter)).\n"
-    "7. Locate any \"may contain\" / equivalent trace-allergen statement on the label."
-    " Rewrite it using the trace notice template from the user message, with the listed"
-    " allergens in ALL CAPS. Place this rewritten trace notice at the very end of the"
-    " output, after the main ingredient list.\n"
-    "8. Do not carry over text from other-language sections, nutritional tables, serving"
-    " instructions, or marketing claims.\n"
-    "9. Ensure the output ends with exactly one period.\n"
+    "  (A) A comma-separated ingredient list in the target language, ending with\n"
+    "      a period — when the target-language ingredient section is present in\n"
+    "      the label: extract, clean, and normalise it.\n"
     "\n"
-    "INTERNAL STEP 4 — OUTPUT\n"
-    "Return the normalised ingredient string from STEP 3. No section headers. No language"
-    " labels. No explanations. No step markers. No markdown. No reasoning."
+    "  (B) A comma-separated ingredient list in the target language, ending with\n"
+    "      a period — when no target-language section is present but an ingredient\n"
+    "      list is readable in another language: translate it into the target\n"
+    "      language, then apply the same normalisation rules.\n"
+    "\n"
+    "  (C) An empty string — only when no readable ingredient list exists anywhere\n"
+    "      on the label (unreadable image, non-food content, blank label, etc.).\n"
+    "\n"
+    "NEVER output reasoning, explanations, apologies, step labels, headings,\n"
+    "markdown, or any text that is not the ingredient list itself.\n"
+    "When returning (C), output ZERO characters — not a space, not a word.\n"
+    "\n"
+    "══ INTERNAL STEP 1 — Find the ingredient section ══\n"
+    "(Do not include any part of this step in your response.)\n"
+    "\n"
+    "The target language is named in the user message. Food labels may print the\n"
+    "ingredient list under headings in several languages, often in columns that OCR\n"
+    "reads as interleaved lines.\n"
+    "\n"
+    "First, search for the target-language ingredient section. Its heading is a word\n"
+    "or short phrase in the target language meaning 'ingredients' or 'contents',\n"
+    "typically printed in all-caps or title case, optionally followed by a colon.\n"
+    "You know the vocabulary of the target language — use that knowledge to\n"
+    "recognise the heading without relying on any pre-listed keywords.\n"
+    "If found, extract that block and proceed to STEP 2 (path A).\n"
+    "\n"
+    "If no target-language section is found, search for an ingredient list in any\n"
+    "other language on the label. Use the same structural cue: a heading meaning\n"
+    "'ingredients' or 'contents' in any language, followed by a list of food items.\n"
+    "Select the most complete readable block and proceed to STEP 3 (path B).\n"
+    "\n"
+    "If no readable ingredient list is found in any language, return an empty string\n"
+    "and stop (path C). Output nothing else.\n"
+    "\n"
+    "══ INTERNAL STEP 2 — Extract and normalise (path A: target language present) ══\n"
+    "(Do not include any part of this step in your response.)\n"
+    "\n"
+    "Cross-language contamination: OCR of multilingual labels often mixes adjacent\n"
+    "language columns into a single block. Discard any word or phrase that does not\n"
+    "belong to the target language — ask yourself whether a native speaker of the\n"
+    "target language would write that word in an ingredient list. If not, discard it.\n"
+    "Remove the foreign fragment and continue; do not restart.\n"
+    "\n"
+    "Apply the normalisation rules in STEP 4 and output the result.\n"
+    "\n"
+    "══ INTERNAL STEP 3 — Translate and normalise (path B: target language absent) ══\n"
+    "(Do not include any part of this step in your response.)\n"
+    "\n"
+    "Translate each ingredient name from the source language into the target language.\n"
+    "Translate ingredient terms, not prose: preserve the list structure, E-numbers,\n"
+    "percentages, and sub-ingredient parentheses. Translate compound ingredient names\n"
+    "as food terms.\n"
+    "\n"
+    "Apply the normalisation rules in STEP 4 and output the result.\n"
+    "\n"
+    "══ INTERNAL STEP 4 — Normalisation rules ══\n"
+    "(Apply after extraction (path A) or translation (path B). Do not include any\n"
+    "part of this step in your response.)\n"
+    "\n"
+    "1.  Output ONLY the cleaned ingredient list. No preamble, no explanation,\n"
+    "    no headers, no extra sentences.\n"
+    "2.  Format as a single comma-separated line.\n"
+    "3.  The user message provides the allergen terms for the target language.\n"
+    "    Every occurrence of those terms — or compound words containing them —\n"
+    "    must be written in ALL CAPS, including inside sub-ingredient parentheses.\n"
+    "4.  Use the decimal separator specified in the user message (comma or dot).\n"
+    "5.  Preserve E-numbers exactly as printed: E270, E150d, E471, E904a.\n"
+    "6.  Sub-ingredients go in parentheses immediately after their parent ingredient.\n"
+    "7.  Preserve percentages from the label.\n"
+    "8.  Append the trace-allergen notice at the very end using the exact phrasing\n"
+    "    from the user message as the final sentence.\n"
+    "9.  The list ends with exactly one period.\n"
+    "10. Strip ingredient-section headings from the output.\n"
+    "11. Strip nutrition-table values, brand names, trademarks, weights, barcodes.\n"
+    "12. Strip allergen-information headings — convert their content into the\n"
+    "    trace-allergen notice format instead.\n"
+    "13. If the extracted or translated block does not resemble an ingredient list,\n"
+    "    return an empty string.\n"
+    "\n"
+    "══ FINAL CHECK — before writing your response ══\n"
+    "Path A or B (found or produced an ingredient list)?\n"
+    "  → Output the cleaned, normalised list ending with a period.\n"
+    "Path C (no readable ingredient list anywhere on the label)?\n"
+    "  → Output nothing. Zero characters. No explanation.\n"
 )
 
 _SUPPORTED_BACKENDS = frozenset(
@@ -119,26 +173,31 @@ _NUTRITION_PROMPT = (
 )
 
 
-def build_ingredient_prompt(language: str) -> str:
-    """Return the user message for ingredient OCR for the given language code.
+def build_ingredient_prompt(language: "str | None" = None) -> str:
+    """Return the structured user message for ingredient extraction.
 
-    Raises:
-        ValueError: If language is not a supported code (no, en, se).
+    Tells the vision LLM the target language, allergen terms, decimal separator,
+    and trace-notice template. The system prompt (_HARDENED_SYSTEM_PROMPT)
+    carries all normalisation rules.
+
+    Falls back to Norwegian for None, empty string, or unknown language codes.
     """
-    cfg = _LANGUAGE_CONFIG.get(language)
-    if cfg is None:
-        raise ValueError(f"Unsupported language: {language!r}")
+    lang = (language or "").strip() or "no"
+    if lang not in ("no", "en", "se"):
+        lang = "no"
+
+    cfg = _LANGUAGE_CONFIG[lang]
     return (
         f"Language: {cfg['name']}\n"
-        f"Allergen terms (ALL CAPS): {cfg['allergen_terms']}\n"
-        f"Decimal separator: {cfg['decimal_sep']}\n"
-        f"Trace notice template: {cfg['trace_template']}\n\n"
-        "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels."
+        f"Allergen terms: {cfg['allergen_terms']}\n"
+        f"Decimal separator: {cfg['decimal_word']}\n"
+        f"Trace notice template: {cfg['trace_template']}\n"
+        "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
     )
 
 
 # Backward-compat alias — code that references _INGREDIENT_PROMPT still works.
-_INGREDIENT_PROMPT = build_ingredient_prompt("no")
+_INGREDIENT_PROMPT = build_ingredient_prompt()
 
 
 def dispatch_ocr(
@@ -168,6 +227,9 @@ def dispatch_ocr(
     if backend == "tesseract":
         from .tesseract import extract
         return extract(image_base64)
+
+    if language not in ("no", "en", "se"):
+        raise ValueError(f"Unsupported language: {language!r}")
 
     if backend == "claude":
         from .claude import extract

@@ -1086,17 +1086,17 @@ class TestBuildIngredientPrompt:
     def test_norwegian_decimal_separator_comma(self):
         from services.ocr_backends import build_ingredient_prompt
 
-        assert "Decimal separator: ," in build_ingredient_prompt("no")
+        assert "Decimal separator: comma" in build_ingredient_prompt("no")
 
     def test_english_decimal_separator_period(self):
         from services.ocr_backends import build_ingredient_prompt
 
-        assert "Decimal separator: ." in build_ingredient_prompt("en")
+        assert "Decimal separator: dot" in build_ingredient_prompt("en")
 
     def test_swedish_decimal_separator_comma(self):
         from services.ocr_backends import build_ingredient_prompt
 
-        assert "Decimal separator: ," in build_ingredient_prompt("se")
+        assert "Decimal separator: comma" in build_ingredient_prompt("se")
 
     def test_norwegian_trace_notice_template(self):
         from services.ocr_backends import build_ingredient_prompt
@@ -1113,23 +1113,20 @@ class TestBuildIngredientPrompt:
 
         assert "Kan innehålla spår av {items}." in build_ingredient_prompt("se")
 
-    def test_unsupported_language_raises_value_error(self):
+    def test_unsupported_language_falls_back_to_norwegian(self):
         from services.ocr_backends import build_ingredient_prompt
 
-        with pytest.raises(ValueError, match="Unsupported language"):
-            build_ingredient_prompt("de")
+        assert "Language: Norwegian" in build_ingredient_prompt("de")
 
-    def test_empty_string_language_raises_value_error(self):
+    def test_empty_string_language_falls_back_to_norwegian(self):
         from services.ocr_backends import build_ingredient_prompt
 
-        with pytest.raises(ValueError, match="Unsupported language"):
-            build_ingredient_prompt("")
+        assert "Language: Norwegian" in build_ingredient_prompt("")
 
-    def test_none_language_raises(self):
+    def test_none_language_falls_back_to_norwegian(self):
         from services.ocr_backends import build_ingredient_prompt
 
-        with pytest.raises((ValueError, TypeError, AttributeError)):
-            build_ingredient_prompt(None)  # type: ignore[arg-type]
+        assert "Language: Norwegian" in build_ingredient_prompt(None)
 
     def test_all_languages_return_nonempty_string(self):
         from services.ocr_backends import build_ingredient_prompt
