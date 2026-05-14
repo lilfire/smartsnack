@@ -123,6 +123,7 @@ jobs:
     env:
       SMARTSNACK_SECRET_KEY: ci-e2e-dummy-key
       PLAYWRIGHT_BROWSERS_PATH: /tmp/ms-playwright
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
