@@ -274,7 +274,7 @@ class TestHardenedSystemPrompt:
     def test_has_four_step_structure(self):
         from services.ocr_backends import _HARDENED_SYSTEM_PROMPT
 
-        for step in ("Step 1", "Step 2", "Step 3", "Step 4"):
+        for step in ("INTERNAL STEP 1", "INTERNAL STEP 2", "INTERNAL STEP 3", "INTERNAL STEP 4"):
             assert step in _HARDENED_SYSTEM_PROMPT, f"Missing {step!r} in system prompt"
 
     def test_is_nonempty_string(self):
