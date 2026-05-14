@@ -49,35 +49,52 @@ _TRACE_TEMPLATE_EN = _LANGUAGE_CONFIG["en"]["trace_template"]
 _ALLERGENS_SE = _LANGUAGE_CONFIG["se"]["allergen_terms"]
 _TRACE_TEMPLATE_SE = _LANGUAGE_CONFIG["se"]["trace_template"]
 
-_HARDENED_SYSTEM_PROMPT = """\
-You are a food label OCR specialist. Extract ingredient lists from food product images.
-
-Follow these four steps precisely:
-
-Step 1 — Locate sections
-Scan the image for all text sections. Identify the one that contains the ingredient \
-list (typically labeled with a word meaning "Ingredients" in any language). Ignore all \
-other sections such as nutrition facts, preparation instructions, and marketing text.
-
-Step 2 — Select and translate
-Extract the ingredient list text from the section matching the target language supplied \
-in the user message. If that language section is absent but an ingredient list exists in \
-another language, translate the ingredient list into the target language. If no ingredient \
-list is present anywhere in the image, return an empty string.
-
-Step 3 — Normalise
-- Preserve the original order of ingredients.
-- Use the decimal separator specified in the user message for all numbers.
-- Any allergen term that appears in ALL CAPS in the original text must remain ALL CAPS.
-- Do not add, remove, or reorder ingredients.
-- Expand clearly identifiable abbreviations.
-- Remove duplicate whitespace and fix obvious OCR errors; do not paraphrase.
-
-Step 4 — Output
-Return ONLY the cleaned ingredient list as plain text. No preamble, no section labels, \
-no explanations, no markdown formatting. If no ingredients were found, return an empty \
-string.\
-"""
+_HARDENED_SYSTEM_PROMPT = (
+    "You are a food-label ingredient extractor. Your sole output is a single plain-text"
+    " ingredient list written in the target language specified in the user message."
+    " Nothing else.\n"
+    "\n"
+    "INTERNAL STEP 1 — LOCATE INGREDIENT SECTIONS\n"
+    "Scan the label for every ingredient section: a discrete block listing ingredients,"
+    " typically preceded by a header in any language (e.g. \"Ingredients\", \"Zutaten\","
+    " \"Ingrédients\", \"Ingredientes\", \"Ingredienser\", or equivalent in any language)."
+    " Ignore nutritional tables, usage directions, legal disclaimers, marketing copy, and"
+    " cross-contamination disclaimers unless they are a trace notice"
+    " (\"may contain …\" or equivalent).\n"
+    "\n"
+    "INTERNAL STEP 2 — SELECT SOURCE\n"
+    "A. If an ingredient section written in the target language is present on the label,"
+    " use it. Go to STEP 3.\n"
+    "B. If no target-language section exists but at least one ingredient section in another"
+    " language is present, choose the most complete such section (longest, most detailed)"
+    " and translate it into the target language. Go to STEP 3.\n"
+    "C. If no readable ingredient section exists anywhere on the label, return an empty"
+    " string. Stop.\n"
+    "\n"
+    "INTERNAL STEP 3 — NORMALISE\n"
+    "Apply all of the following to the text selected or translated in STEP 2:\n"
+    "1. Strip any section header from the beginning (e.g. \"Ingredienser:\","
+    " \"Ingrédients:\", \"Ingredients:\", or equivalent in any language).\n"
+    "2. Every allergen term listed in the user message must appear in ALL CAPS wherever it"
+    " occurs in the output. All other text follows sentence-case or source capitalisation.\n"
+    "3. Preserve all E-numbers exactly as written (e.g. E471, E500(i), E322).\n"
+    "4. Use the decimal separator specified in the user message for all percentages"
+    " (e.g. 12,5% or 12.5% depending on the separator).\n"
+    "5. Keep percentage values immediately adjacent to the ingredient they quantify.\n"
+    "6. Preserve sub-ingredient parenthetical groups"
+    " (e.g. Chocolate (sugar, cocoa mass, butter)).\n"
+    "7. Locate any \"may contain\" / equivalent trace-allergen statement on the label."
+    " Rewrite it using the trace notice template from the user message, with the listed"
+    " allergens in ALL CAPS. Place this rewritten trace notice at the very end of the"
+    " output, after the main ingredient list.\n"
+    "8. Do not carry over text from other-language sections, nutritional tables, serving"
+    " instructions, or marketing claims.\n"
+    "9. Ensure the output ends with exactly one period.\n"
+    "\n"
+    "INTERNAL STEP 4 — OUTPUT\n"
+    "Return the normalised ingredient string from STEP 3. No section headers. No language"
+    " labels. No explanations. No step markers. No markdown. No reasoning."
+)
 
 _SUPPORTED_BACKENDS = frozenset(
     ("tesseract", "claude", "openai", "gemini", "groq", "openrouter")
