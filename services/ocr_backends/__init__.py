@@ -2,55 +2,13 @@
 
 Exports:
   _HARDENED_SYSTEM_PROMPT  — language-agnostic 4-step system prompt
-  build_ingredient_prompt  — locale-specific user message for a language code
-  _INGREDIENT_PROMPT       — backward-compat alias (Norwegian defaults)
+  build_ingredient_prompt  — user message containing only the language code
+  _INGREDIENT_PROMPT       — backward-compat alias (default language)
   dispatch_ocr             — route to the correct backend
 """
 import os
 
-_LANGUAGE_CONFIG = {
-    "no": {
-        "name": "Norwegian",
-        "allergen_terms": (
-            "MELK, EGG, HVETE, RUG, BYGG, HAVRE, GLUTEN, SOYA, NØTTER, "
-            "PEANØTTER, SESAM, FISK, KREPSDYR, BLØTDYR, SENNEP, SELLERI, "
-            "LUPIN, SULFITTER, SVOVELDIOKSID"
-        ),
-        "decimal_sep": ",",
-        "decimal_word": "comma",
-        "trace_template": "Kan inneholde spor av {items}.",
-    },
-    "en": {
-        "name": "English",
-        "allergen_terms": (
-            "MILK, EGGS, WHEAT, RYE, BARLEY, OATS, GLUTEN, SOY, NUTS, "
-            "PEANUTS, SESAME, FISH, CRUSTACEANS, MOLLUSCS, MUSTARD, CELERY, "
-            "LUPIN, SULPHITES, SULPHUR DIOXIDE"
-        ),
-        "decimal_sep": ".",
-        "decimal_word": "dot",
-        "trace_template": "May contain traces of {items}.",
-    },
-    "se": {
-        "name": "Swedish",
-        "allergen_terms": (
-            "MJÖLK, ÄGG, VETE, RÅG, KORN, HAVRE, GLUTEN, SOJA, NÖTTER, "
-            "JORDNÖTTER, SESAM, FISK, KRÄFTDJUR, BLÖTDJUR, SENAP, SELLERI, "
-            "LUPIN, SULFITER, SVAVELDIOXID"
-        ),
-        "decimal_sep": ",",
-        "decimal_word": "comma",
-        "trace_template": "Kan innehålla spår av {items}.",
-    },
-}
-
-# Module-level aliases for each language (used by test_hardened_vision_prompt.py)
-_ALLERGENS_NO = _LANGUAGE_CONFIG["no"]["allergen_terms"]
-_TRACE_TEMPLATE_NO = _LANGUAGE_CONFIG["no"]["trace_template"]
-_ALLERGENS_EN = _LANGUAGE_CONFIG["en"]["allergen_terms"]
-_TRACE_TEMPLATE_EN = _LANGUAGE_CONFIG["en"]["trace_template"]
-_ALLERGENS_SE = _LANGUAGE_CONFIG["se"]["allergen_terms"]
-_TRACE_TEMPLATE_SE = _LANGUAGE_CONFIG["se"]["trace_template"]
+from config import SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 
 _HARDENED_SYSTEM_PROMPT = (
     "You are a food label specialist. Your task is to produce a clean, normalised\n"
@@ -126,15 +84,16 @@ _HARDENED_SYSTEM_PROMPT = (
     "1.  Output ONLY the cleaned ingredient list. No preamble, no explanation,\n"
     "    no headers, no extra sentences.\n"
     "2.  Format as a single comma-separated line.\n"
-    "3.  The user message provides the allergen terms for the target language.\n"
-    "    Every occurrence of those terms — or compound words containing them —\n"
-    "    must be written in ALL CAPS, including inside sub-ingredient parentheses.\n"
-    "4.  Use the decimal separator specified in the user message (comma or dot).\n"
+    "3.  Every regulated allergen term in the target language — and compound words\n"
+    "    that contain them — must be written in ALL CAPS, including inside\n"
+    "    sub-ingredient parentheses. Apply your language knowledge to identify the\n"
+    "    full set of allergen terms for the target language.\n"
+    "4.  Use the decimal separator that is standard in the target language.\n"
     "5.  Preserve E-numbers exactly as printed: E270, E150d, E471, E904a.\n"
     "6.  Sub-ingredients go in parentheses immediately after their parent ingredient.\n"
     "7.  Preserve percentages from the label.\n"
-    "8.  Append the trace-allergen notice at the very end using the exact phrasing\n"
-    "    from the user message as the final sentence.\n"
+    "8.  Append a trace-allergen notice at the very end, phrased naturally in the\n"
+    "    target language, as the final sentence.\n"
     "9.  The list ends with exactly one period.\n"
     "10. Strip ingredient-section headings from the output.\n"
     "11. Strip nutrition-table values, brand names, trademarks, weights, barcodes.\n"
@@ -174,25 +133,21 @@ _NUTRITION_PROMPT = (
 
 
 def build_ingredient_prompt(language: "str | None" = None) -> str:
-    """Return the structured user message for ingredient extraction.
+    """Return the user message for ingredient extraction.
 
-    Tells the vision LLM the target language, allergen terms, decimal separator,
-    and trace-notice template. The system prompt (_HARDENED_SYSTEM_PROMPT)
-    carries all normalisation rules.
+    Passes only the language code so the LLM resolves allergen vocabulary,
+    decimal separator, and trace-notice phrasing from its own language knowledge.
+    The system prompt (_HARDENED_SYSTEM_PROMPT) carries all normalisation rules.
 
-    Falls back to Norwegian for None, empty string, or unknown language codes.
+    Falls back to the default language for None, empty string, or unknown codes.
     """
-    lang = (language or "").strip() or "no"
-    if lang not in ("no", "en", "se"):
-        lang = "no"
-
-    cfg = _LANGUAGE_CONFIG[lang]
+    lang = (language or "").strip() or DEFAULT_LANGUAGE
     return (
-        f"Language: {cfg['name']}\n"
-        f"Allergen terms: {cfg['allergen_terms']}\n"
-        f"Decimal separator: {cfg['decimal_word']}\n"
-        f"Trace notice template: {cfg['trace_template']}\n"
-        "Return the ingredient list for the language stated above — extracted if that language is present, or translated from another language if not. Return an empty string only if no readable ingredient list exists anywhere on the label. Do not output reasoning, explanations, or step labels.\n"
+        f"Language: {lang}\n"
+        "Return the ingredient list for the language stated above — extracted if that language "
+        "is present, or translated from another language if not. "
+        "Return an empty string only if no readable ingredient list exists anywhere on the label. "
+        "Do not output reasoning, explanations, or step labels."
     )
 
 
@@ -203,7 +158,7 @@ _INGREDIENT_PROMPT = build_ingredient_prompt()
 def dispatch_ocr(
     image_base64: str,
     backend: str = "tesseract",
-    language: str = "no",
+    language: str = DEFAULT_LANGUAGE,
 ) -> str:
     """Route ingredient OCR to the specified backend.
 
@@ -211,7 +166,8 @@ def dispatch_ocr(
         image_base64: Raw base64 string or data URI (data:image/...;base64,...).
         backend: One of "tesseract", "claude", "openai", "gemini", "groq",
                  "openrouter". Defaults to "tesseract".
-        language: Language code for the target output: "no", "en", or "se".
+        language: Language code for the target output. Must be one of the
+                  supported languages (derived from the translations directory).
                   Ignored by the tesseract backend.
 
     Returns:
@@ -228,7 +184,7 @@ def dispatch_ocr(
         from .tesseract import extract
         return extract(image_base64)
 
-    if language not in ("no", "en", "se"):
+    if language not in SUPPORTED_LANGUAGES:
         raise ValueError(f"Unsupported language: {language!r}")
 
     if backend == "claude":

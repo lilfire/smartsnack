@@ -1050,83 +1050,32 @@ def _make_groq_module(response_text: str):
 
 
 class TestBuildIngredientPrompt:
-    def test_norwegian_language_field(self):
+    """LSO-1243: build_ingredient_prompt carries only the language code.
+    No allergen vocab, decimal separators, or trace templates in code or tests."""
+
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_language_code_in_prompt(self, lang):
         from services.ocr_backends import build_ingredient_prompt
+        assert lang in build_ingredient_prompt(lang)
 
-        assert "Language: Norwegian" in build_ingredient_prompt("no")
-
-    def test_english_language_field(self):
+    @pytest.mark.parametrize("lang", ["no", "en", "se"])
+    def test_prompt_starts_with_language_line(self, lang):
         from services.ocr_backends import build_ingredient_prompt
+        assert build_ingredient_prompt(lang).startswith("Language:")
 
-        assert "Language: English" in build_ingredient_prompt("en")
-
-    def test_swedish_language_field(self):
+    def test_empty_string_falls_back_to_default(self):
         from services.ocr_backends import build_ingredient_prompt
+        from config import DEFAULT_LANGUAGE
+        assert DEFAULT_LANGUAGE in build_ingredient_prompt("")
 
-        assert "Language: Swedish" in build_ingredient_prompt("se")
-
-    @pytest.mark.parametrize("term", ["MELK", "EGG", "HVETE", "GLUTEN", "SOYA", "SESAM", "FISK"])
-    def test_norwegian_allergen_terms_all_caps(self, term):
+    def test_none_falls_back_to_default(self):
         from services.ocr_backends import build_ingredient_prompt
+        from config import DEFAULT_LANGUAGE
+        assert DEFAULT_LANGUAGE in build_ingredient_prompt(None)
 
-        assert term in build_ingredient_prompt("no"), f"Expected {term!r} in Norwegian prompt"
-
-    @pytest.mark.parametrize("term", ["MILK", "EGGS", "WHEAT", "GLUTEN", "SOY", "SESAME", "FISH"])
-    def test_english_allergen_terms_all_caps(self, term):
+    def test_unknown_code_is_passed_through(self):
         from services.ocr_backends import build_ingredient_prompt
-
-        assert term in build_ingredient_prompt("en"), f"Expected {term!r} in English prompt"
-
-    @pytest.mark.parametrize("term", ["MJÖLK", "ÄGG", "VETE", "GLUTEN", "SOJA", "SESAM", "FISK"])
-    def test_swedish_allergen_terms_all_caps(self, term):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert term in build_ingredient_prompt("se"), f"Expected {term!r} in Swedish prompt"
-
-    def test_norwegian_decimal_separator_comma(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Decimal separator: comma" in build_ingredient_prompt("no")
-
-    def test_english_decimal_separator_period(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Decimal separator: dot" in build_ingredient_prompt("en")
-
-    def test_swedish_decimal_separator_comma(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Decimal separator: comma" in build_ingredient_prompt("se")
-
-    def test_norwegian_trace_notice_template(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Kan inneholde spor av {items}." in build_ingredient_prompt("no")
-
-    def test_english_trace_notice_template(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "May contain traces of {items}." in build_ingredient_prompt("en")
-
-    def test_swedish_trace_notice_template(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Kan innehålla spår av {items}." in build_ingredient_prompt("se")
-
-    def test_unsupported_language_falls_back_to_norwegian(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Language: Norwegian" in build_ingredient_prompt("de")
-
-    def test_empty_string_language_falls_back_to_norwegian(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Language: Norwegian" in build_ingredient_prompt("")
-
-    def test_none_language_falls_back_to_norwegian(self):
-        from services.ocr_backends import build_ingredient_prompt
-
-        assert "Language: Norwegian" in build_ingredient_prompt(None)
+        assert "de" in build_ingredient_prompt("de")
 
     def test_all_languages_return_nonempty_string(self):
         from services.ocr_backends import build_ingredient_prompt
@@ -1263,7 +1212,8 @@ class TestClaudeBackend:
         kwargs = mock_client.messages.create.call_args.kwargs
         user_content = kwargs["messages"][0]["content"]
         texts = [c["text"] for c in user_content if c.get("type") == "text"]
-        assert any("Language: English" in t for t in texts)
+        # LSO-1243: user message carries only the language code, not the name
+        assert any("en" in t for t in texts)
 
     def test_sdk_not_installed_raises_runtime_error(self, monkeypatch):
         monkeypatch.setitem(sys.modules, "anthropic", None)
