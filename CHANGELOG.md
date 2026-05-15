@@ -6,6 +6,47 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 # 
 
+## [0.19.0] - 2026-05-15
+
+### Added
+
+- Hardened, language-aware vision system prompt shared across all 5 LLM OCR backends (Claude, Gemini, GPT-4, OpenRouter, Groq). The shared prompt lives in `services/ocr_backends/__init__.py` as `_HARDENED_SYSTEM_PROMPT` and `build_ingredient_prompt(language)`; it defines a 4-step internal extraction process, cross-language contamination rules (non-target-language words are discarded from multilingual labels), and a language-agnostic design — allergen vocabulary, decimal separator, and trace-notice wording come from the language file rather than hardcoded lists
+- Public `extract(image_base64, language)` function on every LLM backend, with explicit language validation and `RuntimeError` when the provider SDK package is missing
+- LLM cleanup pass (`services/llm_cleanup_service.cleanup_ingredients`): runs Claude Haiku over raw OCR output to capitalize allergens, apply the language's decimal separator, format trace notices, and strip OCR artifacts. Pulls `allergen_terms`, `decimal_separator`, and `trace_notice_template` from `translations/<lang>.json`. Gracefully skips (returning the raw text) when the input is empty, the Anthropic API key is missing, the translation file is unavailable, or the LLM refuses; the OCR response carries `llm_cleanup_skipped`
+- Locale validation pipeline (`services/ocr_locale_validator.validate_and_correct`, wrapped by `extract_with_locale_validation` in `services/ocr_core.py`): on language mismatch it retries the extraction, then translates the result, then flags `localeMismatch=true` with the detected language. Powered by `langdetect`
+- LLM refusal detection in `services/ocr_core.py` — conversational phrases like "I'm happy to help" are downgraded to `no_text`; trailing period is enforced on every non-Tesseract result
+- `lang` parameter on `POST /api/ocr` (multipart form-data or JSON body, default `"no"`) threaded through extraction, locale validation, and cleanup
+- `GET /api/products/<pid>` returns a single product or 404
+- `APP_VERSION_SUFFIX` environment variable appended to the version badge (e.g. `v0.19-DEV`); wired through `.env.example`, `docker-compose.yml`, `config.py`, and `blueprints/core.py`
+- GitHub Actions `e2e-test` job that installs Tesseract, Cairo, Playwright Chromium, and runs `pytest tests/e2e/` against an in-process Flask server
+- Scheduled `stale-audit` workflow (`.github/workflows/stale-audit.yml`, daily 06:00 UTC) backed by `scripts/audit-stale-branches.sh`: audits stale `development`-targeted PRs, stale `LSO-*` branches, and branches tied to done/cancelled Paperclip issues. Dry-run by default; `--cleanup` actually merges and deletes
+- Keyboard-activatable product rows (`role="button"`, tab-focusable, Enter/Space) with expanded rows that span the full grid and stay open on inside-clicks
+- ARIA labels across the header, search, register, and settings templates via new `data-i18n-aria-label` attributes; result count is now `role="status" aria-live="polite"`
+- 10 new translation keys per language (no/en/se): `bulk_report_updated`, `decimal_separator`, `allergen_terms`, `trace_notice_template`, `aria_clear_search`, `aria_search_results`, `aria_loading_more`, `aria_restore_file`, `aria_import_file`, `aria_main_navigation`
+- New regression/unit tests: `tests/test_hardened_vision_prompt.py`, `tests/test_llm_cleanup_service.py`, `tests/test_ocr_locale_validator.py`, expanded `tests/test_ocr_core.py`, and multilingual e2e fixtures (`china_ingriditens.jpg`, `de.jpg`, `ingredients_list.jpg`, `multi.jpg`) plus ~30 browser-level e2e suites covering tag/EAN/OFF/scanner/OCR/validation/accessibility flows
+- `langdetect>=1.0.9` dependency
+
+### Changed
+
+- `services/llm_translate_service.py` translation prompt strengthened to forbid code-switching and non-Latin-script residue (explicit self-check rule, with `palm油` cited as forbidden)
+- Duplicate detection (`services/product_duplicate.py`) now also runs the name-match check when the candidate product already has an EAN, broadening duplicate coverage
+- Tag names preserve their original case in `services/tag_service.py` (create and update no longer lowercase); idempotency still works via case-insensitive lookup
+- Backup restore in `services/backup_core.py` no longer inserts EAN rows during `_restore_product`; EAN restoration now flows exclusively through the dedicated EAN path
+- `unsync_product` returns HTTP 404 (not 400) when the product doesn't exist, surfaced via `LookupError`
+- Search result count reports the true `state.pagination.total` instead of the in-page row count; `state.pagination.offset` is reset to 0 on every load
+- Scan buttons are visible on all devices — the `@media (pointer: coarse)` gate in `scanner.css` and `search.css` is removed
+- Language and OCR-provider `<select>` elements opt out of the custom dropdown wrapper via a new `data-no-custom-select` attribute (`state.js` `initAllFieldSelects` honours it); language switching and provider selection use the native browser dropdown
+- Settings → Backup download now appends `?api_key=` when `window.SMARTSNACK_API_KEY` is set; restore distinguishes `SyntaxError` (invalid JSON) from unexpected failures and surfaces the raw error message
+- Settings → Protein Quality cards autosave on both `change` and `blur` and now display the field name as a label above each input
+- Settings → Categories shows a display-only label before each editable input
+- OFF refresh progress bar uses an explicit `display: 'block'` and shows the `bulk_running` status string while running
+
+### Fixed
+
+- `delete_ean` refuses to remove a product's last remaining EAN (`cannot_delete_only_ean`), preventing products from being left without any identifier
+- Tag input modal no longer renders twice when the field is clicked rapidly, and the click no longer bubbles up to collapse the parent product row before the modal appears
+- OFF refresh progress bar reliably becomes visible at the start of a run instead of being hidden by an empty `display` string
+
 ## [0.18.0] - 2026-04-27
 
 ### Added
