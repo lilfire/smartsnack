@@ -223,6 +223,16 @@ playwright install chromium
 python -m pytest tests/e2e/
 ```
 
+#### Groq live E2E tests
+
+Two test modules (`test_groq_vision_images_e2e.py`, `test_vision_language_e2e.py`) call the live Groq API and are **skipped by default** to avoid exhausting the daily token quota on every CI run. They only run automatically on `development` and `main` branch pushes.
+
+To run them locally, set both env vars:
+
+```bash
+RUN_GROQ_E2E=1 GROQ_API_KEY=your_key pytest tests/e2e/test_groq_vision_images_e2e.py tests/e2e/test_vision_language_e2e.py
+```
+
 ## Usage
 
 1. Open the app in a browser and go to the **Registrer** (Register) tab.

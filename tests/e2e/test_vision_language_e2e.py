@@ -5,9 +5,8 @@ asserts that the returned text is non-empty and that different target languages
 produce different outputs — proving that build_ingredient_prompt() correctly
 routes the model via the native language name, not a bare ISO code.
 
-Skipped unless GROQ_API_KEY is set in the environment.
-DevOps will add the secret to CI (LSO-1249); until then the test runs
-locally only.
+Gated by RUN_GROQ_E2E=1 (set in CI only on development/main pushes).
+Set RUN_GROQ_E2E=1 locally to opt in; also requires GROQ_API_KEY.
 """
 import base64
 import io
@@ -18,9 +17,11 @@ from PIL import Image, ImageDraw, ImageFont
 
 from config import SUPPORTED_LANGUAGES
 from services.ocr_backends import dispatch_ocr
+from tests.e2e.groq_helpers import skip_on_groq_quota
 
 
 _GROQ_KEY = os.environ.get("GROQ_API_KEY")
+_RUN_GROQ_E2E = os.environ.get("RUN_GROQ_E2E") == "1"
 
 
 def _make_multilingual_label_b64() -> str:
@@ -67,7 +68,10 @@ def _make_multilingual_label_b64() -> str:
 _LABEL_B64 = _make_multilingual_label_b64()
 
 
-@pytest.mark.skipif(not _GROQ_KEY, reason="requires live GROQ_API_KEY")
+@pytest.mark.skipif(
+    not (_RUN_GROQ_E2E and _GROQ_KEY),
+    reason="Groq E2E skipped: requires RUN_GROQ_E2E=1 and GROQ_API_KEY",
+)
 class TestVisionLanguageRoutingLive:
     """Verify that the native-name fix in build_ingredient_prompt() routes
     the Groq vision model to the correct language section on a multilingual label.
@@ -80,7 +84,8 @@ class TestVisionLanguageRoutingLive:
     @pytest.mark.parametrize("lang", SUPPORTED_LANGUAGES)
     def test_groq_returns_nonempty_for_target_language(self, lang):
         """dispatch_ocr must return a non-empty ingredient string for each language."""
-        result = dispatch_ocr(_LABEL_B64, backend="groq", language=lang)
+        with skip_on_groq_quota():
+            result = dispatch_ocr(_LABEL_B64, backend="groq", language=lang)
         assert result, (
             f"dispatch_ocr(backend='groq', language={lang!r}) returned empty. "
             "The vision LLM should extract or translate the multilingual label."
@@ -92,8 +97,9 @@ class TestVisionLanguageRoutingLive:
         If the fix regresses (bare code again), the LLM often outputs the
         same section for all codes, making this assertion fail.
         """
-        no_result = dispatch_ocr(_LABEL_B64, backend="groq", language="no")
-        en_result = dispatch_ocr(_LABEL_B64, backend="groq", language="en")
+        with skip_on_groq_quota():
+            no_result = dispatch_ocr(_LABEL_B64, backend="groq", language="no")
+            en_result = dispatch_ocr(_LABEL_B64, backend="groq", language="en")
 
         assert no_result, "Norwegian extraction returned empty"
         assert en_result, "English extraction returned empty"
