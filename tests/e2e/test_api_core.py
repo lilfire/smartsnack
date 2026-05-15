@@ -139,6 +139,70 @@ def test_products_api_type_filter(live_url, api_create_product, unique_name):
 
 
 # ---------------------------------------------------------------------------
+# Single product GET
+# ---------------------------------------------------------------------------
+
+
+def test_get_single_product_endpoint(live_url, api_create_product, unique_name):
+    """GET /api/products/<pid> returns the product, and 404 for unknown ids.
+
+    Closes the gap where ``GET /api/products/<pid>`` had no direct e2e
+    coverage. The endpoint is the canonical re-fetch path used by every
+    "did this save actually persist?" check, so its happy path and 404
+    behavior must both be exercised.
+    """
+    name = unique_name("SingleGetProduct")
+    created = api_create_product(
+        name=name,
+        category="Snacks",
+        kcal=250,
+        protein=12,
+        fat=8,
+        brand="SingleGetBrand",
+    )
+    pid = created["id"]
+
+    product = _get(f"{live_url}/api/products/{pid}")
+
+    assert product.get("id") == pid, (
+        f"Expected id={pid} in single-product response, got {product.get('id')!r}"
+    )
+    assert product.get("name") == name, (
+        f"Expected name={name!r}, got {product.get('name')!r}"
+    )
+    assert product.get("type") == "Snacks", (
+        f"Expected type='Snacks', got {product.get('type')!r}"
+    )
+    assert product.get("brand") == "SingleGetBrand", (
+        f"Expected brand='SingleGetBrand', got {product.get('brand')!r}"
+    )
+    assert float(product.get("kcal")) == 250.0, (
+        f"Expected kcal=250, got {product.get('kcal')!r}"
+    )
+
+    # 404 for a non-existent id — use a far-out integer that cannot collide
+    # with anything ``api_create_product`` ever generates inside a test run.
+    req = urllib.request.Request(
+        f"{live_url}/api/products/9999999",
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            body = json.loads(resp.read())
+            raise AssertionError(
+                f"Expected 404 for missing product id, got 200: {body}"
+            )
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404, (
+            f"Expected HTTP 404 for unknown product id, got {exc.code}"
+        )
+        body = json.loads(exc.read())
+        assert "error" in body, (
+            f"404 response should include an 'error' key, got: {body}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Products update
 # ---------------------------------------------------------------------------
 
