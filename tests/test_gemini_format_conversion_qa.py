@@ -99,7 +99,7 @@ class TestDispatchOcrFormatConversion:
                 with genai_patch:
                     result = dispatch_ocr(_b64(image_bytes))
 
-        assert result["text"] == "ingredienser"
+        assert result["text"] == "ingredienser."
         # Verify the API was called with PNG mime type
         call_kwargs = mock_client.models.generate_content.call_args
         parts = call_kwargs[1]["contents"][0]["parts"]
@@ -121,7 +121,7 @@ class TestDispatchOcrFormatConversion:
                     with patch("services.ocr_backends.gemini._svg_to_png", return_value=fake_png, autospec=True):
                         result = dispatch_ocr(_b64(svg_bytes))
 
-        assert result["text"] == "ingredienser fra svg"
+        assert result["text"] == "ingredienser fra svg."
         call_kwargs = mock_client.models.generate_content.call_args
         parts = call_kwargs[1]["contents"][0]["parts"]
         assert parts[0]["inline_data"]["mime_type"] == "image/png"
@@ -144,7 +144,7 @@ class TestDispatchOcrFormatConversion:
                 with genai_patch:
                     result = dispatch_ocr(_b64(image_bytes))
 
-        assert result["text"] == "sukker"
+        assert result["text"] == "sukker."
         call_kwargs = mock_client.models.generate_content.call_args
         parts = call_kwargs[1]["contents"][0]["parts"]
         assert parts[0]["inline_data"]["mime_type"] == expected_mime
@@ -163,7 +163,7 @@ class TestDispatchOcrFormatConversion:
                 with genai_patch:
                     result = dispatch_ocr(_b64(webp_bytes))
 
-        assert result["text"] == "mel"
+        assert result["text"] == "mel."
         call_kwargs = mock_client.models.generate_content.call_args
         parts = call_kwargs[1]["contents"][0]["parts"]
         assert parts[0]["inline_data"]["mime_type"] == "image/webp"
@@ -199,7 +199,7 @@ class TestDispatchOcrFormatConversion:
                 with genai_patch:
                     result = dispatch_ocr(_data_uri(bmp_bytes, mime="image/bmp"))
 
-        assert result["text"] == "data uri test"
+        assert result["text"] == "data uri test."
         call_kwargs = mock_client.models.generate_content.call_args
         parts = call_kwargs[1]["contents"][0]["parts"]
         assert parts[0]["inline_data"]["mime_type"] == "image/png"
@@ -408,7 +408,7 @@ class TestBlueprintFormatConversion:
 
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["text"] == f"ingredients from {label}"
+        assert data["text"] == f"ingredients from {label}."
         assert "provider" in data
 
     def test_endpoint_with_svg_returns_200(self, client):
@@ -429,7 +429,7 @@ class TestBlueprintFormatConversion:
 
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["text"] == "svg ingredients"
+        assert data["text"] == "svg ingredients."
 
     @pytest.mark.parametrize("fmt", ["JPEG", "PNG"])
     def test_endpoint_with_supported_format_returns_200(self, fmt, client):
@@ -449,7 +449,7 @@ class TestBlueprintFormatConversion:
 
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["text"] == "normal ingredients"
+        assert data["text"] == "normal ingredients."
 
     def test_endpoint_with_webp_returns_200(self, client):
         mock_client = _make_gemini_response("webp ingredients")
@@ -467,7 +467,7 @@ class TestBlueprintFormatConversion:
 
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["text"] == "webp ingredients"
+        assert data["text"] == "webp ingredients."
 
     def test_endpoint_no_ui_change_unsupported_format(self, client):
         """Response shape for unsupported formats should match supported ones."""
@@ -485,5 +485,5 @@ class TestBlueprintFormatConversion:
                     )
 
         data = resp.get_json()
-        # Same response shape as any other format — no extra fields
-        assert set(data.keys()) == {"text", "provider", "fallback"}
+        # Response includes LLM cleanup status in addition to OCR fields
+        assert set(data.keys()) == {"text", "provider", "fallback", "llm_cleanup_skipped"}

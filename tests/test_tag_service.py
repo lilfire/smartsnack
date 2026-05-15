@@ -13,20 +13,20 @@ class TestCreateTag:
         assert tag["label"] == "organic"
         assert isinstance(tag["id"], int)
 
-    def test_lowercases_label(self, app_ctx):
+    def test_preserves_original_case(self, app_ctx):
         from services.tag_service import create_tag
         tag = create_tag("ORGANIC")
-        assert tag["label"] == "organic"
+        assert tag["label"] == "ORGANIC"
 
     def test_strips_whitespace(self, app_ctx):
         from services.tag_service import create_tag
         tag = create_tag("  organic  ")
         assert tag["label"] == "organic"
 
-    def test_strips_and_lowercases_combined(self, app_ctx):
+    def test_strips_whitespace_preserves_case(self, app_ctx):
         from services.tag_service import create_tag
         tag = create_tag("  Organic  ")
-        assert tag["label"] == "organic"
+        assert tag["label"] == "Organic"
 
     def test_empty_label_raises_value_error(self, app_ctx):
         from services.tag_service import create_tag
@@ -195,11 +195,11 @@ class TestUpdateTag:
         assert result is not None
         assert result["label"] == "organic"
 
-    def test_rename_lowercases_and_strips(self, app_ctx):
+    def test_rename_strips_whitespace_preserves_case(self, app_ctx):
         from services.tag_service import create_tag, update_tag
         t = create_tag("old")
         result = update_tag(t["id"], "  NEW  ")
-        assert result["label"] == "new"
+        assert result["label"] == "NEW"
 
 
 # ── delete_tag ─────────────────────────────────────────────────────────────────

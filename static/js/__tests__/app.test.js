@@ -297,7 +297,7 @@ describe('app.js initialization', () => {
 });
 
 describe('language-select callback', () => {
-  it('calls upgradeSelect for #language-select with a changeLanguage callback', async () => {
+  it('sets onchange on #language-select to call changeLanguage', async () => {
     vi.resetModules();
     document.body.innerHTML = '';
 
@@ -310,15 +310,14 @@ describe('language-select callback', () => {
     await import('../app.js');
     await flushPromises();
 
-    const { upgradeSelect } = await import('../state.js');
     const { changeLanguage } = await import('../i18n.js');
 
-    const langCall = upgradeSelect.mock.calls.find((c) => c[0] === langSelect);
-    expect(langCall).toBeDefined();
-    expect(typeof langCall[1]).toBe('function');
+    // app.js wires up a native onchange handler (no custom dropdown)
+    expect(typeof langSelect.onchange).toBe('function');
 
-    // Invoking the callback must call changeLanguage with the chosen value
-    langCall[1]('en');
+    // Changing value and firing change event must call changeLanguage
+    langSelect.value = 'en';
+    langSelect.dispatchEvent(new Event('change'));
     expect(changeLanguage).toHaveBeenCalledWith('en');
   });
 

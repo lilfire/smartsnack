@@ -15,9 +15,11 @@ export function renderPqTable() {
   if (!pqData.length) { container.innerHTML = '<p style="color:rgba(255,255,255,0.3);font-size:13px;text-align:center;padding:20px">No protein sources</p>'; return; }
   let h = '';
   pqData.forEach((row) => {
+    const labelText = esc(row.label || row.keywords[0]);
     h += '<div class="pq-card">'
+      + '<span class="pq-card-name">' + labelText + '</span>'
       + '<div class="pq-card-top">'
-      + '<input class="cat-item-label-input" id="pqe-label-' + row.id + '" value="' + esc(row.label || row.keywords[0]) + '" title="Name">'
+      + '<input class="cat-item-label-input" id="pqe-label-' + row.id + '" value="' + labelText + '" title="Name">'
       + '<span class="pq-badges"><span class="pq-badge"><span class="pq-badge-label">P </span>'
       + '<input class="pq-inline-num mono" id="pqe-pdcaas-' + row.id + '" type="number" step="0.01" min="0" max="1" value="' + row.pdcaas + '">'
       + '</span><span class="pq-badge"><span class="pq-badge-label">D </span>'
@@ -29,14 +31,19 @@ export function renderPqTable() {
       + '</div>';
   });
   container.innerHTML = h;
-  // Attach change handlers for autosave
+  // Attach autosave handlers — both 'change' and 'blur' so that programmatic
+  // fills (e.g. Playwright .fill()) followed by a Tab keypress reliably trigger
+  // the save even when the browser skips the 'change' event.
   pqData.forEach((row) => {
     const labelEl = document.getElementById('pqe-label-' + row.id);
     const pdcaasEl = document.getElementById('pqe-pdcaas-' + row.id);
     const diaasEl = document.getElementById('pqe-diaas-' + row.id);
     const kwEl = document.getElementById('pqe-kw-' + row.id);
     [labelEl, pdcaasEl, diaasEl, kwEl].forEach((el) => {
-      if (el) el.addEventListener('change', () => { autosavePq(row.id); });
+      if (el) {
+        el.addEventListener('change', () => { autosavePq(row.id); });
+        el.addEventListener('blur', () => { autosavePq(row.id); });
+      }
     });
   });
   // Attach delete handlers

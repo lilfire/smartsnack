@@ -616,7 +616,7 @@ describe('renderResults - event delegation', () => {
     expect(document.getElementById('result-count').textContent).toContain('result_count_plural');
   });
 
-  it('does not call toggleExpand when clicking inside expanded area', () => {
+  it('calls toggleExpand when clicking inside expanded area (allows collapse by re-clicking row)', () => {
     state.expandedId = 1;
     const products = [{
       id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
@@ -626,7 +626,22 @@ describe('renderResults - event delegation', () => {
     renderResults(products, '');
     const expandedDiv = document.querySelector('.expanded');
     expandedDiv.click();
-    expect(window.toggleExpand).not.toHaveBeenCalled();
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('does not call toggleExpand when clicking a button inside expanded area', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const btn = document.querySelector('.expanded button');
+    if (btn) {
+      btn.click();
+      expect(window.toggleExpand).not.toHaveBeenCalled();
+    }
   });
 
   it('renders has_missing_scores asterisk in score cell', () => {
@@ -1120,6 +1135,24 @@ describe('renderResults - additional branch coverage', () => {
     expect(window.toggleExpand).toHaveBeenCalled();
   });
 
+  it('pressing Enter on a focused table-row calls toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row[data-action="toggle-expand"]');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('pressing non-Enter key on table-row does not call toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row[data-action="toggle-expand"]');
+    const event = new KeyboardEvent('keydown', { key: 'Space', bubbles: true });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
   it('does not toggle-expand when clicking a button inside the row', () => {
     state.expandedId = 1;
     state.editingId = null;
@@ -1250,6 +1283,109 @@ describe('renderResults - additional branch coverage', () => {
     renderResults(products, '');
     expect(document.getElementById('ed-off-btn')).toBeNull();
     expect(document.querySelector('[data-action="lookup-off"]')).toBeNull();
+  });
+});
+
+describe('renderResults - keyboard accessibility', () => {
+  beforeEach(() => {
+    const count = document.createElement('div');
+    count.id = 'result-count';
+    document.body.appendChild(count);
+    const container = document.createElement('div');
+    container.id = 'results-container';
+    document.body.appendChild(container);
+    window.setSort = vi.fn();
+    window.toggleExpand = vi.fn();
+    window.triggerImageUpload = vi.fn();
+    window.saveProduct = vi.fn();
+    window.startEdit = vi.fn();
+    window.removeProductImage = vi.fn();
+    window.deleteProduct = vi.fn();
+    window.openScanner = vi.fn();
+    window.lookupOFF = vi.fn();
+    window.estimateProteinQuality = vi.fn();
+    window.switchView = vi.fn();
+    window.validateOffBtn = vi.fn();
+    window.updateEstimateBtn = vi.fn();
+  });
+
+  it('table-row has tabindex="0" and role="button"', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    expect(row.getAttribute('tabindex')).toBe('0');
+    expect(row.getAttribute('role')).toBe('button');
+  });
+
+  it('table-row has aria-label set to product name', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    expect(row.getAttribute('aria-label')).toBe('Milk');
+  });
+
+  it('Enter key on table-row triggers toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const row = document.querySelector('.table-row');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(event, 'target', { value: row, writable: false });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('Space key on table-row triggers toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true });
+    Object.defineProperty(event, 'target', { value: row, writable: false });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('other keys on table-row do not trigger toggleExpand', () => {
+    const products = [{ id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0 }];
+    renderResults(products, '');
+    const row = document.querySelector('.table-row');
+    const event = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true });
+    Object.defineProperty(event, 'target', { value: row, writable: false });
+    row.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
+  it('Enter key inside expanded area does not trigger toggleExpand', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const expandedDiv = document.querySelector('.expanded');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(event, 'target', { value: expandedDiv, writable: false });
+    expandedDiv.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
+  });
+
+  it('Enter key on a button inside a row does not trigger toggleExpand', () => {
+    state.expandedId = 1;
+    state.editingId = null;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3, saturated_fat: 2, carbs: 5,
+      sugar: 5, protein: 3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const container = document.getElementById('results-container');
+    const btn = document.querySelector('[data-action="start-edit"]');
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
+    Object.defineProperty(event, 'target', { value: btn, writable: false });
+    btn.dispatchEvent(event);
+    expect(window.toggleExpand).not.toHaveBeenCalled();
   });
 });
 

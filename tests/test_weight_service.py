@@ -74,6 +74,10 @@ class TestUpdateWeights:
 
     def test_unknown_field_ignored(self, app_ctx):
         from services.weight_service import update_weights
+        from db import get_db
 
-        # Should not raise
         update_weights([{"field": "nonexistent_field", "weight": 10}])
+        row = get_db().execute(
+            "SELECT weight FROM score_weights WHERE field='nonexistent_field'"
+        ).fetchone()
+        assert row is None

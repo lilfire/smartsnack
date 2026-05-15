@@ -261,7 +261,7 @@ export async function loadData() {
     const results = Array.isArray(data) ? data : (data.products || []);
     const total = Array.isArray(data) ? null : (data.total != null ? data.total : null);
     if (total !== null) state.pagination.total = total;
-    state.pagination.offset = results.length > 0 ? state.pagination.pageSize : 0;
+    state.pagination.offset = 0;
     renderResults(results, search);
     requestAnimationFrame(() => {
       if (search && results.length > 0) {

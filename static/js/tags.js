@@ -13,6 +13,15 @@ export function initTagInput(existingTags) {
   }
   _renderPills();
   _setupAddTagButton();
+  const field = document.getElementById('tag-field-ed');
+  if (field && !field.dataset.tagClickBound) {
+    field.dataset.tagClickBound = '1';
+    field.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (e.target.closest('.tag-remove')) return;
+      _openModal();
+    });
+  }
 }
 
 export function getTagsForSave() {
@@ -59,6 +68,14 @@ function _setupAddTagButton() {
   btn.setAttribute('aria-haspopup', 'dialog');
   btn.addEventListener('click', _openModal);
   field.appendChild(btn);
+  // Clicking anywhere on the field (not on pill or button) opens the modal.
+  // stopPropagation prevents the click from bubbling to the container's
+  // delegated toggle-expand handler, which would collapse the product row
+  // and remove #tag-field-ed from the DOM before _confirmAdd renders the pill.
+  field.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (!e.target.closest('button') && !e.target.closest('.tag-pill')) _openModal();
+  });
 }
 
 async function _fetchSuggestions(q, list, input, onSelect) {
@@ -108,6 +125,7 @@ function _clearHighlight(list) {
 }
 
 function _openModal() {
+  if (document.getElementById('tag-modal-overlay')) return;
   const overlay = document.createElement('div');
   overlay.id = 'tag-modal-overlay';
   overlay.className = 'tag-modal-overlay';

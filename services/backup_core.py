@@ -71,12 +71,6 @@ def _restore_product(cur, p, valid_flags=None):
         ),
     )
     new_id = cur.lastrowid
-    ean = p.get("ean", "").strip()
-    if ean:
-        cur.execute(
-            "INSERT OR IGNORE INTO product_eans (product_id, ean, is_primary) VALUES (?, ?, 1)",
-            (new_id, ean),
-        )
     if valid_flags is None:
         valid_flags = flag_service.get_all_flag_names()
     for flag in p.get("flags", []):

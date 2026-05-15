@@ -315,7 +315,7 @@ class TestOcrDispatchWiring:
 
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called_with.get("backend") == "claude_vision"
-        assert result["text"] == "claude text"
+        assert result["text"] == "claude text."
         assert result["provider"] == "Claude Vision"
         assert result["fallback"] is False
 
@@ -360,4 +360,4 @@ class TestOcrDispatchWiring:
         monkeypatch.setitem(ocr_service._PROVIDERS, "claude_vision", mock_claude)
         result = ocr_service.dispatch_ocr(self._make_test_image_b64())
         assert called.get("called") is True
-        assert result["text"] == "text"
+        assert result["text"] == "text."

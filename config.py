@@ -2,7 +2,8 @@
 
 import os
 
-APP_VERSION = "0.18"
+APP_VERSION = "0.19"
+APP_VERSION_SUFFIX = os.environ.get("APP_VERSION_SUFFIX", "")
 
 DB_PATH = os.environ.get("DB_PATH", "/data/smartsnack.sqlite")
 

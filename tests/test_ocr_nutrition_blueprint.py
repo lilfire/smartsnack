@@ -356,7 +356,8 @@ class TestPromptThreadedThroughBackends:
 
         call = fake_openai.OpenAI.return_value.chat.completions.create.call_args
         messages = call.kwargs["messages"]
-        text_block = messages[0]["content"][1]
+        # system is messages[0], user is messages[1]
+        text_block = messages[1]["content"][1]
         assert text_block["text"] == "CUSTOM PROMPT"
 
     def test_groq_forwards_prompt(self):
@@ -377,7 +378,8 @@ class TestPromptThreadedThroughBackends:
 
         call = fake_groq_module.Groq.return_value.chat.completions.create.call_args
         messages = call.kwargs["messages"]
-        text_block = messages[0]["content"][1]
+        # system is messages[0], user is messages[1]
+        text_block = messages[1]["content"][1]
         assert text_block["text"] == "CUSTOM PROMPT"
 
     def test_openrouter_forwards_prompt_and_drops_system(self):

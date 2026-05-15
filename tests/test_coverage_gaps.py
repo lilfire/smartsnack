@@ -515,12 +515,19 @@ class TestImportWithCategoriesAndFlags:
     def test_import_duplicate_category_ignored(self, app_ctx, seed_category):
         """Line 612: IntegrityError on duplicate category is silently ignored."""
         from services.import_service import import_products
+        from db import get_db
 
+        count_before = get_db().execute(
+            "SELECT COUNT(*) FROM categories WHERE name='Snacks'"
+        ).fetchone()[0]
         import_products({
             "categories": [{"name": "Snacks", "emoji": "🍿"}],
             "products": [],
         })
-        # Should not raise
+        count_after = get_db().execute(
+            "SELECT COUNT(*) FROM categories WHERE name='Snacks'"
+        ).fetchone()[0]
+        assert count_after == count_before  # duplicate was not inserted
 
     def test_import_with_flag_definitions(self, app_ctx, seed_category):
         """Lines 615-630: import creates flag definitions with translations."""
@@ -553,11 +560,19 @@ class TestImportWithCategoriesAndFlags:
             "flag_definitions": [{"name": "dup_flag", "type": "user"}],
             "products": [],
         })
-        # Second import — same flag — should not raise
+        count_after_first = get_db().execute(
+            "SELECT COUNT(*) FROM flag_definitions WHERE name='dup_flag'"
+        ).fetchone()[0]
+        # Second import — same flag — should not raise and not duplicate
         import_products({
             "flag_definitions": [{"name": "dup_flag", "type": "user"}],
             "products": [],
         })
+        count_after_second = get_db().execute(
+            "SELECT COUNT(*) FROM flag_definitions WHERE name='dup_flag'"
+        ).fetchone()[0]
+        assert count_after_first == 1
+        assert count_after_second == count_after_first  # no duplicate inserted
 
     def test_import_flag_definition_invalid_type_skipped(self, app_ctx, seed_category):
         """Line 618: flag definition with invalid type is skipped during import."""

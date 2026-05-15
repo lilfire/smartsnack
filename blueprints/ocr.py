@@ -5,7 +5,7 @@ from PIL import UnidentifiedImageError
 
 from extensions import limiter
 from helpers import _require_json
-from services import ocr_service
+from services import ocr_service, llm_cleanup_service
 
 bp = Blueprint("ocr", __name__)
 
@@ -94,6 +94,7 @@ def ocr_ingredients():
     if "image" in request.files:
         # Multipart/form-data upload path
         image_bytes = request.files["image"].read()
+        lang = request.form.get("lang", "no")
         if not image_bytes:
             return _error_response("No image provided", 400)
         try:
@@ -140,6 +141,7 @@ def ocr_ingredients():
             return _error_response(str(e), 400)
 
         image = data.get("image", "")
+        lang = data.get("lang", "no")
         if not image:
             return _error_response("No image provided", 400)
 
@@ -187,13 +189,20 @@ def ocr_ingredients():
     if not text:
         return jsonify({
             "text": "",
+            "llm_cleanup_skipped": True,
             "error": "No text found in image",
             "error_type": "no_text",
             "provider": provider,
             "fallback": fallback,
         }), 200
 
-    return jsonify({"text": text, "provider": provider, "fallback": fallback})
+    cleanup = llm_cleanup_service.cleanup_ingredients(text, lang)
+    return jsonify({
+        "text": cleanup["text"],
+        "llm_cleanup_skipped": cleanup["llm_cleanup_skipped"],
+        "provider": provider,
+        "fallback": fallback,
+    })
 
 
 def _read_request_image_bytes():

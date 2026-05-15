@@ -656,7 +656,7 @@ class TestParseAdvancedFilters:
             }
         )
         sql, params, post = _parse_advanced_filters(filters)
-        assert sql == "" or sql is not None
+        assert sql == ""  # total_score is a computed field — goes to post-filter, not SQL
         assert post is not None
         assert post["field"] == "total_score"
 
