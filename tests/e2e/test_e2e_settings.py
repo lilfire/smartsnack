@@ -197,6 +197,50 @@ class TestSetOffLanguagePriority:
 # ===========================================================================
 
 
+class TestLegacyOcrSettingsPut:
+    """Legacy PUT /api/settings/ocr endpoint round-trip coverage.
+
+    The newer settings live under /api/ocr/settings, but the legacy
+    /api/settings/ocr (GET + PUT) endpoints still ship and had zero e2e
+    coverage. This class drives the PUT happy path with the always-available
+    ``tesseract`` backend and then confirms persistence via GET.
+    """
+
+    def test_put_tesseract_returns_ok(self, live_url):
+        status, data = _put(
+            f"{live_url}/api/settings/ocr", {"backend": "tesseract"}
+        )
+        assert status == 200, f"Expected 200, got {status}: {data}"
+        assert data.get("ok") is True, f"Expected ok=True, got: {data}"
+        assert data.get("backend") == "tesseract", (
+            f"Expected backend='tesseract' echoed back, got: {data}"
+        )
+
+    def test_put_then_get_persists(self, live_url):
+        """After PUT, GET /api/settings/ocr must report the same backend."""
+        _put(f"{live_url}/api/settings/ocr", {"backend": "tesseract"})
+
+        status, data = _get(f"{live_url}/api/settings/ocr")
+        assert status == 200, f"Expected 200 from GET, got {status}: {data}"
+        assert data.get("current_backend") == "tesseract", (
+            f"Expected current_backend='tesseract' after PUT, got: {data}"
+        )
+
+    def test_put_rejects_missing_backend(self, live_url):
+        status, data = _put(f"{live_url}/api/settings/ocr", {})
+        assert status == 400, f"Expected 400 for missing backend, got {status}: {data}"
+        assert "error" in data, f"Expected 'error' key in response, got: {data}"
+
+    def test_put_rejects_unknown_backend(self, live_url):
+        status, data = _put(
+            f"{live_url}/api/settings/ocr", {"backend": "definitely_not_a_backend"}
+        )
+        assert status == 400, (
+            f"Expected 400 for unknown backend, got {status}: {data}"
+        )
+        assert "error" in data, f"Expected 'error' key in response, got: {data}"
+
+
 class TestOffLanguagePriorityFlow:
     """Integration flow: set -> get -> set -> get round-trip."""
 

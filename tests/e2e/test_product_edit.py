@@ -204,6 +204,120 @@ def test_edit_category_change(page, api_create_product):
     expect(toast.first).to_be_visible(timeout=5000)
 
 
+def test_edit_category_persists_via_get_after_save(page, api_create_product, live_url):
+    """Re-GET the product after a UI category change confirms the new ``type`` persisted.
+
+    Regression vector for LSO-1267 — that bug shipped through ``test_edit_category_change``
+    which only asserted a success toast. A silently-broken save would still
+    flash the toast while leaving the underlying type unchanged. This test
+    closes that loophole by hitting ``GET /api/products/<pid>`` after the
+    save and comparing the returned ``type`` to the originally-selected
+    category, not to any DOM-class indicator.
+    """
+    # Seed a second category so we have a guaranteed-different option to pick.
+    # The default seed only includes "Snacks", which matches the starting type.
+    target_category = "EditPersistTargetCat"
+    create_cat_req = urllib.request.Request(
+        f"{live_url}/api/categories",
+        data=json.dumps({"name": target_category, "label": target_category}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(create_cat_req, timeout=5).read()
+    except urllib.error.HTTPError as exc:
+        # 409 (already exists) is fine; anything else is a setup failure.
+        if exc.code != 409:
+            raise
+
+    created = api_create_product(name="CatPersistTest", category="Snacks")
+    pid = created["id"]
+    _reload_and_wait(page)
+
+    _open_edit_form(page, "CatPersistTest")
+
+    category_select = page.locator("#ed-type")
+    expect(category_select).to_be_attached(timeout=3000)
+
+    category_select.select_option(target_category)
+
+    page.locator("[data-action='save-product']").first.click()
+
+    # Wait for the success toast before re-fetching so the PUT round-trip
+    # has actually committed.
+    expect(page.locator(".toast").first).to_be_visible(timeout=5000)
+
+    # The decisive check: hit the API directly and confirm the category
+    # column was updated. No DOM polling, no toast-only fallback.
+    req = urllib.request.Request(
+        f"{live_url}/api/products/{pid}", method="GET",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        product = json.loads(resp.read())
+
+    assert product.get("type") == target_category, (
+        f"After UI save, GET /api/products/{pid} returned type={product.get('type')!r}, "
+        f"expected {target_category!r}. This is the LSO-1267 regression class."
+    )
+
+
+def test_edit_persists_saved_fields_via_api_get(page, api_create_product, live_url):
+    """Brand, stores, and nutrition edits must all show up on a subsequent API GET.
+
+    Same regression class as ``test_edit_category_persists_via_get_after_save``
+    (LSO-1267) but exercises the text and numeric fields. A silent save
+    regression for any of brand/stores/nutrition would slip past current
+    toast-only tests; this test asserts every saved field via the
+    authoritative ``GET /api/products/<pid>`` response.
+    """
+    created = api_create_product(
+        name="EditPersistMulti",
+        brand="OriginalBrand",
+        stores="OriginalStore",
+        kcal=200,
+        protein=8,
+        fat=10,
+    )
+    pid = created["id"]
+    _reload_and_wait(page)
+
+    _open_edit_form(page, "EditPersistMulti")
+
+    expect(page.locator("#ed-brand")).to_be_visible(timeout=3000)
+
+    # Apply distinctive new values that won't collide with the seed data.
+    page.locator("#ed-brand").fill("NewBrandX")
+    page.locator("#ed-stores").fill("NewStoreY, NewStoreZ")
+    page.locator("#ed-kcal").fill("345")
+    page.locator("#ed-protein").fill("21")
+    page.locator("#ed-fat").fill("7")
+
+    page.locator("[data-action='save-product']").first.click()
+    expect(page.locator(".toast").first).to_be_visible(timeout=5000)
+
+    req = urllib.request.Request(
+        f"{live_url}/api/products/{pid}", method="GET",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        product = json.loads(resp.read())
+
+    assert product.get("brand") == "NewBrandX", (
+        f"brand should be 'NewBrandX' after save, got {product.get('brand')!r}"
+    )
+    assert product.get("stores") == "NewStoreY, NewStoreZ", (
+        f"stores should be 'NewStoreY, NewStoreZ' after save, got {product.get('stores')!r}"
+    )
+    assert float(product.get("kcal")) == 345.0, (
+        f"kcal should be 345 after save, got {product.get('kcal')!r}"
+    )
+    assert float(product.get("protein")) == 21.0, (
+        f"protein should be 21 after save, got {product.get('protein')!r}"
+    )
+    assert float(product.get("fat")) == 7.0, (
+        f"fat should be 7 after save, got {product.get('fat')!r}"
+    )
+
+
 def test_edit_brand_and_stores(page, api_create_product):
     """Filling in brand and stores fields and saving should succeed with a toast.
 

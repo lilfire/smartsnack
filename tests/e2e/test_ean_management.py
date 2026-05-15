@@ -177,6 +177,118 @@ def test_ean_delete_api(live_url, api_create_product):
     )
 
 
+def test_unsync_individual_ean_endpoint(live_url):
+    """POST /api/products/<pid>/eans/<ean_id>/unsync clears the per-EAN synced flag.
+
+    Closes the coverage gap for the per-EAN unsync endpoint, which had no
+    direct e2e test. The OFF sync state is seeded through ``/api/restore``
+    so the endpoint actually has a synced EAN to flip back — there is no
+    public POST that would set ``synced_with_off=1`` on its own.
+    """
+    seed_payload = {
+        "products": [
+            {
+                "type": "Snacks",
+                "name": "EANUnsyncTestProd",
+                "kcal": 200,
+                "fat": 5,
+                "carbs": 30,
+                "sugar": 6,
+                "protein": 10,
+                "fiber": 3,
+                "salt": 0.5,
+                "flags": ["is_synced_with_off"],
+                "eans": [
+                    {"ean": "9990000000001", "is_primary": True, "synced_with_off": True},
+                    {"ean": "9990000000002", "is_primary": False, "synced_with_off": True},
+                ],
+            }
+        ]
+    }
+
+    restore_req = urllib.request.Request(
+        f"{live_url}/api/restore",
+        data=json.dumps(seed_payload).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "X-API-Key": "e2e-testing-secret",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(restore_req, timeout=5) as resp:
+        body = json.loads(resp.read())
+        assert body.get("ok") is True, f"Setup restore failed: {body}"
+
+    # Find the freshly-restored product and its EAN ids.
+    with urllib.request.urlopen(f"{live_url}/api/products", timeout=5) as resp:
+        products = json.loads(resp.read())["products"]
+    target = next(
+        (p for p in products if p.get("name") == "EANUnsyncTestProd"), None,
+    )
+    assert target is not None, (
+        f"Restore did not produce EANUnsyncTestProd. Products: "
+        f"{[p.get('name') for p in products]}"
+    )
+    pid = target["id"]
+
+    with urllib.request.urlopen(
+        f"{live_url}/api/products/{pid}/eans", timeout=5,
+    ) as resp:
+        eans_before = json.loads(resp.read())
+    assert len(eans_before) == 2, (
+        f"Expected 2 seeded EANs, got: {eans_before}"
+    )
+    # Pick the non-primary EAN so we exercise the leg that doesn't touch
+    # the primary-EAN bookkeeping.
+    secondary = next((e for e in eans_before if not e.get("is_primary")), None)
+    assert secondary is not None and secondary.get("synced_with_off") is True, (
+        f"Expected a non-primary, synced EAN to be present, got: {eans_before}"
+    )
+    secondary_id = secondary["id"]
+
+    unsync_req = urllib.request.Request(
+        f"{live_url}/api/products/{pid}/eans/{secondary_id}/unsync",
+        data=b"{}",
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(unsync_req, timeout=5) as resp:
+        unsync_body = json.loads(resp.read())
+    assert unsync_body.get("ok") is True, (
+        f"Expected ok=True from per-EAN unsync, got: {unsync_body}"
+    )
+
+    # Re-fetch and assert the targeted EAN flipped to synced_with_off=False
+    # while the other EAN was left untouched.
+    with urllib.request.urlopen(
+        f"{live_url}/api/products/{pid}/eans", timeout=5,
+    ) as resp:
+        eans_after = json.loads(resp.read())
+    by_id = {e["id"]: e for e in eans_after}
+    assert by_id[secondary_id]["synced_with_off"] is False, (
+        f"Targeted EAN should be unsynced, got: {by_id[secondary_id]}"
+    )
+    other_id = next(eid for eid in by_id if eid != secondary_id)
+    assert by_id[other_id]["synced_with_off"] is True, (
+        f"Other EAN should remain synced, got: {by_id[other_id]}"
+    )
+
+    # 404 for an unknown ean id on the same product.
+    bad_req = urllib.request.Request(
+        f"{live_url}/api/products/{pid}/eans/999999/unsync",
+        data=b"{}",
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(bad_req, timeout=5)
+        raise AssertionError("Expected 404 for unknown ean id")
+    except urllib.error.HTTPError as exc:
+        assert exc.code == 404, (
+            f"Expected 404 for unknown ean id, got {exc.code}"
+        )
+
+
 def test_ean_delete_only_ean_returns_error(live_url, api_create_product):
     """DELETE on the only EAN should return a 4xx error, not silently succeed."""
     product = api_create_product(name="EANDeleteOnlyProd", ean="4444444444444")
