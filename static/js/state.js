@@ -525,6 +525,7 @@ export function upgradeSelect(sel, onSelect) {
   }
   function _pick(value, label) {
     sel.value = value;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
     trigger.textContent = label;
     _close();
     if (cb) cb(value);
