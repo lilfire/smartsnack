@@ -133,8 +133,12 @@ def test_assign_flag_to_product_persists_in_list(page, live_url, api_create_prod
     flag_badge = page.locator(".product-flags .flag-badge.flag-user", has_text=flag_label)
     expect(flag_badge.first).to_be_visible(timeout=5000)
 
-    # And the label text must match exactly — not a substring fallback.
-    badge_text = flag_badge.first.inner_text()
+    # And the underlying DOM text must contain the label. ``inner_text``
+    # returns the rendered text *after* CSS ``text-transform`` has been
+    # applied (the chip uses ``text-transform: uppercase``), which loses
+    # the original casing. ``text_content`` returns the raw node text and
+    # is the right surface for an API-label-vs-DOM comparison.
+    badge_text = flag_badge.first.text_content() or ""
     assert flag_label in badge_text, (
         f"Flag chip text should contain {flag_label!r}, got {badge_text!r}"
     )
