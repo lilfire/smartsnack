@@ -342,8 +342,8 @@ export function renderResults(results, search) {
         window.setSort(target.dataset.col);
         break;
       case 'toggle-expand': {
-        // Don't expand if clicking on buttons or other interactive actions
-        if (e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
+        // Don't expand if clicking inside the expanded section, on buttons, or on other interactive actions
+        if (e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
         const rowId = target.dataset.productId ? parseInt(target.dataset.productId, 10) : id;
         window.toggleExpand(rowId);
       }

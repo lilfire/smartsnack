@@ -358,6 +358,114 @@ def test_product_score_displayed(page, api_create_product):
     )
 
 
+def test_edit_category_change_persists(page, api_create_product, live_url):
+    """Category change via custom dropdown must persist after save (regression for LSO-1267).
+
+    Steps match the spec in LSO-1267 task-description document:
+    1. Open edit form.
+    2. Click the custom dropdown trigger (NOT select_option on the hidden native select).
+    3. Pick a different category option.
+    4. Assert trigger label and native select value both updated.
+    5. Save and assert toast + form closed.
+    6. GET product endpoint and assert new category is stored.
+    7. Assert old category is not stored.
+    8. Second GET for idempotency.
+    """
+    # Ensure a second category exists so we can change away from "Snacks"
+    cat_payload = json.dumps({"name": "Dairy", "label": "Dairy", "emoji": "\U0001f95b"}).encode()
+    cat_req = urllib.request.Request(
+        f"{live_url}/api/categories",
+        data=cat_payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(cat_req, timeout=5):
+            pass
+    except urllib.error.HTTPError:
+        pass  # 409 if category already exists from a previous run
+
+    product = api_create_product(name="CatPersistTest", category="Snacks")
+    product_id = product["id"]
+
+    _reload_and_wait(page)
+    _open_edit_form(page, "CatPersistTest")
+
+    # Locate the custom dropdown trigger rendered by upgradeSelect around #ed-type.
+    # The native <select> itself is hidden on desktop; interact via the custom UI only.
+    edit_form = page.locator(".edit-form").first
+    category_trigger = edit_form.locator(".custom-select-trigger").first
+    expect(category_trigger).to_be_visible(timeout=3000)
+
+    # Open the custom dropdown
+    category_trigger.click()
+    page.wait_for_timeout(300)
+
+    # Find an option that differs from the current category ("Snacks")
+    custom_options = edit_form.locator(".custom-select-option")
+    new_category_value = None
+    new_category_label = None
+    option_count = custom_options.count()
+    for i in range(option_count):
+        opt = custom_options.nth(i)
+        val = opt.get_attribute("data-value")
+        if val and val != "Snacks":
+            new_category_value = val
+            new_category_label = opt.text_content().strip()
+            opt.click()
+            break
+
+    assert new_category_value is not None, (
+        "Expected at least one non-Snacks category option in the dropdown"
+    )
+    page.wait_for_timeout(300)
+
+    # Assertion: custom dropdown trigger label updated after picking new option
+    expect(category_trigger).to_contain_text(new_category_label)
+
+    # Assertion: underlying native <select> value also updated
+    native_val = page.locator("#ed-type").evaluate("el => el.value")
+    assert native_val == new_category_value, (
+        f"Native #ed-type should be {new_category_value!r} after custom pick, got {native_val!r}"
+    )
+
+    # Save button must still be visible — a premature form close would remove it
+    save_btn = page.locator("[data-action='save-product']").first
+    expect(save_btn).to_be_visible(timeout=3000)
+
+    save_btn.click()
+
+    # Assertion 8 (spec step 8): success toast confirms the API round-trip succeeded
+    toast = page.locator(".toast")
+    expect(toast.first).to_be_visible(timeout=5000)
+
+    # Assertion 1: modal is closed after save (save button no longer visible)
+    expect(save_btn).not_to_be_visible(timeout=5000)
+
+    # Assertion 2: GET to product endpoint returns the new category value
+    get_req = urllib.request.Request(f"{live_url}/api/products/{product_id}")
+    with urllib.request.urlopen(get_req, timeout=5) as resp:
+        product_data = json.loads(resp.read())
+
+    assert product_data.get("type") == new_category_value, (
+        f"Expected persisted category {new_category_value!r}, got {product_data.get('type')!r}"
+    )
+
+    # Assertion 3: old category is NOT still stored
+    assert product_data.get("type") != "Snacks", (
+        f"Old category 'Snacks' should not be stored, got {product_data.get('type')!r}"
+    )
+
+    # Assertion 4: idempotent — second GET still returns the new category
+    get_req2 = urllib.request.Request(f"{live_url}/api/products/{product_id}")
+    with urllib.request.urlopen(get_req2, timeout=5) as resp2:
+        product_data2 = json.loads(resp2.read())
+
+    assert product_data2.get("type") == new_category_value, (
+        f"Idempotency: second GET returned {product_data2.get('type')!r}, expected {new_category_value!r}"
+    )
+
+
 def test_expanded_view_shows_nutrition_table(page, api_create_product):
     """Expanding a product row should reveal the nutrition table (.nutri-table).
 
