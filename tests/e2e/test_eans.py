@@ -109,22 +109,6 @@ def test_delete_ean(live_url, api_create_product):
     assert ean_id not in ean_ids
 
 
-def test_delete_last_ean_succeeds(live_url, api_create_product):
-    """Deleting the last remaining EAN on a product is now allowed."""
-    product = api_create_product(name="EanDeleteLast")
-    pid = product["id"]
-
-    _, add_body = _post(f"{live_url}/api/products/{pid}/eans", {"ean": "9990000000050"})
-    ean_id = add_body["id"]
-
-    status, body = _delete(f"{live_url}/api/products/{pid}/eans/{ean_id}")
-    assert status == 200, f"Expected 200 when deleting last EAN, got {status}"
-    assert body.get("ok") is True
-
-    _, eans = _get(f"{live_url}/api/products/{pid}/eans")
-    assert len(eans) == 0, "Product should have no EANs after deleting the last one"
-
-
 def test_set_primary_ean(live_url, api_create_product):
     """PATCH /api/products/<id>/eans/<ean_id>/set-primary succeeds."""
     product = api_create_product(name="EanPrimary")

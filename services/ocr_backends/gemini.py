@@ -1,10 +1,12 @@
 """Google Gemini OCR backend."""
+import base64
 import io
 import logging
+import re
 
 from PIL import Image
 
-from . import _get_api_key, build_ingredient_prompt
+from . import _get_api_key, _HARDENED_SYSTEM_PROMPT, build_ingredient_prompt
 
 logger = logging.getLogger("services.ocr_service")
 
@@ -49,7 +51,7 @@ def _convert_for_gemini(image_bytes):
         stripped.startswith(b"<?xml") and b"<svg" in stripped[:512]
     ):
         converted = _svg_to_png(image_bytes)
-        logger.info("OCR: converted svg \u2192 image/png for Gemini")
+        logger.info("OCR: converted svg → image/png for Gemini")
         return converted, "image/png"
 
     try:
@@ -69,7 +71,7 @@ def _convert_for_gemini(image_bytes):
     buf = io.BytesIO()
     img.convert("RGBA").save(buf, format="PNG")
     converted_bytes = buf.getvalue()
-    logger.info("OCR: converted %s \u2192 image/png for Gemini", pil_format.lower())
+    logger.info("OCR: converted %s → image/png for Gemini", pil_format.lower())
     return converted_bytes, "image/png"
 
 
@@ -91,6 +93,7 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None, p
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
         model=model or _DEFAULT_MODEL,
+        config={"system_instruction": _HARDENED_SYSTEM_PROMPT},
         contents=[
             {
                 "parts": [
@@ -100,9 +103,52 @@ def _extract_gemini(image_bytes, image_b64, mime_type="image/png", model=None, p
                             "data": image_bytes,
                         }
                     },
-                    {"text": prompt or build_ingredient_prompt(language)},
+                    {"text": prompt or build_ingredient_prompt(language or "no")},
                 ]
             }
         ],
     )
     return response.text.strip() if response.text else ""
+
+
+def _parse_image(image_base64: str) -> tuple[bytes, str]:
+    """Return (raw_bytes, mime_type) from a raw or data-URI string."""
+    if image_base64.startswith("data:"):
+        m = re.match(r"data:image/([^;]+);base64,(.+)", image_base64, re.DOTALL)
+        if m:
+            return base64.b64decode(m.group(2).strip()), f"image/{m.group(1)}"
+    return base64.b64decode(image_base64.strip()), "image/jpeg"
+
+
+def extract(image_base64: str, language: str) -> str:
+    """Extract ingredients from *image_base64* using Gemini vision.
+
+    Args:
+        image_base64: Raw base64 string or data URI.
+        language: Target language code ("no", "en", "se").
+
+    Returns:
+        Cleaned ingredient text, or empty string when none found.
+
+    Raises:
+        RuntimeError: If the google-generativeai package is not installed.
+        ValueError: If *language* is unsupported.
+    """
+    try:
+        import google.generativeai as genai
+    except ImportError as exc:
+        raise RuntimeError(
+            "google-generativeai package required for Gemini backend: "
+            "pip install google-generativeai"
+        ) from exc
+
+    raw_bytes, mime_type = _parse_image(image_base64)
+    user_text = build_ingredient_prompt(language)
+
+    model = genai.GenerativeModel(
+        model_name=_DEFAULT_MODEL,
+        system_instruction=_HARDENED_SYSTEM_PROMPT,
+    )
+    image_part = {"mime_type": mime_type, "data": raw_bytes}
+    response = model.generate_content([image_part, user_text])
+    return response.text.strip()

@@ -165,6 +165,33 @@ describe('Add Tag button', () => {
     expect(overlay.getAttribute('role')).toBe('dialog');
     expect(overlay.getAttribute('aria-modal')).toBe('true');
   });
+
+  it('opens a modal when tag-field-ed itself is clicked', () => {
+    initTagInput([]);
+    document.getElementById('tag-field-ed').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.getElementById('tag-modal-overlay')).not.toBeNull();
+  });
+
+  it('does not open two modals when field click also bubbles from button', () => {
+    initTagInput([]);
+    document.getElementById('add-tag-btn').click();
+    expect(document.querySelectorAll('#tag-modal-overlay').length).toBe(1);
+  });
+
+  it('clicking a tag-remove pill inside the field does not open modal', () => {
+    initTagInput([{ id: 1, label: 'alpha' }]);
+    const removeBtn = document.querySelector('.tag-remove');
+    removeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.getElementById('tag-modal-overlay')).toBeNull();
+  });
+
+  it('field click calls stopPropagation to block toggle-expand bubbling', () => {
+    initTagInput([]);
+    const event = new MouseEvent('click', { bubbles: true });
+    const stopSpy = vi.spyOn(event, 'stopPropagation');
+    document.getElementById('tag-field-ed').dispatchEvent(event);
+    expect(stopSpy).toHaveBeenCalled();
+  });
 });
 
 // ── modal cancel / close ─────────────────────────────────────────────────────

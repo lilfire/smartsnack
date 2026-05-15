@@ -49,6 +49,14 @@ def add_product():
     return jsonify(result), status
 
 
+@bp.route("/api/products/<int:pid>")
+def get_product(pid):
+    product = product_service.get_product(pid)
+    if product is None:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(product)
+
+
 @bp.route("/api/products/<int:pid>", methods=["PUT"])
 def update_product(pid):
     try:
@@ -69,7 +77,7 @@ def unsync_product(pid):
             raise LookupError("Product not found")
         product_service.set_system_flag(pid, "is_synced_with_off", False)
     except LookupError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"error": str(e)}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True})

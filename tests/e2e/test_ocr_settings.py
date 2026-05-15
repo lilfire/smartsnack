@@ -73,7 +73,14 @@ def _clean_ocr_env(app_server):
 
     Saves and restores any pre-existing values so tests don't leak state.
     """
-    keys = ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENAI_API_KEY", "LLM_API_KEY"]
+    keys = [
+        "ANTHROPIC_API_KEY",
+        "GEMINI_API_KEY",
+        "OPENAI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "GROQ_API_KEY",
+        "LLM_API_KEY",
+    ]
     saved = {k: os.environ.pop(k, None) for k in keys}
     yield
     for k, v in saved.items():
@@ -330,7 +337,7 @@ class TestOcrDispatchUsesSelectedBackend:
                 f"{live_url}/api/ocr/ingredients", {"image": image_b64}
             )
             assert status == 200
-            assert data["text"] == "claude result"
+            assert data["text"] == "claude result."
             mock_cv.assert_called_once()
         finally:
             ocr_service._PROVIDERS["claude_vision"] = original

@@ -154,8 +154,16 @@ class TestUpdateCategoryWeights:
 
     def test_empty_list_is_noop(self, app_ctx, seed_category):
         from services.category_weight_service import update_category_weights
+        from db import get_db
 
+        count_before = get_db().execute(
+            "SELECT COUNT(*) FROM category_score_weights WHERE category=?", (seed_category,)
+        ).fetchone()[0]
         update_category_weights(seed_category, [])
+        count_after = get_db().execute(
+            "SELECT COUNT(*) FROM category_score_weights WHERE category=?", (seed_category,)
+        ).fetchone()[0]
+        assert count_after == count_before
 
     def test_invalidates_scoring_cache(self, app_ctx, seed_category):
         from services.category_weight_service import update_category_weights

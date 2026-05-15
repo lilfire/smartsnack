@@ -3,9 +3,14 @@ import base64
 import logging
 import os
 import re
+from typing import Protocol, runtime_checkable
 
 from config import OCR_BACKENDS, DEFAULT_OCR_BACKEND
-from services.ocr_backends import _NUTRITION_PROMPT
+from services.ocr_backends import (
+    _NUTRITION_PROMPT,
+    ensure_trailing_period,
+    looks_like_llm_refusal,
+)
 from services.ocr_backends.tesseract import _extract_tesseract
 from services.ocr_backends.claude import _extract_claude_vision
 from services.ocr_backends.gemini import _extract_gemini
@@ -13,6 +18,7 @@ from services.ocr_backends.openai import _extract_openai
 from services.ocr_backends.openrouter import _extract_openrouter
 from services.ocr_backends.groq import _extract_groq
 from services.nutrition_parser import parse_nutrition_response
+from services.ocr_locale_validator import validate_and_correct
 
 logger = logging.getLogger("services.ocr_service")
 
@@ -200,6 +206,17 @@ def dispatch_ocr(image_base64, prompt=None):
         kwargs["language"] = lang
     text = provider_fn(image_bytes, raw, mime_type, **kwargs)
 
+    if backend_id != DEFAULT_OCR_BACKEND and looks_like_llm_refusal(text):
+        logger.warning(
+            "Vision backend '%s' returned a conversational response instead "
+            "of an ingredient list; treating as no_text. First 80 chars: %r",
+            backend_id, (text or "")[:80],
+        )
+        text = ""
+
+    if backend_id != DEFAULT_OCR_BACKEND:
+        text = ensure_trailing_period(text)
+
     return {"text": text, "provider": provider_name, "fallback": fallback}
 
 
@@ -265,6 +282,17 @@ def dispatch_ocr_bytes(image_bytes, prompt=None):
         kwargs["language"] = lang
     text = provider_fn(image_bytes, raw_b64, mime_type, **kwargs)
 
+    if backend_id != DEFAULT_OCR_BACKEND and looks_like_llm_refusal(text):
+        logger.warning(
+            "Vision backend '%s' returned a conversational response instead "
+            "of an ingredient list; treating as no_text. First 80 chars: %r",
+            backend_id, (text or "")[:80],
+        )
+        text = ""
+
+    if backend_id != DEFAULT_OCR_BACKEND:
+        text = ensure_trailing_period(text)
+
     return {"text": text, "provider": provider_name, "fallback": fallback}
 
 
@@ -292,3 +320,50 @@ def dispatch_nutrition_ocr_bytes(image_bytes):
         "provider": result.get("provider", ""),
         "fallback": bool(result.get("fallback", False)),
     }
+
+
+# ---------------------------------------------------------------------------
+# Engine-agnostic locale validation wrapper
+# ---------------------------------------------------------------------------
+
+@runtime_checkable
+class VisionBackend(Protocol):
+    """Minimal interface every vision-LLM backend must satisfy."""
+
+    def extract(self, image_b64: str, language: str) -> str:
+        """Return extracted ingredient text from *image_b64* in *language*."""
+        ...
+
+    def translate(self, text: str, target_language: str) -> str:
+        """Return *text* translated into *target_language*."""
+        ...
+
+
+def extract_with_locale_validation(
+    image_b64: str,
+    language: str,
+    backend: VisionBackend,
+) -> dict:
+    """Extract ingredient text via *backend* and validate/correct locale.
+
+    Builds ``retry_fn`` by re-calling ``backend.extract`` and
+    ``translate_fn`` by calling ``backend.translate``, then delegates to
+    the cascading locale validator.
+
+    Returns a dict with keys:
+        ``text``             (str)       — final text, original or corrected.
+        ``localeMismatch``  (bool)      — True only when all correction
+                                         attempts failed to produce the
+                                         requested language.
+        ``detectedLanguage`` (str|None) — language code detected in the
+                                         initial extraction, or None.
+    """
+    text = backend.extract(image_b64, language)
+
+    def retry_fn() -> str:
+        return backend.extract(image_b64, language)
+
+    def translate_fn(t: str) -> str:
+        return backend.translate(t, language)
+
+    return validate_and_correct(text, language, retry_fn, translate_fn)

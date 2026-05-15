@@ -106,9 +106,12 @@ window.addEventListener('resize', () => {
 
 export function renderResults(results, search) {
   state.cachedResults = results;
+  const displayTotal = (!search && state.pagination && state.pagination.total != null)
+    ? state.pagination.total
+    : results.length;
   document.getElementById('result-count').textContent = search
     ? (results.length !== 1 ? t('result_count_search_plural', { count: results.length, query: search }) : t('result_count_search', { count: results.length, query: search }))
-    : (results.length !== 1 ? t('result_count_plural', { count: results.length }) : t('result_count', { count: results.length }));
+    : (displayTotal !== 1 ? t('result_count_plural', { count: displayTotal }) : t('result_count', { count: displayTotal }));
   const container = document.getElementById('results-container');
   if (!results.length) {
     // Clean up any existing delegation listener — prevents ghost handlers when
@@ -154,7 +157,7 @@ export function renderResults(results, search) {
       prodName = p.name;
     }
     const nameHtml = '<span class="prod-name">' + esc(prodName) + '</span>';
-    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="row" aria-label="' + esc(p.name) + '">'
+    h += '<div class="table-row" data-product-id="' + p.id + '" style="grid-template-columns:' + gridTpl + '" data-action="toggle-expand" tabindex="0" role="button" aria-label="' + esc(prodName) + '">'
       + '<div><div style="display:flex;align-items:flex-start;gap:8px"><div class="prod-cat"><span style="font-size:14px">' + esc(catEmoji(p.type)) + '</span><span class="prod-cat-label">' + esc(catLabel(p.type)) + '</span></div>' + thumbHtml + '<div class="prod-info">' + brandHtml + nameHtml
       + '<div class="prod-meta">' + eanHtml
       + '<span class="completeness-badge" style="color:' + (p.completeness === 100 ? '#4ecdc4' : p.completeness >= 50 ? 'rgba(78,205,196,0.6)' : 'rgba(255,255,255,0.2)') + '">' + (p.completeness != null ? p.completeness + '%' : '') + '</span>'
@@ -168,9 +171,8 @@ export function renderResults(results, search) {
         h += '<span class="cell-right">' + fmtCell(c.key, p[c.key]) + '</span>';
       }
     }
-    h += '</div>';
     if (state.expandedId === p.id) {
-      h += '<div class="expanded"><div class="expanded-top">'
+      h += '<div class="expanded" style="grid-column:1/-1"><div class="expanded-top">'
         + '<div class="expanded-img-section">'
         + '<div class="expanded-img-area" data-action="' + (hasImg ? 'view-image' : 'change-image') + '" data-id="' + p.id + '">'
         + '<div id="prod-img-wrap-' + p.id + '">' + (hasImg ? '<img id="prod-img-' + p.id + '" src="" alt="' + esc(p.name) + '" style="width:100%;height:100%;object-fit:cover">' : '<div class="expanded-img-placeholder">\u{1F4F7}</div>') + '</div>'
@@ -319,6 +321,7 @@ export function renderResults(results, search) {
       }
       h += '</div>';
     }
+    h += '</div>';
   });
   h += '</div>';
   container.innerHTML = h;
@@ -339,8 +342,8 @@ export function renderResults(results, search) {
         window.setSort(target.dataset.col);
         break;
       case 'toggle-expand': {
-        // Don't expand if clicking inside expanded area or on buttons
-        if (e.target.closest('.expanded') || e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
+        // Don't expand if clicking on buttons or other interactive actions
+        if (e.target.closest('button') || e.target.closest('[data-action]:not([data-action="toggle-expand"])')) return;
         const rowId = target.dataset.productId ? parseInt(target.dataset.productId, 10) : id;
         window.toggleExpand(rowId);
       }
@@ -383,6 +386,16 @@ export function renderResults(results, search) {
         window.estimateProteinQuality('ed');
         break;
     }
+  }, { signal: _resultsAbort.signal });
+
+  container.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const target = e.target.closest('[data-action="toggle-expand"]');
+    if (!target) return;
+    e.preventDefault();
+    if (e.target.closest('.expanded') || e.target.closest('button')) return;
+    const rowId = target.dataset.productId ? parseInt(target.dataset.productId, 10) : null;
+    if (rowId) window.toggleExpand(rowId);
   }, { signal: _resultsAbort.signal });
 
   // Attach input handlers for validation

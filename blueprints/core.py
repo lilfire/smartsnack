@@ -6,7 +6,7 @@ import sqlite3
 from flask import Blueprint, jsonify, render_template
 
 from db import get_db
-from config import APP_VERSION
+from config import APP_VERSION, APP_VERSION_SUFFIX
 
 logger = logging.getLogger(__name__)
 
@@ -26,4 +26,5 @@ def health():
 
 @bp.route("/")
 def index():
-    return render_template("index.html", version=APP_VERSION)
+    version = f"{APP_VERSION}-{APP_VERSION_SUFFIX}" if APP_VERSION_SUFFIX else APP_VERSION
+    return render_template("index.html", version=version)

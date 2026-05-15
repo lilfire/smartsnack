@@ -127,3 +127,9 @@ def _extract_tesseract(image_bytes, image_b64, mime_type="image/jpeg", model=Non
             best_text = _sort_and_join(items)
 
     return best_text
+
+
+def extract(image_base64: str) -> str:
+    """Extract text from image using ocr_service (delegates to configured backend)."""
+    from services import ocr_service
+    return ocr_service.extract_text(image_base64)

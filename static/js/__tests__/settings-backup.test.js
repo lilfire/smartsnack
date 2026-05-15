@@ -79,11 +79,45 @@ describe('toggleSettingsSection', () => {
 
 // ── downloadBackup ───────────────────────────────────
 describe('downloadBackup', () => {
-  it('sets window.location.href to backup endpoint', () => {
-    const original = window.location.href;
+  let assignedHrefs;
+  let origLocationDescriptor;
+
+  beforeEach(() => {
+    assignedHrefs = [];
+    origLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: {
+        set href(v) { assignedHrefs.push(v); },
+        get href() { return assignedHrefs[assignedHrefs.length - 1] || ''; },
+      },
+    });
+  });
+
+  afterEach(() => {
+    delete window.SMARTSNACK_API_KEY;
+    if (origLocationDescriptor) {
+      Object.defineProperty(window, 'location', origLocationDescriptor);
+    }
+  });
+
+  it('sets window.location.href to /api/backup when no API key configured', () => {
     downloadBackup();
-    // jsdom doesn't really navigate, but showToast should be called
+    expect(assignedHrefs[0]).toBe('/api/backup');
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+  });
+
+  it('includes api_key query param when SMARTSNACK_API_KEY is set', () => {
+    window.SMARTSNACK_API_KEY = 'my-secret';
+    downloadBackup();
+    expect(assignedHrefs[0]).toBe('/api/backup?api_key=my-secret');
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+  });
+
+  it('URL-encodes special characters in api_key', () => {
+    window.SMARTSNACK_API_KEY = 'key with spaces&special=chars';
+    downloadBackup();
+    expect(assignedHrefs[0]).toContain('api_key=key%20with%20spaces%26special%3Dchars');
   });
 });
 
@@ -164,6 +198,34 @@ describe('handleRestore', () => {
     await new Promise((r) => setTimeout(r, 50));
     await restorePromise;
     expect(api).toHaveBeenCalledWith('/api/restore', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('shows real API error message when api throws (not SyntaxError)', async () => {
+    api.mockRejectedValue(new Error('Restore failed: database locked'));
+    const fileContent = JSON.stringify({ products: [] });
+    const file = new File([fileContent], 'backup.json', { type: 'application/json' });
+    let capturedValue = '';
+    const input = {
+      files: [file],
+      get value() { return capturedValue; },
+      set value(v) { capturedValue = v; },
+    };
+    handleRestore(input);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(showToast).toHaveBeenCalledWith('Restore failed: database locked', 'error');
+  });
+
+  it('shows toast_invalid_file for SyntaxError (malformed JSON)', async () => {
+    const file = new File(['not valid json {{{'], 'backup.json', { type: 'application/json' });
+    let capturedValue = '';
+    const input = {
+      files: [file],
+      get value() { return capturedValue; },
+      set value(v) { capturedValue = v; },
+    };
+    handleRestore(input);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(showToast).toHaveBeenCalledWith('toast_invalid_file', 'error');
   });
 });
 
