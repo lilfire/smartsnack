@@ -239,7 +239,10 @@ def test_edit_category_persists_via_get_after_save(page, api_create_product, liv
     category_select = page.locator("#ed-type")
     expect(category_select).to_be_attached(timeout=3000)
 
-    category_select.select_option(target_category)
+    # ``#ed-type`` is wrapped by the ``upgradeSelect`` custom UI which hides
+    # the native <select>; force=True bypasses the visibility check while
+    # still firing the change event the save handler relies on.
+    category_select.select_option(target_category, force=True)
 
     page.locator("[data-action='save-product']").first.click()
 

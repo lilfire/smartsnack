@@ -51,6 +51,22 @@ def _get_json(live_url: str, path: str) -> dict:
         return json.loads(resp.read())
 
 
+def _find_in_list(live_url: str, pid: int) -> dict:
+    """Look up a product in ``GET /api/products`` by id.
+
+    Flags are attached to products by ``list_products`` but NOT by the
+    single-product ``get_product``. The list endpoint is the canonical
+    place to read a product's flags via the API.
+    """
+    listed = _get_json(live_url, "/api/products")["products"]
+    match = next((p for p in listed if p.get("id") == pid), None)
+    assert match is not None, (
+        f"Product id={pid} missing from /api/products. "
+        f"Available ids: {[p.get('id') for p in listed]}"
+    )
+    return match
+
+
 def _reload_and_wait(page) -> None:
     page.reload()
     page.wait_for_function(
@@ -68,21 +84,24 @@ def test_assign_flag_to_product_persists_in_list(page, live_url, api_create_prod
     """Assigning a user flag must persist on the product and render a chip after reload.
 
     Flow:
-    1. Create a user flag with a distinctive label via POST /api/flags.
+    1. Define a user flag via POST /api/flags.
     2. Create a product, then PUT /api/products/<pid> with flags=[<name>].
-    3. Confirm GET /api/products/<pid> reports the flag in its ``flags`` list.
+    3. Confirm the product in GET /api/products reports the flag.
     4. Reload the page, expand the row, confirm the rendered flag chip
        (``.flag-badge.flag-user``) is visible and shows the flag's label.
+
+    The list endpoint (not the single-product GET) is the canonical place
+    to read a product's flags via the API — ``services.product_crud.list_products``
+    attaches flags via ``_get_product_flags`` whereas the single
+    ``get_product`` does not.
     """
     flag_name = "is_e2e_assign_flag"
     flag_label = "E2E AssignFlag Label"
 
-    # 1. Define the user flag.
     _post_json(
         live_url, "/api/flags", {"name": flag_name, "label": flag_label},
     )
 
-    # 2. Create the target product and attach the flag via update.
     product_name = unique_name("FlagAssignProd")
     created = api_create_product(name=product_name)
     pid = created["id"]
@@ -94,8 +113,7 @@ def test_assign_flag_to_product_persists_in_list(page, live_url, api_create_prod
         f"PUT /api/products/{pid} with flags should return ok=True, got: {update_resp}"
     )
 
-    # 3. Authoritative re-fetch — flag must be present in the product's flags.
-    fetched = _get_json(live_url, f"/api/products/{pid}")
+    fetched = _find_in_list(live_url, pid)
     assert flag_name in (fetched.get("flags") or []), (
         f"Flag {flag_name!r} missing from product after assignment. "
         f"flags={fetched.get('flags')!r}"
@@ -142,7 +160,7 @@ def test_clear_flag_assignment_removes_chip(page, live_url, api_create_product, 
     _put_json(live_url, f"/api/products/{pid}", {"flags": [flag_name]})
     _put_json(live_url, f"/api/products/{pid}", {"flags": []})
 
-    fetched = _get_json(live_url, f"/api/products/{pid}")
+    fetched = _find_in_list(live_url, pid)
     assert flag_name not in (fetched.get("flags") or []), (
         f"Flag {flag_name!r} should be cleared, but flags={fetched.get('flags')!r}"
     )
