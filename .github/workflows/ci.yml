@@ -124,6 +124,10 @@ jobs:
       SMARTSNACK_SECRET_KEY: ci-e2e-dummy-key
       PLAYWRIGHT_BROWSERS_PATH: /tmp/ms-playwright
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      # Enable live Groq E2E only on direct pushes to development/main.
+      # Feature-branch PRs leave this unset so the 12 Groq tests are skipped,
+      # preventing daily-quota exhaustion from blocking feature-branch CI.
+      RUN_GROQ_E2E: ${{ github.event_name == 'push' && '1' || '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
