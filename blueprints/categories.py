@@ -40,6 +40,8 @@ def update_category(name):
         label = data.get("label", "").strip()
         emoji = data.get("emoji", "").strip()
         category_service.update_category(name, label, emoji)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "message": "Category updated"})
