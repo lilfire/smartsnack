@@ -321,6 +321,36 @@ class TestBackupBlueprint:
         )
         assert resp.status_code == 200
 
+    def test_backup_default_excludes_images(self, client):
+        """GET /api/backup without ?images= must not include image fields."""
+        resp = client.get("/api/backup")
+        assert resp.status_code == 200
+        backup = resp.get_json()
+        for product in backup.get("products", []):
+            assert "image" not in product, (
+                f"Product '{product.get('name')}' unexpectedly contains 'image' in default backup"
+            )
+
+    def test_backup_images_true_includes_images(self, client):
+        """GET /api/backup?images=true must include image fields."""
+        resp = client.get("/api/backup?images=true")
+        assert resp.status_code == 200
+        backup = resp.get_json()
+        for product in backup.get("products", []):
+            assert "image" in product, (
+                f"Product '{product.get('name')}' missing 'image' key when ?images=true"
+            )
+
+    def test_backup_images_false_excludes_images(self, client):
+        """GET /api/backup?images=false must not include image fields."""
+        resp = client.get("/api/backup?images=false")
+        assert resp.status_code == 200
+        backup = resp.get_json()
+        for product in backup.get("products", []):
+            assert "image" not in product, (
+                f"Product '{product.get('name')}' unexpectedly contains 'image' when ?images=false"
+            )
+
 
 class TestProxyBlueprint:
     def test_missing_url(self, client):

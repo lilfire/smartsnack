@@ -21,7 +21,7 @@ def backup_db():
     denied = _check_api_key()
     if denied:
         return denied
-    include_images = request.args.get("images", "true").lower() == "true"
+    include_images = request.args.get("images", "false").lower() == "true"
     payload = backup_service.create_backup(include_images=include_images)
     json_str = json.dumps(payload, ensure_ascii=False, indent=2)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
