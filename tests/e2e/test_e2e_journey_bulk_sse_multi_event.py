@@ -33,6 +33,7 @@ Rules:
 """
 
 import json
+import os
 import re
 import urllib.error
 import urllib.request
@@ -42,6 +43,20 @@ from unittest.mock import patch
 _STREAM_URL = "/api/bulk/refresh-off/stream"
 _START_URL = "/api/bulk/refresh-off/start"
 _DATA_PATTERN = re.compile(r"^data: (.+)$", re.MULTILINE)
+
+
+def _db_path():
+    # ``services.bulk_service`` does ``from config import DB_PATH`` at
+    # import time, so its module-level ``DB_PATH`` is whatever
+    # ``config.DB_PATH`` was the first time bulk_service was imported.
+    # In CI, unit tests collected before the e2e session fixture had
+    # patched the env var → bulk_service.DB_PATH is the production
+    # default (``/data/smartsnack.sqlite``). The worker thread opens a
+    # fresh sqlite connection on that stale path and finds zero rows,
+    # so ``total`` stays 0 and our assertions fail. Patching
+    # ``bulk_service.DB_PATH`` to the live test DB for the duration of
+    # this test reconnects the worker to the same DB the API writes to.
+    return os.environ["DB_PATH"]
 
 
 def _post(url, payload, timeout=5):
@@ -153,6 +168,9 @@ def test_bulk_refresh_sse_emits_monotonic_multi_events_until_done(
     ), patch(
         "services.bulk_service.time.sleep",
         lambda _s: None,
+    ), patch(
+        "services.bulk_service.DB_PATH",
+        _db_path(),
     ):
         # Step 1: kick off the background refresh job.
         status, body = _post(f"{live_url}{_START_URL}", {})
@@ -235,6 +253,9 @@ def test_bulk_refresh_sse_with_no_products_completes_immediately(live_url):
     ), patch(
         "services.bulk_service.time.sleep",
         lambda _s: None,
+    ), patch(
+        "services.bulk_service.DB_PATH",
+        _db_path(),
     ):
         status, body = _post(f"{live_url}{_START_URL}", {})
         assert status == 200, f"start must succeed, got {status}: {body}"
