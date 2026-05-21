@@ -89,6 +89,8 @@ def merge_products(target_id: int, source_id: int, choices: dict | None = None) 
     ``choices`` is an optional dict of {field: value} for fields where both
     products had values and the user picked which to keep.
     """
+    if target_id == source_id:
+        raise ValueError("Cannot merge a product into itself")
     conn = get_db()
     cur = conn.cursor()
     target = cur.execute(
