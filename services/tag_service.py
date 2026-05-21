@@ -32,9 +32,11 @@ def create_tag(label: str) -> dict:
     """Create or return existing tag with the given label.
 
     Strips whitespace; preserves original case.
-    Raises ValueError if label is empty or exceeds TAG_LABEL_MAX_LEN.
+    Raises ValueError if label is empty, non-string, or exceeds TAG_LABEL_MAX_LEN.
     Idempotent: returns existing tag if label already exists (case-insensitive).
     """
+    if not isinstance(label, str):
+        raise ValueError("label is required")
     label = label.strip()
     if not label:
         raise ValueError("label is required")
@@ -62,8 +64,11 @@ def create_tag(label: str) -> dict:
 def update_tag(tag_id: int, label: str) -> dict | None:
     """Rename a tag. Returns updated dict or None if not found.
 
-    Raises ValueError if label is empty, too long, or already used by another tag.
+    Raises ValueError if label is empty, non-string, too long, or already
+    used by another tag.
     """
+    if not isinstance(label, str):
+        raise ValueError("label is required")
     label = label.strip()
     if not label:
         raise ValueError("label is required")

@@ -326,15 +326,14 @@ class TestDeleteFlagErrors:
             "System flag must not have been deleted by the rejected DELETE"
         )
 
-    def test_delete_unknown_flag_returns_400(self, live_url):
-        """Deleting a flag that does not exist returns 400 with 'Flag not found'.
+    def test_delete_unknown_flag_returns_404(self, live_url):
+        """Deleting a flag that does not exist returns 404 with 'Flag not found'.
 
-        Documents current behaviour: ``flag_service.delete_flag`` raises
-        ``ValueError("Flag not found")`` for missing names, which the
-        blueprint surfaces as 400 (not 404). The audit asked for this
-        contract to be asserted explicitly so a future refactor cannot
-        silently change the response code."""
+        ``flag_service.delete_flag`` raises ``LookupError("Flag not found")``
+        for missing names, which the blueprint surfaces as 404 (REST 'absent
+        resource' contract). LSO-1357 (Phase 2C audit) made this explicit so
+        a future refactor cannot silently change the response code."""
         status, body = _delete(f"{live_url}/api/flags/__nonexistent_user_flag__")
-        assert status == 400, f"Expected 400 for unknown flag, got {status}: {body}"
+        assert status == 404, f"Expected 404 for unknown flag, got {status}: {body}"
         assert "error" in body
         assert "not found" in body["error"].lower()

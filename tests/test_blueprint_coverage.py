@@ -120,10 +120,12 @@ class TestUpdateFlagEndpoint:
         assert resp.status_code == 400
         assert "error" in resp.get_json()
 
-    def test_update_nonexistent_flag_returns_400(self, client):
+    def test_update_nonexistent_flag_returns_404(self, client):
         resp = client.put("/api/flags/does_not_exist", json={"label": "Label"})
-        assert resp.status_code == 400
-        assert "error" in resp.get_json()
+        assert resp.status_code == 404
+        body = resp.get_json()
+        assert "error" in body
+        assert "not found" in body["error"].lower()
 
     def test_update_missing_json_returns_400(self, client):
         name = self._create_flag(client, "upd_flag_no_json")
@@ -159,10 +161,12 @@ class TestDeleteFlagEndpoint:
         # No products flagged, so count is 0
         assert data["removed_from"] == 0
 
-    def test_delete_nonexistent_flag_returns_400(self, client):
+    def test_delete_nonexistent_flag_returns_404(self, client):
         resp = client.delete("/api/flags/no_such_flag_ever")
-        assert resp.status_code == 400
-        assert "error" in resp.get_json()
+        assert resp.status_code == 404
+        body = resp.get_json()
+        assert "error" in body
+        assert "not found" in body["error"].lower()
 
     def test_delete_system_flag_returns_400(self, client):
         # is_synced_with_off is a system flag — cannot be deleted
