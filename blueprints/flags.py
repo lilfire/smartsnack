@@ -39,6 +39,8 @@ def update_flag(name):
         data = _require_json()
         label = data.get("label", "").strip()
         flag_service.update_flag_label(name, label)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "message": "Flag updated"})
@@ -48,6 +50,8 @@ def update_flag(name):
 def delete_flag(name):
     try:
         count = flag_service.delete_flag(name)
+    except LookupError as e:
+        return jsonify({"error": str(e)}), 404
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     return jsonify({"ok": True, "message": "Flag deleted", "removed_from": count})

@@ -111,7 +111,7 @@ def update_flag_label(name: str, label: str) -> None:
         "SELECT type, label_key FROM flag_definitions WHERE name = ?", (name,)
     ).fetchone()
     if not row:
-        raise ValueError("Flag not found")
+        raise LookupError("Flag not found")
     if row["type"] != "user":
         raise ValueError("Cannot edit system flags")
     lang = _get_current_lang()
@@ -125,7 +125,7 @@ def delete_flag(name: str) -> int:
         "SELECT type, label_key FROM flag_definitions WHERE name = ?", (name,)
     ).fetchone()
     if not row:
-        raise ValueError("Flag not found")
+        raise LookupError("Flag not found")
     if row["type"] != "user":
         raise ValueError("Cannot delete system flags")
     count = conn.execute(

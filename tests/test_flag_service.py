@@ -218,10 +218,10 @@ class TestUpdateFlagLabel:
         with pytest.raises(ValueError, match="system"):
             update_flag_label("is_synced_with_off", "New label")
 
-    def test_not_found_raises_value_error(self, app_ctx, translations_dir):
+    def test_not_found_raises_lookup_error(self, app_ctx, translations_dir):
         from services.flag_service import update_flag_label
 
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(LookupError, match="not found"):
             update_flag_label("nonexistent_flag", "Label")
 
     def test_empty_label_raises_value_error(self, app_ctx, translations_dir):
@@ -295,10 +295,10 @@ class TestDeleteFlag:
         with pytest.raises(ValueError, match="system"):
             delete_flag("is_synced_with_off")
 
-    def test_not_found_raises_value_error(self, app_ctx, translations_dir):
+    def test_not_found_raises_lookup_error(self, app_ctx, translations_dir):
         from services.flag_service import delete_flag
 
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(LookupError, match="not found"):
             delete_flag("no_such_flag_xyz")
 
     def test_deleted_flag_absent_from_all_names(self, app_ctx, translations_dir):
