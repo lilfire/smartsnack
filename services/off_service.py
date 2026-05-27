@@ -8,6 +8,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
+from helpers import _str_field
 from services.settings_service import get_off_credentials
 
 logger = logging.getLogger(__name__)
@@ -21,11 +22,11 @@ def add_product_to_off(product_data: dict) -> dict:
     if not creds["off_user_id"] or not creds["off_password"]:
         raise ValueError("off_err_no_credentials")
 
-    code = product_data.get("code", "").strip()
+    code = _str_field(product_data, "code").strip()
     if not code:
         raise ValueError("off_err_no_ean")
 
-    product_name = product_data.get("product_name", "").strip()
+    product_name = _str_field(product_data, "product_name").strip()
     if not product_name:
         raise ValueError("off_err_no_name")
 
@@ -38,7 +39,7 @@ def add_product_to_off(product_data: dict) -> dict:
 
     # Optional text fields
     for key in ("brands", "stores", "ingredients_text", "quantity", "serving_size"):
-        val = product_data.get(key, "").strip()
+        val = _str_field(product_data, key).strip()
         if val:
             fields[key] = val
 

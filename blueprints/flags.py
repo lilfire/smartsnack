@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify
 
 from exceptions import ConflictError
-from helpers import _require_json
+from helpers import _require_json, _str_field
 from services import flag_service
 
 bp = Blueprint("flags", __name__)
@@ -23,8 +23,8 @@ def get_flag_config():
 def add_flag():
     try:
         data = _require_json()
-        name = data.get("name", "").strip()
-        label = data.get("label", "").strip()
+        name = _str_field(data, "name").strip()
+        label = _str_field(data, "label").strip()
         flag_service.add_flag(name, label)
     except ConflictError as e:
         return jsonify({"error": str(e)}), 409
@@ -37,7 +37,7 @@ def add_flag():
 def update_flag(name):
     try:
         data = _require_json()
-        label = data.get("label", "").strip()
+        label = _str_field(data, "label").strip()
         flag_service.update_flag_label(name, label)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
