@@ -177,8 +177,11 @@ def test_backup_restore_round_trip_keeps_stats_and_listings_consistent(
     # initial seed state (Snacks only, 0 products).
     # ──────────────────────────────────────────────────────────────────
     msg = _restore(live_url, empty_snapshot)
-    assert "0" in msg["message"], (
-        f"Restore message must report 0 products restored, got {msg!r}"
+    # LSO-1364: tightened from substring (`"0" in msg`) to exact equality
+    # — substring matched any digit, so "Restored 10 products..." would
+    # also pass and a wrong-count regression could slip through.
+    assert msg["message"] == "Restored 0 products successfully", (
+        f"Restore-empty must report exactly 0 products, got {msg!r}"
     )
 
     # ──────────────────────────────────────────────────────────────────
@@ -224,9 +227,13 @@ def test_backup_restore_round_trip_keeps_stats_and_listings_consistent(
     # across M+1=3 categories.
     # ──────────────────────────────────────────────────────────────────
     msg = _restore(live_url, populated_snapshot)
-    assert str(expected_total_products) in msg["message"], (
-        f"Restore message must report {expected_total_products} products, "
-        f"got {msg!r}"
+    # LSO-1364: tightened from substring containment to exact equality.
+    assert (
+        msg["message"]
+        == f"Restored {expected_total_products} products successfully"
+    ), (
+        f"Restore-populated must report exactly {expected_total_products} "
+        f"products, got {msg!r}"
     )
 
     # ──────────────────────────────────────────────────────────────────

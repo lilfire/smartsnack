@@ -12,6 +12,8 @@ bp = Blueprint("images", __name__)
 def get_product_image(pid):
     image = image_service.get_image(pid)
     if image is None:
+        if not image_service.product_exists(pid):
+            return jsonify({"error": "Product not found"}), 404
         return jsonify({"error": "No image"}), 404
     return jsonify({"image": image})
 
