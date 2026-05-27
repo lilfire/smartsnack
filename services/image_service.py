@@ -19,6 +19,13 @@ def get_image(pid: int) -> str | None:
     return row["image"]
 
 
+def product_exists(pid: int) -> bool:
+    """Return True if a product with the given id exists."""
+    conn = get_db()
+    row = conn.execute("SELECT 1 FROM products WHERE id = ?", (pid,)).fetchone()
+    return row is not None
+
+
 def set_image(pid: int, image: str) -> bool:
     """Set a product image from a base64 data URI."""
     if not image or not image.startswith(_ALLOWED_IMAGE_PREFIXES):

@@ -392,11 +392,36 @@ class TestGetTagInvalidId:
             f"Non-int tag id must not match the int converter, got {status}"
         )
 
-    def test_get_negative_id_returns_404_no_such_tag(self, live_url):
-        """A negative or extremely large id is valid Python int but not a valid
-        tag PK; the service returns ``None`` so the route returns 404 with
-        'Tag not found'."""
-        status, body = _get(f"{live_url}/api/tags/-1")
-        # Flask's <int:...> converter rejects negatives → 404.
-        assert status == 404
-        # Body may be Flask's HTML 404; just ensure non-200.
+    def test_get_unknown_tag_id_hits_service_branch_returns_json_404(
+        self, live_url
+    ):
+        """A large positive id that does not exist returns 404 with the
+        JSON ``{"error": "Tag not found"}`` body.
+
+        LSO-1364 false-positive fix: the prior version used id ``-1`` which
+        is rejected by Flask's ``<int:tag_id>`` converter BEFORE the route
+        ever runs — the service branch was never exercised, and the
+        docstring's claim was false. A regression where
+        ``tag_service.get_tag`` raised instead of returning None would have
+        slipped through. The corrected test uses a large positive id to
+        guarantee Flask routes the request to the service, then asserts
+        the JSON error body.
+        """
+        status, body = _get(f"{live_url}/api/tags/999999")
+        assert status == 404, f"Unknown tag must return 404; got {status}: {body}"
+        assert body == {"error": "Tag not found"}, (
+            f"Service-None branch must return JSON body, got: {body!r}"
+        )
+
+    def test_get_negative_id_rejected_by_route_converter(self, live_url):
+        """Flask's ``<int:tag_id>`` converter rejects negative integers at
+        the routing layer — the service is never invoked.
+
+        This is a routing-layer contract pin, distinct from the unknown-id
+        service-layer contract above.
+        """
+        status, _ = _get(f"{live_url}/api/tags/-1")
+        # Flask returns 404 (HTML) here — body is intentionally not asserted.
+        assert status == 404, (
+            f"Negative id must not match <int:> converter; got {status}"
+        )

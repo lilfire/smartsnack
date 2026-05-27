@@ -236,17 +236,33 @@ class TestImageFormatRejection:
         """A valid data: prefix with no payload is accepted by prefix-only
         validation (documents the limitation: no decode is performed).
 
-        This is intentional documentation of current contract — image_service
-        only validates the *prefix* and length, not the base64 payload.
-        Future work could add real base64 validation; this test will flip if
-        it does."""
+        LSO-1364 false-positive fix: prior test asserted only ``status == 200``
+        and never read the stored value back. A regression that returned
+        200 but persisted ``None`` or stripped the prefix would still pass.
+        The corrected test verifies the prefix-only string round-trips
+        verbatim via GET — proving the route actually stored what it
+        accepted.
+        """
         product = api_create_product(name="PrefixOnly")
+        prefix_only = "data:image/png;base64,"
         status, body = _put(
             f"{live_url}/api/products/{product['id']}/image",
-            {"image": "data:image/png;base64,"},
+            {"image": prefix_only},
         )
         # Documented behaviour: accepted (no decode).
         assert status == 200, f"Prefix-only is accepted by current contract: {body}"
+
+        # Verify the value was actually stored — not silently dropped.
+        get_status, get_body = _get(
+            f"{live_url}/api/products/{product['id']}/image"
+        )
+        assert get_status == 200, (
+            f"GET after prefix-only PUT must succeed: {get_status} {get_body}"
+        )
+        assert get_body["image"] == prefix_only, (
+            f"Prefix-only payload must round-trip verbatim "
+            f"(documents current contract); got: {get_body['image']!r}"
+        )
 
 
 # ===========================================================================
@@ -327,12 +343,39 @@ class TestImageProductNotFound:
         assert status == 404, f"Expected 404, got {status}: {body}"
         assert "not found" in body["error"].lower()
 
-    def test_get_image_on_unknown_product_returns_404(self, live_url):
-        """The GET route returns 404 both when no image is set AND when the
-        product itself does not exist (the route checks via SELECT image)."""
+    def test_get_image_on_unknown_product_returns_404_distinguishable(
+        self, live_url, api_create_product
+    ):
+        """GET on an unknown product MUST return 404 ``Product not found`` —
+        distinguishable from 404 ``No image`` (existing product with no image).
+
+        LSO-1364 false-positive fix: the prior test asserted both cases
+        returned the same ``"No image"`` body, cementing a real bug where
+        the route could not distinguish missing-product from missing-image.
+        The blueprint now checks ``image_service.product_exists`` before
+        falling back to ``"No image"``.
+        """
+        # Unknown product → "Product not found".
         status, body = _get(f"{live_url}/api/products/999999/image")
-        assert status == 404
-        assert body["error"] == "No image"
+        assert status == 404, f"Expected 404, got {status}: {body}"
+        assert body["error"] == "Product not found", (
+            f"Unknown product must return 'Product not found', got: {body!r}"
+        )
+
+        # Existing product with no image set → "No image" (different message).
+        product = api_create_product(name="ExistsNoImage")
+        exist_status, exist_body = _get(
+            f"{live_url}/api/products/{product['id']}/image"
+        )
+        assert exist_status == 404
+        assert exist_body["error"] == "No image", (
+            f"Existing product with no image must return 'No image', "
+            f"got: {exist_body!r}"
+        )
+
+        # The two responses MUST be distinguishable so the frontend can
+        # show a meaningful error to the user.
+        assert body["error"] != exist_body["error"]
 
     def test_delete_image_on_unknown_product_returns_404(self, live_url):
         status, body = _delete(f"{live_url}/api/products/999999/image")
