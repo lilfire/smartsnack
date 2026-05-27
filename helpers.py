@@ -33,6 +33,21 @@ def _require_json() -> dict:
     return data
 
 
+def _str_field(data: dict, field: str, default: str = "") -> str:
+    """Return ``data[field]`` as a string, mapping JSON ``null`` to ``default``.
+
+    Use this when a route accepts an optional string field and downstream code
+    calls ``.strip()``. ``data.get(field, "")`` returns ``None`` (not the
+    default) when the key is present but its value is ``null``, which crashes
+    ``.strip()`` with ``AttributeError`` → 500. This helper normalises that to
+    the default so the caller's ``.strip()`` is always safe.
+    """
+    val = data.get(field, default)
+    if val is None:
+        return default
+    return val
+
+
 def _num(data: dict, field: str) -> float | None:
     v = data.get(field)
     if v is None or v == "":

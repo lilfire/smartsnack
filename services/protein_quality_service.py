@@ -6,7 +6,7 @@ import sqlite3
 from db import get_db
 from config import _PQ_MAX_LABEL_LEN
 from exceptions import ConflictError
-from helpers import _safe_float, _validate_keywords
+from helpers import _safe_float, _validate_keywords, _str_field
 from translations import (
     _pq_label,
     _pq_keywords,
@@ -41,11 +41,11 @@ def list_entries() -> list:
 
 def add_entry(data: dict) -> dict:
     """Add a new protein quality entry."""
-    name = data.get("name", "").strip()
+    name = _str_field(data, "name").strip()
     keywords = data.get("keywords", [])
     pdcaas = data.get("pdcaas")
     diaas = data.get("diaas")
-    label = data.get("label", "").strip()
+    label = _str_field(data, "label").strip()
     if not name:
         name = label or (keywords[0] if keywords else "")
     if not name or not keywords or pdcaas is None or diaas is None:
@@ -109,7 +109,7 @@ def update_entry(pid, data):
             raise ValueError(kw_err)
         _set_translation_key(f"pq_{pq_name}_keywords", {lang: ", ".join(kws)})
     if "label" in data:
-        label = data["label"].strip()
+        label = _str_field(data, "label").strip()
         if len(label) > _PQ_MAX_LABEL_LEN:
             raise ValueError(f"label exceeds max length of {_PQ_MAX_LABEL_LEN}")
         _set_translation_key(f"pq_{pq_name}_label", {lang: label})

@@ -3,7 +3,7 @@
 from flask import Blueprint, jsonify, request
 
 from exceptions import ConflictError
-from helpers import _require_json, _validate_category_name
+from helpers import _require_json, _validate_category_name, _str_field
 from services import category_service
 from services import category_weight_service
 
@@ -19,9 +19,9 @@ def get_categories():
 def add_category():
     try:
         data = _require_json()
-        name = data.get("name", "").strip()
-        label = data.get("label", "").strip()
-        emoji = data.get("emoji", "\U0001f4e6").strip()
+        name = _str_field(data, "name").strip()
+        label = _str_field(data, "label").strip()
+        emoji = _str_field(data, "emoji", "\U0001f4e6").strip()
         category_service.add_category(name, label, emoji)
     except ConflictError as e:
         return jsonify({"error": str(e)}), 409
@@ -37,8 +37,8 @@ def update_category(name):
         return jsonify({"error": err}), 400
     try:
         data = _require_json()
-        label = data.get("label", "").strip()
-        emoji = data.get("emoji", "").strip()
+        label = _str_field(data, "label").strip()
+        emoji = _str_field(data, "emoji").strip()
         category_service.update_category(name, label, emoji)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404
