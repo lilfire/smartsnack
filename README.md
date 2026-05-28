@@ -84,7 +84,7 @@ docker compose up -d --build
 | `SMARTSNACK_SECRET_KEY`                                                                           | yes      | Flask session secret                                                                                                           |
 | `SMARTSNACK_API_KEY`                                                                              | optional | API token enforced on write endpoints                                                                                          |
 | `DB_PATH`                                                                                         | optional | SQLite path (default `/data/smartsnack.sqlite` in Docker, `./smartsnack.sqlite` locally)                                       |
-| `APP_VERSION_SUFFIX`                                                                              | optional | Appended to the version badge in the footer, e.g. `APP_VERSION_SUFFIX=DEV` renders `v0.19-DEV`                                 |
+| `APP_VERSION_SUFFIX`                                                                              | optional | Appended to the version badge in the footer, e.g. `APP_VERSION_SUFFIX=DEV` renders `v0.20-DEV`                                 |
 | `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `GROQ_API_KEY` | optional | Enable the matching OCR provider — see [OCR Providers](#ocr-providers). `ANTHROPIC_API_KEY` also enables the OCR cleanup pass. |
 
 The app will be available at:
