@@ -84,7 +84,7 @@ docker compose up -d --build
 | `SMARTSNACK_SECRET_KEY`                                                                           | yes      | Flask session secret                                                                                                           |
 | `SMARTSNACK_API_KEY`                                                                              | optional | API token enforced on write endpoints                                                                                          |
 | `DB_PATH`                                                                                         | optional | SQLite path (default `/data/smartsnack.sqlite` in Docker, `./smartsnack.sqlite` locally)                                       |
-| `APP_VERSION_SUFFIX`                                                                              | optional | Appended to the version badge in the footer, e.g. `APP_VERSION_SUFFIX=DEV` renders `v0.19-DEV`                                 |
+| `APP_VERSION_SUFFIX`                                                                              | optional | Appended to the version badge in the footer, e.g. `APP_VERSION_SUFFIX=DEV` renders `v0.20-DEV`                                 |
 | `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY` / `OPENROUTER_API_KEY` / `GROQ_API_KEY` | optional | Enable the matching OCR provider — see [OCR Providers](#ocr-providers). `ANTHROPIC_API_KEY` also enables the OCR cleanup pass. |
 
 The app will be available at:
@@ -221,6 +221,16 @@ The `tests/e2e/` suite drives a real browser against an in-process Flask server.
 pip install -r requirements-dev.txt
 playwright install chromium
 python -m pytest tests/e2e/
+```
+
+#### Groq live E2E tests
+
+Two test modules (`test_groq_vision_images_e2e.py`, `test_vision_language_e2e.py`) call the live Groq API and are **skipped by default** to avoid exhausting the daily token quota on every CI run. They only run automatically on `development` and `main` branch pushes.
+
+To run them locally, set both env vars:
+
+```bash
+RUN_GROQ_E2E=1 GROQ_API_KEY=your_key pytest tests/e2e/test_groq_vision_images_e2e.py tests/e2e/test_vision_language_e2e.py
 ```
 
 ## Usage

@@ -2,6 +2,7 @@
 
 import sqlite3
 
+from config import _PQ_MAX_LABEL_LEN
 from db import get_db
 from exceptions import ConflictError
 from helpers import _validate_category_name
@@ -64,7 +65,14 @@ def update_category(name: str, label: str, emoji: str) -> None:
         raise ValueError(err)
     if not label and not emoji:
         raise ValueError("Nothing to update")
+    if label and len(label) > _PQ_MAX_LABEL_LEN:
+        raise ValueError(f"label exceeds max length of {_PQ_MAX_LABEL_LEN}")
     conn = get_db()
+    exists = conn.execute(
+        "SELECT name FROM categories WHERE name = ?", (name,)
+    ).fetchone()
+    if not exists:
+        raise LookupError(f"Category not found: {name!r}")
     if emoji:
         conn.execute("UPDATE categories SET emoji = ? WHERE name = ?", (emoji, name))
         conn.commit()

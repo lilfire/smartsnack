@@ -14,7 +14,7 @@ from config import (
     DEFAULT_PAGE_SIZE,
 )
 from services import flag_service, tag_service
-from helpers import _num, _safe_float
+from helpers import _num, _safe_float, _str_field
 from services.product_scoring import (
     _load_weight_config,
     _compute_category_ranges,
@@ -191,12 +191,12 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
         val = data.get(tf, "")
         if isinstance(val, str) and len(val) > max_len:
             raise ValueError(f"{tf} exceeds max length of {max_len}")
-    ean = data.get("ean", "").strip()
+    ean = _str_field(data, "ean").strip()
     if ean and not re.fullmatch(r"\d{8,13}", ean):
         raise ValueError("EAN must be 8-13 digits")
     conn = get_db()
     cur = conn.cursor()
-    product_type = data.get("type", "").strip()
+    product_type = _str_field(data, "type").strip()
     if product_type:
         cat_exists = cur.execute(
             "SELECT 1 FROM categories WHERE name = ?", (product_type,)
@@ -257,12 +257,12 @@ def add_product(data: dict, on_duplicate: str | None = None) -> dict:
     cur.execute(
         f"INSERT INTO products ({INSERT_FIELDS}) VALUES ({INSERT_PLACEHOLDERS})",
         (
-            data.get("type", "").strip(),
+            _str_field(data, "type").strip(),
             data["name"].strip(),
-            data.get("brand", "").strip(),
-            data.get("stores", "").strip(),
-            data.get("ingredients", "").strip(),
-            data.get("taste_note", "").strip(),
+            _str_field(data, "brand").strip(),
+            _str_field(data, "stores").strip(),
+            _str_field(data, "ingredients").strip(),
+            _str_field(data, "taste_note").strip(),
             _num(data, "taste_score"),
             _num(data, "kcal"),
             _num(data, "energy_kj"),

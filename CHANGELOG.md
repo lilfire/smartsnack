@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 # 
 
+## [0.20.0] - 2026-05-28
+
+### Changed
+
+- Custom select dropdowns (`static/js/state.js`) dispatch a native `change` event on the underlying `<select>` after selection, so parent code can react via standard DOM event handlers
+- Groq live-vision E2E tests are now gated behind `RUN_GROQ_E2E=1` and only run automatically on direct pushes to `development` and `main`, not on feature-branch PRs, to avoid exhausting the daily Groq API quota. README documents how to opt in locally
+
+### Fixed
+
+- Optional string fields on `POST`/`PUT` routes no longer return HTTP 500 when the JSON payload contains `null`. A new `_str_field()` helper in `helpers.py` coerces JSON `null` to the default string before downstream `.strip()` calls, applied across `blueprints/categories.py`, `blueprints/flags.py`, `blueprints/settings.py`, `services/category_service.py`, `services/off_service.py`, `services/product_crud.py`, and `services/protein_quality_service.py`
+- `GET /api/products/<pid>/image` now returns `{"error": "Product not found"}` (404) when the product does not exist, instead of the misleading `{"error": "No image"}`. Backed by a new `image_service.product_exists()` lookup
+- `PUT`/`DELETE` on a missing category, flag, or related resource now returns HTTP 404 with a proper error body instead of an ambiguous status. `services/flag_service.py` and `services/category_service.py` raise `LookupError`, which the blueprints (`blueprints/categories.py`, `blueprints/flags.py`) translate to 404
+- `merge_products` in `services/product_duplicate.py` rejects merging a product into itself with a `ValueError` instead of silently corrupting the row
+- `services/tag_service.get_or_create_tag` and `update_tag` validate that `label` is a string, raising `ValueError("label is required")` instead of crashing when a non-string (e.g. JSON `null` or number) is supplied
+- Clicking inside an expanded product row's edit form (`static/js/render.js`) no longer collapses the row, preventing accidental loss of unsaved edits when users click on form labels or whitespace
+- E2E test suite no longer harbours false-positive assertions that would silently pass on regressions; the affected suites were rewritten to assert the actual API contract
+
+### Internal
+
+- Large expansion of the `tests/e2e/` suite covering EAN primary-lifecycle, category delete-with-reassign, per-category weight overrides, bulk OFF SSE streams, OCR-to-save journeys, OFF search-to-create, restore/stats consistency, and edge-case validation for products, categories, flags, images, settings, weights, tags, and rate limiting. Unit-level coverage added for the new request-parsing helpers and 404 paths
+
 ## [0.19.0] - 2026-05-15
 
 ### Added

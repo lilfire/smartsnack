@@ -616,7 +616,9 @@ describe('renderResults - event delegation', () => {
     expect(document.getElementById('result-count').textContent).toContain('result_count_plural');
   });
 
-  it('calls toggleExpand when clicking inside expanded area (allows collapse by re-clicking row)', () => {
+  it('calls toggleExpand when clicking the expanded section backdrop (collapses the row)', () => {
+    // Clicking the .expanded backdrop (score/nutrition area, not the edit form) must still
+    // collapse the row — this is the expected UX for dismissing the expanded view.
     state.expandedId = 1;
     const products = [{
       id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
@@ -626,6 +628,38 @@ describe('renderResults - event delegation', () => {
     renderResults(products, '');
     const expandedDiv = document.querySelector('.expanded');
     expandedDiv.click();
+    expect(window.toggleExpand).toHaveBeenCalledWith(1);
+  });
+
+  it('does not call toggleExpand when clicking inside the edit form (regression: LSO-1267)', () => {
+    // Clicking a label, input, or any element inside .edit-form must NOT fire toggleExpand.
+    // Without this guard, form labels/whitespace inside .edit-form would close the edit modal.
+    state.expandedId = 1;
+    state.editingId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    const editForm = document.querySelector('.edit-form');
+    if (editForm) {
+      editForm.click();
+      expect(window.toggleExpand).not.toHaveBeenCalled();
+    }
+  });
+
+  it('calls toggleExpand when clicking the row header area outside the expanded section', () => {
+    state.expandedId = 1;
+    const products = [{
+      id: 1, name: 'Milk', type: 'dairy', total_score: 85, has_image: 0,
+      kcal: 60, energy_kj: 250, fat: 3.5, saturated_fat: 2.3, carbs: 4.8,
+      sugar: 4.8, protein: 3.3, fiber: 0, salt: 0.1, scores: {}, flags: [],
+    }];
+    renderResults(products, '');
+    // Click the product name span — it is inside .table-row but NOT inside .expanded
+    const prodName = document.querySelector('.prod-name');
+    prodName.click();
     expect(window.toggleExpand).toHaveBeenCalledWith(1);
   });
 

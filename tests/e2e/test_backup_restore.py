@@ -250,6 +250,211 @@ def test_import_api_adds_products(live_url, api_create_product, unique_name):
     )
 
 
+def test_backup_restore_round_trips_image_data(live_url, api_create_product, unique_name):
+    """Image bytes seeded on a product must survive a backup/wipe/restore cycle.
+
+    Backup/restore is the primary data-loss surface in SmartSnack — images
+    are stored as base64 data URIs in the SQLite ``image`` column and are
+    not deduped or sharded, so a single dropped field silently loses the
+    user's photo. The existing tests never seeded an image, so a regression
+    in image (un)pickling would slip through. This test:
+
+    1. Creates a product
+    2. Attaches a distinctive base64 PNG via PUT /api/products/<pid>/image
+    3. Takes a backup
+    4. Wipes the product
+    5. Restores from the snapshot
+    6. Asserts ``GET /api/products/<pid>/image`` returns the *exact* bytes
+    """
+    name = unique_name("ImageRoundtripProd")
+    created = api_create_product(name=name)
+    pid = created["id"]
+
+    # 1×1 transparent PNG, base64-encoded as a data URI so the value is
+    # both unique and byte-identical to what the UI would upload.
+    image_data_uri = (
+        "data:image/png;base64,"
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgAAIAAAUAAen63NgAAAAASUVORK5CYII="
+    )
+
+    set_image_req = urllib.request.Request(
+        f"{live_url}/api/products/{pid}/image",
+        data=json.dumps({"image": image_data_uri}).encode(),
+        headers={"Content-Type": "application/json"},
+        method="PUT",
+    )
+    with urllib.request.urlopen(set_image_req, timeout=5) as resp:
+        body = json.loads(resp.read())
+        assert body.get("ok") is True, f"Image PUT failed: {body}"
+
+    # Capture the backup *after* the image is attached.
+    backup = _get_backup(live_url)
+    backed_up = next(
+        (p for p in backup["products"] if p.get("name") == name), None,
+    )
+    assert backed_up is not None, (
+        f"Product {name!r} missing from backup. Names: "
+        f"{[p.get('name') for p in backup['products']]}"
+    )
+    assert backed_up.get("image") == image_data_uri, (
+        f"Backup did not capture image data byte-identical. "
+        f"Expected len={len(image_data_uri)}, got len="
+        f"{len(backed_up.get('image') or '')}"
+    )
+
+    # Wipe the product so we can verify restore actually recreates it.
+    delete_req = urllib.request.Request(
+        f"{live_url}/api/products/{pid}", method="DELETE",
+    )
+    with urllib.request.urlopen(delete_req, timeout=5) as resp:
+        del_body = json.loads(resp.read())
+        assert del_body.get("ok") is True, f"Pre-restore delete failed: {del_body}"
+
+    # Restore from the snapshot.
+    response = _post_restore(live_url, backup)
+    assert response.get("ok") is True, (
+        f"Restore returned ok=False or unexpected error: {response}"
+    )
+
+    # The new product won't necessarily have the old id; look it up by name.
+    products = _get_products(live_url)
+    restored = next((p for p in products if p.get("name") == name), None)
+    assert restored is not None, (
+        f"Restored product {name!r} not found in /api/products. "
+        f"Available: {[p.get('name') for p in products]}"
+    )
+    restored_pid = restored["id"]
+
+    # Fetch the image via its dedicated endpoint and assert byte-identity.
+    img_req = urllib.request.Request(
+        f"{live_url}/api/products/{restored_pid}/image", method="GET",
+    )
+    with urllib.request.urlopen(img_req, timeout=5) as resp:
+        img_body = json.loads(resp.read())
+    assert img_body.get("image") == image_data_uri, (
+        f"Restored image bytes do not match. "
+        f"Expected len={len(image_data_uri)}, "
+        f"got len={len(img_body.get('image') or '')}"
+    )
+
+
+def test_import_merge_mode_resolves_conflicts(live_url, api_create_product, unique_name):
+    """POST /api/import with mode='merge' must honour the merge_priority resolution.
+
+    The merge code path in ``import_service._merge_product`` decides whether
+    the imported side or the existing side wins on a field-by-field basis,
+    yet it had no direct e2e coverage. Without this test, the merge logic
+    could silently regress (e.g. always keep existing, or always overwrite)
+    and only get caught by users in production.
+
+    Scenario: an existing unsynced product gets imported with overlapping
+    fields under ``merge_priority='use_imported'``. The imported brand and
+    nutrition values must replace the originals for the matched product.
+    """
+    name = unique_name("ImportMergeProd")
+    created = api_create_product(
+        name=name,
+        category="Snacks",
+        brand="OriginalBrand",
+        stores="OriginalStore",
+        kcal=100,
+        protein=5,
+        fat=3,
+    )
+    pid = created["id"]
+
+    import_body = {
+        "products": [
+            {
+                "type": "Snacks",
+                "name": name,
+                "brand": "ImportedBrand",
+                "stores": "ImportedStore",
+                "kcal": 250,
+                "protein": 22,
+                "fat": 11,
+            }
+        ],
+        "match_criteria": "name",
+        "on_duplicate": "merge",
+        "merge_priority": "use_imported",
+    }
+
+    response = _post_import(live_url, import_body)
+    assert response.get("ok") is True, (
+        f"Merge import returned ok=False or error: {response}"
+    )
+
+    # Re-fetch the product directly and assert that the imported side won
+    # for every overlapping field. We use the dedicated single-product
+    # endpoint so the assertions are authoritative.
+    with urllib.request.urlopen(
+        f"{live_url}/api/products/{pid}", timeout=5,
+    ) as resp:
+        merged = json.loads(resp.read())
+
+    assert merged.get("brand") == "ImportedBrand", (
+        f"merge_priority=use_imported should overwrite brand, "
+        f"got {merged.get('brand')!r}"
+    )
+    assert merged.get("stores") == "ImportedStore", (
+        f"merge should overwrite stores, got {merged.get('stores')!r}"
+    )
+    assert float(merged.get("kcal")) == 250.0, (
+        f"merge should overwrite kcal, got {merged.get('kcal')!r}"
+    )
+    assert float(merged.get("protein")) == 22.0, (
+        f"merge should overwrite protein, got {merged.get('protein')!r}"
+    )
+    assert float(merged.get("fat")) == 11.0, (
+        f"merge should overwrite fat, got {merged.get('fat')!r}"
+    )
+
+    # Also confirm the keep_existing branch: a separate product where the
+    # imported side should *not* win. Brand has values on both sides and
+    # neither is synced, so keep_existing must preserve the original.
+    name_keep = unique_name("ImportMergeKeep")
+    created_keep = api_create_product(
+        name=name_keep,
+        category="Snacks",
+        brand="KeepThisBrand",
+        kcal=150,
+    )
+    pid_keep = created_keep["id"]
+
+    keep_body = {
+        "products": [
+            {
+                "type": "Snacks",
+                "name": name_keep,
+                "brand": "WouldOverwrite",
+                "kcal": 999,
+            }
+        ],
+        "match_criteria": "name",
+        "on_duplicate": "merge",
+        "merge_priority": "keep_existing",
+    }
+    keep_resp = _post_import(live_url, keep_body)
+    assert keep_resp.get("ok") is True, (
+        f"keep_existing merge returned error: {keep_resp}"
+    )
+
+    with urllib.request.urlopen(
+        f"{live_url}/api/products/{pid_keep}", timeout=5,
+    ) as resp:
+        kept = json.loads(resp.read())
+
+    assert kept.get("brand") == "KeepThisBrand", (
+        f"merge_priority=keep_existing should retain brand, "
+        f"got {kept.get('brand')!r}"
+    )
+    assert float(kept.get("kcal")) == 150.0, (
+        f"merge_priority=keep_existing should retain kcal, "
+        f"got {kept.get('kcal')!r}"
+    )
+
+
 def test_import_api_new_product_is_added(live_url, api_create_product, unique_name):
     """POST /api/import should insert a product that does not yet exist in the DB.
 

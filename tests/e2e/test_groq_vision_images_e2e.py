@@ -6,7 +6,8 @@ guarantees the final text is in the requested language, so the language-term
 assertion stays deterministic when Groq picks a different language section of
 a multilingual label.
 
-Skipped unless GROQ_API_KEY is present (wired by LSO-1250).
+Gated by RUN_GROQ_E2E=1 (set in CI only on development/main pushes).
+Set RUN_GROQ_E2E=1 locally to opt in; also requires GROQ_API_KEY.
 """
 import base64
 import os
@@ -17,9 +18,11 @@ import pytest
 from services.llm_translate_service import translate_ingredients
 from services.ocr_backends import dispatch_ocr, looks_like_llm_refusal
 from services.ocr_core import extract_with_locale_validation
+from tests.e2e.groq_helpers import skip_on_groq_quota
 
 FIXTURES = Path(__file__).parent / "fixtures"
 _GROQ_KEY = os.environ.get("GROQ_API_KEY")
+_RUN_GROQ_E2E = os.environ.get("RUN_GROQ_E2E") == "1"
 
 
 def _load_b64(filename: str) -> str:
@@ -37,7 +40,10 @@ class _GroqVisionBackend:
         return translate_ingredients(text, target_language)
 
 
-@pytest.mark.skipif(not _GROQ_KEY, reason="requires live GROQ_API_KEY")
+@pytest.mark.skipif(
+    not (_RUN_GROQ_E2E and _GROQ_KEY),
+    reason="Groq E2E skipped: requires RUN_GROQ_E2E=1 and GROQ_API_KEY",
+)
 class TestGroqVisionEnglish:
     """Verify the post-process pipeline produces English ingredient text."""
 
@@ -54,9 +60,10 @@ class TestGroqVisionEnglish:
         ],
     )
     def test_groq_english_extraction(self, image_name, expected_terms):
-        result = extract_with_locale_validation(
-            _load_b64(image_name), "en", _GroqVisionBackend()
-        )
+        with skip_on_groq_quota():
+            result = extract_with_locale_validation(
+                _load_b64(image_name), "en", _GroqVisionBackend()
+            )
         text = result["text"]
         assert text, f"Empty result for {image_name} (language=en)"
         assert not looks_like_llm_refusal(text), (
@@ -72,7 +79,10 @@ class TestGroqVisionEnglish:
         )
 
 
-@pytest.mark.skipif(not _GROQ_KEY, reason="requires live GROQ_API_KEY")
+@pytest.mark.skipif(
+    not (_RUN_GROQ_E2E and _GROQ_KEY),
+    reason="Groq E2E skipped: requires RUN_GROQ_E2E=1 and GROQ_API_KEY",
+)
 class TestGroqVisionNorwegian:
     """Verify the post-process pipeline produces Norwegian ingredient text."""
 
@@ -104,9 +114,10 @@ class TestGroqVisionNorwegian:
         ],
     )
     def test_groq_norwegian_extraction(self, image_name, expected_terms):
-        result = extract_with_locale_validation(
-            _load_b64(image_name), "no", _GroqVisionBackend()
-        )
+        with skip_on_groq_quota():
+            result = extract_with_locale_validation(
+                _load_b64(image_name), "no", _GroqVisionBackend()
+            )
         text = result["text"]
         assert text, f"Empty result for {image_name} (language=no)"
         assert not looks_like_llm_refusal(text), (

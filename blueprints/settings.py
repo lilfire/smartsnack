@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify
 
-from helpers import _require_json, _check_api_key
+from helpers import _require_json, _check_api_key, _str_field
 from config import _MAX_PASSWORD_LEN, OFF_SUPPORTED_LANGUAGES
 from services import settings_service, ocr_service
 
@@ -53,8 +53,8 @@ def set_off_credentials():
         data = _require_json()
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
-    user_id = data.get("off_user_id", "").strip()
-    password = data.get("off_password", "")
+    user_id = _str_field(data, "off_user_id").strip()
+    password = data.get("off_password") or ""
     if len(password) > _MAX_PASSWORD_LEN:
         return jsonify({"error": "Password too long"}), 400
     try:

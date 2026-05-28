@@ -53,6 +53,53 @@ class TestNum:
         assert _num({"x": -5.5}, "x") == -5.5
 
 
+class TestStrField:
+    """LSO-1371: ``_str_field`` must coerce JSON ``null`` to default.
+
+    Before this helper existed, ``data.get("k", "").strip()`` returned
+    ``None`` (not the default) when the key was present but set to
+    ``null`` — crashing every blueprint that did so with a 500.
+    """
+
+    def test_absent_key_returns_default(self):
+        from helpers import _str_field
+
+        assert _str_field({}, "x") == ""
+
+    def test_absent_key_with_custom_default(self):
+        from helpers import _str_field
+
+        assert _str_field({}, "x", "\U0001f4e6") == "\U0001f4e6"
+
+    def test_present_string_returned_as_is(self):
+        from helpers import _str_field
+
+        assert _str_field({"x": "  hello  "}, "x") == "  hello  "
+
+    def test_present_none_returns_default(self):
+        """JSON ``null`` (Python ``None``) must map to the default."""
+        from helpers import _str_field
+
+        assert _str_field({"x": None}, "x") == ""
+
+    def test_present_none_with_custom_default(self):
+        from helpers import _str_field
+
+        assert _str_field({"x": None}, "x", "fallback") == "fallback"
+
+    def test_strip_after_str_field_does_not_crash_on_null(self):
+        """The whole point of the helper: ``.strip()`` must be safe."""
+        from helpers import _str_field
+
+        # Pre-fix: ``data.get("x", "").strip()`` would crash here.
+        assert _str_field({"x": None}, "x").strip() == ""
+
+    def test_empty_string_preserved(self):
+        from helpers import _str_field
+
+        assert _str_field({"x": ""}, "x") == ""
+
+
 class TestSafeFloat:
     def test_valid_conversion(self):
         from helpers import _safe_float
