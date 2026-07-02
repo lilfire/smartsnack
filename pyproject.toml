@@ -23,7 +23,18 @@ e2e = [
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["blueprints", "services", "app", "config", "db", "helpers", "translations"]
+source = [
+    "blueprints",
+    "services",
+    "app",
+    "config",
+    "db",
+    "exceptions",
+    "extensions",
+    "helpers",
+    "migrations",
+    "translations",
+]
 omit = ["tests/*", "tests/e2e/*"]
 
 [tool.coverage.report]

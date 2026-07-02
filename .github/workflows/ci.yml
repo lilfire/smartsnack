@@ -57,8 +57,8 @@ jobs:
           python-version: "3.12"
 
       - name: Check E2E endpoint coverage
-        # Warning-only: does not block the build. Use --strict to make it a hard gate.
-        run: python scripts/check_e2e_coverage.py
+        # Hard gate: fails the build when any endpoint method lacks E2E coverage.
+        run: python scripts/check_e2e_coverage.py --strict
 
   build:
     name: Docker Build
@@ -124,9 +124,14 @@ jobs:
       SMARTSNACK_SECRET_KEY: ci-e2e-dummy-key
       PLAYWRIGHT_BROWSERS_PATH: /tmp/ms-playwright
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      # Enable live Groq E2E only on direct pushes to development/main.
-      # Feature-branch PRs leave this unset so the 12 Groq tests are skipped,
-      # preventing daily-quota exhaustion from blocking feature-branch CI.
+      # POLICY (intentional, do not "fix"): live Groq E2E runs on direct
+      # pushes to development/main ONLY. Feature-branch PRs leave RUN_GROQ_E2E
+      # unset so the 12 Groq tests are skipped, preventing daily-quota
+      # exhaustion from blocking feature-branch CI. When the tests do run,
+      # 429/quota errors are converted to skips (tests/e2e/groq_helpers.py) so
+      # provider rate limits never fail the build — real assertion failures
+      # still do. Post-merge pushes therefore remain the enforcement point for
+      # live-LLM behavior.
       RUN_GROQ_E2E: ${{ github.event_name == 'push' && '1' || '' }}
     steps:
       - name: Checkout
