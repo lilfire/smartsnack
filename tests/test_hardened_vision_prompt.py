@@ -27,6 +27,11 @@ from services.ocr_backends import (
     _HARDENED_SYSTEM_PROMPT,
     build_ingredient_prompt,
 )
+from tests.mock_shape_validator import (
+    make_claude_response,
+    make_gemini_response,
+    make_openai_response,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -250,9 +255,7 @@ class TestBuildIngredientPromptLanguageIdentifier:
 def _call_claude(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     img = _tiny_png_bytes()
-    mock_message = types.SimpleNamespace(
-        content=[types.SimpleNamespace(text="ok")]
-    )
+    mock_message = make_claude_response("ok")
     with patch("anthropic.Anthropic") as mock_cls:
         mock_cls.return_value.messages.create.return_value = mock_message
         from services.ocr_backends.claude import _extract_claude_vision
@@ -263,9 +266,7 @@ def _call_claude(monkeypatch):
 def _call_openai(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "k")
     img = _tiny_png_bytes()
-    mock_response = types.SimpleNamespace(
-        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
-    )
+    mock_response = make_openai_response("ok")
     with patch("openai.OpenAI") as mock_cls:
         mock_cls.return_value.chat.completions.create.return_value = mock_response
         from services.ocr_backends.openai import _extract_openai
@@ -276,9 +277,7 @@ def _call_openai(monkeypatch):
 def _call_groq(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "k")
     img = _tiny_png_bytes()
-    mock_response = types.SimpleNamespace(
-        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
-    )
+    mock_response = make_openai_response("ok")
     with patch("groq.Groq") as mock_cls:
         mock_cls.return_value.chat.completions.create.return_value = mock_response
         from services.ocr_backends.groq import _extract_groq
@@ -289,9 +288,7 @@ def _call_groq(monkeypatch):
 def _call_openrouter(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "k")
     img = _tiny_png_bytes()
-    mock_response = types.SimpleNamespace(
-        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
-    )
+    mock_response = make_openai_response("ok")
     with patch("openai.OpenAI") as mock_cls:
         mock_cls.return_value.chat.completions.create.return_value = mock_response
         from services.ocr_backends.openrouter import _extract_openrouter
@@ -302,7 +299,7 @@ def _call_openrouter(monkeypatch):
 def _call_gemini(monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
     img = _tiny_png_bytes()
-    mock_response = types.SimpleNamespace(text="ok")
+    mock_response = make_gemini_response("ok")
     with patch("google.genai.Client", autospec=True) as mock_cls:
         mock_cls.return_value.models.generate_content.return_value = mock_response
         from services.ocr_backends.gemini import _extract_gemini
@@ -386,9 +383,7 @@ class TestLSO1222MultilingualBiscuitRegression:
     def _setup_claude_mock(self, monkeypatch, llm_text):
         from unittest.mock import MagicMock
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text=llm_text)]
-        )
+        mock_message = make_claude_response(llm_text)
         ctx = patch.multiple(
             "services.settings_service",
             get_ocr_backend=MagicMock(return_value="claude_vision"),
@@ -537,9 +532,7 @@ class TestHardenedPromptEdgeCases:
         from services.ocr_core import dispatch_ocr_bytes
 
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text="Sukker, mel.")]
-        )
+        mock_message = make_claude_response("Sukker, mel.")
         with patch.multiple(
             "services.settings_service",
             get_ocr_backend=MagicMock(return_value="claude_vision"),
@@ -565,9 +558,7 @@ class TestHardenedPromptEdgeCases:
         from config import DEFAULT_LANGUAGE
 
         monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text="vann.")]
-        )
+        mock_message = make_claude_response("vann.")
         with patch.multiple(
             "services.settings_service",
             get_ocr_backend=MagicMock(return_value="claude_vision"),
@@ -685,9 +676,6 @@ class TestLso1222CanonicalLlmResponseShape:
     def test_claude_canonical_response_matches_validator(self):
         from tests.mock_shape_validator import validate_claude_response_shape
 
-        canonical = {
-            "content": [
-                {"type": "text", "text": _LSO_1222_EXPECTED_NORWEGIAN}
-            ]
-        }
+        canonical = make_claude_response(_LSO_1222_EXPECTED_NORWEGIAN)
         validate_claude_response_shape(canonical)
+        assert canonical.content[0].text == _LSO_1222_EXPECTED_NORWEGIAN

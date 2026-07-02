@@ -105,9 +105,23 @@ class TestImagesBlueprint:
     def test_get_image(self, client):
         products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
+        image_data = "data:image/png;base64,iVBORw0KGgo="
+        put_resp = client.put(
+            f"/api/products/{pid}/image", json={"image": image_data}
+        )
+        assert put_resp.status_code == 200
         resp = client.get(f"/api/products/{pid}/image")
-        # May return 200 or 404 depending on whether image exists
-        assert resp.status_code in (200, 404)
+        assert resp.status_code == 200
+        assert resp.get_json()["image"] == image_data
+
+    def test_get_image_missing_returns_404(self, client):
+        products = client.get("/api/products").get_json()["products"]
+        pid = products[0]["id"]
+        del_resp = client.delete(f"/api/products/{pid}/image")
+        assert del_resp.status_code == 200
+        resp = client.get(f"/api/products/{pid}/image")
+        assert resp.status_code == 404
+        assert resp.get_json()["error"] == "No image"
 
     def test_set_image(self, client):
         products = client.get("/api/products").get_json()["products"]
