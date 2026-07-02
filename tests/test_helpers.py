@@ -301,3 +301,116 @@ class TestCheckApiKey:
         with app.test_request_context("/test?api_key=secret123"):
             result = helpers._check_api_key()
             assert result is None
+
+
+class TestRequireJsonBodyType:
+    """LSO-1672 H1: ``_require_json`` must reject non-dict JSON bodies.
+
+    Every POST/PUT handler calls ``.get()``/``.pop()`` on the parsed body;
+    a valid-JSON string/array/number body used to flow through and crash
+    with ``AttributeError`` → 500. It must raise ``ValueError`` → 400.
+    """
+
+    def _ctx(self, app, body):
+        return app.test_request_context(
+            "/test",
+            method="POST",
+            content_type="application/json",
+            data=body,
+        )
+
+    def test_require_json_rejects_string_body(self, app):
+        from helpers import _require_json
+
+        with self._ctx(app, '"hello"'):
+            with pytest.raises(ValueError, match="must be a JSON object"):
+                _require_json()
+
+    def test_require_json_rejects_array_body(self, app):
+        from helpers import _require_json
+
+        with self._ctx(app, "[1, 2, 3]"):
+            with pytest.raises(ValueError, match="must be a JSON object"):
+                _require_json()
+
+    def test_require_json_rejects_number_body(self, app):
+        from helpers import _require_json
+
+        with self._ctx(app, "42"):
+            with pytest.raises(ValueError, match="must be a JSON object"):
+                _require_json()
+
+    def test_require_json_rejects_boolean_body(self, app):
+        from helpers import _require_json
+
+        with self._ctx(app, "true"):
+            with pytest.raises(ValueError, match="must be a JSON object"):
+                _require_json()
+
+    def test_require_json_accepts_object(self, app):
+        from helpers import _require_json
+
+        with self._ctx(app, "{}"):
+            assert _require_json() == {}
+
+    def test_post_string_body_returns_400_not_500(self, client):
+        """A real POST handler must map the ValueError to HTTP 400."""
+        resp = client.post(
+            "/api/products", data='"hello"', content_type="application/json"
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Request body must be a JSON object"
+
+    def test_post_array_body_returns_400_not_500(self, client):
+        resp = client.post(
+            "/api/products", data="[1, 2, 3]", content_type="application/json"
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Request body must be a JSON object"
+
+    def test_post_number_body_returns_400_not_500(self, client):
+        resp = client.post(
+            "/api/products", data="42", content_type="application/json"
+        )
+        assert resp.status_code == 400
+        assert resp.get_json()["error"] == "Request body must be a JSON object"
+
+
+class TestStrFieldCoercion:
+    """LSO-1672 H2: ``_str_field`` must coerce non-string JSON values.
+
+    A numeric field value (e.g. ``{"ean": 7038010009457}``) used to be
+    returned raw and crash downstream ``.strip()`` calls with
+    ``AttributeError`` → 500.
+    """
+
+    def test_str_field_coerces_integer(self):
+        from helpers import _str_field
+
+        assert _str_field({"ean": 7038010009457}, "ean") == "7038010009457"
+
+    def test_str_field_coerces_float(self):
+        from helpers import _str_field
+
+        assert _str_field({"v": 1.5}, "v") == "1.5"
+
+    def test_str_field_coerces_boolean(self):
+        from helpers import _str_field
+
+        assert _str_field({"x": True}, "x") == "True"
+
+    def test_str_field_null_returns_default(self):
+        from helpers import _str_field
+
+        assert _str_field({"x": None}, "x") == ""
+
+    def test_str_field_string_passthrough(self):
+        from helpers import _str_field
+
+        assert _str_field({"x": "hi"}, "x") == "hi"
+
+    def test_str_field_coerced_value_strips_safely(self):
+        """The whole point: downstream ``.strip()`` must never crash."""
+        from helpers import _str_field
+
+        assert _str_field({"ean": 123}, "ean").strip() == "123"

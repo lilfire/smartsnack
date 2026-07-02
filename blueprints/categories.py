@@ -81,7 +81,8 @@ def update_category_weights(name):
     if err:
         return jsonify({"error": err}), 400
     try:
-        data = _require_json()
+        # Body is a JSON array; the service validates the shape itself
+        data = _require_json(expect=None)
         category_weight_service.update_category_weights(name, data)
     except LookupError as e:
         return jsonify({"error": str(e)}), 404

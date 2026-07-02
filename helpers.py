@@ -25,12 +25,20 @@ def _check_api_key():
     return None
 
 
-def _require_json() -> dict:
-    """Parse JSON from request body, raising ValueError on failure."""
+def _require_json(expect: type | None = dict):
+    """Parse JSON from request body, raising ValueError on failure.
+
+    ``expect`` is the required top-level JSON type. The default ``dict``
+    rejects string/array/number bodies with a 400-mapped ValueError —
+    callers immediately use ``.get()``/``.pop()``, which crashed with
+    AttributeError → 500 on non-object bodies. Handlers whose body is a
+    JSON array validated downstream (the weights endpoints) pass
+    ``expect=None`` to skip the type check.
+    """
     data = request.get_json(silent=True)
     if data is None:
         raise ValueError("Invalid or missing JSON body")
-    if not isinstance(data, dict):
+    if expect is not None and not isinstance(data, expect):
         raise ValueError("Request body must be a JSON object")
     return data
 
