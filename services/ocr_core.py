@@ -242,6 +242,15 @@ def dispatch_ocr_bytes(image_bytes, prompt=None):
     backend = backends.get(requested_id)
 
     if not backend or not backend["available"]:
+        # Check user preference before falling back (same as dispatch_ocr)
+        from services import ocr_settings_service
+
+        ocr_settings = ocr_settings_service.get_ocr_settings()
+        if not ocr_settings.get("fallback_to_tesseract", False):
+            raise ValueError(
+                f"Selected OCR provider '{requested_id}' is unavailable "
+                f"and fallback to tesseract is disabled"
+            )
         logger.warning(
             "Stored OCR backend '%s' is unavailable, falling back to tesseract",
             requested_id,

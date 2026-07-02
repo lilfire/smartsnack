@@ -127,11 +127,16 @@ def _condition_to_post(field: str, op: str, value: str) -> tuple:
 
     Returns (field, op, num_val).
     For flag fields, returns (field, op, "true"/"false") where value is a string.
+    For text fields, returns (field, op, lowercased_value).
     """
     if field.startswith(_FLAG_FIELD_PREFIX):
         return field, op, value
     if op in ("is_not_set", "is_set"):
         return field, op, None
+    if field in TEXT_FIELDS:
+        if op not in ("=", "!=", "contains", "!contains"):
+            raise ValueError(f"Operator '{op}' not valid for text field '{field}'")
+        return field, op, value.lower()
     if op in ("contains", "!contains"):
         raise ValueError(f"Operator '{op}' not valid for numeric field '{field}'")
     try:
@@ -322,6 +327,13 @@ def _evaluate_post_node(node: dict, product: dict) -> bool:
             return pval is None or pval == ""
         if node["op"] == "is_set":
             return pval is not None and pval != ""
+        if field in TEXT_FIELDS:
+            sval = str(pval).lower() if pval is not None else ""
+            if node["op"] == "contains":
+                return node["val"] in sval
+            if node["op"] == "!contains":
+                return node["val"] not in sval
+            return _OP_FNS[node["op"]](sval, node["val"])
         if pval is None:
             return False
         return _OP_FNS[node["op"]](float(pval), node["val"])

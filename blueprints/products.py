@@ -100,7 +100,7 @@ def merge_product(pid):
     try:
         data = _require_json()
         source_id = data.get("source_id")
-        if not source_id or not isinstance(source_id, int):
+        if not source_id or not isinstance(source_id, int) or isinstance(source_id, bool):
             raise ValueError("source_id is required and must be an integer")
         choices = data.get("choices") or {}
         product_service.merge_products(pid, source_id, choices=choices)
@@ -132,7 +132,9 @@ def list_eans(pid):
 def add_ean(pid):
     try:
         data = _require_json()
-        ean = data.get("ean", "")
+        ean = data.get("ean") or ""
+        if not isinstance(ean, str):
+            raise ValueError("ean must be a string")
         result = product_service.add_ean(pid, ean)
     except LookupError:
         return jsonify({"error": "Product not found"}), 404

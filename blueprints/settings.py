@@ -23,6 +23,8 @@ def set_language():
         return jsonify({"error": str(e)}), 400
     if "language" not in data:
         return jsonify({"error": "language is required"}), 400
+    if not isinstance(data["language"], str):
+        return jsonify({"error": "language must be a string"}), 400
     try:
         lang = settings_service.set_language(data["language"])
     except ValueError as e:

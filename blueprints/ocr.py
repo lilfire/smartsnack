@@ -1,5 +1,7 @@
 """Blueprint for OCR ingredient extraction endpoint."""
 
+import os
+
 from flask import Blueprint, jsonify, request
 from PIL import UnidentifiedImageError
 
@@ -8,6 +10,13 @@ from helpers import _require_json
 from services import ocr_service, llm_cleanup_service
 
 bp = Blueprint("ocr", __name__)
+
+
+@bp.before_request
+def _check_ocr_api_key():
+    api_key = os.environ.get("OCR_API_KEY")
+    if api_key and request.headers.get("X-API-Key") != api_key:
+        return jsonify({"error": "unauthorized"}), 401
 
 _TOKEN_LIMIT_KEYWORDS = ("token limit", "token_limit", "usage budget", "quota exceeded")
 _QUOTA_KEYWORDS = ("resource_exhausted", "quota exceeded", "rate limit", "rate_limit")
