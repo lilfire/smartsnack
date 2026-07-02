@@ -47,16 +47,22 @@ def rate_app(tmp_path_factory):
     body doesn't deny while we're verifying the *429* behaviour.)
     """
     db_file = str(tmp_path_factory.mktemp("rate_db") / "rate_e2e.sqlite")
+
+    import config
+    import db as db_mod
+
+    # Snapshot everything we mutate so teardown can restore it — otherwise
+    # every alphabetically-later E2E module runs against this module's DB.
+    _orig_env_db = os.environ.get("DB_PATH")
+    _orig_env_api_key = os.environ.get("SMARTSNACK_API_KEY")
+    _orig_config_db = config.DB_PATH
+    _orig_db_db = db_mod.DB_PATH
+
     os.environ["DB_PATH"] = db_file
     os.environ["SMARTSNACK_SECRET_KEY"] = "rate-e2e-secret-key"
     os.environ["SMARTSNACK_API_KEY"] = _TEST_API_KEY
 
-    import config
-
     config.DB_PATH = db_file
-
-    import db as db_mod
-
     db_mod.DB_PATH = db_file
 
     import helpers
@@ -86,6 +92,16 @@ def rate_app(tmp_path_factory):
 
     _limiter.enabled = saved_limiter_enabled
     helpers._API_KEY = saved_api_key
+    if _orig_env_db is None:
+        os.environ.pop("DB_PATH", None)
+    else:
+        os.environ["DB_PATH"] = _orig_env_db
+    if _orig_env_api_key is None:
+        os.environ.pop("SMARTSNACK_API_KEY", None)
+    else:
+        os.environ["SMARTSNACK_API_KEY"] = _orig_env_api_key
+    config.DB_PATH = _orig_config_db
+    db_mod.DB_PATH = _orig_db_db
 
 
 @pytest.fixture(autouse=True)
