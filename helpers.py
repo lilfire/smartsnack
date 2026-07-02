@@ -30,6 +30,8 @@ def _require_json() -> dict:
     data = request.get_json(silent=True)
     if data is None:
         raise ValueError("Invalid or missing JSON body")
+    if not isinstance(data, dict):
+        raise ValueError("Request body must be a JSON object")
     return data
 
 
@@ -40,11 +42,15 @@ def _str_field(data: dict, field: str, default: str = "") -> str:
     calls ``.strip()``. ``data.get(field, "")`` returns ``None`` (not the
     default) when the key is present but its value is ``null``, which crashes
     ``.strip()`` with ``AttributeError`` → 500. This helper normalises that to
-    the default so the caller's ``.strip()`` is always safe.
+    the default so the caller's ``.strip()`` is always safe. Non-string
+    values (e.g. a numeric EAN like ``7038010009457``) are coerced with
+    ``str()`` so downstream string methods never crash.
     """
     val = data.get(field, default)
     if val is None:
         return default
+    if not isinstance(val, str):
+        return str(val)
     return val
 
 

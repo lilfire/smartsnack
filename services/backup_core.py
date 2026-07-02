@@ -45,12 +45,12 @@ def _restore_product(cur, p, valid_flags=None):
     cur.execute(
         INSERT_WITH_IMAGE_SQL,
         (
-            p.get("type", ""),
-            p.get("name", ""),
-            p.get("brand", ""),
-            p.get("stores", ""),
-            p.get("ingredients", ""),
-            p.get("taste_note", ""),
+            p.get("type") or "",
+            p.get("name") or "",
+            p.get("brand") or "",
+            p.get("stores") or "",
+            p.get("ingredients") or "",
+            p.get("taste_note") or "",
             _opt_float(p.get("taste_score")),
             _opt_float(p.get("kcal")),
             _opt_float(p.get("energy_kj")),
@@ -67,7 +67,7 @@ def _restore_product(cur, p, valid_flags=None):
             _opt_float(p.get("portion")),
             _opt_float(p.get("est_pdcaas")),
             _opt_float(p.get("est_diaas")),
-            p.get("image", ""),
+            p.get("image") or "",
         ),
     )
     new_id = cur.lastrowid
@@ -311,7 +311,7 @@ def _restore_protein_quality(cur: sqlite3.Cursor, pq_list: list) -> list:
     pending_translations = []
     cur.execute("DELETE FROM protein_quality")
     for pq in pq_list:
-        name = pq.get("name", "").strip()
+        name = (pq.get("name") or "").strip()
         if not name:
             name = pq.get("label", "")
             if not name:
