@@ -283,13 +283,17 @@ class TestDispatchOcrBytes:
 
         from unittest.mock import patch as _patch, MagicMock
         with _patch("services.settings_service.get_ocr_backend", return_value="claude_vision"):
-            # claude_vision unavailable (no key)
+            # claude_vision unavailable (no key); fallback enabled (LSO-1698 M8)
             with patch.dict(os.environ, {}, clear=False):
                 os.environ.pop("ANTHROPIC_API_KEY", None)
                 os.environ.pop("LLM_API_KEY", None)
-                with _patch("pytesseract.image_to_data", return_value=mock_itd_data):
-                    with _patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"})):
-                        png_bytes = _make_png_bytes()
-                        result = mod.dispatch_ocr_bytes(png_bytes)
+                with _patch(
+                    "services.ocr_settings_service.get_ocr_settings",
+                    return_value={"fallback_to_tesseract": True},
+                ):
+                    with _patch("pytesseract.image_to_data", return_value=mock_itd_data):
+                        with _patch("pytesseract.Output", new_callable=lambda: type("Output", (), {"DICT": "dict"})):
+                            png_bytes = _make_png_bytes()
+                            result = mod.dispatch_ocr_bytes(png_bytes)
 
         assert result["fallback"] is True

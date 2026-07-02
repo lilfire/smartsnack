@@ -282,7 +282,7 @@ class TestM9BulkGenericErrors:
         from services import bulk_service
 
         def _boom():
-            raise KeyError("secret column name")
+            raise TypeError("secret column name")
 
         monkeypatch.setattr(bulk_service, "estimate_all_pq", _boom)
         resp = client.post("/api/bulk/estimate-pq")
