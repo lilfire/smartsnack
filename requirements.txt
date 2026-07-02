@@ -1,8 +1,8 @@
-flask==3.1.0
+flask==3.1.1
 flask-limiter==3.8.0
 gunicorn==23.0.0
-pyopenssl==24.3.0
-cryptography==43.0.3
+pyopenssl==25.0.0
+cryptography==44.0.1
 pytesseract>=0.3.10
 anthropic>=0.39.0
 google-genai>=1.0.0
