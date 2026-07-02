@@ -53,8 +53,17 @@ RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 RUN mkdir -p /data /app/certs
 
+# Create non-root user and hand over app + data dirs so the runtime process
+# (and any RCE in the image pipeline) does not run as root. UID 1000 keeps
+# the named /data volume writable across container rebuilds.
+RUN groupadd --system --gid 1000 appuser \
+    && useradd --system --uid 1000 --gid 1000 --home-dir /app --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app /data
+
 ENV DB_PATH=/data/smartsnack.sqlite
 
 EXPOSE 5000
+
+USER appuser
 
 ENTRYPOINT ["/app/entrypoint.sh"]
