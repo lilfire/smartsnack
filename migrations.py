@@ -284,7 +284,7 @@ MIGRATIONS = [
         ],
     ),
     (
-        "022_idx_product_eans_ean",
+        "022_add_product_eans_ean_index",
         [
             "CREATE INDEX IF NOT EXISTS idx_product_eans_ean ON product_eans(ean)",
         ],

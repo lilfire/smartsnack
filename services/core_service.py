@@ -1,6 +1,4 @@
-"""Service for core app-level operations (health check, etc.)."""
-
-import sqlite3
+"""Service for core health-check operations."""
 
 from db import get_db
 

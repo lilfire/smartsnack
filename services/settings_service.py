@@ -34,6 +34,7 @@ def _resolve_secret_key() -> str:
         fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(secret)
+        os.chmod(key_file, 0o600)
         logger.warning(
             "SMARTSNACK_SECRET_KEY not set. Generated random key at %s. "
             "Set the environment variable for production use.",

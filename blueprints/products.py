@@ -4,7 +4,7 @@ from flask import Blueprint, request, jsonify
 
 from helpers import _require_json
 from services import product_service, tag_service
-from config import DEFAULT_PAGE_SIZE
+from config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 
 bp = Blueprint("products", __name__)
 
@@ -28,6 +28,11 @@ def get_products():
         offset = max(0, int(request.args.get("offset", 0)))
     except ValueError:
         return jsonify({"error": "limit and offset must be integers"}), 400
+    if offset < 0:
+        return jsonify({"error": "offset must be non-negative"}), 400
+    if limit < 0:
+        return jsonify({"error": "limit must be non-negative"}), 400
+    limit = max(1, min(limit, MAX_PAGE_SIZE))
     try:
         result = product_service.list_products(search, type_filter, advanced_filters, limit, offset)
     except ValueError as e:

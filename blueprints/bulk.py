@@ -49,11 +49,15 @@ def refresh_off_status():
     return jsonify(bulk_service.get_refresh_status())
 
 
+_SSE_STREAM_TIMEOUT = 300  # 5 minutes max; prevents thread leak when client disconnects
+
+
 @bp.route("/api/bulk/refresh-off/stream")
 def refresh_off_stream():
     def generate():
         last_sent = None
-        while True:
+        deadline = time.time() + _SSE_STREAM_TIMEOUT
+        while time.time() < deadline:
             status = bulk_service.get_refresh_status()
             snapshot = json.dumps(status, sort_keys=True)
             if snapshot != last_sent:

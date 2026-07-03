@@ -24,7 +24,7 @@ def create_app() -> Flask:
         sys.exit(1)
 
     app = Flask(__name__)
-    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
+    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB (covers base64 images up to ~12 MB raw)
 
     app.teardown_appcontext(close_db)
 
@@ -54,6 +54,8 @@ def create_app() -> Flask:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             "script-src 'self'; "
+            # style-src keeps 'unsafe-inline': templates and render.js rely
+            # on inline style="" attributes for dynamic show/hide and layout.
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https://*.openfoodfacts.org https://*.openfoodfacts.net; "
             "connect-src 'self'; "

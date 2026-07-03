@@ -378,7 +378,7 @@ class TestPaginationValidation:
         assert resp.status_code == 200
 
     def test_zero_limit_clamped_to_one(self, client, seed_category):
-        """limit=0 is clamped to 1 (minimum page size)."""
+        """limit=0 is clamped to 1 (prevents catalog dump via limit=-1 or limit=0)."""
         resp = client.get("/api/products?limit=0&offset=0")
         assert resp.status_code == 200
         data = resp.get_json()
