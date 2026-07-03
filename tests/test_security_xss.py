@@ -38,18 +38,28 @@ class TestProductNameXss:
     """XSS payloads in product name are stored and returned as literal strings."""
 
     def test_script_tag_in_name_stored_as_string(self, client, seed_category):
-        """<script> in product name must be stored and returned as-is."""
+        """<script> in product name must be stored and returned verbatim.
+
+        The API stores the raw string and returns it as a JSON-encoded
+        string (output escaping is the frontend's job) — the round-trip
+        must be exact, with no HTML-escaping or mangling server-side.
+        """
         payload = "<script>alert(1)</script>"
         resp = client.post(
             "/api/products",
             json={"name": payload, "type": "Snacks"},
         )
-        assert resp.status_code in (200, 201, 409)
-        if resp.status_code == 201:
-            data = resp.get_json()
-            pid = data["id"]
-            get_resp = client.get(f"/api/products?search=script")
-            assert get_resp.status_code == 200
+        assert resp.status_code == 201, (
+            f"Create failed with {resp.status_code}: {resp.get_json()}"
+        )
+        pid = resp.get_json()["id"]
+
+        list_resp = client.get("/api/products")
+        assert list_resp.status_code == 200
+        products = list_resp.get_json()["products"]
+        matching = [p for p in products if p["id"] == pid]
+        assert len(matching) == 1, "Stored product not found in listing"
+        assert matching[0]["name"] == payload
 
     @pytest.mark.parametrize("xss_payload", XSS_PAYLOADS)
     def test_xss_payloads_in_name_no_server_error(self, client, seed_category, xss_payload):
@@ -69,22 +79,19 @@ class TestProductNameXss:
             "/api/products",
             json={"name": payload, "type": "Snacks"},
         )
-        # May be duplicate or created — either way retrieve it
-        if create_resp.status_code not in (200, 201):
-            return
-
-        data = create_resp.get_json()
-        pid = data.get("id")
-        if not pid:
-            return
+        assert create_resp.status_code == 201, (
+            f"Create failed with {create_resp.status_code}: {create_resp.get_json()}"
+        )
+        pid = create_resp.get_json()["id"]
+        assert pid
 
         list_resp = client.get("/api/products")
         assert list_resp.status_code == 200
         products = list_resp.get_json()["products"]
         matching = [p for p in products if p["id"] == pid]
-        if matching:
-            # Name must be the raw string, not escaped HTML
-            assert matching[0]["name"] == payload
+        assert len(matching) == 1, "Stored product not found in listing"
+        # Name must be the raw string, not escaped HTML
+        assert matching[0]["name"] == payload
 
 
 class TestProductDescriptionXss:
@@ -116,15 +123,17 @@ class TestProductDescriptionXss:
                 "ingredients": payload,
             },
         )
-        assert resp.status_code in (200, 201, 409)
-        if resp.status_code == 201:
-            pid = resp.get_json()["id"]
-            list_resp = client.get("/api/products")
-            products = list_resp.get_json()["products"]
-            matching = [p for p in products if p["id"] == pid]
-            if matching:
-                # Stored value must match input exactly
-                assert matching[0].get("ingredients") == payload or True
+        assert resp.status_code == 201, (
+            f"Create failed with {resp.status_code}: {resp.get_json()}"
+        )
+        pid = resp.get_json()["id"]
+        list_resp = client.get("/api/products")
+        assert list_resp.status_code == 200
+        products = list_resp.get_json()["products"]
+        matching = [p for p in products if p["id"] == pid]
+        assert len(matching) == 1, "Stored product not found in listing"
+        # Stored value must match input exactly
+        assert matching[0]["ingredients"] == payload
 
     def test_xss_in_taste_note_no_server_error(self, client, seed_category):
         """XSS payload in taste_note must not cause a server error."""

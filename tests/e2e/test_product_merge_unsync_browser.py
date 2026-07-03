@@ -56,29 +56,33 @@ class TestUnsyncButtonBrowser:
     """Test the unsync button for OFF-synced products."""
 
     def test_unsync_button_on_synced_product(self, page, api_create_product, live_url):
-        """A synced product should have an unsync button."""
+        """A synced product must show an unsync button in the EAN manager.
+
+        from_off=True marks the product (and its EAN) as OFF-synced; the
+        EAN manager renders in edit mode, so the unsync button must exist.
+        """
         product = api_create_product(
-            name="SyncedProd", ean="7038010069307",
-            off_source="openfoodfacts",
+            name="SyncedProd", ean="7038010069307", from_off=True,
         )
         _reload_and_wait(page)
-        _expand_product_row(page, "SyncedProd")
+        _open_edit_form(page, "SyncedProd")
 
-        # Look for an unsync action
-        row = page.locator(f".table-row:has-text('SyncedProd')").first
-        unsync_btn = row.locator("[data-ean-action='unsync-ean']")
-        if unsync_btn.count() > 0:
-            expect(unsync_btn.first).to_be_visible()
+        unsync_btn = page.locator(
+            f"#ean-manager-{product['id']} [data-ean-action='unsync-ean']"
+        )
+        expect(unsync_btn.first).to_be_visible(timeout=5000)
 
     def test_non_synced_product_no_unsync(self, page, api_create_product):
         """A non-synced product should not show an unsync button."""
-        api_create_product(name="LocalOnlyProd")
+        product = api_create_product(name="LocalOnlyProd", ean="7038010069314")
         _reload_and_wait(page)
-        _expand_product_row(page, "LocalOnlyProd")
+        _open_edit_form(page, "LocalOnlyProd")
 
-        row = page.locator(f".table-row:has-text('LocalOnlyProd')").first
-        unsync_btns = row.locator("[data-ean-action='unsync-ean']")
-        assert unsync_btns.count() == 0
+        # The EAN manager must have loaded (the product's EAN row is shown)
+        # so the absence of the unsync button is meaningful, not vacuous.
+        manager = page.locator(f"#ean-manager-{product['id']}")
+        expect(manager.locator(".ean-item").first).to_be_visible(timeout=5000)
+        assert manager.locator("[data-ean-action='unsync-ean']").count() == 0
 
 
 class TestProductDeleteBrowser:

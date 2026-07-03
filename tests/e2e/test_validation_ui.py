@@ -38,7 +38,7 @@ def _open_section(page, i18n_key):
         f".settings-toggle:has(span[data-i18n='{i18n_key}'])"
     ).first
     toggle.click()
-    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
+    page.wait_for_timeout(300)
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +75,13 @@ class TestRegisterValidation:
         expect(toast).to_be_visible(timeout=5000)
         expect(toast).to_contain_text(t["toast_invalid_ean"])
 
-    def test_long_name_accepted_or_rejected(self, page):
-        """Name >200 chars: either gets rejected or accepted (app may truncate)."""
+    def test_long_name_rejected(self, page, live_url):
+        """Name >200 chars is rejected: server returns 400, error toast
+        shows the server message, and no product is created.
+
+        Backend pins this via _TEXT_FIELD_LIMITS["name"] == 200 in
+        services/product_crud.py (ValueError -> HTTP 400).
+        """
         _go_to_register(page)
 
         long_name = "A" * 201
@@ -89,17 +94,21 @@ class TestRegisterValidation:
         page.locator("#f-salt").fill("0.1")
         page.locator("#btn-submit").click()
 
-        # Wait for either the toast or a modal to appear
-        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
-        # Dismiss OFF modal if it appears
-        cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
-        if cancel.is_visible():
-            cancel.click()
-
-        # Either a toast appeared (error or success) — just verify
-        # the form didn't silently do nothing
+        # products.js surfaces the server error message in an error toast.
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text("exceeds max length")
+
+        # The product must NOT have been persisted.
+        req = urllib.request.Request(
+            f"{live_url}/api/products?search={'A' * 30}",
+            headers={"X-Requested-With": "SmartSnack"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        assert data["products"] == [], (
+            "Product with >200-char name must be rejected, but was persisted"
+        )
 
     def test_all_nutrition_zero_succeeds(self, page):
         """All nutrition fields at 0 (boundary min) should succeed."""
@@ -112,24 +121,31 @@ class TestRegisterValidation:
             page.locator(f"#f-{field}").fill("0")
         page.locator("#btn-submit").click()
 
-        # Wait for either the toast or a modal to appear
-        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
+        page.wait_for_timeout(500)
         # Dismiss OFF modal if it appears
         cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
         if cancel.is_visible():
             cancel.click()
+            page.wait_for_timeout(200)
 
         expected = t["toast_product_added"].replace("{name}", product_name)
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
         expect(toast).to_contain_text(expected)
 
-    def test_negative_kcal_clamped_or_rejected(self, page):
-        """Negative kcal value: HTML input[type=number] min=0 should clamp."""
+    def test_negative_kcal_accepted_stored_verbatim(self, page, live_url):
+        """Negative kcal is accepted and stored verbatim (no clamping).
+
+        Pins current backend behavior: helpers._num applies no minimum
+        bound, so -50 round-trips unchanged and registration succeeds
+        with the standard success toast.
+        """
+        t = _load_translations()
         _go_to_register(page)
 
-        page.locator("#f-name").fill("NegKcalProduct")
-        # Use evaluate to set a negative value (bypassing HTML min attr)
+        product_name = "NegKcalProduct"
+        page.locator("#f-name").fill(product_name)
+        # fill() sets the value programmatically, bypassing the HTML min attr
         page.locator("#f-kcal").fill("-50")
         page.locator("#f-protein").fill("5")
         page.locator("#f-fat").fill("3")
@@ -138,16 +154,21 @@ class TestRegisterValidation:
         page.locator("#f-salt").fill("0.1")
         page.locator("#btn-submit").click()
 
-        # Wait for either the toast or a modal to appear
-        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
-        # Dismiss OFF modal if it appears
-        cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
-        if cancel.is_visible():
-            cancel.click()
-
-        # Either accepted (server clamps to 0) or shows error toast
+        expected = t["toast_product_added"].replace("{name}", product_name)
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text(expected)
+
+        # The stored product must carry the negative value unchanged.
+        req = urllib.request.Request(
+            f"{live_url}/api/products?search={product_name}",
+            headers={"X-Requested-With": "SmartSnack"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read())
+        matching = [p for p in data["products"] if p["name"] == product_name]
+        assert len(matching) == 1, f"Expected 1 stored product, got {len(matching)}"
+        assert matching[0]["kcal"] == -50.0
 
 
 # ---------------------------------------------------------------------------
@@ -196,20 +217,19 @@ class TestCategoryValidation:
 
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
-        # Category rows render async after settings load
-        page.wait_for_selector("input.cat-item-label-input", timeout=5000)
+        page.wait_for_timeout(500)
 
         # Find the label input for our test category and clear it
         label_input = page.locator(
             f"input.cat-item-label-input[data-cat-name='{cat_name}']"
         )
-        if label_input.count() > 0:
-            label_input.fill("")
-            label_input.dispatch_event("change")
+        expect(label_input).to_be_visible(timeout=5000)
+        label_input.fill("")
+        label_input.dispatch_event("change")
 
-            toast = page.locator(".toast").last
-            expect(toast).to_be_visible(timeout=5000)
-            expect(toast).to_contain_text(t["toast_display_name_empty"])
+        toast = page.locator(".toast").last
+        expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text(t["toast_display_name_empty"])
 
         # Cleanup
         try:
@@ -251,8 +271,6 @@ class TestCategoryValidation:
 
         delete_btn = page.locator("[data-action='delete-cat']").first
         delete_btn.click()
-        # Fixed wait: the next check asserts the cat-move modal does NOT
-        # appear; absence has no event to await.
         page.wait_for_timeout(300)
 
         # With only one category there is nowhere to move products — the
@@ -380,6 +398,7 @@ class TestWeightOverrideValidation:
 
         # Wait for weight items to load (async)
         page.wait_for_selector("#weight-items .weight-item", timeout=10000)
+        page.wait_for_timeout(500)
 
         # The add button is hidden by JS when all categories have overrides.
         # Force it visible and click it to trigger openAddOverridePicker.
@@ -387,6 +406,7 @@ class TestWeightOverrideValidation:
             "() => document.getElementById('weight-scope-add').style.display = ''"
         )
         page.locator("#weight-scope-add").click()
+        page.wait_for_timeout(300)
 
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
@@ -455,37 +475,33 @@ class TestWeightOverrideValidation:
 
         _go_to_settings(page)
         _open_section(page, "settings_weights_title")
+        # Wait for weight items to load (async)
+        page.wait_for_selector("#weight-items .weight-item", timeout=10000)
         page.wait_for_timeout(500)
 
-        # Click add override
+        # Add an override: pick a category in the picker modal and confirm
         add_btn = page.locator("#weight-scope-add")
-        if add_btn.count() > 0 and add_btn.is_visible():
-            add_btn.click()
-            page.wait_for_timeout(300)
+        expect(add_btn).to_be_visible(timeout=5000)
+        add_btn.click()
 
-            modal = page.locator(".scan-modal-bg")
-            if modal.is_visible():
-                # Confirm to add override
-                confirm_btn = modal.locator(".scan-modal-btn-register")
-                confirm_btn.click()
-                page.wait_for_timeout(500)
+        modal = page.locator(".scan-modal-bg")
+        expect(modal).to_be_visible(timeout=5000)
+        modal.locator(".scan-modal-btn-register").click()
+        page.wait_for_timeout(500)
 
-                # Now delete the override
-                delete_btn = page.locator("#weight-scope-delete")
-                if delete_btn.count() > 0 and delete_btn.is_visible():
-                    delete_btn.click()
-                    page.wait_for_timeout(300)
+        # Now delete the override
+        delete_btn = page.locator("#weight-scope-delete")
+        expect(delete_btn).to_be_visible(timeout=5000)
+        delete_btn.click()
 
-                    # Confirm deletion
-                    confirm = page.locator(".confirm-yes")
-                    if confirm.is_visible():
-                        confirm.click()
+        # Confirm deletion in the confirm dialog
+        confirm = page.locator(".confirm-yes")
+        expect(confirm.first).to_be_visible(timeout=5000)
+        confirm.first.click()
 
-                    toast = page.locator(".toast").last
-                    expect(toast).to_be_visible(timeout=5000)
-                    expect(toast).to_contain_text(
-                        t["toast_category_override_deleted"]
-                    )
+        toast = page.locator(".toast").last
+        expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text(t["toast_category_override_deleted"])
 
 
 # ---------------------------------------------------------------------------

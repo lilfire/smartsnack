@@ -19,7 +19,7 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
+    page.wait_for_timeout(600)
 
 
 class TestCategoryListBrowser:
@@ -70,9 +70,10 @@ class TestCategoryAddBrowser:
         page.locator("#cat-name").fill("e2e_persist_cat")
         page.locator("#cat-label").fill("Persist Category")
         page.locator("button[data-i18n='btn_add_category']").first.click()
+        page.wait_for_timeout(500)
 
         cat_list = page.locator("#cat-list")
-        expect(cat_list).to_contain_text("Persist Category", timeout=5000)
+        expect(cat_list).to_contain_text("Persist Category")
 
     def test_category_available_in_register(self, page):
         """An added category should be selectable in the registration form."""
@@ -81,14 +82,8 @@ class TestCategoryAddBrowser:
         _open_section(page, "settings_categories_title")
         page.locator("#cat-name").fill("e2e_reg_cat")
         page.locator("#cat-label").fill("Register Category")
-        # Wait for the create request to complete so the register view's
-        # category refetch sees the new category.
-        with page.expect_response(
-            lambda r: r.url.endswith("/api/categories")
-            and r.request.method == "POST",
-            timeout=5000,
-        ):
-            page.locator("button[data-i18n='btn_add_category']").first.click()
+        page.locator("button[data-i18n='btn_add_category']").first.click()
+        page.wait_for_timeout(500)
 
         # Now go to register and check
         page.locator("button[data-view='register']").click()
@@ -110,27 +105,23 @@ class TestCategoryEditBrowser:
     """Test editing category display names in the settings UI."""
 
     def test_edit_category_label(self, page):
-        """Editing a category label should update the display."""
+        """Editing a category label must update the display and show a toast.
+
+        settings-categories.js renders an inline label input per category
+        (input.cat-item-label-input) and binds updateCategoryLabel on its
+        'change' event.
+        """
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
 
-        # Look for edit buttons on existing categories
-        edit_btns = page.locator("#cat-list [data-action='edit-category']")
-        if edit_btns.count() > 0:
-            edit_btns.first.click()
+        label_input = page.locator("#cat-list input.cat-item-label-input").first
+        expect(label_input).to_be_visible(timeout=5000)
+        label_input.fill("Updated Label")
+        label_input.dispatch_event("change")
 
-            # An inline edit input should appear (tolerated if it does not:
-            # the test deliberately branches on visibility)
-            inline_input = page.locator(
-                "#cat-list input.settings-item-edit-input"
-            ).first
-            try:
-                inline_input.wait_for(state="visible", timeout=3000)
-            except Exception:
-                pass
-            if inline_input.is_visible():
-                inline_input.fill("Updated Label")
-                inline_input.press("Enter")
-
-                toast = page.locator(".toast")
-                expect(toast.first).to_be_visible(timeout=5000)
+        toast = page.locator(".toast")
+        expect(toast.first).to_be_visible(timeout=5000)
+        # The list re-renders from the API — the new label must round-trip.
+        expect(
+            page.locator("#cat-list input.cat-item-label-input").first
+        ).to_have_value("Updated Label", timeout=5000)

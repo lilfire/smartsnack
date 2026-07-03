@@ -4,6 +4,8 @@ import json
 import types
 from unittest.mock import patch, MagicMock
 
+from services import bulk_refresh_state
+
 import pytest
 
 
@@ -554,13 +556,13 @@ class TestRunRefresh:
         with patch("services.bulk_service.proxy_service.off_product", return_value=off_data, autospec=True), \
              patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh()
+            svc._run_refresh(["no", "en"])
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["done"] is True
-            assert svc._refresh_job["updated"] >= 1
-            # Reset state
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["done"] is True
+        assert job["updated"] >= 1
+        # Reset state
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase1_product_not_found_skipped(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -570,11 +572,11 @@ class TestRunRefresh:
 
         with patch("services.bulk_service.proxy_service.off_product", return_value={"status": 0}, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh()
+            svc._run_refresh(["no", "en"])
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["skipped"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["skipped"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase1_no_new_data_skipped(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -589,11 +591,11 @@ class TestRunRefresh:
         with patch("services.bulk_service.proxy_service.off_product", return_value=off_data, autospec=True), \
              patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh()
+            svc._run_refresh(["no", "en"])
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["skipped"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["skipped"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase1_error_counted(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -603,11 +605,11 @@ class TestRunRefresh:
 
         with patch("services.bulk_service.proxy_service.off_product", side_effect=RuntimeError("fail"), autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh()
+            svc._run_refresh(["no", "en"])
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["errors"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["errors"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase1_with_image(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -625,11 +627,11 @@ class TestRunRefresh:
         with patch("services.bulk_service.proxy_service.off_product", return_value=off_data, autospec=True), \
              patch("services.bulk_service._fetch_off_image", return_value="data:image/jpeg;base64,abc", autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh()
+            svc._run_refresh(["no", "en"])
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["updated"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["updated"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase2_search_missing_no_results(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -646,12 +648,12 @@ class TestRunRefresh:
         with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
              patch("services.bulk_service.proxy_service.off_search", return_value={"products": []}, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
+            svc._run_refresh(["no", "en"], {"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["done"] is True
-            assert svc._refresh_job["skipped"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["done"] is True
+        assert job["skipped"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase2_search_missing_below_threshold(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -672,11 +674,11 @@ class TestRunRefresh:
         with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
              patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh({"search_missing": True, "min_certainty": 90, "min_completeness": 90})
+            svc._run_refresh(["no", "en"], {"search_missing": True, "min_certainty": 90, "min_completeness": 90})
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["skipped"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["skipped"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase2_search_missing_match_found(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -705,11 +707,11 @@ class TestRunRefresh:
              patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
              patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
+            svc._run_refresh(["no", "en"], {"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["updated"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["updated"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase2_search_error_counted(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -725,11 +727,11 @@ class TestRunRefresh:
         with patch("services.bulk_service.proxy_service.off_product", autospec=True), \
              patch("services.bulk_service.proxy_service.off_search", side_effect=RuntimeError("search fail"), autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
+            svc._run_refresh(["no", "en"], {"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["errors"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["errors"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_crash_sets_done(self, app_ctx, db, monkeypatch, tmp_path):
         import services.bulk_service as svc
@@ -737,25 +739,24 @@ class TestRunRefresh:
         crash_db = str(tmp_path / "crash.sqlite")
         monkeypatch.setattr(svc, "DB_PATH", crash_db)
 
-        # Force a crash inside the try block: let PRAGMA pass but crash on SELECT
-        call_count = [0]
-
-        with patch("services.bulk_service.sqlite3.connect", autospec=True) as mock_connect:
+        # Force a crash inside the try block: the worker connection raises on
+        # the first SELECT. Patch _open_worker_connection (not sqlite3.connect)
+        # so the DB-backed job state still uses real connections.
+        with patch(
+            "services.bulk_service._open_worker_connection", autospec=True
+        ) as mock_open:
             mock_conn = MagicMock(spec=["execute", "close", "__enter__", "__exit__"])
 
             def side_effect_execute(sql, *args):
-                call_count[0] += 1
-                if call_count[0] <= 1:  # PRAGMA busy_timeout
-                    return types.SimpleNamespace()
                 raise RuntimeError("DB crashed on query")
 
             mock_conn.execute = side_effect_execute
-            mock_connect.return_value = mock_conn
-            svc._run_refresh()
+            mock_open.return_value = mock_conn
+            svc._run_refresh(["no", "en"])
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["done"] is True
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["done"] is True
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase2_match_with_image(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -783,11 +784,11 @@ class TestRunRefresh:
              patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
              patch("services.bulk_service._fetch_off_image", return_value="data:image/png;base64,xyz", autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
+            svc._run_refresh(["no", "en"], {"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["updated"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["updated"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
     def test_phase2_no_new_data_skipped(self, app_ctx, db, monkeypatch):
         import services.bulk_service as svc
@@ -816,11 +817,11 @@ class TestRunRefresh:
              patch("services.bulk_service.proxy_service.off_search", return_value=search_result, autospec=True), \
              patch("services.bulk_service._fetch_off_image", return_value=None, autospec=True), \
              patch("services.bulk_service.time.sleep", autospec=True):
-            svc._run_refresh({"search_missing": True, "min_certainty": 50, "min_completeness": 50})
+            svc._run_refresh(["no", "en"], {"search_missing": True, "min_certainty": 50, "min_completeness": 50})
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["skipped"] >= 1
-            svc._refresh_job.update(done=False, running=False, updated=0, skipped=0, errors=0)
+        job = bulk_refresh_state.read_job()
+        assert job["skipped"] >= 1
+        bulk_refresh_state.update_job(done=False, running=False, updated=0, skipped=0, errors=0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

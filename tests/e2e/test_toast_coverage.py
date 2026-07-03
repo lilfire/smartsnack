@@ -296,17 +296,15 @@ class TestCategoryToasts:
 
         _go_to_settings(page)
         _open_settings_section(page, "settings_categories_title")
-        # Category rows render async after settings load
-        page.wait_for_selector("input.cat-item-label-input", timeout=5000)
-        # Find and modify a category display name input, then blur
-        cat_inputs = page.locator(
-            ".settings-section .category-row input[data-field='display']"
-        )
-        if cat_inputs.count() > 0:
-            first_input = cat_inputs.first
-            first_input.fill("UpdatedDisplay")
-            first_input.blur()
-            _wait_for_toast(page, t["toast_category_updated"])
+        # Modify a category display name input and fire its change handler
+        # (settings-categories.js binds updateCategoryLabel on 'change').
+        # Category rows render async after settings load; the visibility
+        # expectation below is the wait — no fixed sleep needed.
+        first_input = page.locator("#cat-list input.cat-item-label-input").first
+        expect(first_input).to_be_visible(timeout=5000)
+        first_input.fill("UpdatedDisplay")
+        first_input.dispatch_event("change")
+        _wait_for_toast(page, t["toast_category_updated"])
 
     def test_toast_cannot_delete_only_category(self, page, live_url):
         """Trying to delete the only category shows error toast."""
@@ -388,68 +386,67 @@ class TestBackupToasts:
 class TestOcrToasts:
     """Tests for OCR-related toast messages.
 
-    OCR uses a file picker triggered by button click, so we simulate
-    the error handling by calling the _handleOcrError path directly
-    via page.evaluate, with the API intercepted.
+    Each test drives the real OCR error path: clicking the register-form
+    OCR button opens a file chooser, a file is provided, and the routed
+    /api/ocr/ingredients request fails with a specific error_type. The
+    toast must come from ocr.js _handleOcrError mapping that error_type —
+    it is never injected directly, so these tests fail if the OCR error
+    handling is removed or the error_type mapping breaks.
     """
 
-    def _trigger_ocr_error(self, page, error_type, expected_text, title_text):
-        """Trigger OCR error by showing toast directly with translated text."""
-        # Use window.showToast which is exposed globally by app.js
-        escaped_msg = expected_text.replace("'", "\\'")
-        escaped_title = title_text.replace("'", "\\'")
-        page.evaluate(
-            f"() => window.showToast('{escaped_msg}', 'error', "
-            f"{{title: '{escaped_title}'}})"
+    # Minimal JPEG (SOI + EOI). The OCR API call is intercepted via
+    # page.route(), so the content never reaches a real OCR provider.
+    _TINY_JPEG = b"\xff\xd8\xff\xd9"
+
+    def _trigger_ocr_error(self, page, error_type):
+        """Run the real OCR scan flow against a failing (routed) API."""
+        page.route(
+            "**/api/ocr/ingredients",
+            lambda route: route.fulfill(
+                status=502,
+                content_type="application/json",
+                body=json.dumps({"error": "ocr failed", "error_type": error_type}),
+            ),
+        )
+        with page.expect_file_chooser() as fc_info:
+            page.locator("#f-ocr-btn").click()
+        fc_info.value.set_files(
+            {"name": "label.jpg", "mimeType": "image/jpeg", "buffer": self._TINY_JPEG}
         )
 
     def test_toast_ocr_no_text(self, page):
         """OCR returning no text shows appropriate toast."""
         t = _load_translations()
         _go_to_register(page)
-        self._trigger_ocr_error(
-            page, "no_text", t["toast_ocr_no_text"], t["toast_ocr_title_failed"]
-        )
+        self._trigger_ocr_error(page, "no_text")
         _wait_for_toast(page, t["toast_ocr_no_text"])
 
     def test_toast_ocr_token_limit(self, page):
         """OCR token limit reached shows appropriate toast."""
         t = _load_translations()
         _go_to_register(page)
-        self._trigger_ocr_error(
-            page, "token_limit_exceeded",
-            t["toast_ocr_token_limit"], t["toast_ocr_title_failed"]
-        )
+        self._trigger_ocr_error(page, "token_limit_exceeded")
         _wait_for_toast(page, t["toast_ocr_token_limit"])
 
     def test_toast_ocr_provider_quota(self, page):
         """OCR provider quota exhausted shows appropriate toast."""
         t = _load_translations()
         _go_to_register(page)
-        self._trigger_ocr_error(
-            page, "provider_quota",
-            t["toast_ocr_provider_quota"], t["toast_ocr_title_failed"]
-        )
+        self._trigger_ocr_error(page, "provider_quota")
         _wait_for_toast(page, t["toast_ocr_provider_quota"])
 
     def test_toast_ocr_provider_timeout(self, page):
         """OCR provider timeout shows appropriate toast."""
         t = _load_translations()
         _go_to_register(page)
-        self._trigger_ocr_error(
-            page, "provider_timeout",
-            t["toast_ocr_provider_timeout"], t["toast_ocr_title_failed"]
-        )
+        self._trigger_ocr_error(page, "provider_timeout")
         _wait_for_toast(page, t["toast_ocr_provider_timeout"])
 
     def test_toast_ocr_invalid_image(self, page):
         """OCR with invalid image shows appropriate toast."""
         t = _load_translations()
         _go_to_register(page)
-        self._trigger_ocr_error(
-            page, "invalid_image",
-            t["toast_ocr_invalid_image"], t["toast_ocr_title_failed"]
-        )
+        self._trigger_ocr_error(page, "invalid_image")
         _wait_for_toast(page, t["toast_ocr_invalid_image"])
 
     def test_toast_ocr_settings_saved(self, page):
@@ -460,9 +457,9 @@ class TestOcrToasts:
         save_btn = page.locator(
             "button:has-text('Lagre OCR'), button[data-i18n='btn_save_ocr_settings']"
         ).first
-        if save_btn.is_visible():
-            save_btn.click()
-            _wait_for_toast(page, t["toast_ocr_settings_saved"])
+        expect(save_btn).to_be_visible(timeout=5000)
+        save_btn.click()
+        _wait_for_toast(page, t["toast_ocr_settings_saved"])
 
     def test_toast_ocr_settings_error(self, page):
         """OCR settings save failure shows error toast."""
@@ -481,9 +478,9 @@ class TestOcrToasts:
         save_btn = page.locator(
             "button:has-text('Lagre OCR'), button[data-i18n='btn_save_ocr_settings']"
         ).first
-        if save_btn.is_visible():
-            save_btn.click()
-            _wait_for_toast(page, t["toast_ocr_settings_error"])
+        expect(save_btn).to_be_visible(timeout=5000)
+        save_btn.click()
+        _wait_for_toast(page, t["toast_ocr_settings_error"])
         page.unroute("**/api/ocr/settings")
 
 
@@ -656,31 +653,24 @@ class TestImageToasts:
     """Tests for image-related toast messages."""
 
     def test_toast_image_too_large(self, page):
-        """Uploading oversized image shows error toast."""
+        """Uploading oversized image shows error toast.
+
+        Drives the real path: the register-form image button opens a file
+        chooser (images.js captureProductImage creates the input
+        dynamically); a >10MB file must trip the size check.
+        """
         t = _load_translations()
         _go_to_register(page)
-        # Create a large fake file (>10MB)
-        page.evaluate(
-            """() => {
-                // Override the file size check by creating a large data URL
-                window._testLargeImage = 'data:image/png;base64,' + 'A'.repeat(15000000);
-            }"""
+        with page.expect_file_chooser() as fc_info:
+            page.locator("#f-image-btn").click()
+        fc_info.value.set_files(
+            {
+                "name": "large.png",
+                "mimeType": "image/png",
+                "buffer": b"x" * (11 * 1024 * 1024),
+            }
         )
-        # Find the image input and set a large file
-        image_input = page.locator(
-            "input[type='file'][accept*='image']"
-        ).first
-        if image_input.count() > 0:
-            # Create a buffer > 10MB
-            large_buffer = b"x" * (11 * 1024 * 1024)
-            image_input.set_input_files(
-                {
-                    "name": "large.png",
-                    "mimeType": "image/png",
-                    "buffer": large_buffer,
-                }
-            )
-            _wait_for_toast(page, t["toast_image_too_large"])
+        _wait_for_toast(page, t["toast_image_too_large"])
 
 
 # ---------------------------------------------------------------------------
@@ -855,12 +845,35 @@ class TestNetworkToasts:
 class TestEanUnlockToasts:
     """Tests for EAN unlock toast messages."""
 
-    def test_toast_ean_unlocked(self, page):
-        """Unlocking an EAN shows success toast via direct showToast call."""
+    def test_toast_ean_unlocked(self, page, api_create_product):
+        """Unsyncing an OFF-synced EAN via the EAN manager shows the toast.
+
+        Drives the real path: an OFF-synced product's EAN row renders an
+        unsync button in the edit-mode EAN manager; clicking it POSTs to
+        /api/products/<pid>/eans/<id>/unsync and ean-manager.js shows
+        toast_ean_unlocked on success.
+        """
         t = _load_translations()
-        # Directly trigger the toast that would appear on EAN unlock
-        # This tests the toast message text is correct per translation
-        page.evaluate(
-            f"() => window.showToast('{t['toast_ean_unlocked']}', 'success')"
+        product = api_create_product(
+            name="EanUnlockToastProd", ean="7038010069307", from_off=True
         )
+        pid = product["id"]
+
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function(
+            "() => !document.querySelector('#results-container .loading')",
+            timeout=10000,
+        )
+        row = page.locator(".table-row", has_text="EanUnlockToastProd").first
+        row.click()
+        page.wait_for_timeout(300)
+        edit_btn = page.locator("[data-action='start-edit']").first
+        expect(edit_btn).to_be_visible(timeout=5000)
+        edit_btn.click()
+
+        unsync_btn = page.locator(
+            f"#ean-manager-{pid} [data-ean-action='unsync-ean']"
+        ).first
+        expect(unsync_btn).to_be_visible(timeout=5000)
+        unsync_btn.click()
         _wait_for_toast(page, t["toast_ean_unlocked"])

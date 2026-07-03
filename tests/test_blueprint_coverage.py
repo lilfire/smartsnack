@@ -542,7 +542,8 @@ class TestRefreshOffSyncEndpoint:
         assert resp.status_code == 500
         data = resp.get_json()
         assert "error" in data
-        assert "connection error" in data["error"]
+        # Internal exception text must not leak to the client (LSO-1698 M9)
+        assert data["error"] == "Internal error"
 
 
 class TestRefreshOffStreamEndpoint:

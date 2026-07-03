@@ -91,8 +91,8 @@ class TestRefreshOffSync:
         assert spec.call_count == 1
 
     def test_service_exception_returns_500_with_error_body(self, live_url):
-        """When ``refresh_from_off`` raises, the route returns 500 with the
-        exception message in ``error``."""
+        """When ``refresh_from_off`` raises, the route returns 500 with a
+        generic error — internal exception text must not leak (LSO-1698 M9)."""
         with patch(
             "services.bulk_service.refresh_from_off",
             side_effect=RuntimeError("OFF upstream is on fire"),
@@ -100,9 +100,10 @@ class TestRefreshOffSync:
             status, body = _post(f"{live_url}/api/bulk/refresh-off")
 
         assert status == 500, f"Expected 500 on service exception, got {status}: {body}"
-        assert body.get("error") == "OFF upstream is on fire", (
-            "Route must surface the exception's str() in the error field"
+        assert body.get("error") == "Internal error", (
+            "Route must return a generic error, not the exception's str()"
         )
+        assert "on fire" not in str(body)
 
 
 # ===========================================================================
@@ -377,7 +378,8 @@ class TestEstimatePqBulk:
         assert spec.call_count == 1
 
     def test_service_exception_returns_500(self, live_url):
-        """When ``estimate_all_pq`` raises, the route returns 500 + error body."""
+        """When ``estimate_all_pq`` raises, the route returns 500 with a
+        generic error — internal exception text must not leak (LSO-1698 M9)."""
         with patch(
             "services.bulk_service.estimate_all_pq",
             side_effect=RuntimeError("PQ estimator crashed"),
@@ -385,4 +387,5 @@ class TestEstimatePqBulk:
             status, body = _post(f"{live_url}/api/bulk/estimate-pq")
 
         assert status == 500, f"Expected 500 on exception, got {status}: {body}"
-        assert body.get("error") == "PQ estimator crashed"
+        assert body.get("error") == "Internal error"
+        assert "crashed" not in str(body)

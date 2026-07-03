@@ -324,7 +324,7 @@ def off_search(query: str, nutrition: dict | None = None, category: str = "") ->
             if (
                 p.get("ingredients_text")
                 and p.get("lang") != priority[0]
-                and not p.get(f"ingredients_text_{priority[0]}", "").strip()
+                and not (p.get(f"ingredients_text_{priority[0]}") or "").strip()
             ):
                 p["ingredients_text"] = llm_translate_service.translate_ingredients(
                     p["ingredients_text"], priority[0]

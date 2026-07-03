@@ -252,19 +252,18 @@ class TestI18nImageTooLarge:
         t = _load_translations(lang)
         _change_language(page, lang)
         _go_to_register(page)
-        image_input = page.locator(
-            "input[type='file'][accept*='image']"
-        ).first
-        if image_input.count() > 0:
-            large_buffer = b"x" * (11 * 1024 * 1024)
-            image_input.set_input_files(
-                {
-                    "name": "large.png",
-                    "mimeType": "image/png",
-                    "buffer": large_buffer,
-                }
-            )
-            _wait_for_toast(page, t["toast_image_too_large"])
+        # The register-form image button opens a file chooser (images.js
+        # creates the input dynamically); a >10MB file trips the size check.
+        with page.expect_file_chooser() as fc_info:
+            page.locator("#f-image-btn").click()
+        fc_info.value.set_files(
+            {
+                "name": "large.png",
+                "mimeType": "image/png",
+                "buffer": b"x" * (11 * 1024 * 1024),
+            }
+        )
+        _wait_for_toast(page, t["toast_image_too_large"])
 
 
 # ---------------------------------------------------------------------------

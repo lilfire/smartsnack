@@ -274,7 +274,7 @@ def import_products(
                     pass
         if "flag_definitions" in data:
             for fd in data["flag_definitions"]:
-                name = fd.get("name", "").strip()
+                name = (fd.get("name") or "").strip()
                 fd_type = fd.get("type", "user")
                 if not name or fd_type not in ("user", "system"):
                     continue
@@ -296,7 +296,7 @@ def import_products(
             r[0] for r in cur.execute("SELECT name FROM flag_definitions").fetchall()
         }
         for p in data["products"]:
-            cat = p.get("type", "").strip()
+            cat = (p.get("type") or "").strip()
             if cat and cat not in existing_cats:
                 emoji = _pick_emoji_for_category(cat)
                 try:
@@ -314,7 +314,7 @@ def import_products(
                 except sqlite3.IntegrityError:
                     existing_cats.add(cat)
             ean = (p.get("ean") or "").strip()
-            name = p.get("name", "").strip()
+            name = (p.get("name") or "").strip()
             existing_id = None
             if match_criteria in ("ean", "both") and ean:
                 row = cur.execute(

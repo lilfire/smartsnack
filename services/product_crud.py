@@ -140,14 +140,24 @@ def list_products(
 
     where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
-    total_count = cur.execute(
-        f"SELECT COUNT(*) FROM products {where}", params
-    ).fetchone()[0]
-
-    rows = cur.execute(
-        f"SELECT {PRODUCT_COLS_NO_IMAGE} FROM products {where} ORDER BY name LIMIT ? OFFSET ?",
-        params + [limit, offset],
-    ).fetchall()
+    if post_filter_spec is None:
+        total_count = cur.execute(
+            f"SELECT COUNT(*) FROM products {where}", params
+        ).fetchone()[0]
+        rows = cur.execute(
+            f"SELECT {PRODUCT_COLS_NO_IMAGE} FROM products {where} ORDER BY name LIMIT ? OFFSET ?",
+            params + [limit, offset],
+        ).fetchall()
+    else:
+        # Computed-field filters (total_score, completeness, flags in mixed OR
+        # groups) can only be evaluated in Python, so pagination must happen
+        # AFTER filtering: fetch every row matching the SQL WHERE, filter,
+        # then slice. total_count is set from the filtered set below.
+        total_count = 0
+        rows = cur.execute(
+            f"SELECT {PRODUCT_COLS_NO_IMAGE} FROM products {where} ORDER BY name",
+            params,
+        ).fetchall()
 
     results = []
     for r in rows:
@@ -175,6 +185,10 @@ def list_products(
         p["tags"] = tags_map.get(p["id"], [])
 
     results = _apply_post_filters(results, post_filter_spec)
+
+    if post_filter_spec is not None:
+        total_count = len(results)
+        results = results[offset:offset + limit]
 
     results.sort(key=lambda x: x["total_score"], reverse=True)
     return {"products": results, "total": total_count}

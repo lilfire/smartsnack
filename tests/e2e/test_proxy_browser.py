@@ -49,16 +49,18 @@ class TestImageUploadBrowser:
         expect(preview).to_be_hidden()
 
     def test_image_controls_in_edit(self, page, api_create_product):
-        """The edit form should have image-related controls."""
+        """The expanded/edit view must show the change-image control.
+
+        render.js always emits a [data-action='change-image'] button in the
+        expanded image section (upload or change variant), which persists
+        in edit mode.
+        """
         api_create_product(name="ImgEditProd")
         _reload_and_wait(page)
         _open_edit_form(page, "ImgEditProd")
 
-        # Look for change-image or view-image actions
-        row = page.locator(f".table-row:has-text('ImgEditProd')").first
-        img_btns = row.locator("[data-action='change-image']")
-        if img_btns.count() > 0:
-            expect(img_btns.first).to_be_visible()
+        img_btns = page.locator("[data-action='change-image']")
+        expect(img_btns.first).to_be_visible(timeout=5000)
 
 
 class TestImageDisplayBrowser:
