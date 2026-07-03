@@ -4,15 +4,15 @@
   <div class="search-row">
     <div class="search-wrap" id="search-box">
       <label for="search-input" class="search-icon" data-i18n-title="search_placeholder" title="Search for product or EAN">&#128270;</label>
-      <input class="search-input" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Search for product or EAN..." oninput="onSearchInput()" aria-label="Search for product or EAN">
-      <button type="button" class="search-clear" id="search-clear" onclick="clearSearch()" data-i18n-aria-label="aria_clear_search" aria-label="Clear search">&times;</button>
+      <input class="search-input" id="search-input" data-i18n-placeholder="search_placeholder" placeholder="Search for product or EAN..." aria-label="Search for product or EAN">
+      <button type="button" class="search-clear" id="search-clear" data-i18n-aria-label="aria_clear_search" aria-label="Clear search">&times;</button>
     </div>
-    <button type="button" class="btn-scan-search" onclick="openSearchScanner()" data-i18n-aria-label="search_scan_title" data-i18n-title="search_scan_title" aria-label="Scan barcode to find product">&#128247;</button>
+    <button type="button" class="btn-scan-search" id="btn-scan-search" data-i18n-aria-label="search_scan_title" data-i18n-title="search_scan_title" aria-label="Scan barcode to find product">&#128247;</button>
   </div>
   <div class="filter-wrap" id="filter-wrap">
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-      <button type="button" class="filter-toggle" id="adv-filter-toggle" onclick="toggleAdvancedFilters()" aria-expanded="false" aria-controls="advanced-filters" data-i18n="adv_filter_toggle">Advanced filter</button>
-      <button type="button" class="filter-toggle" id="filter-toggle" onclick="toggleFilters()" aria-expanded="false" aria-controls="filter-row">
+      <button type="button" class="filter-toggle" id="adv-filter-toggle" aria-expanded="false" aria-controls="advanced-filters" data-i18n="adv_filter_toggle">Advanced filter</button>
+      <button type="button" class="filter-toggle" id="filter-toggle" aria-expanded="false" aria-controls="filter-row">
         <span id="filter-toggle-label" data-i18n="filter_all">All categories</span> <span class="ft-arrow">&#9660;</span>
       </button>
     </div>

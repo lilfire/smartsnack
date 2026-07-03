@@ -82,6 +82,15 @@ describe('downloadBackup', () => {
   let assignedHrefs;
   let origLocationDescriptor;
 
+  // LSO-1783: the API key comes from a <meta> tag rendered by base.html
+  // (no inline <script>, so CSP script-src can stay 'self'-only).
+  function setMetaApiKey(value) {
+    const meta = document.createElement('meta');
+    meta.setAttribute('name', 'smartsnack-api-key');
+    meta.setAttribute('content', value);
+    document.head.appendChild(meta);
+  }
+
   beforeEach(() => {
     assignedHrefs = [];
     origLocationDescriptor = Object.getOwnPropertyDescriptor(window, 'location');
@@ -95,28 +104,34 @@ describe('downloadBackup', () => {
   });
 
   afterEach(() => {
-    delete window.SMARTSNACK_API_KEY;
+    document.querySelectorAll('meta[name="smartsnack-api-key"]').forEach((m) => m.remove());
     if (origLocationDescriptor) {
       Object.defineProperty(window, 'location', origLocationDescriptor);
     }
   });
 
-  it('sets window.location.href to /api/backup when no API key configured', () => {
+  it('sets window.location.href to /api/backup when no API key meta tag exists', () => {
     downloadBackup();
     expect(assignedHrefs[0]).toBe('/api/backup');
     // M22: no premature success toast — a neutral "started" info toast instead
     expect(showToast).toHaveBeenCalledWith('toast_backup_download_started', 'info');
   });
 
-  it('includes api_key query param when SMARTSNACK_API_KEY is set', () => {
-    window.SMARTSNACK_API_KEY = 'my-secret';
+  it('sets window.location.href to /api/backup when the meta tag content is empty', () => {
+    setMetaApiKey('');
+    downloadBackup();
+    expect(assignedHrefs[0]).toBe('/api/backup');
+  });
+
+  it('includes api_key query param when the meta tag has a key', () => {
+    setMetaApiKey('my-secret');
     downloadBackup();
     expect(assignedHrefs[0]).toBe('/api/backup?api_key=my-secret');
     expect(showToast).toHaveBeenCalledWith('toast_backup_download_started', 'info');
   });
 
   it('URL-encodes special characters in api_key', () => {
-    window.SMARTSNACK_API_KEY = 'key with spaces&special=chars';
+    setMetaApiKey('key with spaces&special=chars');
     downloadBackup();
     expect(assignedHrefs[0]).toContain('api_key=key%20with%20spaces%26special%3Dchars');
   });

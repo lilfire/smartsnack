@@ -39,8 +39,10 @@ import { closeOffPicker, offModalSearch, selectOffResult } from './off-picker.js
 import { showOffAddReview, closeOffAddReview, submitToOff } from './off-review.js';
 import { toggleAdvancedFilters } from './advanced-filters.js';
 import { scanIngredients } from './ocr.js';
+import { initDomBindings } from './dom-bindings.js';
 
-// ── Expose functions to window for HTML onclick handlers ──
+// ── Expose functions to window for cross-module use and the
+// data-action delegation in render.js ──
 Object.assign(window, {
   // i18n
   changeLanguage,
@@ -117,6 +119,7 @@ document.addEventListener('touchstart', function(e) {
 
 // ── Init ─────────────────────────────────────────────
 (async function() {
+  initDomBindings();
   await initLanguage();
   initAllFieldSelects();
   const langSel = document.getElementById('language-select');
