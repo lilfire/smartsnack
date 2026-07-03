@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MOCK_PRODUCTS_RESPONSE, MOCK_PRODUCTS_EMPTY } from './mock-shapes.js';
 
 vi.mock('../state.js', () => {
   const _state = {
@@ -260,7 +261,7 @@ describe('scanPickerSearch', () => {
 
   it('shows empty message when no results', async () => {
     document.getElementById('scan-picker-input').value = 'nonexistent';
-    fetchProducts.mockResolvedValueOnce({ products: [], total: 0 });
+    fetchProducts.mockResolvedValueOnce(MOCK_PRODUCTS_EMPTY);
     await scanPickerSearch();
     const body = document.getElementById('scan-picker-body');
     expect(body.innerHTML).toContain('off-modal-empty');
@@ -268,7 +269,7 @@ describe('scanPickerSearch', () => {
 
   it('renders search results', async () => {
     document.getElementById('scan-picker-input').value = 'Milk';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'Milk', type: 'dairy', has_image: 0 },
       { id: 2, name: 'Milk 2', type: 'dairy', has_image: 0 },
     ], total: 2 });
@@ -557,7 +558,7 @@ describe('onSearchScanDetected when currentView is already search', () => {
 
     state.currentView = 'search';
     const matchingProduct = { id: 10, name: 'TestProduct', type: 'dairy', ean: '7038010055720' };
-    fetchProducts.mockResolvedValue({ products: [matchingProduct], total: 1 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [matchingProduct], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -571,7 +572,7 @@ describe('onSearchScanDetected when currentView is already search', () => {
 
     expect(switchView).not.toHaveBeenCalled();
     // Reset
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -609,7 +610,7 @@ describe('onSearchScanDetected when filter row is already open', () => {
 
     state.currentView = 'search';
     const matchingProduct = { id: 11, name: 'OpenFilterProduct', type: 'snack', ean: '1234567890128' };
-    fetchProducts.mockResolvedValue({ products: [matchingProduct], total: 1 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [matchingProduct], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -625,7 +626,7 @@ describe('onSearchScanDetected when filter row is already open', () => {
     expect(filterRow.classList.contains('open')).toBe(true);
     // filterToggle should NOT have gotten 'open' added since the condition was false
     expect(filterToggle.classList.contains('open')).toBe(false);
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -661,7 +662,7 @@ describe('onSearchScanDetected when product row element is null', () => {
 
     state.currentView = 'search';
     const matchingProduct = { id: 99, name: 'NoRowProduct', type: 'bread', ean: '9999999999999' };
-    fetchProducts.mockResolvedValue({ products: [matchingProduct], total: 1 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [matchingProduct], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -679,7 +680,7 @@ describe('onSearchScanDetected when product row element is null', () => {
       // The setTimeout should have fired and not crashed
       expect(document.querySelector('.scan-highlight')).toBeNull();
     });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -702,7 +703,7 @@ describe('scanPickerSearch singular result count', () => {
 
   it('shows singular translation key when exactly 1 result', async () => {
     document.getElementById('scan-picker-input').value = 'Cheese';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'Cheese', type: 'dairy', has_image: 0 },
     ], total: 1 });
     await scanPickerSearch();
@@ -733,7 +734,7 @@ describe('scanPickerSearch loadProductImage with dataUri', () => {
     loadProductImage.mockResolvedValueOnce(fakeDataUri);
 
     document.getElementById('scan-picker-input').value = 'ImgProduct';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 50, name: 'ImgProduct', type: 'dairy', has_image: 1 },
     ], total: 1 });
     await scanPickerSearch();
@@ -767,7 +768,7 @@ describe('scanPickerSearch EAN vs no EAN products', () => {
 
   it('shows EAN for products with ean and scan_no_ean for those without', async () => {
     document.getElementById('scan-picker-input').value = 'Test';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'WithEAN', type: 'dairy', has_image: 0, ean: '7038010055720' },
       { id: 2, name: 'NoEAN', type: 'dairy', has_image: 0, ean: '' },
     ], total: 2 });
@@ -798,7 +799,7 @@ describe('onSearchScanDetected when product is not found', () => {
 
     state.currentView = 'search';
     // Backend search returns no results for the scanned EAN
-    fetchProducts.mockResolvedValueOnce({ products: [], total: 0 });
+    fetchProducts.mockResolvedValueOnce(MOCK_PRODUCTS_EMPTY);
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -810,7 +811,7 @@ describe('onSearchScanDetected when product is not found', () => {
       // Should show the not-found modal since no product matched
       expect(document.getElementById('scan-modal-bg')).not.toBeNull();
     });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -853,7 +854,7 @@ describe('onSearchScanDetected when product row EXISTS in DOM', () => {
 
     state.currentView = 'search';
     const matchingProduct = { id: 77, name: 'RowProduct', type: 'dairy', ean: '5555555555555' };
-    fetchProducts.mockResolvedValue({ products: [matchingProduct], total: 1 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [matchingProduct], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -870,7 +871,7 @@ describe('onSearchScanDetected when product row EXISTS in DOM', () => {
       expect(tableRow.classList.contains('scan-highlight')).toBe(true);
     });
     expect(tableRow.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -902,7 +903,7 @@ describe('onSearchScanDetected switchView when not on search', () => {
     document.body.appendChild(filterRow);
 
     state.currentView = 'register'; // NOT search
-    fetchProducts.mockResolvedValue({ products: [
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'Prod', type: 'dairy', ean: '1111111111111' },
     ], total: 1 });
 
@@ -915,7 +916,7 @@ describe('onSearchScanDetected switchView when not on search', () => {
     await vi.waitFor(() => {
       expect(switchView).toHaveBeenCalledWith('search');
     });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -931,7 +932,7 @@ describe('scanPickerSearch click delegation on result rows', () => {
     const inp = document.getElementById('scan-picker-input');
     inp.value = 'Clickable';
 
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 42, name: 'Clickable', type: 'dairy', has_image: 0 },
     ], total: 1 });
     api.mockResolvedValueOnce({ id: 42, name: 'Clickable', ean: '' })
@@ -1035,7 +1036,7 @@ describe('onSearchScanDetected error handling', () => {
     expect(consoleSpy).toHaveBeenCalled();
 
     consoleSpy.mockRestore();
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -1115,7 +1116,7 @@ describe('scanPickerSearch Enter key handler (line 320 branch)', () => {
 
     const inp = document.getElementById('scan-picker-input');
     inp.value = 'TestEnter';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'TestEnter', type: 'dairy', has_image: 0 },
     ], total: 1 });
 
@@ -1189,7 +1190,7 @@ describe('scanPickerSearch loadProductImage returns falsy (line 391 branch)', ()
     loadProductImage.mockResolvedValueOnce(null);
 
     document.getElementById('scan-picker-input').value = 'NullImg';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 60, name: 'NullImg', type: 'dairy', has_image: 1 },
     ], total: 1 });
     await scanPickerSearch();
@@ -1311,7 +1312,7 @@ describe('showScanProductPicker close button and search button click (line 311, 
 
     const inp = document.getElementById('scan-picker-input');
     inp.value = 'BtnSearch';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'BtnSearch', type: 'dairy', has_image: 0 },
     ], total: 1 });
 
@@ -1344,7 +1345,7 @@ describe('openSearchScanner search scan success callback (line 159-163)', () => 
     navigator.vibrate = vi.fn();
 
     state.currentView = 'search';
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -1362,7 +1363,7 @@ describe('openSearchScanner search scan success callback (line 159-163)', () => 
       expect(document.getElementById('scan-modal-bg')).not.toBeNull();
     });
 
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -1385,7 +1386,7 @@ describe('scanPickerSearch brand vs no brand products', () => {
 
   it('shows brand for products with brand and omits it for those without', async () => {
     document.getElementById('scan-picker-input').value = 'Brand';
-    fetchProducts.mockResolvedValueOnce({ products: [
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [
       { id: 1, name: 'WithBrand', type: 'dairy', has_image: 0, brand: 'Tine' },
       { id: 2, name: 'NoBrand', type: 'snack', has_image: 0, brand: '' },
     ], total: 2 });
@@ -1433,8 +1434,8 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
     const getCaptured = setupSearchScanner();
     state.currentView = 'search';
     const product = { id: 5, name: 'Gouda', type: 'dairy', ean: '7038010055720' };
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 }); // filtered render call
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 }); // filtered render call
 
     openSearchScanner();
     await vi.waitFor(() => expect(getCaptured()).toBeDefined());
@@ -1445,13 +1446,13 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
     expect(state.currentFilter).toEqual(['dairy']);
     expect(renderResults).toHaveBeenCalled();
     expect(document.getElementById('scan-modal-bg')).toBeNull();
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('shows not-found modal when fetchProducts returns empty object format {products: [], total: 0}', async () => {
     const getCaptured = setupSearchScanner();
     state.currentView = 'search';
-    fetchProducts.mockResolvedValueOnce({ products: [], total: 0 });
+    fetchProducts.mockResolvedValueOnce(MOCK_PRODUCTS_EMPTY);
 
     openSearchScanner();
     await vi.waitFor(() => expect(getCaptured()).toBeDefined());
@@ -1460,7 +1461,7 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
     await vi.waitFor(() => {
       expect(document.getElementById('scan-modal-bg')).not.toBeNull();
     });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('finds correct product when fetchProducts returns object with multiple products', async () => {
@@ -1468,8 +1469,8 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
     state.currentView = 'search';
     const target = { id: 2, name: 'Target', type: 'snack', ean: '1234567890123' };
     const other = { id: 3, name: 'Other', type: 'snack', ean: '9999999999999' };
-    fetchProducts.mockResolvedValueOnce({ products: [target, other], total: 2 });
-    fetchProducts.mockResolvedValueOnce({ products: [target], total: 1 }); // filtered render call
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [target, other], total: 2 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [target], total: 1 }); // filtered render call
 
     openSearchScanner();
     await vi.waitFor(() => expect(getCaptured()).toBeDefined());
@@ -1479,7 +1480,7 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
 
     expect(state.currentFilter).toEqual(['snack']);
     expect(document.getElementById('scan-modal-bg')).toBeNull();
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('shows not-found modal when multiple products returned but none match the EAN', async () => {
@@ -1487,7 +1488,7 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
     state.currentView = 'search';
     const p1 = { id: 1, name: 'P1', type: 'dairy', ean: '1111111111111' };
     const p2 = { id: 2, name: 'P2', type: 'dairy', ean: '2222222222222' };
-    fetchProducts.mockResolvedValueOnce({ products: [p1, p2], total: 2 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [p1, p2], total: 2 });
 
     openSearchScanner();
     await vi.waitFor(() => expect(getCaptured()).toBeDefined());
@@ -1496,7 +1497,7 @@ describe('onSearchScanDetected fetchProducts response unwrapping', () => {
     await vi.waitFor(() => {
       expect(document.getElementById('scan-modal-bg')).not.toBeNull();
     });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 
@@ -1539,9 +1540,9 @@ describe('onSearchScanDetected secondary EAN match', () => {
       eans: ['7038010069307', '5000000000001'],
     };
     // First fetchProducts call returns all products (includes the one with eans array)
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
     // Second call for filtered results
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -1558,7 +1559,7 @@ describe('onSearchScanDetected secondary EAN match', () => {
     expect(state.currentFilter).toEqual(['dairy']);
     expect(renderResults).toHaveBeenCalled();
 
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('finds product with null ean but populated eans array', async () => {
@@ -1593,8 +1594,8 @@ describe('onSearchScanDetected secondary EAN match', () => {
     state.currentView = 'search';
     const code = '3333333333';
     const product = { id: 5, name: 'NullEan', type: 'dairy', ean: null, eans: [code] };
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => { expect(capturedOnSuccess).toBeDefined(); });
@@ -1602,7 +1603,7 @@ describe('onSearchScanDetected secondary EAN match', () => {
     capturedOnSuccess(code);
     await vi.waitFor(() => { expect(buildFilters).toHaveBeenCalled(); });
     expect(state.currentFilter).toEqual(['dairy']);
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('falls back to backend search when eans is empty array and ean is empty string', async () => {
@@ -1637,9 +1638,9 @@ describe('onSearchScanDetected secondary EAN match', () => {
     state.currentView = 'search';
     const code = '4444444444';
     // Product has empty ean and empty eans - no local match possible
-    fetchProducts.mockResolvedValueOnce({ products: [{ id: 6, name: 'NoEan', type: 'snack', ean: '', eans: [] }], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [{ id: 6, name: 'NoEan', type: 'snack', ean: '', eans: [] }], total: 1 });
     // Backend search also returns nothing
-    fetchProducts.mockResolvedValueOnce({ products: [], total: 0 });
+    fetchProducts.mockResolvedValueOnce(MOCK_PRODUCTS_EMPTY);
 
     openSearchScanner();
     await vi.waitFor(() => { expect(capturedOnSuccess).toBeDefined(); });
@@ -1649,7 +1650,7 @@ describe('onSearchScanDetected secondary EAN match', () => {
       // Should have called fetchProducts with the scanned code for backend search
       expect(fetchProducts).toHaveBeenCalledWith(code, []);
     });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('finds product via legacy ean when eans is undefined', async () => {
@@ -1685,8 +1686,8 @@ describe('onSearchScanDetected secondary EAN match', () => {
     const code = '5555555555';
     // Product has legacy ean only, no eans array at all
     const product = { id: 7, name: 'LegacyOnly', type: 'bakery', ean: code };
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => { expect(capturedOnSuccess).toBeDefined(); });
@@ -1694,7 +1695,7 @@ describe('onSearchScanDetected secondary EAN match', () => {
     capturedOnSuccess(code);
     await vi.waitFor(() => { expect(buildFilters).toHaveBeenCalled(); });
     expect(state.currentFilter).toEqual(['bakery']);
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 
   it('falls back to backend search when secondary EAN is not in local eans array', async () => {
@@ -1734,11 +1735,11 @@ describe('onSearchScanDetected secondary EAN match', () => {
       ean: '7038010069307',
     };
     // First call: all products (no local match for the scanned code)
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
     // Second call: backend search finds the product via secondary EAN
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
     // Third call: filtered results for rendering
-    fetchProducts.mockResolvedValueOnce({ products: [product], total: 1 });
+    fetchProducts.mockResolvedValueOnce({ ...MOCK_PRODUCTS_RESPONSE, products: [product], total: 1 });
 
     openSearchScanner();
     await vi.waitFor(() => {
@@ -1754,7 +1755,7 @@ describe('onSearchScanDetected secondary EAN match', () => {
     // fetchProducts should be called with the scanned code for backend search
     expect(fetchProducts).toHaveBeenCalledWith('5000000000001', []);
 
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
   });
 });
 

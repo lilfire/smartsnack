@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MOCK_PRODUCTS_RESPONSE, MOCK_PRODUCTS_EMPTY } from './mock-shapes.js';
 
 const { _state } = vi.hoisted(() => {
   const _state = {
@@ -78,7 +79,7 @@ describe('loadNextPage', () => {
   it('fetches next page with correct offset', async () => {
     state.pagination.offset = 50;
     state.pagination.total = 150;
-    fetchProducts.mockResolvedValue({ products: [{ id: 3, name: 'C' }], total: 150 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [{ id: 3, name: 'C' }], total: 150 });
     await loadNextPage();
     expect(fetchProducts).toHaveBeenCalledWith(
       expect.any(String),
@@ -91,7 +92,7 @@ describe('loadNextPage', () => {
     state.pagination.offset = 0;
     state.pagination.total = 100;
     const newProducts = [{ id: 3, name: 'C' }];
-    fetchProducts.mockResolvedValue({ products: newProducts, total: 100 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: newProducts, total: 100 });
     await loadNextPage();
     expect(state.cachedResults).toEqual(newProducts);
     expect(appendResults).toHaveBeenCalledWith(newProducts);
@@ -110,7 +111,7 @@ describe('loadNextPage', () => {
   it('updates pagination offset after successful fetch', async () => {
     state.pagination.offset = 50;
     state.pagination.total = 200;
-    fetchProducts.mockResolvedValue({ products: [{ id: 5 }], total: 200 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [{ id: 5 }], total: 200 });
     await loadNextPage();
     expect(state.pagination.offset).toBe(100);
   });
@@ -118,7 +119,7 @@ describe('loadNextPage', () => {
   it('updates pagination total from response', async () => {
     state.pagination.offset = 0;
     state.pagination.total = null;
-    fetchProducts.mockResolvedValue({ products: [{ id: 6 }], total: 75 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [{ id: 6 }], total: 75 });
     await loadNextPage();
     expect(state.pagination.total).toBe(75);
   });
@@ -135,7 +136,7 @@ describe('loadNextPage', () => {
   it('resets inFlight to false after fetch', async () => {
     state.pagination.offset = 0;
     state.pagination.total = 100;
-    fetchProducts.mockResolvedValue({ products: [], total: 100 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY, total: 100 });
     await loadNextPage();
     expect(state.pagination.inFlight).toBe(false);
   });
@@ -207,7 +208,7 @@ describe('_onScroll (via scroll event)', () => {
 
   it('calls loadNextPage when distFromBottom <= SCROLL_THRESHOLD', async () => {
     // jsdom defaults: offsetHeight=0, innerHeight=0, scrollY=0 → dist=0 ≤ 200
-    fetchProducts.mockResolvedValue({ products: [], total: 200 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY, total: 200 });
     window.dispatchEvent(new Event('scroll'));
     await new Promise((r) => setTimeout(r, 0));
     expect(fetchProducts).toHaveBeenCalled();
@@ -241,7 +242,7 @@ describe('M17: scrollGeneration guard', () => {
     const inFlight = loadNextPage();
     // A new search starts while the page request is in flight (loadData bumps the generation)
     state.pagination.scrollGeneration++;
-    resolveFetch({ products: [{ id: 99, name: 'Stale' }], total: 200 });
+    resolveFetch({ ...MOCK_PRODUCTS_RESPONSE, products: [{ id: 99, name: 'Stale' }], total: 200 });
     await inFlight;
 
     expect(appendResults).not.toHaveBeenCalled();
@@ -252,7 +253,7 @@ describe('M17: scrollGeneration guard', () => {
 
   it('appends the page normally when no new search started mid-flight', async () => {
     state.pagination = { offset: 0, total: 200, inFlight: false, pageSize: 50, scrollGeneration: 3 };
-    fetchProducts.mockResolvedValue({ products: [{ id: 1, name: 'Fresh' }], total: 200 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: [{ id: 1, name: 'Fresh' }], total: 200 });
 
     await loadNextPage();
 
