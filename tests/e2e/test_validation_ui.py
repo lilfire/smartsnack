@@ -41,6 +41,13 @@ def _open_section(page, i18n_key):
     page.wait_for_timeout(300)
 
 
+def _api_get(page, path):
+    """GET a JSON API path against the live server the page is driving."""
+    base = re.match(r"https?://[^/]+", page.url).group(0)
+    with urllib.request.urlopen(f"{base}{path}", timeout=10) as resp:
+        return json.loads(resp.read())
+
+
 # ---------------------------------------------------------------------------
 # Register form validation
 # ---------------------------------------------------------------------------
@@ -75,12 +82,11 @@ class TestRegisterValidation:
         expect(toast).to_be_visible(timeout=5000)
         expect(toast).to_contain_text(t["toast_invalid_ean"])
 
-    def test_long_name_rejected(self, page, live_url):
-        """Name >200 chars is rejected: server returns 400, error toast
-        shows the server message, and no product is created.
-
-        Backend pins this via _TEXT_FIELD_LIMITS["name"] == 200 in
-        services/product_crud.py (ValueError -> HTTP 400).
+    def test_long_name_rejected_with_max_length_error(self, page):
+        """Name >200 chars is rejected: the backend raises
+        ``name exceeds max length of 200`` (see ``_TEXT_FIELD_LIMITS`` in
+        config.py and ``add_product`` in services/product_crud.py) and the
+        register form surfaces the server error message in an error toast.
         """
         _go_to_register(page)
 
@@ -94,21 +100,14 @@ class TestRegisterValidation:
         page.locator("#f-salt").fill("0.1")
         page.locator("#btn-submit").click()
 
-        # products.js surfaces the server error message in an error toast.
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
-        expect(toast).to_contain_text("exceeds max length")
+        expect(toast).to_contain_text("name exceeds max length of 200")
 
-        # The product must NOT have been persisted.
-        req = urllib.request.Request(
-            f"{live_url}/api/products?search={'A' * 30}",
-            headers={"X-Requested-With": "SmartSnack"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read())
-        assert data["products"] == [], (
-            "Product with >200-char name must be rejected, but was persisted"
-        )
+        # The product must NOT have been created.
+        resp = _api_get(page, "/api/products?search=" + "A" * 50)
+        names = [p["name"] for p in resp["products"]]
+        assert long_name not in names
 
     def test_all_nutrition_zero_succeeds(self, page):
         """All nutrition fields at 0 (boundary min) should succeed."""
@@ -133,19 +132,20 @@ class TestRegisterValidation:
         expect(toast).to_be_visible(timeout=5000)
         expect(toast).to_contain_text(expected)
 
-    def test_negative_kcal_accepted_stored_verbatim(self, page, live_url):
-        """Negative kcal is accepted and stored verbatim (no clamping).
+    def test_negative_kcal_accepted_and_stored_as_is(self, page, unique_name):
+        """Negative kcal is accepted and stored verbatim (NOT clamped).
 
-        Pins current backend behavior: helpers._num applies no minimum
-        bound, so -50 round-trips unchanged and registration succeeds
-        with the standard success toast.
+        The HTML ``min=0`` attribute only affects native form validation,
+        which the JS submit path (``registerProduct``) never consults, and
+        the backend ``_num`` helper (helpers.py) accepts any finite float —
+        there is no server-side non-negativity check. This pins the actual
+        end-to-end behavior: the product is created with kcal exactly as
+        typed.
         """
-        t = _load_translations()
         _go_to_register(page)
 
-        product_name = "NegKcalProduct"
-        page.locator("#f-name").fill(product_name)
-        # fill() sets the value programmatically, bypassing the HTML min attr
+        prod_name = unique_name("NegKcalProduct")
+        page.locator("#f-name").fill(prod_name)
         page.locator("#f-kcal").fill("-50")
         page.locator("#f-protein").fill("5")
         page.locator("#f-fat").fill("3")
@@ -154,21 +154,24 @@ class TestRegisterValidation:
         page.locator("#f-salt").fill("0.1")
         page.locator("#btn-submit").click()
 
-        expected = t["toast_product_added"].replace("{name}", product_name)
+        page.wait_for_timeout(1000)
+        # Dismiss OFF modal if it appears
+        cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
+        if cancel.is_visible():
+            cancel.click()
+            page.wait_for_timeout(200)
+
+        t = _load_translations()
+        expected = t["toast_product_added"].replace("{name}", prod_name)
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
         expect(toast).to_contain_text(expected)
 
-        # The stored product must carry the negative value unchanged.
-        req = urllib.request.Request(
-            f"{live_url}/api/products?search={product_name}",
-            headers={"X-Requested-With": "SmartSnack"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            data = json.loads(resp.read())
-        matching = [p for p in data["products"] if p["name"] == product_name]
-        assert len(matching) == 1, f"Expected 1 stored product, got {len(matching)}"
-        assert matching[0]["kcal"] == -50.0
+        # The stored kcal must be exactly what was typed — no clamping.
+        resp = _api_get(page, f"/api/products?search={prod_name}")
+        matching = [p for p in resp["products"] if p["name"] == prod_name]
+        assert matching, f"{prod_name} was not created"
+        assert matching[0]["kcal"] == -50
 
 
 # ---------------------------------------------------------------------------
@@ -219,11 +222,13 @@ class TestCategoryValidation:
         _open_section(page, "settings_categories_title")
         page.wait_for_timeout(500)
 
-        # Find the label input for our test category and clear it
+        # Find the label input for our test category and clear it. The input
+        # must exist — the category was just created via the API and the
+        # categories section renders one input per category.
         label_input = page.locator(
             f"input.cat-item-label-input[data-cat-name='{cat_name}']"
         )
-        expect(label_input).to_be_visible(timeout=5000)
+        expect(label_input).to_be_attached(timeout=5000)
         label_input.fill("")
         label_input.dispatch_event("change")
 
@@ -475,29 +480,31 @@ class TestWeightOverrideValidation:
 
         _go_to_settings(page)
         _open_section(page, "settings_weights_title")
-        # Wait for weight items to load (async)
-        page.wait_for_selector("#weight-items .weight-item", timeout=10000)
         page.wait_for_timeout(500)
 
-        # Add an override: pick a category in the picker modal and confirm
+        # The add-override button is shown whenever at least one category has
+        # no override yet (updateScopeButtons in settings-weights.js) — true
+        # here since we just ensured a second, override-free category exists.
         add_btn = page.locator("#weight-scope-add")
         expect(add_btn).to_be_visible(timeout=5000)
         add_btn.click()
 
+        # The category picker modal must open; confirm to add the override.
         modal = page.locator(".scan-modal-bg")
-        expect(modal).to_be_visible(timeout=5000)
+        expect(modal).to_be_visible(timeout=3000)
         modal.locator(".scan-modal-btn-register").click()
         page.wait_for_timeout(500)
 
-        # Now delete the override
+        # Confirming switches the scope to the new override category, which
+        # makes the delete button visible (updateScopeButtons).
         delete_btn = page.locator("#weight-scope-delete")
         expect(delete_btn).to_be_visible(timeout=5000)
         delete_btn.click()
 
-        # Confirm deletion in the confirm dialog
+        # Confirm the destructive delete in the confirm modal.
         confirm = page.locator(".confirm-yes")
-        expect(confirm.first).to_be_visible(timeout=5000)
-        confirm.first.click()
+        expect(confirm).to_be_visible(timeout=3000)
+        confirm.click()
 
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)

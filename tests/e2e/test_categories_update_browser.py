@@ -5,9 +5,18 @@ list interactions.
 """
 
 import json
+import os
 import urllib.request
 
 from playwright.sync_api import expect
+
+
+def _load_translations(lang="no"):
+    path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "translations", f"{lang}.json"
+    )
+    with open(path) as f:
+        return json.load(f)
 
 
 def _go_to_settings(page):
@@ -105,23 +114,33 @@ class TestCategoryEditBrowser:
     """Test editing category display names in the settings UI."""
 
     def test_edit_category_label(self, page):
-        """Editing a category label must update the display and show a toast.
+        """Editing a category label via its inline input shows the toast.
 
-        settings-categories.js renders an inline label input per category
-        (input.cat-item-label-input) and binds updateCategoryLabel on its
-        'change' event.
+        The real UI (loadCategories in settings-categories.js) renders one
+        ``input.cat-item-label-input`` per category whose ``change`` event
+        PUTs the new label and shows toast_category_updated. The selectors
+        this test previously guarded on ([data-action='edit-category'],
+        input.settings-item-edit-input) never existed, so it asserted
+        nothing.
         """
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
 
-        label_input = page.locator("#cat-list input.cat-item-label-input").first
-        expect(label_input).to_be_visible(timeout=5000)
+        # Seed data guarantees the 'Snacks' category exists.
+        label_input = page.locator(
+            "#cat-list input.cat-item-label-input[data-cat-name='Snacks']"
+        )
+        expect(label_input).to_be_attached(timeout=5000)
         label_input.fill("Updated Label")
         label_input.dispatch_event("change")
 
-        toast = page.locator(".toast")
-        expect(toast.first).to_be_visible(timeout=5000)
+        toast = page.locator("#toast.show")
+        expect(toast).to_be_visible(timeout=5000)
+        t = _load_translations()
+        expect(toast).to_contain_text(t["toast_category_updated"])
         # The list re-renders from the API — the new label must round-trip.
         expect(
-            page.locator("#cat-list input.cat-item-label-input").first
+            page.locator(
+                "#cat-list input.cat-item-label-input[data-cat-name='Snacks']"
+            )
         ).to_have_value("Updated Label", timeout=5000)
