@@ -79,7 +79,7 @@ def add_product_to_off(product_data: dict) -> dict:
             try:
                 data = json.loads(body)
             except json.JSONDecodeError as e:
-                logger.error("OFF API returned non-JSON response: %.200s", body)
+                logger.error("OFF API returned non-JSON response: %s", body[:200])
                 raise RuntimeError("off_err_api") from e
             if data.get("status") != 1:
                 raise RuntimeError(data.get("status_verbose", "Unknown error from OFF"))

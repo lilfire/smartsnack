@@ -49,16 +49,18 @@ def off_search():
             nutrition = {}
             for k, v in raw_nutrition.items():
                 try:
-                    f = float(v)
-                    if not math.isfinite(f):
+                    fv = float(v)
+                    if not math.isfinite(fv):
                         continue
-                    nutrition[k] = f
+                    nutrition[k] = fv
                 except (TypeError, ValueError):
                     continue
             if not nutrition:
                 nutrition = None
     else:
         query = request.args.get("q", "")
+        if not isinstance(query, str):
+            return jsonify({"error": "q must be a string"}), 400
     try:
         data = proxy_service.off_search(query, nutrition, category)
         return jsonify(data)

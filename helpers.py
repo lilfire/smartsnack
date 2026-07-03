@@ -20,7 +20,7 @@ def _check_api_key():
     """
     if not _API_KEY:
         return None
-    provided = request.headers.get("X-API-Key", "")
+    provided = request.headers.get("X-API-Key") or ""
     if not hmac.compare_digest(provided, _API_KEY):
         return jsonify({"error": "Unauthorized: invalid or missing API key"}), 401
     return None

@@ -83,7 +83,7 @@ class TestRateLimiterStorage:
             if "extensions" in sys.modules:
                 del sys.modules["extensions"]
             import extensions
-            assert extensions._storage_uri == "memory://"
+            assert extensions._rate_limit_uri == "memory://"
         finally:
             if orig is not None:
                 os.environ["RATELIMIT_STORAGE_URI"] = orig
@@ -98,7 +98,7 @@ class TestRateLimiterStorage:
             del sys.modules["extensions"]
         try:
             import extensions
-            assert extensions._storage_uri == "redis://localhost:6379/0"
+            assert extensions._rate_limit_uri == "redis://localhost:6379/0"
         finally:
             if "extensions" in sys.modules:
                 del sys.modules["extensions"]
