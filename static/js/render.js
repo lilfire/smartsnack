@@ -259,8 +259,8 @@ export function renderResults(results, search) {
           + '<div><label>' + t('label_category') + '</label><select class="field-select" id="ed-type">' + opts + '</select></div>'
           + '<div><label>' + t('label_brand') + '</label><input id="ed-brand" value="' + esc(p.brand || '') + '"></div>'
           + '<div><label>' + t('label_stores') + '</label><input id="ed-stores" value="' + esc(p.stores || '') + '"></div>'
-          + '<div class="edit-grid-2"><div style="display:flex;align-items:center;justify-content:space-between"><label>' + t('label_ingredients') + '</label><button type="button" class="btn-ocr" id="ed-ocr-btn" onclick="scanIngredients(\'ed\')" title="' + esc(t('btn_ocr_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
-          + '<div class="edit-grid-2" style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span class="field-label" style="margin:0">' + t('section_nutrition') + '</span><button type="button" class="btn-ocr" id="ed-ocr-nutri-btn" onclick="scanNutrition(\'ed\')" title="' + esc(t('btn_ocr_nutrition_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div>'
+          + '<div class="edit-grid-2"><div style="display:flex;align-items:center;justify-content:space-between"><label>' + t('label_ingredients') + '</label><button type="button" class="btn-ocr" id="ed-ocr-btn" data-action="scan-ingredients" title="' + esc(t('btn_ocr_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div><textarea id="ed-ingredients" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.ingredients || '') + '</textarea></div>'
+          + '<div class="edit-grid-2" style="display:flex;align-items:center;justify-content:space-between;margin-top:4px"><span class="field-label" style="margin:0">' + t('section_nutrition') + '</span><button type="button" class="btn-ocr" id="ed-ocr-nutri-btn" data-action="scan-nutrition" title="' + esc(t('btn_ocr_nutrition_title')) + '"><span class="ocr-spin"></span><span class="ocr-label">&#128247;</span></button></div>'
         h += '<div><label>' + t('label_kcal') + '</label><input type="number" step="1" id="ed-kcal" value="' + ev(p.kcal) + '"></div>'
           + '<div><label>' + t('edit_label_energy_kj') + '</label><input type="number" step="1" id="ed-energy_kj" value="' + ev(p.energy_kj) + '"></div>'
           + '<div><label>' + t('label_fat') + '</label><input type="number" step="0.1" id="ed-fat" value="' + ev(p.fat) + '"></div>'
@@ -274,7 +274,7 @@ export function renderResults(results, search) {
           + '<div><label>' + t('label_portion') + '</label><input type="number" step="1" id="ed-portion" value="' + ev(p.portion) + '"></div>'
           + '<div><label>' + t('label_volume') + '</label><select class="field-select" id="ed-volume"><option value="">-</option><option value="1"' + (p.volume === 1 ? ' selected' : '') + '>' + t('volume_low') + '</option><option value="2"' + (p.volume === 2 ? ' selected' : '') + '>' + t('volume_medium') + '</option><option value="3"' + (p.volume === 3 ? ' selected' : '') + '>' + t('volume_high') + '</option></select></div>'
           + '<div><label>' + t('label_price') + '</label><input type="number" step="1" id="ed-price" value="' + ev(p.price) + '"></div>'
-          + '<div><label>' + t('edit_label_taste') + '</label><div class="range-row"><input type="range" min="0" max="6" step="0.5" value="' + (p.taste_score != null ? p.taste_score : 3) + '" id="ed-smak" oninput="document.getElementById(\'ed-smak-val\').textContent=this.value"><span class="range-val" id="ed-smak-val">' + (p.taste_score != null ? p.taste_score : 3) + '</span></div></div>'
+          + '<div><label>' + t('edit_label_taste') + '</label><div class="range-row"><input type="range" min="0" max="6" step="0.5" value="' + (p.taste_score != null ? p.taste_score : 3) + '" id="ed-smak"><span class="range-val" id="ed-smak-val">' + (p.taste_score != null ? p.taste_score : 3) + '</span></div></div>'
           + '<div class="edit-grid-2"><label>' + t('label_taste_note') + '</label><textarea id="ed-taste_note" rows="2" style="resize:vertical;min-height:50px;width:100%;padding:7px 9px;border-radius:7px;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.04);color:#e8e6e3;font-size:13px;font-family:\'DM Sans\',sans-serif;outline:none">' + esc(p.taste_note || '') + '</textarea></div>'
           + '</div>'
           + (p.ingredients
@@ -386,6 +386,14 @@ export function renderResults(results, search) {
         e.stopPropagation();
         window.estimateProteinQuality('ed');
         break;
+      case 'scan-ingredients':
+        e.stopPropagation();
+        window.scanIngredients('ed');
+        break;
+      case 'scan-nutrition':
+        e.stopPropagation();
+        window.scanNutrition('ed');
+        break;
     }
   }, { signal: _resultsAbort.signal });
 
@@ -404,6 +412,11 @@ export function renderResults(results, search) {
   const edIngredients = document.getElementById('ed-ingredients');
   if (edName) edName.addEventListener('input', () => window.validateOffBtn('ed'));
   if (edIngredients) edIngredients.addEventListener('input', () => window.updateEstimateBtn('ed'));
+  const edSmak = document.getElementById('ed-smak');
+  if (edSmak) edSmak.addEventListener('input', () => {
+    const out = document.getElementById('ed-smak-val');
+    if (out) out.textContent = edSmak.value;
+  });
 
   // Load EAN manager asynchronously after edit form renders
   if (state.editingId) {

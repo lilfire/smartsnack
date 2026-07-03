@@ -116,8 +116,8 @@ class TestMaxContentLength:
 
 # ---------------------------------------------------------------------------
 # Fix 5: CSP restricts script sources to self.
-# script-src keeps 'unsafe-inline' until the templates' inline event
-# handlers are migrated to addEventListener (tracked separately).
+# LSO-1783: inline event handlers were migrated to addEventListener, so
+# script-src no longer needs (or allows) 'unsafe-inline'.
 # ---------------------------------------------------------------------------
 
 
@@ -128,9 +128,10 @@ class TestCSP:
         assert "script-src" in csp
         script_src = next(d for d in csp.split(";") if "script-src" in d)
         assert "'self'" in script_src
-        # No external script hosts, no unsafe-eval
+        # No external script hosts, no unsafe-eval, no unsafe-inline
         assert "http" not in script_src
         assert "'unsafe-eval'" not in script_src
+        assert "'unsafe-inline'" not in script_src
 
     def test_style_src_may_keep_unsafe_inline(self, client):
         """style-src still allows unsafe-inline (for dynamic inline styles)."""

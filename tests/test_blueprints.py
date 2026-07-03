@@ -16,18 +16,32 @@ class TestCoreBlueprint:
     def test_index_injects_api_key(self, client, monkeypatch):
         # M22: the API key must be exposed to the frontend so downloadBackup()
         # can authenticate; without it the backup endpoint returns 401.
+        # LSO-1783: exposed via a <meta> tag (not an inline <script>) so the
+        # CSP can keep script-src free of 'unsafe-inline'.
         monkeypatch.setenv("SMARTSNACK_API_KEY", "test-key-123")
         resp = client.get("/")
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
-        assert 'window.SMARTSNACK_API_KEY = "test-key-123";' in html
+        assert '<meta name="smartsnack-api-key" content="test-key-123">' in html
 
     def test_index_injects_empty_api_key_when_unset(self, client, monkeypatch):
         monkeypatch.delenv("SMARTSNACK_API_KEY", raising=False)
         resp = client.get("/")
         assert resp.status_code == 200
         html = resp.get_data(as_text=True)
-        assert 'window.SMARTSNACK_API_KEY = "";' in html
+        assert '<meta name="smartsnack-api-key" content="">' in html
+
+    def test_index_has_no_inline_script_or_handlers(self, client):
+        # LSO-1783 regression guard: the page must stay compatible with
+        # script-src 'self' — no inline <script> bodies, no on*="" handlers.
+        import re
+
+        resp = client.get("/")
+        html = resp.get_data(as_text=True)
+        for m in re.finditer(r"<script\b[^>]*>", html):
+            assert "src=" in m.group(0), f"inline <script> found: {m.group(0)}"
+        inline_handlers = re.findall(r"<[^>]+\son[a-z]+\s*=", html)
+        assert inline_handlers == []
 
 
 class TestProductsBlueprint:

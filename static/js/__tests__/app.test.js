@@ -148,6 +148,7 @@ vi.mock('../advanced-filters.js', () => ({
 
 vi.mock('../ocr.js', () => ({
   scanIngredients: vi.fn(),
+  scanNutrition: vi.fn(),
 }));
 
 vi.mock('../off-utils.js', () => ({

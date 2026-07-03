@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tags.css') }}">
+    <meta name="smartsnack-api-key" content="{{ api_key or '' }}">
     {% block head %}{% endblock %}
     <script src="{{ url_for('static', filename='js/vendor/html5-qrcode.min.js') }}"></script>
   </head>
@@ -17,7 +18,6 @@
     {% block body %}{% endblock %}
     <div class="version-badge">v{{ version }}</div>
     {% block scripts %}
-    <script>window.SMARTSNACK_API_KEY = {{ (api_key or "") | tojson }};</script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% endblock %}
   </body>

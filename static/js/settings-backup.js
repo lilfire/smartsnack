@@ -3,8 +3,15 @@ import { state, api, showConfirmModal, showToast } from './state.js';
 import { t } from './i18n.js';
 import { loadData } from './products.js';
 
+// The API key is exposed via a <meta> tag in base.html instead of an inline
+// <script> so the CSP can keep script-src free of 'unsafe-inline'.
+function _getApiKey() {
+  const meta = document.querySelector('meta[name="smartsnack-api-key"]');
+  return meta ? meta.getAttribute('content') : '';
+}
+
 export function downloadBackup() {
-  const apiKey = window.SMARTSNACK_API_KEY;
+  const apiKey = _getApiKey();
   const url = apiKey ? '/api/backup?api_key=' + encodeURIComponent(apiKey) : '/api/backup';
   window.location.href = url;
   // We cannot know here whether the download actually succeeded (the browser

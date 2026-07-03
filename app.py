@@ -53,10 +53,9 @@ def create_app() -> Flask:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            # 'unsafe-inline' is required until the templates' inline
-            # onclick/oninput handlers are migrated to addEventListener
-            # (tracked separately); dropping it breaks all UI interaction.
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            # style-src keeps 'unsafe-inline': templates and render.js rely
+            # on inline style="" attributes for dynamic show/hide and layout.
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https://*.openfoodfacts.org https://*.openfoodfacts.net; "
             "connect-src 'self'; "
