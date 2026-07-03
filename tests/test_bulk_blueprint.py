@@ -716,22 +716,21 @@ class TestGetRefreshStatusKeys:
 
 
 class TestStartRefreshFromOff:
-    """services.bulk_service.start_refresh_from_off"""
+    """services.bulk_service.start_refresh_from_off (DB-backed job state)"""
 
     def test_returns_false_when_already_running(self, app_ctx):
-        """If the in-memory job flag is already set, the function must return
-        False immediately without spawning another thread."""
+        """If the DB job row is already marked running, the function must
+        return False immediately without spawning another thread."""
         import services.bulk_service as svc
+        from services import bulk_refresh_state
 
         # Force the job into the 'running' state
-        with svc._refresh_lock:
-            svc._refresh_job["running"] = True
+        bulk_refresh_state.update_job(running=True)
         try:
             result = svc.start_refresh_from_off()
         finally:
             # Always restore so later tests see an idle job
-            with svc._refresh_lock:
-                svc._refresh_job["running"] = False
+            bulk_refresh_state.update_job(running=False)
 
         assert result is False
 
@@ -739,10 +738,9 @@ class TestStartRefreshFromOff:
         """When the job is idle, start_refresh_from_off must return True and
         spawn a background thread (which we immediately stub out)."""
         import services.bulk_service as svc
+        from services import bulk_refresh_state
 
-        # Ensure idle state
-        with svc._refresh_lock:
-            svc._refresh_job["running"] = False
+        bulk_refresh_state.update_job(running=False)
 
         with patch("services.bulk_service._run_refresh", autospec=True):
             # Patch threading.Thread so no real thread is created
@@ -752,19 +750,19 @@ class TestStartRefreshFromOff:
                 , autospec=True):
                 result = svc.start_refresh_from_off({"search_missing": False})
 
-        # Restore state (thread was mocked so running is still True from the update)
-        with svc._refresh_lock:
-            svc._refresh_job["running"] = False
+        # Restore state (thread was mocked so running is still True in the DB)
+        bulk_refresh_state.update_job(running=False)
 
         assert result is True
         mock_thread.start.assert_called_once()
 
-    def test_options_are_forwarded_to_run_refresh(self, app_ctx):
-        """The options dict passed by the caller must be forwarded to _run_refresh."""
+    def test_options_and_priority_are_forwarded_to_run_refresh(self, app_ctx):
+        """The language priority (read in Flask context) and the options dict
+        must both be forwarded to _run_refresh as thread args."""
         import services.bulk_service as svc
+        from services import bulk_refresh_state
 
-        with svc._refresh_lock:
-            svc._refresh_job["running"] = False
+        bulk_refresh_state.update_job(running=False)
 
         captured_args = {}
         mock_thread = create_autospec(threading.Thread, instance=True)
@@ -776,34 +774,38 @@ class TestStartRefreshFromOff:
         with patch(
             "services.bulk_service.threading.Thread", side_effect=capture_thread
             , autospec=True):
-            svc.start_refresh_from_off({"min_certainty": 80})
+            with patch(
+                "services.bulk_service.get_off_language_priority",
+                return_value=["se", "en"],
+                autospec=True,
+            ):
+                svc.start_refresh_from_off({"min_certainty": 80})
 
-        with svc._refresh_lock:
-            svc._refresh_job["running"] = False
+        bulk_refresh_state.update_job(running=False)
 
-        assert captured_args.get("args") == ({"min_certainty": 80},)
+        assert captured_args.get("args") == (["se", "en"], {"min_certainty": 80})
 
     def test_job_state_reset_on_start(self, app_ctx):
         """Starting a fresh job must zero out counters from any previous run."""
         import services.bulk_service as svc
+        from services import bulk_refresh_state
 
-        with svc._refresh_lock:
-            svc._refresh_job.update(
-                running=False,
-                updated=42,
-                skipped=7,
-                errors=3,
-                done=True,
-            )
+        bulk_refresh_state.update_job(
+            running=False,
+            updated=42,
+            skipped=7,
+            errors=3,
+            done=True,
+        )
 
         mock_thread = create_autospec(threading.Thread, instance=True)
         with patch("services.bulk_service.threading.Thread", return_value=mock_thread, autospec=True):
             svc.start_refresh_from_off()
 
-        with svc._refresh_lock:
-            assert svc._refresh_job["updated"] == 0
-            assert svc._refresh_job["skipped"] == 0
-            assert svc._refresh_job["errors"] == 0
-            assert svc._refresh_job["done"] is False
-            # Restore
-            svc._refresh_job["running"] = False
+        job = bulk_refresh_state.read_job()
+        assert job["updated"] == 0
+        assert job["skipped"] == 0
+        assert job["errors"] == 0
+        assert job["done"] is False
+        # Restore
+        bulk_refresh_state.update_job(running=False)
