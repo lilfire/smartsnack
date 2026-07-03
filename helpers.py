@@ -1,5 +1,6 @@
 """Request parsing and validation helpers used across blueprints."""
 
+import hmac
 import math
 import os
 import re
@@ -19,8 +20,8 @@ def _check_api_key():
     """
     if not _API_KEY:
         return None
-    provided = request.headers.get("X-API-Key") or request.args.get("api_key", "")
-    if provided != _API_KEY:
+    provided = request.headers.get("X-API-Key", "")
+    if not hmac.compare_digest(provided, _API_KEY):
         return jsonify({"error": "Unauthorized: invalid or missing API key"}), 401
     return None
 

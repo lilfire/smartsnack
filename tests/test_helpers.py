@@ -294,13 +294,16 @@ class TestCheckApiKey:
             response, status = result
             assert status == 401
 
-    def test_key_in_query_param(self, app, monkeypatch):
+    def test_key_in_query_param_rejected(self, app, monkeypatch):
+        """?api_key= query string must NOT be accepted — it gets logged in access logs."""
         import helpers
 
         monkeypatch.setattr(helpers, "_API_KEY", "secret123")
         with app.test_request_context("/test?api_key=secret123"):
             result = helpers._check_api_key()
-            assert result is None
+            assert result is not None, "query-string api_key must be rejected"
+            response, status = result
+            assert status == 401
 
 
 class TestRequireJsonBodyType:

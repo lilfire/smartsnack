@@ -33,6 +33,7 @@ def _resolve_secret_key() -> str:
         os.makedirs(data_dir, exist_ok=True)
         with open(key_file, "w") as f:
             f.write(secret)
+        os.chmod(key_file, 0o600)
         logger.warning(
             "SMARTSNACK_SECRET_KEY not set. Generated random key at %s. "
             "Set the environment variable for production use.",

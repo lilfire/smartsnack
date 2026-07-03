@@ -5,8 +5,8 @@ import sqlite3
 
 from flask import Blueprint, jsonify, render_template
 
-from db import get_db
 from config import APP_VERSION, APP_VERSION_SUFFIX
+from services import core_service
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,7 @@ bp = Blueprint("core", __name__)
 @bp.route("/health")
 def health():
     try:
-        conn = get_db()
-        count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
+        count = core_service.get_product_count()
         return jsonify({"status": "ok", "version": APP_VERSION, "products": count})
     except (sqlite3.Error, OSError) as e:
         logger.error("Health check failed: %s", e)

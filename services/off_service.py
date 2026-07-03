@@ -76,7 +76,11 @@ def add_product_to_off(product_data: dict) -> dict:
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = resp.read().decode("utf-8")
-            data = json.loads(body)
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError as e:
+                logger.error("OFF API returned non-JSON response: %.200s", body)
+                raise RuntimeError("off_err_api") from e
             if data.get("status") != 1:
                 raise RuntimeError(data.get("status_verbose", "Unknown error from OFF"))
             return data
