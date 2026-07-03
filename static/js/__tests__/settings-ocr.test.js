@@ -167,3 +167,38 @@ describe('saveOcrSettings', () => {
     expect(api).not.toHaveBeenCalled();
   });
 });
+
+// ── change-listener accumulation (LSO-1700 Bug 3) ────
+describe('loadOcrProviders change listener', () => {
+  it('does not accumulate listeners across repeated loads (handler runs once per change)', async () => {
+    setupOcrDOM();
+    document.body.insertAdjacentHTML('beforeend', `
+      <div id="ocr-model-row" style="display:none">
+        <select id="ocr-model-select"></select>
+        <input id="ocr-model-input" style="display:none">
+      </div>`);
+    api.mockResolvedValue({
+      providers: [{ key: 'openai', label: 'OpenAI Vision', models: ['gpt-4o', 'gpt-4o-mini'] }],
+    });
+    await loadOcrProviders();
+    await loadOcrProviders();
+    await loadOcrProviders();
+
+    const sel = document.getElementById('ocr-provider-select');
+    sel.value = 'openai';
+
+    // Each handler run rebuilds the model <select>, creating one <option> per
+    // model. With accumulated listeners the change event would create 2 options
+    // per stacked handler (6 with three listeners) instead of exactly 2.
+    const created = [];
+    const origCreate = document.createElement.bind(document);
+    const spy = vi.spyOn(document, 'createElement').mockImplementation((tag) => {
+      created.push(String(tag).toLowerCase());
+      return origCreate(tag);
+    });
+    sel.dispatchEvent(new Event('change'));
+    spy.mockRestore();
+
+    expect(created.filter((tag) => tag === 'option').length).toBe(2);
+  });
+});

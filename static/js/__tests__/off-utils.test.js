@@ -30,6 +30,7 @@ import {
   _numericFields,
   _formatNumeric,
   _detectConflicts,
+  _parseServingGrams,
   _esc,
   isValidImageUrl,
   updateEstimateBtn,
@@ -161,19 +162,22 @@ describe('_detectConflicts', () => {
       <input id="p-brand" value="">`;
   });
 
-  it('auto-applies OFF value when field exists', () => {
-    const { autoApply } = _detectConflicts({ kcal: 200 }, 'p');
-    expect(autoApply.kcal).toBe('200');
+  it('reports a conflict when local numeric differs from OFF value', () => {
+    const { autoApply, conflicts } = _detectConflicts({ kcal: 200 }, 'p');
+    expect(autoApply.kcal).toBeUndefined();
+    expect(conflicts).toEqual([{ key: 'kcal', local: '100', off: '200' }]);
   });
 
   it('skips OFF zero numeric value', () => {
-    const { autoApply } = _detectConflicts({ kcal: 0 }, 'p');
+    const { autoApply, conflicts } = _detectConflicts({ kcal: 0 }, 'p');
     expect(autoApply.kcal).toBeUndefined();
+    expect(conflicts).toEqual([]);
   });
 
-  it('auto-applies text field', () => {
-    const { autoApply } = _detectConflicts({ brand: 'Acme' }, 'p');
+  it('auto-applies text field when local is empty', () => {
+    const { autoApply, conflicts } = _detectConflicts({ brand: 'Acme' }, 'p');
     expect(autoApply.brand).toBe('Acme');
+    expect(conflicts).toEqual([]);
   });
 
   it('skips empty OFF text field', () => {
@@ -185,6 +189,51 @@ describe('_detectConflicts', () => {
     const { autoApply } = _detectConflicts({ nonexistent: 'x' }, 'p');
     expect(autoApply.nonexistent).toBeUndefined();
   });
+
+  // LSO-1700 Bug 6: conflicts must actually be populated
+  it('auto-applies numeric when local field is empty', () => {
+    document.getElementById('p-kcal').value = '';
+    const { autoApply, conflicts } = _detectConflicts({ kcal: 200 }, 'p');
+    expect(autoApply.kcal).toBe('200');
+    expect(conflicts).toEqual([]);
+  });
+
+  it('auto-applies numeric when local equals OFF value', () => {
+    const { autoApply, conflicts } = _detectConflicts({ kcal: 100 }, 'p');
+    expect(autoApply.kcal).toBe('100');
+    expect(conflicts).toEqual([]);
+  });
+
+  it('reports a conflict when local text differs from OFF value', () => {
+    const { autoApply, conflicts } = _detectConflicts({ name: 'OFF Name' }, 'p');
+    expect(autoApply.name).toBeUndefined();
+    expect(conflicts).toEqual([{ key: 'name', local: 'Existing', off: 'OFF Name' }]);
+  });
+
+  it('auto-applies text when local equals OFF value', () => {
+    const { autoApply, conflicts } = _detectConflicts({ name: 'Existing' }, 'p');
+    expect(autoApply.name).toBe('Existing');
+    expect(conflicts).toEqual([]);
+  });
+
+  it('auto-applies numeric when local is non-numeric text', () => {
+    document.getElementById('p-kcal').value = 'abc';
+    const { autoApply, conflicts } = _detectConflicts({ kcal: 200 }, 'p');
+    expect(autoApply.kcal).toBe('200');
+    expect(conflicts).toEqual([]);
+  });
+});
+
+// ── _parseServingGrams (LSO-1700 Bug 5) ──────────────
+describe('_parseServingGrams', () => {
+  it('parses comma-decimal grams', () => expect(_parseServingGrams('2,5 g')).toBe(2.5));
+  it('parses integer grams', () => expect(_parseServingGrams('150 g')).toBe(150));
+  it('parses dot-decimal grams', () => expect(_parseServingGrams('1.5 g')).toBe(1.5));
+  it('parses grams without a space', () => expect(_parseServingGrams('10g')).toBe(10));
+  it('parses uppercase unit', () => expect(_parseServingGrams('25 G')).toBe(25));
+  it('returns null for empty string', () => expect(_parseServingGrams('')).toBeNull());
+  it('returns null for null', () => expect(_parseServingGrams(null)).toBeNull());
+  it('returns null when no gram value present', () => expect(_parseServingGrams('one portion')).toBeNull());
 });
 
 // ── _esc ─────────────────────────────────────────────
