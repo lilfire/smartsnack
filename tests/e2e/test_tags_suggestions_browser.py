@@ -141,9 +141,8 @@ class TestTagSuggestionsBrowser:
         modal_input.press("ArrowDown")
         page.wait_for_timeout(200)
 
-        # A suggestion item should have a highlighted class
+        # A suggestion item must be highlighted after ArrowDown
         highlighted = page.locator("#tag-modal-suggestions .highlighted")
-        if highlighted.count() > 0:
-            expect(highlighted.first).to_be_visible()
+        expect(highlighted.first).to_be_visible(timeout=3000)
 
         _cleanup_tag(live_url, tag["id"])

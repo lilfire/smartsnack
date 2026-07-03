@@ -105,24 +105,23 @@ class TestCategoryEditBrowser:
     """Test editing category display names in the settings UI."""
 
     def test_edit_category_label(self, page):
-        """Editing a category label should update the display."""
+        """Editing a category label must update the display and show a toast.
+
+        settings-categories.js renders an inline label input per category
+        (input.cat-item-label-input) and binds updateCategoryLabel on its
+        'change' event.
+        """
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
 
-        # Look for edit buttons on existing categories
-        edit_btns = page.locator("#cat-list [data-action='edit-category']")
-        if edit_btns.count() > 0:
-            edit_btns.first.click()
-            page.wait_for_timeout(300)
+        label_input = page.locator("#cat-list input.cat-item-label-input").first
+        expect(label_input).to_be_visible(timeout=5000)
+        label_input.fill("Updated Label")
+        label_input.dispatch_event("change")
 
-            # An inline edit input should appear
-            inline_input = page.locator(
-                "#cat-list input.settings-item-edit-input"
-            ).first
-            if inline_input.is_visible():
-                inline_input.fill("Updated Label")
-                inline_input.press("Enter")
-                page.wait_for_timeout(300)
-
-                toast = page.locator(".toast")
-                expect(toast.first).to_be_visible(timeout=5000)
+        toast = page.locator(".toast")
+        expect(toast.first).to_be_visible(timeout=5000)
+        # The list re-renders from the API — the new label must round-trip.
+        expect(
+            page.locator("#cat-list input.cat-item-label-input").first
+        ).to_have_value("Updated Label", timeout=5000)
