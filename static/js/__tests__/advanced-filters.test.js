@@ -1359,3 +1359,49 @@ describe('_updateOps fallback when previous op is not in new ops list', () => {
     expect(newOpSel.options[0].value).toBe('');
   });
 });
+
+// ── M21: Norwegian decimal comma in numeric filters ──
+describe('M21: Norwegian decimal comma', () => {
+  it('accepts "1,5" as valid numeric input', async () => {
+    const { upgradeSelect } = await import('../state.js');
+    let fieldCallback;
+    upgradeSelect.mockImplementation((sel, cb) => {
+      if (sel.classList && sel.classList.contains('adv-field-select') && cb) fieldCallback = cb;
+    });
+
+    const { panel } = openPanel();
+    fieldCallback('kcal');
+    vi.runAllTimers();
+
+    const valInput = panel.querySelector('.adv-row .adv-value-input');
+    valInput.value = '1,5';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(false);
+
+    // Still rejects genuinely invalid input
+    valInput.value = '1,5,5';
+    valInput.dispatchEvent(new Event('input'));
+    expect(valInput.classList.contains('adv-value-invalid')).toBe(true);
+
+    upgradeSelect.mockImplementation(vi.fn());
+  });
+
+  it('serializes "1,5" as "1.5" for the server', () => {
+    const { panel } = openPanel();
+
+    const row = panel.querySelector('.adv-row');
+    row.querySelector('.adv-field-select').value = 'protein';
+    const opSel = row.querySelector('.adv-op-select');
+    opSel.innerHTML = '<option value=">=">>=</option>';
+    opSel.value = '>=';
+    const valInput = row.querySelector('.adv-value-input');
+    valInput.dataset.numeric = '1';
+    valInput.value = '1,5';
+
+    valInput.dispatchEvent(new Event('input'));
+    vi.runAllTimers();
+
+    const parsed = JSON.parse(state.advancedFilters);
+    expect(parsed.children[0]).toEqual({ field: 'protein', op: '>=', value: '1.5' });
+  });
+});

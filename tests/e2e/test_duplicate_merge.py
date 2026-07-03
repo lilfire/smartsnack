@@ -33,7 +33,7 @@ def _dismiss_any_modal(page):
     cancel = page.locator("button.confirm-no, button.scan-modal-btn-cancel")
     if cancel.count() > 0 and cancel.first.is_visible():
         cancel.first.click()
-        page.wait_for_timeout(300)
+        expect(cancel.first).to_be_hidden(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -146,16 +146,14 @@ def test_edit_duplicate_detection(page, api_create_product):
     row = page.locator(".table-row", has_text="EditDupTargetA")
     expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
-    page.wait_for_timeout(300)
 
     edit_btn = page.locator("[data-action='start-edit']").first
-    expect(edit_btn).to_be_visible(timeout=3000)
+    expect(edit_btn).to_be_visible(timeout=5000)
     edit_btn.click()
-    page.wait_for_timeout(500)
 
     # Change name to match the first product
     edit_name = page.locator("#ed-name")
-    expect(edit_name).to_be_visible(timeout=3000)
+    expect(edit_name).to_be_visible(timeout=5000)
     edit_name.fill("EditDupOrigA")
 
     # Save — should trigger duplicate check
@@ -197,15 +195,13 @@ def test_merge_conflict_shows_conflicting_fields(page, api_create_product):
     rows = page.locator(".table-row", has_text="ConflictA")
     expect(rows.first).to_be_visible(timeout=5000)
     rows.first.click()
-    page.wait_for_timeout(300)
 
     edit_btn = page.locator("[data-action='start-edit']").first
-    expect(edit_btn).to_be_visible(timeout=3000)
+    expect(edit_btn).to_be_visible(timeout=5000)
     edit_btn.click()
-    page.wait_for_timeout(500)
 
     save_btn = page.locator("[data-action='save-product']").first
-    expect(save_btn).to_be_visible(timeout=3000)
+    expect(save_btn).to_be_visible(timeout=5000)
     save_btn.click()
 
     # Wait for conflict/duplicate modal

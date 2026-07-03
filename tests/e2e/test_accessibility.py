@@ -43,7 +43,10 @@ def _go_to_settings(page):
 def test_tab_moves_focus_to_focusable_element(page):
     """Pressing Tab from the page body must focus a real interactive element."""
     page.keyboard.press("Tab")
-    page.wait_for_timeout(200)
+    page.wait_for_function(
+        "() => document.activeElement && document.activeElement !== document.body",
+        timeout=5000,
+    )
 
     focused_tag = page.evaluate("document.activeElement?.tagName?.toUpperCase()")
     assert focused_tag in ("BUTTON", "INPUT", "A", "SELECT", "TEXTAREA", "[object HTMLElement]"), (
@@ -72,7 +75,10 @@ def test_tab_navigates_register_form_fields(page):
 
     page.locator("#f-name").focus()
     page.keyboard.press("Tab")
-    page.wait_for_timeout(150)
+    page.wait_for_function(
+        "() => document.activeElement && document.activeElement.id !== 'f-name'",
+        timeout=5000,
+    )
 
     focused_id = page.evaluate("document.activeElement?.id")
     assert focused_id is not None, "Expected a focused element after Tab"
@@ -140,13 +146,11 @@ def test_click_row_again_collapses_expanded(page, api_create_product):
 
     row = page.locator(".table-row", has_text="ToggleCollapseProd").first
     row.click()
-    page.wait_for_timeout(300)
 
     expanded = page.locator(".expanded").first
     expect(expanded).to_be_visible(timeout=3000)
 
     row.click()
-    page.wait_for_timeout(300)
 
     expect(expanded).to_be_hidden(timeout=3000)
 
@@ -257,13 +261,10 @@ def test_tag_modal_has_role_dialog(page, api_create_product):
 
     row = page.locator(".table-row", has_text="TagARIAProd").first
     row.click()
-    page.wait_for_timeout(300)
 
     page.locator("[data-action='start-edit']").first.click()
-    page.wait_for_timeout(500)
 
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
 
     modal = page.locator("#tag-modal-overlay")
     expect(modal).to_be_visible(timeout=3000)

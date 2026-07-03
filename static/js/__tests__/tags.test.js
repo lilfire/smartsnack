@@ -9,6 +9,13 @@ vi.mock('../i18n.js', () => ({
 
 import { initTagInput, getTagsForSave } from '../tags.js';
 
+// TODO(LSO-1694): promote to mock-shapes.js — it has no shapes yet for
+// GET /api/tags (root array of {id, label}) or POST /api/tags ({id, label}).
+const MOCK_TAG_SALTY = { id: 1, label: 'salty' };
+const MOCK_TAG_SAVORY = { id: 2, label: 'savory' };
+const MOCK_TAG_SMOKY = { id: 3, label: 'smoky' };
+const MOCK_TAG_SUGGESTIONS = [MOCK_TAG_SALTY, MOCK_TAG_SAVORY];
+
 function mockFetchGet(suggestions) {
   global.fetch = vi.fn().mockResolvedValue({
     ok: true,
@@ -314,7 +321,7 @@ describe('modal suggestions', () => {
 
   it('fetches suggestions on modal open with empty query', async () => {
     vi.useFakeTimers();
-    mockFetchGet([{ id: 1, label: 'salty' }, { id: 2, label: 'savory' }]);
+    mockFetchGet(MOCK_TAG_SUGGESTIONS);
     initTagInput([]);
     document.getElementById('add-tag-btn').click();
     await vi.runAllTimersAsync();
@@ -325,7 +332,7 @@ describe('modal suggestions', () => {
 
   it('fetches suggestions as user types in modal', async () => {
     vi.useFakeTimers();
-    mockFetchGet([{ id: 1, label: 'salty' }, { id: 2, label: 'savory' }]);
+    mockFetchGet(MOCK_TAG_SUGGESTIONS);
     initTagInput([]);
     document.getElementById('add-tag-btn').click();
     await vi.runAllTimersAsync();
@@ -361,7 +368,7 @@ describe('modal suggestions', () => {
 
   it('does not show already-selected tags in suggestions', async () => {
     vi.useFakeTimers();
-    mockFetchGet([{ id: 1, label: 'salty' }, { id: 2, label: 'savory' }]);
+    mockFetchGet(MOCK_TAG_SUGGESTIONS);
     initTagInput([{ id: 1, label: 'salty' }]);
     document.getElementById('add-tag-btn').click();
     await vi.runAllTimersAsync();
@@ -372,7 +379,7 @@ describe('modal suggestions', () => {
   });
 
   it('clicking a suggestion adds tag and closes modal', async () => {
-    await openModalWithSuggestions([{ id: 3, label: 'salty' }, { id: 4, label: 'savory' }]);
+    await openModalWithSuggestions([{ ...MOCK_TAG_SALTY, id: 3 }, { ...MOCK_TAG_SAVORY, id: 4 }]);
     const li = document.querySelector('#tag-modal-suggestions li');
     li.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
     expect(getTagsForSave()).toContain(3);
@@ -396,7 +403,7 @@ describe('modal suggestions', () => {
 
   it('clicking a suggestion after typing adds tag and closes modal', async () => {
     vi.useFakeTimers();
-    mockFetchGet([{ id: 5, label: 'salty' }]);
+    mockFetchGet([{ ...MOCK_TAG_SALTY, id: 5 }]);
     initTagInput([]);
     document.getElementById('add-tag-btn').click();
     await vi.runAllTimersAsync();
@@ -444,9 +451,7 @@ describe('modal arrow key navigation', () => {
   }
 
   it('ArrowDown highlights the first item', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }, { id: 2, label: 'savory' }
-    ]);
+    const { input, list } = await setupWithSuggestions(MOCK_TAG_SUGGESTIONS);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     const items = list.querySelectorAll('li');
     expect(items[0].classList.contains('highlighted')).toBe(true);
@@ -454,9 +459,7 @@ describe('modal arrow key navigation', () => {
   });
 
   it('subsequent ArrowDown advances highlight', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }, { id: 2, label: 'savory' }, { id: 3, label: 'smoky' }
-    ]);
+    const { input, list } = await setupWithSuggestions([...MOCK_TAG_SUGGESTIONS, MOCK_TAG_SMOKY]);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     const items = list.querySelectorAll('li');
@@ -464,9 +467,7 @@ describe('modal arrow key navigation', () => {
   });
 
   it('ArrowDown does not go past last item', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }
-    ]);
+    const { input, list } = await setupWithSuggestions([MOCK_TAG_SALTY]);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     const items = list.querySelectorAll('li');
@@ -474,9 +475,7 @@ describe('modal arrow key navigation', () => {
   });
 
   it('ArrowUp moves highlight back', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }, { id: 2, label: 'savory' }
-    ]);
+    const { input, list } = await setupWithSuggestions(MOCK_TAG_SUGGESTIONS);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
@@ -485,18 +484,14 @@ describe('modal arrow key navigation', () => {
   });
 
   it('ArrowUp with no highlight selects last item', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }, { id: 2, label: 'savory' }
-    ]);
+    const { input, list } = await setupWithSuggestions(MOCK_TAG_SUGGESTIONS);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     const items = list.querySelectorAll('li');
     expect(items[items.length - 1].classList.contains('highlighted')).toBe(true);
   });
 
   it('ArrowUp does not go past first item', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }
-    ]);
+    const { input, list } = await setupWithSuggestions([MOCK_TAG_SALTY]);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
@@ -513,9 +508,7 @@ describe('modal arrow key navigation', () => {
   });
 
   it('Enter with highlighted suggestion adds that tag and closes modal', async () => {
-    const { input, list } = await setupWithSuggestions([
-      { id: 1, label: 'salty' }, { id: 2, label: 'savory' }
-    ]);
+    const { input, list } = await setupWithSuggestions(MOCK_TAG_SUGGESTIONS);
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     expect(list.querySelectorAll('li')[1].classList.contains('highlighted')).toBe(true);

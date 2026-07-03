@@ -123,9 +123,8 @@ def test_image_remove_button_hides_preview(page, tmp_path):
     expect(page.locator("#f-image-preview")).to_be_visible(timeout=5000)
 
     page.locator("#f-image-remove").click()
-    page.wait_for_timeout(300)
 
-    expect(page.locator("#f-image-preview")).to_be_hidden()
+    expect(page.locator("#f-image-preview")).to_be_hidden(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +142,6 @@ def test_image_visible_in_expanded_row(page, api_create_product, live_url):
 
     row = page.locator(".table-row", has_text="ImgPreviewProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     img = page.locator(f"#prod-img-{product['id']}")
     expect(img).to_be_visible(timeout=5000)
@@ -163,7 +161,6 @@ def test_image_viewer_opens_on_click(page, api_create_product, live_url):
 
     row = page.locator(".table-row", has_text="ImgViewerProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     img = page.locator(f"#prod-img-{product['id']}")
     expect(img).to_be_visible(timeout=5000)
@@ -182,7 +179,6 @@ def test_image_viewer_close_button_dismisses(page, api_create_product, live_url)
 
     row = page.locator(".table-row", has_text="ImgViewerCloseProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     img = page.locator(f"#prod-img-{product['id']}")
     expect(img).to_be_visible(timeout=5000)
@@ -205,7 +201,6 @@ def test_image_viewer_closes_on_escape(page, api_create_product, live_url):
 
     row = page.locator(".table-row", has_text="ImgViewerEscProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     img = page.locator(f"#prod-img-{product['id']}")
     expect(img).to_be_visible(timeout=5000)
@@ -228,7 +223,6 @@ def test_image_viewer_closes_on_backdrop_click(page, api_create_product, live_ur
 
     row = page.locator(".table-row", has_text="ImgViewerBgProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     img = page.locator(f"#prod-img-{product['id']}")
     expect(img).to_be_visible(timeout=5000)
@@ -255,7 +249,6 @@ def test_placeholder_shown_when_no_image(page, api_create_product):
 
     row = page.locator(".table-row", has_text="NoImgPlaceholderProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     placeholder = page.locator(".expanded-img-placeholder")
     expect(placeholder).to_be_visible(timeout=5000)

@@ -13,6 +13,22 @@ class TestCoreBlueprint:
         resp = client.get("/")
         assert resp.status_code == 200
 
+    def test_index_injects_api_key(self, client, monkeypatch):
+        # M22: the API key must be exposed to the frontend so downloadBackup()
+        # can authenticate; without it the backup endpoint returns 401.
+        monkeypatch.setenv("SMARTSNACK_API_KEY", "test-key-123")
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'window.SMARTSNACK_API_KEY = "test-key-123";' in html
+
+    def test_index_injects_empty_api_key_when_unset(self, client, monkeypatch):
+        monkeypatch.delenv("SMARTSNACK_API_KEY", raising=False)
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'window.SMARTSNACK_API_KEY = "";' in html
+
 
 class TestProductsBlueprint:
     def test_list_products(self, client):
@@ -105,9 +121,23 @@ class TestImagesBlueprint:
     def test_get_image(self, client):
         products = client.get("/api/products").get_json()["products"]
         pid = products[0]["id"]
+        image_data = "data:image/png;base64,iVBORw0KGgo="
+        put_resp = client.put(
+            f"/api/products/{pid}/image", json={"image": image_data}
+        )
+        assert put_resp.status_code == 200
         resp = client.get(f"/api/products/{pid}/image")
-        # May return 200 or 404 depending on whether image exists
-        assert resp.status_code in (200, 404)
+        assert resp.status_code == 200
+        assert resp.get_json()["image"] == image_data
+
+    def test_get_image_missing_returns_404(self, client):
+        products = client.get("/api/products").get_json()["products"]
+        pid = products[0]["id"]
+        del_resp = client.delete(f"/api/products/{pid}/image")
+        assert del_resp.status_code == 200
+        resp = client.get(f"/api/products/{pid}/image")
+        assert resp.status_code == 404
+        assert resp.get_json()["error"] == "No image"
 
     def test_set_image(self, client):
         products = client.get("/api/products").get_json()["products"]

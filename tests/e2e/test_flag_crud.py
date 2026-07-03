@@ -37,7 +37,6 @@ def _open_flags_section(page):
             }
         }
     }""")
-    page.wait_for_timeout(600)
 
 
 def _api(live_url, path, *, method="GET", body=None):
@@ -86,6 +85,7 @@ def test_flag_type_badge_present_on_every_item(page):
     _open_flags_section(page)
 
     badges = page.locator("#flag-list .flag-type-badge")
+    expect(badges.first).to_be_visible(timeout=5000)
     count = badges.count()
     assert count >= 1, f"Expected at least one flag-type-badge, got {count}"
 
@@ -116,7 +116,6 @@ def test_add_user_flag_appears_in_list(page):
     add_btn = page.locator("[data-i18n='btn_add_flag']")
     expect(add_btn.first).to_be_visible(timeout=3000)
     add_btn.first.click()
-    page.wait_for_timeout(600)
 
     # Success toast must appear.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
@@ -143,13 +142,11 @@ def test_delete_user_flag_removes_from_list(page, live_url):
     delete_btn = page.locator("[data-action='delete-flag'][data-flag-name='is_e2e_delete_me']")
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(300)
 
     # Confirmation modal appears — confirm deletion.
     confirm_btn = page.locator("button.confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
     confirm_btn.click()
-    page.wait_for_timeout(600)
 
     # Success toast must appear.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
@@ -172,12 +169,12 @@ def test_delete_user_flag_cancel_keeps_flag(page, live_url):
     delete_btn = page.locator("[data-action='delete-flag'][data-flag-name='is_e2e_cancel_del']")
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(300)
 
     cancel_btn = page.locator("button.confirm-no")
     expect(cancel_btn).to_be_visible(timeout=3000)
     cancel_btn.click()
-    page.wait_for_timeout(400)
+    # The confirm modal is removed from the DOM when dismissed.
+    page.wait_for_selector(".scan-modal-bg", state="detached", timeout=3000)
 
     # Flag must still be in the list (check by name, which is rendered as visible span text).
     expect(page.locator("#flag-list")).to_contain_text("is_e2e_cancel_del", timeout=3000)
@@ -203,7 +200,6 @@ def test_update_flag_label_saves_and_shows_toast(page, live_url):
 
     label_input.fill("E2E Updated Label")
     label_input.press("Tab")
-    page.wait_for_timeout(600)
 
     # A toast must appear to confirm the save.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)

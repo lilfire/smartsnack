@@ -8,6 +8,7 @@ import json
 import urllib.request
 import urllib.error
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import expect
 
 
@@ -46,11 +47,11 @@ def _reload_and_wait(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
     edit_btn = row.locator("[data-action='start-edit']")
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # The edit form always renders the #ed-name input once open.
+    page.wait_for_selector("#ed-name", state="visible", timeout=5000)
 
 
 # ===========================================================================
@@ -95,7 +96,15 @@ class TestEanManagerBrowser:
         _reload_and_wait(page)
         _open_edit_form(page, "EanAddBtnProd")
 
-        # Look for the add-ean action button
+        # Look for the add-ean action button. The EAN manager list loads
+        # asynchronously after the edit form opens; tolerate its absence
+        # since the fallback branch below is a valid outcome.
+        try:
+            page.wait_for_selector(
+                "[data-ean-action='add-ean']", state="visible", timeout=3000
+            )
+        except PlaywrightTimeoutError:
+            pass
         add_btn = page.locator("[data-ean-action='add-ean']").first
         if add_btn.is_visible():
             expect(add_btn).to_be_visible()
@@ -110,18 +119,36 @@ class TestEanManagerBrowser:
         _reload_and_wait(page)
         _open_edit_form(page, "EanAddUiProd")
 
-        # Try the EAN manager add flow
+        # Try the EAN manager add flow. The EAN manager list loads
+        # asynchronously after the edit form opens; tolerate its absence
+        # since the conditional branches below are valid outcomes.
+        try:
+            page.wait_for_selector(
+                "[data-ean-action='add-ean']", state="visible", timeout=3000
+            )
+        except PlaywrightTimeoutError:
+            pass
         add_btn = page.locator("[data-ean-action='add-ean']").first
         if add_btn.is_visible():
             add_btn.click()
-            page.wait_for_timeout(300)
+            # Wait for a dedicated new-EAN input if this UI variant renders one.
+            try:
+                page.wait_for_selector(
+                    "input[data-ean-new]", state="visible", timeout=2000
+                )
+            except PlaywrightTimeoutError:
+                pass
 
             # Fill the new EAN input
             ean_input = page.locator("input[data-ean-new]").first
             if ean_input.is_visible():
                 ean_input.fill("1234567890123")
                 ean_input.press("Enter")
-                page.wait_for_timeout(500)
+                # The add round-trip ends with a toast (success or error).
+                try:
+                    page.wait_for_selector("#toast.show", state="visible", timeout=5000)
+                except PlaywrightTimeoutError:
+                    pass  # inline-error path shows no toast
 
                 # Verify via API
                 _, data = _api_raw(
@@ -145,11 +172,10 @@ class TestEanManagerBrowser:
 
         # Trigger validation by blurring
         ean_input.blur()
-        page.wait_for_timeout(300)
 
         # The hint says 8-13 digits; input should be considered invalid
         hint = page.locator("#f-ean-hint")
-        expect(hint).to_be_visible()
+        expect(hint).to_be_visible(timeout=5000)
 
 
 # ===========================================================================
@@ -180,7 +206,6 @@ class TestEanRegistrationBrowser:
         expect(page.locator("#view-register")).to_be_visible()
 
         page.locator("#f-ean").fill("7038010069307")
-        page.wait_for_timeout(300)
 
         # The OFF fetch button should become enabled
         off_btn = page.locator("#f-off-btn")

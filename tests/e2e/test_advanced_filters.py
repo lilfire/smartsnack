@@ -15,8 +15,9 @@ interactions in these tests go through the custom UI:
 The value input (``.adv-value-input``) remains a native ``<input>`` and is
 filled with ``locator.fill()``.
 
-After changing a filter value the tests wait 500 ms to allow the 300 ms input
-debounce plus the subsequent async ``loadData`` call to complete.
+After changing a filter value the tests rely on auto-waiting ``expect()``
+assertions to absorb the 300 ms input debounce plus the subsequent async
+``loadData`` call.
 """
 
 import re
@@ -32,12 +33,16 @@ from playwright.sync_api import expect
 def _open_advanced_filters(page) -> None:
     """Click the toggle to open the advanced filter panel and wait for it.
 
+    The panel gains the ``open`` class via requestAnimationFrame; wait for
+    that class instead of sleeping.
+
     Args:
         page: Playwright page object.
     """
     page.locator("#adv-filter-toggle").click()
-    # The panel opens via requestAnimationFrame; give it a moment.
-    page.wait_for_timeout(150)
+    expect(page.locator("#advanced-filters")).to_have_class(
+        re.compile(r"\bopen\b"), timeout=2000
+    )
 
 
 def _close_advanced_filters(page) -> None:
@@ -47,7 +52,9 @@ def _close_advanced_filters(page) -> None:
         page: Playwright page object.
     """
     page.locator("#adv-filter-toggle").click()
-    page.wait_for_timeout(150)
+    expect(page.locator("#advanced-filters")).not_to_have_class(
+        re.compile(r"\bopen\b"), timeout=2000
+    )
 
 
 def _reload_and_wait(page) -> None:
@@ -79,15 +86,20 @@ def _select_custom_option(page, trigger_locator, data_value: str) -> None:
         data_value: The ``data-value`` attribute of the desired option div.
     """
     trigger_locator.click()
-    page.wait_for_timeout(100)
     # The option panel is a sibling of the trigger inside .custom-select-wrap.
     # Use a CSS attribute selector to find the correct option regardless of
-    # how many custom selects are present on the page.
+    # how many custom selects are present on the page.  The click auto-waits
+    # for the option to become visible once the dropdown opens.
     option = page.locator(
         f".custom-select-wrap.open .custom-select-option[data-value='{data_value}']"
     )
     option.click()
-    page.wait_for_timeout(100)
+    # Picking an option closes the dropdown synchronously (_pick in state.js);
+    # wait for the dropdown to be closed before continuing.
+    page.wait_for_function(
+        "() => !document.querySelector('.custom-select-wrap.open')",
+        timeout=5000,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +165,6 @@ def test_add_condition(page):
 
     # The first .adv-add-condition-btn adds conditions (the second adds subgroups).
     page.locator(".adv-add-condition-btn").first.click()
-    page.wait_for_timeout(150)
 
     rows = page.locator(".adv-row")
     expect(rows).to_have_count(2)
@@ -170,16 +181,16 @@ def test_logic_toggle_visible_with_two_conditions(page):
 
     # Add a second condition to make the logic toggle appear.
     page.locator(".adv-add-condition-btn").first.click()
-    page.wait_for_timeout(150)
+    page.wait_for_function(
+        "() => document.querySelectorAll('.adv-row').length === 2",
+        timeout=5000,
+    )
 
     logic_btn = page.locator(".adv-group-logic-btn").first
-    # The button exists in the DOM — check its computed visibility style is
-    # not 'hidden' (the JS sets style.visibility, not display).
-    visibility = logic_btn.evaluate("el => window.getComputedStyle(el).visibility")
-    assert visibility != "hidden", (
-        f"Expected .adv-group-logic-btn to be visible with 2 conditions, "
-        f"but got visibility='{visibility}'"
-    )
+    # The JS flips style.visibility (not display). A one-shot computed-style
+    # read races any pending rAF/re-render hop (flaked in CI run 28642337190),
+    # so use the retrying CSS assertion instead.
+    expect(logic_btn).to_have_css("visibility", "visible", timeout=5000)
 
 
 def test_filter_by_numeric_field(page, api_create_product):
@@ -201,9 +212,8 @@ def test_filter_by_numeric_field(page, api_create_product):
     field_trigger = first_row.locator(".custom-select-trigger").first
     _select_custom_option(page, field_trigger, "kcal")
 
-    # After changing the field, the op select is rebuilt.  Wait briefly for
-    # the DOM update triggered by upgradeSelect's callback.
-    page.wait_for_timeout(200)
+    # After changing the field, the op select is rebuilt synchronously by
+    # upgradeSelect's callback; the next click auto-waits on the rebuilt UI.
 
     # --- Select operator: ">" ---
     # The operator select is the second custom-select-trigger in the row.
@@ -214,12 +224,11 @@ def test_filter_by_numeric_field(page, api_create_product):
     value_input = first_row.locator(".adv-value-input")
     value_input.fill("300")
 
-    # Wait for the 300 ms debounce + async loadData round-trip.
-    page.wait_for_timeout(600)
-
+    # The auto-waiting assertions absorb the 300 ms debounce + loadData
+    # round-trip: the filtered-out product disappears once results reload.
     results = page.locator("#results-container")
+    expect(results).not_to_contain_text("LowKcalProduct", timeout=5000)
     expect(results).to_contain_text("HighKcalProduct")
-    expect(results).not_to_contain_text("LowKcalProduct")
 
 
 def test_filter_by_text_field(page, api_create_product):
@@ -242,8 +251,6 @@ def test_filter_by_text_field(page, api_create_product):
     field_trigger = first_row.locator(".custom-select-trigger").first
     _select_custom_option(page, field_trigger, "name")
 
-    page.wait_for_timeout(200)
-
     # --- Select operator: contains ---
     op_trigger = first_row.locator(".custom-select-trigger").nth(1)
     _select_custom_option(page, op_trigger, "contains")
@@ -252,12 +259,10 @@ def test_filter_by_text_field(page, api_create_product):
     value_input = first_row.locator(".adv-value-input")
     value_input.fill("Zephyr")
 
-    # Wait for debounce + API.
-    page.wait_for_timeout(600)
-
+    # The auto-waiting assertions absorb the debounce + API round-trip.
     results = page.locator("#results-container")
+    expect(results).not_to_contain_text("OrdinaryMuesli", timeout=5000)
     expect(results).to_contain_text("ZephyrSnackBar")
-    expect(results).not_to_contain_text("OrdinaryMuesli")
 
 
 def test_close_advanced_filters_restores_search(page):

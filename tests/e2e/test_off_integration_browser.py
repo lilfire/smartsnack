@@ -28,7 +28,6 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(300)
 
 
 def _reload_and_wait(page):
@@ -43,13 +42,13 @@ def _reload_and_wait(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
     # Use page-scoped locator: after re-render the expanded section may not
     # resolve correctly via a row-scoped locator.
     edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # The edit form always renders the #ed-name input once open.
+    page.wait_for_selector("#ed-name", state="visible", timeout=5000)
 
 
 # ===========================================================================
@@ -70,7 +69,6 @@ class TestOffFetchButtonBrowser:
         """The OFF fetch button should enable when a valid EAN is entered."""
         _go_to_register(page)
         page.locator("#f-ean").fill("7038010069307")
-        page.wait_for_timeout(300)
 
         off_btn = page.locator("#f-off-btn")
         expect(off_btn).not_to_have_attribute("disabled", "")
@@ -79,7 +77,6 @@ class TestOffFetchButtonBrowser:
         """The OFF fetch button should enable when a name is entered."""
         _go_to_register(page)
         page.locator("#f-name").fill("Grandiosa Pizza")
-        page.wait_for_timeout(300)
 
         off_btn = page.locator("#f-off-btn")
         expect(off_btn).not_to_have_attribute("disabled", "")
@@ -88,7 +85,6 @@ class TestOffFetchButtonBrowser:
         """Clicking the OFF button should show a loading spinner."""
         _go_to_register(page)
         page.locator("#f-ean").fill("7038010069307")
-        page.wait_for_timeout(300)
 
         off_btn = page.locator("#f-off-btn")
         off_btn.click()

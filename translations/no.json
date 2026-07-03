@@ -131,6 +131,8 @@
   "toast_pq_added": "\"{name}\" lagt til",
   "toast_pq_deleted": "\"{name}\" slettet",
   "toast_backup_downloaded": "Backup lastet ned",
+  "toast_backup_download_started": "Nedlasting av backup startet",
+  "toast_language_change_failed": "Kunne ikke lagre språkinnstillingen. Gikk tilbake til forrige språk.",
   "toast_invalid_file": "Ugyldig fil",
   "toast_scanner_load_error": "Skanner-biblioteket ble ikke lastet. Sjekk internettforbindelsen.",
   "toast_scanner_not_loaded": "Skanner-biblioteket ble ikke lastet.",

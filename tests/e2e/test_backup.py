@@ -17,7 +17,11 @@ def _open_database_section(page):
         ".settings-toggle:has(span[data-i18n='settings_database_title'])"
     ).first
     db_toggle.click()
-    page.wait_for_timeout(300)
+    # The click synchronously reveals the sibling section body — wait on it.
+    body = db_toggle.locator(
+        "xpath=following-sibling::div[contains(@class,'settings-section-body')]"
+    ).first
+    expect(body).to_be_visible(timeout=5000)
 
 
 def test_download_backup_button_exists(page):

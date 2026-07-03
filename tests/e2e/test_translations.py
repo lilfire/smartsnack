@@ -54,7 +54,13 @@ def _set_language(page, lang):
         }""",
         lang,
     )
-    page.wait_for_timeout(1200)
+    # changeLanguage() sets document.documentElement.lang via
+    # applyStaticTranslations() — wait on that instead of a fixed sleep.
+    page.wait_for_function(
+        "(lang) => document.documentElement.lang === lang",
+        arg=lang,
+        timeout=10000,
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { MOCK_PRODUCTS_EMPTY } from './mock-shapes.js';
+
+// TODO(LSO-1694): promote to mock-shapes.js — GET /api/stats response shape
+const MOCK_STATS_RESPONSE = { total: 10, types: 3, categories: [] };
+// TODO(LSO-1694): promote to mock-shapes.js — duplicate-check response from PUT /api/products/:id
+const MOCK_DUPLICATE_CHECK = { duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false };
+// TODO(LSO-1694): promote to mock-shapes.js — 409 duplicate-conflict error payload from POST /api/products
+const MOCK_DUPLICATE_409_PAYLOAD = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: false } };
+// TODO(LSO-1694): promote to mock-shapes.js — POST /api/products create response
+const MOCK_CREATE_RESPONSE = { id: 99 };
 
 vi.mock('../scroll.js', () => ({
   initInfiniteScroll: vi.fn(),
@@ -543,7 +553,7 @@ describe('registerProduct', () => {
   });
 
   it('registers product with valid data', async () => {
-    api.mockResolvedValueOnce({ id: 99 });
+    api.mockResolvedValueOnce(MOCK_CREATE_RESPONSE);
     await registerProduct();
     expect(api).toHaveBeenCalledWith('/api/products', expect.objectContaining({ method: 'POST' }));
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_added'), 'success');
@@ -569,11 +579,13 @@ describe('loadData', () => {
       document.body.appendChild(statsLine);
     }
     // Make cachedStats available after fetchStats resolves
-    fetchStats.mockResolvedValue({ total: 10, types: 3 });
-    state.cachedStats = { total: 10, types: 3 };
+    fetchStats.mockResolvedValue(MOCK_STATS_RESPONSE);
+    state.cachedStats = { ...MOCK_STATS_RESPONSE };
   });
 
   it('calls fetchStats, buildFilters, fetchProducts, and renderResults in sequence', async () => {
+    // Plain-array response (legacy backend format) — deliberately inline to exercise
+    // loadData's Array.isArray branch; do not migrate to MOCK_PRODUCTS_RESPONSE.
     fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy', total_score: 80, has_image: 0 }]);
     await loadData();
     expect(fetchStats).toHaveBeenCalled();
@@ -630,7 +642,7 @@ describe('loadData', () => {
   it('scrolls and highlights first result row when search has results', async () => {
     document.getElementById('search-input').value = 'milk';
     state.currentView = 'search';
-    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]); // legacy plain-array format, deliberate
 
     const rowEl = document.createElement('div');
     rowEl.className = 'table-row';
@@ -652,7 +664,7 @@ describe('loadData', () => {
   it('does not scroll or highlight when search is empty', async () => {
     document.getElementById('search-input').value = '';
     state.currentView = 'search';
-    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]); // legacy plain-array format, deliberate
 
     const rowEl = document.createElement('div');
     rowEl.className = 'table-row';
@@ -670,7 +682,7 @@ describe('loadData', () => {
   it('does not scroll or highlight when results are empty', async () => {
     document.getElementById('search-input').value = 'milk';
     state.currentView = 'search';
-    fetchProducts.mockResolvedValue([]);
+    fetchProducts.mockResolvedValue([]); // legacy plain-array format, deliberate
 
     const rowEl = document.createElement('div');
     rowEl.className = 'table-row';
@@ -688,7 +700,7 @@ describe('loadData', () => {
   it('does not throw when no .table-row is in the DOM', async () => {
     document.getElementById('search-input').value = 'milk';
     state.currentView = 'search';
-    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]);
+    fetchProducts.mockResolvedValue([{ id: 1, name: 'Milk', type: 'dairy' }]); // legacy plain-array format, deliberate
     // No .table-row element added to DOM
 
     await expect(async () => {
@@ -759,7 +771,7 @@ describe('saveProduct duplicate handling', () => {
 
   it('handles b_synced scenario - merges into duplicate', async () => {
     api
-      .mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean', a_is_synced_with_off: false }, a_is_synced_with_off: false })
+      .mockResolvedValueOnce({ ...MOCK_DUPLICATE_CHECK, duplicate: { ...MOCK_DUPLICATE_CHECK.duplicate, a_is_synced_with_off: false } })
       .mockResolvedValueOnce({});
     showDuplicateMergeModal.mockResolvedValueOnce({ scenario: 'b_synced', choices: { kcal: 100 } });
     await saveProduct(1);
@@ -770,7 +782,7 @@ describe('saveProduct duplicate handling', () => {
 
   it('handles a_synced scenario - merges into current', async () => {
     api
-      .mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: true })
+      .mockResolvedValueOnce({ ...MOCK_DUPLICATE_CHECK, a_is_synced_with_off: true })
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({});
     showDuplicateMergeModal.mockResolvedValueOnce({ scenario: 'a_synced', choices: { protein: 20 } });
@@ -781,7 +793,7 @@ describe('saveProduct duplicate handling', () => {
 
   it('handles neither_synced scenario', async () => {
     api
-      .mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false })
+      .mockResolvedValueOnce(MOCK_DUPLICATE_CHECK)
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({});
     showDuplicateMergeModal.mockResolvedValueOnce({ scenario: 'neither', choices: { fat: 5 } });
@@ -790,7 +802,7 @@ describe('saveProduct duplicate handling', () => {
   });
 
   it('cancels when user dismisses duplicate modal', async () => {
-    api.mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false });
+    api.mockResolvedValueOnce(MOCK_DUPLICATE_CHECK);
     showDuplicateMergeModal.mockResolvedValueOnce(null);
     await saveProduct(1);
     // Should not call PUT or merge
@@ -808,7 +820,7 @@ describe('saveProduct duplicate handling', () => {
   it('handles save error after merge', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     api
-      .mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false })
+      .mockResolvedValueOnce(MOCK_DUPLICATE_CHECK)
       .mockResolvedValueOnce({}) // merge succeeds
       .mockRejectedValueOnce(new Error('save fail')); // PUT fails
     showDuplicateMergeModal.mockResolvedValueOnce({ scenario: 'a_synced', choices: {} });
@@ -820,7 +832,7 @@ describe('saveProduct duplicate handling', () => {
   it('includes OFF applied fields in b_synced merge', async () => {
     window._offAppliedFields = ['kcal', 'protein'];
     api
-      .mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false })
+      .mockResolvedValueOnce(MOCK_DUPLICATE_CHECK)
       .mockResolvedValueOnce({});
     showDuplicateMergeModal.mockResolvedValueOnce({ scenario: 'b_synced', choices: {} });
     await saveProduct(1);
@@ -867,7 +879,7 @@ describe('saveProduct re-enables the save button (H8)', () => {
   });
 
   it('re-enables the button after user cancels the duplicate merge modal', async () => {
-    api.mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false });
+    api.mockResolvedValueOnce(MOCK_DUPLICATE_CHECK);
     showDuplicateMergeModal.mockResolvedValueOnce(null); // user cancels
     await saveProduct(1);
     expect(saveBtn.disabled).toBe(false);
@@ -885,7 +897,7 @@ describe('saveProduct re-enables the save button (H8)', () => {
 
   it('re-enables the button after a b_synced merge early return', async () => {
     api
-      .mockResolvedValueOnce({ duplicate: { id: 2, name: 'Dup', match_type: 'ean' }, a_is_synced_with_off: false })
+      .mockResolvedValueOnce(MOCK_DUPLICATE_CHECK)
       .mockResolvedValueOnce({});
     showDuplicateMergeModal.mockResolvedValueOnce({ scenario: 'b_synced', choices: {} });
     await saveProduct(1);
@@ -960,7 +972,7 @@ describe('registerProduct advanced paths', () => {
 
   it('sets from_off flag when _pendingOFFSync is set', async () => {
     window._pendingOFFSync = true;
-    api.mockResolvedValueOnce({ id: 99 });
+    api.mockResolvedValueOnce(MOCK_CREATE_RESPONSE);
     await registerProduct();
     const body = JSON.parse(api.mock.calls[0][1].body);
     expect(body.from_off).toBe(true);
@@ -969,7 +981,7 @@ describe('registerProduct advanced paths', () => {
 
   it('uploads pending image after registration', async () => {
     window._pendingImage = 'data:image/png;base64,abc';
-    api.mockResolvedValueOnce({ id: 99 }).mockResolvedValueOnce({});
+    api.mockResolvedValueOnce(MOCK_CREATE_RESPONSE).mockResolvedValueOnce({});
     await registerProduct();
     expect(api).toHaveBeenCalledWith('/api/products/99/image', expect.objectContaining({ method: 'PUT' }));
     expect(window._pendingImage).toBeNull();
@@ -977,13 +989,13 @@ describe('registerProduct advanced paths', () => {
 
   it('shows image upload error toast on failure', async () => {
     window._pendingImage = 'data:image/png;base64,abc';
-    api.mockResolvedValueOnce({ id: 99 }).mockRejectedValueOnce(new Error('upload fail'));
+    api.mockResolvedValueOnce(MOCK_CREATE_RESPONSE).mockRejectedValueOnce(new Error('upload fail'));
     await registerProduct();
     expect(showToast).toHaveBeenCalledWith('toast_image_upload_error', 'error');
   });
 
   it('shows merged toast when result has merged flag', async () => {
-    api.mockResolvedValueOnce({ id: 99, merged: true });
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, merged: true });
     await registerProduct();
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_product_merged'), 'success');
   });
@@ -1001,7 +1013,7 @@ describe('registerProduct advanced paths', () => {
     document.getElementById('f-brand').value = 'Brand X';
     document.getElementById('f-stores').value = 'Store A';
     document.getElementById('f-ean').value = '';
-    api.mockResolvedValueOnce({ id: 99 });
+    api.mockResolvedValueOnce(MOCK_CREATE_RESPONSE);
     await registerProduct();
     expect(document.getElementById('f-name').value).toBe('');
     expect(document.getElementById('f-brand').value).toBe('');
@@ -1020,7 +1032,7 @@ describe('registerProduct advanced paths', () => {
     filterTog.id = 'filter-toggle';
     document.body.appendChild(filterTog);
 
-    api.mockResolvedValueOnce({ id: 42 });
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 42 });
     await registerProduct();
 
     // Filter row should be opened
@@ -1054,7 +1066,7 @@ describe('registerProduct advanced paths', () => {
     pqr.style.display = 'block';
     document.body.appendChild(pqr);
 
-    api.mockResolvedValueOnce({ id: 99 });
+    api.mockResolvedValueOnce(MOCK_CREATE_RESPONSE);
     await registerProduct();
 
     expect(pqw.style.display).toBe('none');
@@ -1064,7 +1076,7 @@ describe('registerProduct advanced paths', () => {
   it('handles 409 with synced duplicate - shows modal and returns', async () => {
     const dupError = new Error('Conflict');
     dupError.status = 409;
-    dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: true } };
+    dupError.data = { duplicate: { ...MOCK_DUPLICATE_409_PAYLOAD.duplicate, is_synced_with_off: true } };
     api.mockRejectedValueOnce(dupError);
     vi.mocked(showScanDuplicateModal).mockResolvedValueOnce('cancel');
     await registerProduct();
@@ -1076,7 +1088,7 @@ describe('registerProduct advanced paths', () => {
   it('handles 409 with unsynced duplicate - cancel choice', async () => {
     const dupError = new Error('Conflict');
     dupError.status = 409;
-    dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: false } };
+    dupError.data = MOCK_DUPLICATE_409_PAYLOAD;
     api.mockRejectedValueOnce(dupError);
     // _showDuplicateModal creates DOM elements; we need to resolve it
     // Since _showDuplicateModal appends to document.body, we can click the cancel button
@@ -1095,9 +1107,9 @@ describe('registerProduct advanced paths', () => {
   it('handles 409 with unsynced duplicate - overwrite choice', async () => {
     const dupError = new Error('Conflict');
     dupError.status = 409;
-    dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: false } };
+    dupError.data = MOCK_DUPLICATE_409_PAYLOAD;
     api.mockRejectedValueOnce(dupError);
-    api.mockResolvedValueOnce({ id: 5 }); // overwrite result
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 5 }); // overwrite result
     vi.mocked(showScanDuplicateModal).mockResolvedValueOnce('overwrite');
 
     await registerProduct();
@@ -1110,9 +1122,9 @@ describe('registerProduct advanced paths', () => {
   it('handles 409 with unsynced duplicate - create_new choice', async () => {
     const dupError = new Error('Conflict');
     dupError.status = 409;
-    dupError.data = { duplicate: { id: 5, name: 'Dup', match_type: 'ean', is_synced_with_off: false } };
+    dupError.data = MOCK_DUPLICATE_409_PAYLOAD;
     api.mockRejectedValueOnce(dupError);
-    api.mockResolvedValueOnce({ id: 10 }); // create_new result
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 10 }); // create_new result
 
     const registerPromise = registerProduct();
     await vi.advanceTimersByTimeAsync(0);
@@ -1212,7 +1224,7 @@ describe('collectFormFields with flags', () => {
 
   it('collects checked user flags and ignores unchecked and computed flags', async () => {
     // Register triggers collectFormFields('f') internally
-    api.mockResolvedValueOnce({ id: 50 });
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 50 });
     // Add remaining required elements
     if (!document.getElementById('btn-submit')) {
       const btn = document.createElement('button');
@@ -1347,10 +1359,10 @@ describe('registerProduct - OFF prompt branches', () => {
   });
 
   it('asks about OFF when EAN present and not from_off, user accepts', async () => {
-    api.mockResolvedValueOnce({ id: 42 });
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 42 });
     showConfirmModal.mockResolvedValueOnce(true); // wantsOff = true
-    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchStats.mockResolvedValue({ ...MOCK_STATS_RESPONSE, total: 0, types: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     const p = registerProduct();
     await vi.advanceTimersByTimeAsync(0);
@@ -1360,10 +1372,10 @@ describe('registerProduct - OFF prompt branches', () => {
   });
 
   it('does not call showOffAddReview when user declines OFF prompt', async () => {
-    api.mockResolvedValueOnce({ id: 42 });
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 42 });
     showConfirmModal.mockResolvedValueOnce(false); // wantsOff = false
-    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchStats.mockResolvedValue({ ...MOCK_STATS_RESPONSE, total: 0, types: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     const p = registerProduct();
     await vi.advanceTimersByTimeAsync(0);
@@ -1374,9 +1386,9 @@ describe('registerProduct - OFF prompt branches', () => {
 
   it('does not show OFF prompt when registered from_off', async () => {
     window._pendingOFFSync = true;
-    api.mockResolvedValueOnce({ id: 42 });
-    fetchStats.mockResolvedValue({ total: 0, types: 0, categories: [] });
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    api.mockResolvedValueOnce({ ...MOCK_CREATE_RESPONSE, id: 42 });
+    fetchStats.mockResolvedValue({ ...MOCK_STATS_RESPONSE, total: 0, types: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     const p = registerProduct();
     await vi.advanceTimersByTimeAsync(0);
@@ -1384,5 +1396,35 @@ describe('registerProduct - OFF prompt branches', () => {
 
     // showConfirmModal may be called for other reasons but showOffAddReview should not
     expect(showOffAddReview).not.toHaveBeenCalled();
+  });
+});
+
+// ── M18: overlapping loadData calls — only the latest response renders ──
+describe('M18: loadData sequence guard', () => {
+  beforeEach(() => {
+    if (!document.getElementById('stats-line')) {
+      const statsLine = document.createElement('div');
+      statsLine.id = 'stats-line';
+      document.body.appendChild(statsLine);
+    }
+    fetchStats.mockResolvedValue({ total: 10, types: 3 });
+    state.cachedStats = { total: 10, types: 3 };
+  });
+
+  it('discards a stale response that resolves after a newer loadData call', async () => {
+    let resolveFirst;
+    fetchProducts
+      .mockReturnValueOnce(new Promise((r) => { resolveFirst = r; }))
+      .mockResolvedValueOnce({ products: [{ id: 2, name: 'Fresh' }], total: 1 });
+
+    const first = loadData();
+    const second = loadData();
+    await second;
+    // The older request resolves late — it must NOT overwrite the fresh render
+    resolveFirst({ products: [{ id: 1, name: 'Stale' }], total: 1 });
+    await first;
+
+    expect(renderResults).toHaveBeenCalledTimes(1);
+    expect(renderResults.mock.calls[0][0]).toEqual([{ id: 2, name: 'Fresh' }]);
   });
 });

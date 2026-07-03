@@ -16,7 +16,8 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(300)
+    # toggleSettingsSection sets aria-expanded when the section body is shown.
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 class TestPqListBrowser:
@@ -66,11 +67,13 @@ class TestPqAddBrowser:
         page.locator("#pq-add-pdcaas").fill("0.91")
         page.locator("#pq-add-diaas").fill("0.90")
 
-        page.locator("button[data-i18n='btn_add_protein_source']").click()
-        page.wait_for_timeout(500)
+        with page.expect_response(
+            lambda r: "/api/protein-quality" in r.url and r.request.method == "POST"
+        ):
+            page.locator("button[data-i18n='btn_add_protein_source']").click()
 
         pq_list = page.locator("#pq-list")
-        expect(pq_list).to_contain_text("E2E Soy")
+        expect(pq_list).to_contain_text("E2E Soy", timeout=5000)
 
 
 class TestPqScoreFields:

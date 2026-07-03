@@ -43,6 +43,7 @@ import {
   deleteActiveCategoryOverride,
 } from '../settings-weights.js';
 import { api, showToast, upgradeSelect, showConfirmModal } from '../state.js';
+import { MOCK_WEIGHT_ITEM, MOCK_CATEGORY_ITEM } from './mock-shapes.js';
 import { loadData } from '../products.js';
 
 beforeEach(() => {
@@ -338,7 +339,7 @@ async function bootGlobalScope(cats = []) {
   setupScopeDom();
   api.mockImplementation((url) => {
     if (url === '/api/weights') return Promise.resolve([
-      { field: 'kcal', enabled: true, weight: 60, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+      { ...MOCK_WEIGHT_ITEM, weight: 60 },
     ]);
     if (url === '/api/categories') return Promise.resolve(cats);
     return Promise.resolve({});
@@ -352,8 +353,8 @@ async function bootGlobalScope(cats = []) {
 describe('refreshScopeSelect', () => {
   it('populates scope dropdown with Global plus only categories that have overrides', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
-      { name: 'Drinks', emoji: '🧃', label: 'Drinks', count: 0, has_weight_overrides: false },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Drinks', emoji: '🧃', label: 'Drinks', count: 0, has_weight_overrides: false },
     ]);
     const sel = document.getElementById('weight-scope-select');
     const opts = Array.from(sel.options).map((o) => o.value);
@@ -362,7 +363,7 @@ describe('refreshScopeSelect', () => {
 
   it('hides the add-override button when every category already has overrides', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     const addBtn = document.getElementById('weight-scope-add');
     expect(addBtn.style.display).toBe('none');
@@ -370,7 +371,7 @@ describe('refreshScopeSelect', () => {
 
   it('shows the add-override button when at least one category lacks overrides', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: false },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: false },
     ]);
     const addBtn = document.getElementById('weight-scope-add');
     expect(addBtn.style.display).toBe('');
@@ -380,12 +381,12 @@ describe('refreshScopeSelect', () => {
 describe('onScopeChange to category', () => {
   beforeEach(async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 80, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
-        { field: 'sugar', is_overridden: false, enabled: true, weight: 30, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Sugar' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 80 },
+        { ...MOCK_WEIGHT_ITEM, field: 'sugar', label: 'Sugar', is_overridden: false, weight: 30 },
       ]);
       return Promise.resolve({});
     });
@@ -422,11 +423,11 @@ describe('onScopeChange to category', () => {
 describe('addWeightFromDropdown in category scope', () => {
   it('sets is_overridden=true and triggers a category PUT', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'sugar', is_overridden: false, enabled: true, weight: 30, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Sugar' },
+        { ...MOCK_WEIGHT_ITEM, field: 'sugar', label: 'Sugar', is_overridden: false, weight: 30 },
       ]);
       return Promise.resolve({});
     });
@@ -452,11 +453,11 @@ describe('addWeightFromDropdown in category scope', () => {
 describe('removeWeight in category scope', () => {
   it('flips is_overridden=false and triggers a category PUT', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 80, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 80 },
       ]);
       return Promise.resolve({});
     });
@@ -479,14 +480,14 @@ describe('removeWeight in category scope', () => {
 describe('onScopeChange back to global', () => {
   it('reloads /api/weights and hides the delete button', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/weights') return Promise.resolve([
-        { field: 'kcal', enabled: true, weight: 60, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, weight: 60 },
       ]);
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 80, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 80 },
       ]);
       return Promise.resolve({});
     });
@@ -501,11 +502,11 @@ describe('onScopeChange back to global', () => {
 describe('saveWeights branches on scope', () => {
   it('PUTs /api/categories/<name>/weights when in category scope', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 60, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 60 },
       ]);
       return Promise.resolve({});
     });
@@ -521,12 +522,12 @@ describe('saveWeights branches on scope', () => {
 describe('openAddOverridePicker', () => {
   it('lists only categories without overrides and switches scope on confirm', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: false },
-      { name: 'Drinks', emoji: '🧃', label: 'Drinks', count: 0, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: false },
+      { ...MOCK_CATEGORY_ITEM, name: 'Drinks', emoji: '🧃', label: 'Drinks', count: 0, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: false, enabled: true, weight: 60, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: false, weight: 60 },
       ]);
       return Promise.resolve({});
     });
@@ -546,7 +547,7 @@ describe('openAddOverridePicker', () => {
 
   it('shows a toast when every category already has overrides', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     showToast.mockClear();
     openAddOverridePicker();
@@ -558,14 +559,14 @@ describe('openAddOverridePicker', () => {
 describe('deleteActiveCategoryOverride', () => {
   it('PUTs full payload with all is_overridden=false, snaps to global, refreshes', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 80, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 80 },
       ]);
       if (url === '/api/weights') return Promise.resolve([
-        { field: 'kcal', enabled: true, weight: 60, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, weight: 60 },
       ]);
       return Promise.resolve({});
     });
@@ -587,11 +588,11 @@ describe('deleteActiveCategoryOverride', () => {
 
   it('does nothing when user cancels the confirm modal', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 80, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 80 },
       ]);
       return Promise.resolve({});
     });
@@ -607,17 +608,17 @@ describe('deleteActiveCategoryOverride', () => {
 describe('refreshScopeSelect handles deleted active category', () => {
   it('snaps scope back to global if the active category lost its override', async () => {
     await bootGlobalScope([
-      { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
+      { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: true },
     ]);
     api.mockImplementation((url) => {
       if (url === '/api/categories/Snacks/weights') return Promise.resolve([
-        { field: 'kcal', is_overridden: true, enabled: true, weight: 80, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, is_overridden: true, weight: 80 },
       ]);
       if (url === '/api/weights') return Promise.resolve([
-        { field: 'kcal', enabled: true, weight: 60, direction: 'lower', formula: 'minmax', formula_min: 0, formula_max: 100, label: 'Kcal' },
+        { ...MOCK_WEIGHT_ITEM, weight: 60 },
       ]);
       if (url === '/api/categories') return Promise.resolve([
-        { name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: false },
+        { ...MOCK_CATEGORY_ITEM, name: 'Snacks', emoji: '🍿', label: 'Snacks', count: 1, has_weight_overrides: false },
       ]);
       return Promise.resolve({});
     });

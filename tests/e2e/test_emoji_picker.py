@@ -35,7 +35,11 @@ def _open_categories_section(page):
             }
         }
     }""")
-    page.wait_for_timeout(600)
+    # Wait for loadCategories() to populate the list (at least one .cat-item)
+    page.wait_for_function(
+        "() => document.querySelectorAll('#cat-list .cat-item').length > 0",
+        timeout=8000,
+    )
 
 
 def _open_picker(page):
@@ -43,7 +47,6 @@ def _open_picker(page):
     trigger = page.locator(".cat-item-emoji-edit").first
     expect(trigger).to_be_visible(timeout=5000)
     trigger.click()
-    page.wait_for_timeout(300)
     popup = page.locator(".emoji-picker-popup")
     expect(popup).to_be_visible(timeout=3000)
     return trigger, popup
@@ -70,7 +73,6 @@ def test_add_category_emoji_trigger_opens_popup(page):
     _open_categories_section(page)
 
     page.locator("#cat-emoji-trigger").click()
-    page.wait_for_timeout(300)
 
     popup = page.locator(".emoji-picker-popup")
     expect(popup).to_be_visible(timeout=3000)
@@ -149,7 +151,6 @@ def test_selecting_emoji_closes_popup(page):
     first_emoji = page.locator(".emoji-picker-item").first
     expect(first_emoji).to_be_visible(timeout=3000)
     first_emoji.click()
-    page.wait_for_timeout(300)
 
     expect(popup).to_be_hidden(timeout=3000)
 
@@ -158,13 +159,15 @@ def test_selecting_emoji_updates_trigger_text(page):
     """Clicking an emoji item must update the trigger button's text content."""
     _go_to_settings(page)
     _open_categories_section(page)
-    trigger, _ = _open_picker(page)
+    trigger, popup = _open_picker(page)
 
     first_item = page.locator(".emoji-picker-item").first
     selected_emoji = first_item.inner_text()
 
     first_item.click()
-    page.wait_for_timeout(300)
+    # Selecting an emoji closes the popup; the trigger text is updated in the
+    # same handler, so waiting for the close covers the update too.
+    expect(popup).to_be_hidden(timeout=3000)
 
     trigger_text = trigger.inner_text().strip()
     assert trigger_text == selected_emoji.strip(), (
@@ -192,7 +195,13 @@ def test_search_reduces_visible_item_count(page):
 
     search = page.locator(".emoji-picker-search")
     search.fill("apple")
-    page.wait_for_timeout(300)
+    # Wait for the filter to hide at least one item.
+    page.wait_for_function(
+        "(total) => [...document.querySelectorAll('.emoji-picker-item')]"
+        ".filter(el => el.style.display !== 'none').length < total",
+        arg=total_before,
+        timeout=5000,
+    )
 
     # Count visible (non-hidden) items after filtering.
     visible_after = page.evaluate(
@@ -214,7 +223,6 @@ def test_search_with_no_match_shows_empty_message(page):
 
     search = page.locator(".emoji-picker-search")
     search.fill("xyznonexistent99999")
-    page.wait_for_timeout(300)
 
     empty_msg = page.locator(".emoji-picker-empty")
     expect(empty_msg).to_be_visible(timeout=3000)
@@ -241,10 +249,24 @@ def test_clearing_search_restores_all_items(page):
 
     search = page.locator(".emoji-picker-search")
     search.fill("apple")
-    page.wait_for_timeout(200)
+    # Wait for the filter to take effect (some items hidden).
+    page.wait_for_function(
+        "(total) => [...document.querySelectorAll('.emoji-picker-item')]"
+        ".filter(el => !el.classList.contains('emoji-picker-empty') "
+        "         && el.style.display !== 'none').length < total",
+        arg=total_before,
+        timeout=5000,
+    )
 
     search.fill("")
-    page.wait_for_timeout(200)
+    # Wait for the cleared filter to restore the items.
+    page.wait_for_function(
+        "(total) => [...document.querySelectorAll('.emoji-picker-item')]"
+        ".filter(el => !el.classList.contains('emoji-picker-empty') "
+        "         && el.style.display !== 'none').length === total",
+        arg=total_before,
+        timeout=5000,
+    )
 
     visible_after = page.evaluate(
         "() => [...document.querySelectorAll('.emoji-picker-item')]"
@@ -269,7 +291,6 @@ def test_popup_closes_on_escape(page):
     _, popup = _open_picker(page)
 
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
 
     expect(popup).to_be_hidden(timeout=3000)
 
@@ -283,7 +304,6 @@ def test_popup_closes_on_outside_click(page):
 
     # Click a safe region at the top-left corner that is not inside the popup.
     page.locator("h1, #view-settings").first.click(position={"x": 5, "y": 5})
-    page.wait_for_timeout(400)
 
     expect(popup).to_be_hidden(timeout=3000)
 
@@ -297,6 +317,5 @@ def test_clicking_trigger_again_closes_popup(page):
 
     # Click trigger a second time — should close.
     trigger.click()
-    page.wait_for_timeout(300)
 
     expect(popup).to_be_hidden(timeout=3000)

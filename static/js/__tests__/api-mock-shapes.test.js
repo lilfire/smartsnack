@@ -17,12 +17,19 @@ import {
   MOCK_OFF_PRODUCT_NOT_FOUND,
   MOCK_OFF_SEARCH_RESULTS,
   MOCK_PRODUCTS_RESPONSE,
+  MOCK_PRODUCTS_EMPTY,
   MOCK_WEIGHTS_RESPONSE,
+  MOCK_WEIGHT_ITEM,
+  MOCK_CATEGORY_ITEM,
+  MOCK_CATEGORIES_RESPONSE,
   MOCK_OFF_CREDENTIALS,
   MOCK_OFF_LANGUAGE_PRIORITY,
   MOCK_OFF_LANGUAGES,
   MOCK_BULK_STATUS_IDLE,
   MOCK_BULK_STATUS_RUNNING,
+  MOCK_OFF_ADD_PRODUCT_OK,
+  MOCK_PQ_ESTIMATE,
+  MOCK_PQ_ESTIMATE_EMPTY,
 } from './mock-shapes.js';
 
 describe('validateMockShape utility', () => {
@@ -173,11 +180,63 @@ describe('Products mock shapes conform to API contract', () => {
     expect(MOCK_PRODUCTS_RESPONSE.total).toBeTypeOf('number');
   });
 
+  it('MOCK_PRODUCTS_EMPTY matches GET /api/products shape', () => {
+    expect(() =>
+      validateMockShape('GET /api/products', MOCK_PRODUCTS_EMPTY),
+    ).not.toThrow();
+    expect(MOCK_PRODUCTS_EMPTY.products).toEqual([]);
+    expect(MOCK_PRODUCTS_EMPTY.total).toBe(0);
+  });
+
   it('MOCK_WEIGHTS_RESPONSE matches GET /api/weights shape (root array)', () => {
     expect(() =>
       validateMockShape('GET /api/weights', MOCK_WEIGHTS_RESPONSE),
     ).not.toThrow();
     expect(Array.isArray(MOCK_WEIGHTS_RESPONSE)).toBe(true);
+  });
+
+  it('MOCK_WEIGHT_ITEM carries the full weight_service.get_weights() contract', () => {
+    for (const key of [
+      'field', 'label', 'desc', 'enabled', 'weight',
+      'direction', 'formula', 'formula_min', 'formula_max',
+    ]) {
+      expect(MOCK_WEIGHT_ITEM).toHaveProperty(key);
+    }
+    expect(['lower', 'higher']).toContain(MOCK_WEIGHT_ITEM.direction);
+    expect(['minmax', 'direct']).toContain(MOCK_WEIGHT_ITEM.formula);
+  });
+
+  it('every MOCK_WEIGHTS_RESPONSE item carries the full contract keys', () => {
+    for (const item of MOCK_WEIGHTS_RESPONSE) {
+      for (const key of Object.keys(MOCK_WEIGHT_ITEM)) {
+        expect(item).toHaveProperty(key);
+      }
+    }
+  });
+});
+
+describe('Categories mock shapes conform to API contract', () => {
+  it('MOCK_CATEGORIES_RESPONSE matches GET /api/categories shape (root array)', () => {
+    expect(() =>
+      validateMockShape('GET /api/categories', MOCK_CATEGORIES_RESPONSE),
+    ).not.toThrow();
+    expect(MOCK_CATEGORIES_RESPONSE.length).toBeGreaterThan(0);
+  });
+
+  it('MOCK_CATEGORY_ITEM carries the category_service.list_categories() contract', () => {
+    for (const key of ['name', 'emoji', 'label', 'count', 'has_weight_overrides']) {
+      expect(MOCK_CATEGORY_ITEM).toHaveProperty(key);
+    }
+    expect(MOCK_CATEGORY_ITEM.count).toBeTypeOf('number');
+    expect(MOCK_CATEGORY_ITEM.has_weight_overrides).toBeTypeOf('boolean');
+  });
+
+  it('every MOCK_CATEGORIES_RESPONSE item carries the full contract keys', () => {
+    for (const item of MOCK_CATEGORIES_RESPONSE) {
+      for (const key of Object.keys(MOCK_CATEGORY_ITEM)) {
+        expect(item).toHaveProperty(key);
+      }
+    }
   });
 });
 
@@ -198,6 +257,42 @@ describe('OFF credentials + language mock shapes', () => {
     expect(() =>
       validateMockShape('GET /api/off/languages', MOCK_OFF_LANGUAGES),
     ).not.toThrow();
+  });
+});
+
+describe('OFF add-product mock shapes', () => {
+  it('MOCK_OFF_ADD_PRODUCT_OK matches POST /api/off/add-product shape', () => {
+    expect(() =>
+      validateMockShape('POST /api/off/add-product', MOCK_OFF_ADD_PRODUCT_OK),
+    ).not.toThrow();
+  });
+
+  it('MOCK_OFF_ADD_PRODUCT_OK carries the add_and_sync_product() contract', () => {
+    expect(MOCK_OFF_ADD_PRODUCT_OK.ok).toBe(true);
+    // image_warning is string|null in the real response
+    expect(MOCK_OFF_ADD_PRODUCT_OK).toHaveProperty('image_warning');
+    expect(MOCK_OFF_ADD_PRODUCT_OK.image_uploaded).toBeTypeOf('boolean');
+    expect(MOCK_OFF_ADD_PRODUCT_OK.synced_flag_set).toBeTypeOf('boolean');
+  });
+});
+
+describe('Protein quality estimate mock shapes', () => {
+  it('MOCK_PQ_ESTIMATE matches POST /api/estimate-protein-quality shape', () => {
+    expect(() =>
+      validateMockShape('POST /api/estimate-protein-quality', MOCK_PQ_ESTIMATE),
+    ).not.toThrow();
+    expect(MOCK_PQ_ESTIMATE.est_pdcaas).toBeTypeOf('number');
+    expect(MOCK_PQ_ESTIMATE.est_diaas).toBeTypeOf('number');
+    expect(MOCK_PQ_ESTIMATE.sources.length).toBeGreaterThan(0);
+  });
+
+  it('MOCK_PQ_ESTIMATE_EMPTY matches shape with null estimates', () => {
+    expect(() =>
+      validateMockShape('POST /api/estimate-protein-quality', MOCK_PQ_ESTIMATE_EMPTY),
+    ).not.toThrow();
+    expect(MOCK_PQ_ESTIMATE_EMPTY.est_pdcaas).toBeNull();
+    expect(MOCK_PQ_ESTIMATE_EMPTY.est_diaas).toBeNull();
+    expect(MOCK_PQ_ESTIMATE_EMPTY.sources).toEqual([]);
   });
 });
 

@@ -30,11 +30,11 @@ def _reload_and_wait(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
     edit_btn = row.locator("[data-action='start-edit']")
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # The edit form renders synchronously; wait for the name field to appear.
+    expect(page.locator("#ed-name")).to_be_visible(timeout=5000)
 
 
 # ===========================================================================
@@ -51,7 +51,6 @@ class TestRegistrationValidation:
 
         # Leave name empty and click register
         page.locator("#btn-submit").click()
-        page.wait_for_timeout(300)
 
         # Name error should be visible
         error = page.locator("#f-name-error")
@@ -81,7 +80,6 @@ class TestRegistrationValidation:
         _go_to_register(page)
         page.locator("#f-ean").fill("123")
         page.locator("#f-name").click()  # blur EAN
-        page.wait_for_timeout(300)
 
         # The EAN error element exists (may or may not be visible based
         # on how validation triggers — check if the pattern mismatch state
@@ -96,7 +94,6 @@ class TestRegistrationValidation:
         """A valid 13-digit EAN should pass validation."""
         _go_to_register(page)
         page.locator("#f-ean").fill("7038010069307")
-        page.wait_for_timeout(100)
 
         is_valid = page.evaluate(
             "() => document.getElementById('f-ean').checkValidity()"
@@ -107,7 +104,6 @@ class TestRegistrationValidation:
         """An 8-digit EAN should pass validation."""
         _go_to_register(page)
         page.locator("#f-ean").fill("12345678")
-        page.wait_for_timeout(100)
 
         is_valid = page.evaluate(
             "() => document.getElementById('f-ean').checkValidity()"
@@ -181,7 +177,6 @@ class TestTasteScoreSlider:
         _go_to_register(page)
         slider = page.locator("#f-smak")
         slider.fill("5")
-        page.wait_for_timeout(200)
 
         val_display = page.locator("#smak-val")
         expect(val_display).to_have_text("5")
@@ -209,6 +204,8 @@ class TestEditFormValidation:
         # Click save
         save_btn = page.locator("[data-action='save-product']")
         save_btn.click()
+        # Fixed wait: verifies the edit form does NOT close after an invalid
+        # save — the absence of a change has no DOM event to await.
         page.wait_for_timeout(500)
 
         # Either a toast error or inline error should appear
@@ -228,7 +225,6 @@ class TestEditFormValidation:
         # Cancel
         cancel_btn = page.locator("[data-action='cancel-edit']")
         cancel_btn.click()
-        page.wait_for_timeout(300)
 
         # Original name should still be visible
         row = page.locator(f".table-row:has-text('{prod_name}')").first

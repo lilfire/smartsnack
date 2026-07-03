@@ -347,7 +347,9 @@ function _validateNumericInput(valInput) {
     return;
   }
   const v = valInput.value.trim();
-  if (v === '' || /^-?\d*\.?\d+$/.test(v)) {
+  // Accept Norwegian decimal comma ("1,5") by normalizing to a dot first
+  const normalized = v.replace(',', '.');
+  if (v === '' || /^-?\d*\.?\d+$/.test(normalized)) {
     valInput.classList.remove('adv-value-invalid');
   } else {
     valInput.classList.add('adv-value-invalid');
@@ -529,9 +531,15 @@ function _serializeGroup(groupEl) {
         const value = valInput.value.trim();
         // Allow empty value for category field (uncategorized products)
         if (field && opRaw && value !== '__none__' && (value !== '' || field === _CATEGORY_FIELD_NAME)) {
-          // Skip invalid numeric values
-          if (valInput.dataset.numeric && !/^-?\d*\.?\d+$/.test(value)) continue;
-          children.push({ field, op: opRaw, value });
+          let outValue = value;
+          if (valInput.dataset.numeric) {
+            // Normalize Norwegian decimal comma to a dot for the server
+            const normalized = value.replace(',', '.');
+            // Skip invalid numeric values
+            if (!/^-?\d*\.?\d+$/.test(normalized)) continue;
+            outValue = normalized;
+          }
+          children.push({ field, op: opRaw, value: outValue });
         }
       }
     } else if (child.classList.contains('adv-group')) {

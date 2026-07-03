@@ -31,7 +31,11 @@ def _open_database_section(page):
         ".settings-toggle:has(span[data-i18n='settings_database_title'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(300)
+    # The click synchronously reveals the sibling section body — wait on it.
+    body = toggle.locator(
+        "xpath=following-sibling::div[contains(@class,'settings-section-body')]"
+    ).first
+    expect(body).to_be_visible(timeout=5000)
 
 
 class TestRestoreErrors:
@@ -134,7 +138,11 @@ class TestBackupDownloadSuccess:
     """Success path for backup download."""
 
     def test_backup_download_shows_toast(self, page):
-        """Clicking download backup shows toast_backup_downloaded."""
+        """Clicking download backup shows the neutral toast_backup_download_started.
+
+        M22 (LSO-1696) removed the premature success toast: the browser handles
+        the download via navigation, so the UI can only claim it *started*.
+        """
         t = _load_translations()
         _go_to_settings(page)
         _open_database_section(page)
@@ -156,6 +164,6 @@ class TestBackupDownloadSuccess:
 
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
-        expect(toast).to_contain_text(t["toast_backup_downloaded"])
+        expect(toast).to_contain_text(t["toast_backup_download_started"])
 
         page.unroute("**/api/backup**")

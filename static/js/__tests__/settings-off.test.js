@@ -20,6 +20,13 @@ import {
   loadOffLanguagePriority,
 } from '../settings-off.js';
 import { api, showToast } from '../state.js';
+import {
+  MOCK_BULK_STATUS_IDLE,
+  MOCK_BULK_STATUS_RUNNING,
+  MOCK_OFF_CREDENTIALS,
+  MOCK_OFF_LANGUAGE_PRIORITY,
+  MOCK_OFF_LANGUAGES,
+} from './mock-shapes.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,7 +94,7 @@ describe('saveOffCredentials', () => {
 // ── checkRefreshStatus ───────────────────────────────
 describe('checkRefreshStatus', () => {
   it('calls the status API', async () => {
-    api.mockResolvedValue({ running: false });
+    api.mockResolvedValue(MOCK_BULK_STATUS_IDLE);
     await checkRefreshStatus();
     expect(api).toHaveBeenCalledWith('/api/bulk/refresh-off/status');
   });
@@ -98,13 +105,13 @@ describe('checkRefreshStatus', () => {
       <div id="refresh-off-progress" style="display:none"></div>
       <div id="refresh-off-bar"></div>
       <div id="refresh-off-status"></div>`;
-    api.mockResolvedValue({ running: true });
+    api.mockResolvedValue(MOCK_BULK_STATUS_RUNNING);
     await checkRefreshStatus();
     expect(global.EventSource).toHaveBeenCalledWith('/api/bulk/refresh-off/stream');
   });
 
   it('does not connect when not running', async () => {
-    api.mockResolvedValue({ running: false });
+    api.mockResolvedValue(MOCK_BULK_STATUS_IDLE);
     await checkRefreshStatus();
     expect(global.EventSource).not.toHaveBeenCalled();
   });
@@ -197,21 +204,21 @@ describe('loadOffCredentials', () => {
 
   it('populates user id field on success', async () => {
     setupCredDOM();
-    api.mockResolvedValueOnce({ off_user_id: 'myuser', has_password: false });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_CREDENTIALS, off_user_id: 'myuser', has_password: false });
     await loadOffCredentials();
     expect(document.getElementById('off-user-id').value).toBe('myuser');
   });
 
   it('fills password field with placeholder when has_password is true', async () => {
     setupCredDOM();
-    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: true });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_CREDENTIALS, off_user_id: 'u' });
     await loadOffCredentials();
     expect(document.getElementById('off-password').value).toBe('\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022');
   });
 
   it('leaves password blank when has_password is false', async () => {
     setupCredDOM();
-    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: false });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_CREDENTIALS, off_user_id: 'u', has_password: false });
     await loadOffCredentials();
     expect(document.getElementById('off-password').value).toBe('');
   });
@@ -225,7 +232,7 @@ describe('loadOffCredentials', () => {
 
   it('does not crash when DOM elements are absent', async () => {
     document.body.innerHTML = '';
-    api.mockResolvedValueOnce({ off_user_id: 'u', has_password: false });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_CREDENTIALS, off_user_id: 'u', has_password: false });
     await expect(loadOffCredentials()).resolves.not.toThrow();
   });
 });
@@ -247,8 +254,8 @@ describe('loadOffLanguagePriority', () => {
 
   it('loads language priority and renders items', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ priority: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: ['no', 'en', 'se'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGE_PRIORITY, priority: ['no', 'en'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no', 'en', 'se'] });
 
     await loadOffLanguagePriority();
 
@@ -265,8 +272,8 @@ describe('loadOffLanguagePriority', () => {
 
   it('binds the add button to push a new language', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ priority: ['no'] });
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGE_PRIORITY, priority: ['no'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no', 'en'] });
 
     await loadOffLanguagePriority();
 
@@ -292,13 +299,13 @@ describe('loadOffLanguagePriority', () => {
 
   it('does not bind add button twice on re-call', async () => {
     setupLangDOM();
-    api.mockResolvedValueOnce({ priority: ['no'] });
-    api.mockResolvedValueOnce({ languages: ['no'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGE_PRIORITY, priority: ['no'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no'] });
     await loadOffLanguagePriority();
 
     // Second call - button already bound
-    api.mockResolvedValueOnce({ priority: ['no'] });
-    api.mockResolvedValueOnce({ languages: ['no'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGE_PRIORITY, priority: ['no'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no'] });
     await loadOffLanguagePriority();
 
     const addBtn = document.getElementById('off-lang-add-btn');
@@ -314,7 +321,7 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
       <select id="off-lang-add-select"></select>
       <button id="off-lang-add-btn"></button>`;
     api.mockResolvedValueOnce({ priority: priority });
-    api.mockResolvedValueOnce({ languages: ['no', 'en', 'se', 'fi'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no', 'en', 'se', 'fi'] });
     await loadOffLanguagePriority();
   }
 
@@ -407,8 +414,8 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
       <div id="off-lang-priority-list"></div>
       <select id="off-lang-add-select"></select>
       <button id="off-lang-add-btn"></button>`;
-    api.mockResolvedValueOnce({ priority: ['no'] });
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGE_PRIORITY, priority: ['no'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no', 'en'] });
     await loadOffLanguagePriority();
 
     const addBtn = document.getElementById('off-lang-add-btn');
@@ -426,8 +433,8 @@ describe('_renderOffLangPriority interactions (via loadOffLanguagePriority)', ()
       <div id="off-lang-priority-list"></div>
       <select id="off-lang-add-select"></select>
       <button id="off-lang-add-btn"></button>`;
-    api.mockResolvedValueOnce({ priority: ['no', 'en'] });
-    api.mockResolvedValueOnce({ languages: ['no', 'en'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGE_PRIORITY, priority: ['no', 'en'] });
+    api.mockResolvedValueOnce({ ...MOCK_OFF_LANGUAGES, languages: ['no', 'en'] });
     await loadOffLanguagePriority();
 
     const addBtn = document.getElementById('off-lang-add-btn');
@@ -452,7 +459,7 @@ describe('EventSource SSE message parsing (refreshAllFromOff)', () => {
       capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
       return capturedEs;
     });
-    api.mockResolvedValue({ running: true });
+    api.mockResolvedValue(MOCK_BULK_STATUS_RUNNING);
     await checkRefreshStatus();
 
     expect(capturedEs).not.toBeNull();
@@ -474,7 +481,7 @@ describe('EventSource SSE message parsing (refreshAllFromOff)', () => {
       capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
       return capturedEs;
     });
-    api.mockResolvedValue({ running: true });
+    api.mockResolvedValue(MOCK_BULK_STATUS_RUNNING);
     await checkRefreshStatus();
 
     expect(capturedEs).not.toBeNull();
@@ -495,7 +502,7 @@ describe('EventSource SSE message parsing (refreshAllFromOff)', () => {
       capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
       return capturedEs;
     });
-    api.mockResolvedValue({ running: true });
+    api.mockResolvedValue(MOCK_BULK_STATUS_RUNNING);
     await checkRefreshStatus();
 
     expect(capturedEs).not.toBeNull();
@@ -514,7 +521,7 @@ describe('EventSource SSE message parsing (refreshAllFromOff)', () => {
       capturedEs = { onmessage: null, onerror: null, close: vi.fn() };
       return capturedEs;
     });
-    api.mockResolvedValue({ running: true });
+    api.mockResolvedValue(MOCK_BULK_STATUS_RUNNING);
     await checkRefreshStatus();
 
     expect(capturedEs).not.toBeNull();

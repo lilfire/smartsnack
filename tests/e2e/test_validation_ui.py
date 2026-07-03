@@ -38,7 +38,7 @@ def _open_section(page, i18n_key):
         f".settings-toggle:has(span[data-i18n='{i18n_key}'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(300)
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -121,12 +121,14 @@ class TestRegisterValidation:
             page.locator(f"#f-{field}").fill("0")
         page.locator("#btn-submit").click()
 
-        page.wait_for_timeout(500)
+        # Wait until the submit handler surfaces either the success toast or a
+        # modal (duplicate/OFF prompt) — whichever the app shows first.
+        page.wait_for_selector("#toast.show, .scan-modal-bg", state="visible", timeout=5000)
         # Dismiss OFF modal if it appears
         cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
         if cancel.is_visible():
             cancel.click()
-            page.wait_for_timeout(200)
+            expect(cancel).to_be_hidden(timeout=3000)
 
         expected = t["toast_product_added"].replace("{name}", product_name)
         toast = page.locator(".toast").last
@@ -217,7 +219,6 @@ class TestCategoryValidation:
 
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
-        page.wait_for_timeout(500)
 
         # Find the label input for our test category and clear it
         label_input = page.locator(
@@ -271,7 +272,9 @@ class TestCategoryValidation:
 
         delete_btn = page.locator("[data-action='delete-cat']").first
         delete_btn.click()
-        page.wait_for_timeout(300)
+        # The toast signals the delete handler finished; only after it shows
+        # can we assert the cat-move modal never appeared.
+        expect(page.locator(".toast").last).to_be_visible(timeout=5000)
 
         # With only one category there is nowhere to move products — the
         # cat-move modal must NOT appear.  Use the unique .cat-move-modal-bg
@@ -398,7 +401,9 @@ class TestWeightOverrideValidation:
 
         # Wait for weight items to load (async)
         page.wait_for_selector("#weight-items .weight-item", timeout=10000)
-        page.wait_for_timeout(500)
+        # updateScopeButtons() hides the add button once it sees that all
+        # categories have overrides — wait for that render to complete.
+        expect(page.locator("#weight-scope-add")).to_be_hidden(timeout=5000)
 
         # The add button is hidden by JS when all categories have overrides.
         # Force it visible and click it to trigger openAddOverridePicker.
@@ -406,7 +411,6 @@ class TestWeightOverrideValidation:
             "() => document.getElementById('weight-scope-add').style.display = ''"
         )
         page.locator("#weight-scope-add").click()
-        page.wait_for_timeout(300)
 
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
@@ -477,7 +481,6 @@ class TestWeightOverrideValidation:
         _open_section(page, "settings_weights_title")
         # Wait for weight items to load (async)
         page.wait_for_selector("#weight-items .weight-item", timeout=10000)
-        page.wait_for_timeout(500)
 
         # Add an override: pick a category in the picker modal and confirm
         add_btn = page.locator("#weight-scope-add")
@@ -487,7 +490,7 @@ class TestWeightOverrideValidation:
         modal = page.locator(".scan-modal-bg")
         expect(modal).to_be_visible(timeout=5000)
         modal.locator(".scan-modal-btn-register").click()
-        page.wait_for_timeout(500)
+        expect(modal).to_be_hidden(timeout=5000)
 
         # Now delete the override
         delete_btn = page.locator("#weight-scope-delete")
@@ -531,13 +534,11 @@ class TestEanManagerValidation:
         # Click on the product row to expand it
         row = page.locator(".table-row", has_text=product_name).first
         row.click()
-        page.wait_for_timeout(300)
 
         # Click edit button to enter edit mode (which loads EAN manager)
         edit_btn = page.locator("[data-action='start-edit']").first
         expect(edit_btn).to_be_visible(timeout=5000)
         edit_btn.click()
-        page.wait_for_timeout(500)
 
         # Find the EAN add input and enter an invalid EAN
         ean_input = page.locator(f"#ean-add-input-{product_id}")

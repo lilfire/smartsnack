@@ -145,92 +145,105 @@ def validate_ocr_dispatch_result(data):
 
 
 # ---------------------------------------------------------------------------
-# OpenAI-compatible API response shapes
-# (used by OpenAI, Groq, OpenRouter backends)
+# LLM SDK response shapes (OpenAI-compatible, Gemini, Claude)
+#
+# The backends consume SDK response *objects* with attributes, not dicts:
+#   OpenAI/Groq/OpenRouter: response.choices[0].message.content
+#   Gemini (google.genai):  response.text
+#   Claude (anthropic):     message.content[0].text
+#
+# The make_*_response builders below are the single shared source for
+# SDK-shaped mocks; the validators assert against the real attribute
+# structure so a mock that drifts from what the backends actually read
+# fails validation.
 # ---------------------------------------------------------------------------
 
-# Dict form of the OpenAI chat completion response.
-# Real shape: {"choices": [{"message": {"content": str}, ...}], ...}
-OPENAI_RESPONSE_REQUIRED_KEYS = {"choices"}
-OPENAI_CHOICE_REQUIRED_KEYS = {"message"}
-OPENAI_MESSAGE_REQUIRED_KEYS = {"content"}
+import types as _types
+
+_MISSING = object()
 
 
-def validate_openai_response_shape(data):
-    """Validate an OpenAI-compatible chat completion response dict.
+def make_openai_response(content="ingredients"):
+    """Build an OpenAI-compatible chat completion response mock.
 
-    If a test mock returns a dict representation, call this to confirm it
-    matches the documented OpenAI API shape.
+    Mirrors the real SDK structure read by the openai/groq/openrouter
+    backends: ``response.choices[0].message.content``.
     """
-    assert isinstance(data, dict), (
-        f"OpenAI response must be a dict, got {type(data).__name__}"
+    return _types.SimpleNamespace(
+        choices=[
+            _types.SimpleNamespace(
+                message=_types.SimpleNamespace(role="assistant", content=content)
+            )
+        ]
     )
-    missing = OPENAI_RESPONSE_REQUIRED_KEYS - set(data.keys())
-    assert not missing, f"OpenAI response missing keys: {missing}"
-    assert isinstance(data["choices"], list), "'choices' must be a list"
-    assert len(data["choices"]) > 0, "Non-empty 'choices' expected in non-error response"
-    choice = data["choices"][0]
-    assert isinstance(choice, dict), f"choice must be a dict, got {type(choice).__name__}"
-    missing_choice = OPENAI_CHOICE_REQUIRED_KEYS - set(choice.keys())
-    assert not missing_choice, f"OpenAI choice missing keys: {missing_choice}"
-    message = choice["message"]
-    assert isinstance(message, dict), f"message must be a dict, got {type(message).__name__}"
-    missing_msg = OPENAI_MESSAGE_REQUIRED_KEYS - set(message.keys())
-    assert not missing_msg, f"OpenAI message missing keys: {missing_msg}"
-    assert isinstance(message["content"], str), "'content' must be a str"
 
 
-# ---------------------------------------------------------------------------
-# Gemini (google.genai) API response shapes
-# Real shape: response.text (str attribute, not a dict key)
-# Canonical dict form for shape-validation purposes: {"text": str}
-# ---------------------------------------------------------------------------
-
-GEMINI_RESPONSE_REQUIRED_KEYS = {"text"}
+def make_gemini_response(text="ingredients"):
+    """Build a Gemini (google.genai) response mock: ``response.text``."""
+    return _types.SimpleNamespace(text=text)
 
 
-def validate_gemini_response_shape(data):
-    """Validate a Gemini response dict (canonical dict form).
+def make_claude_response(text="ingredients"):
+    """Build a Claude (anthropic) messages.create response mock.
 
-    The real Gemini SDK response is an object with a .text attribute.
-    For shape-validation purposes we use {"text": str} as the canonical dict.
+    Mirrors the real SDK structure read by the claude backend:
+    ``message.content[0].text``.
     """
-    assert isinstance(data, dict), (
-        f"Gemini response must be a dict, got {type(data).__name__}"
+    return _types.SimpleNamespace(
+        content=[_types.SimpleNamespace(type="text", text=text)]
     )
-    missing = GEMINI_RESPONSE_REQUIRED_KEYS - set(data.keys())
-    assert not missing, f"Gemini response missing keys: {missing}"
-    assert isinstance(data["text"], str), "'text' must be a str"
 
 
-# ---------------------------------------------------------------------------
-# Claude (anthropic) API response shapes
-# Real shape: message.content = [ContentBlock(text=str)]
-# Canonical dict form: {"content": [{"text": str}]}
-# ---------------------------------------------------------------------------
+def validate_openai_response_shape(response):
+    """Validate an OpenAI-compatible chat completion response object.
 
-CLAUDE_RESPONSE_REQUIRED_KEYS = {"content"}
-CLAUDE_CONTENT_BLOCK_REQUIRED_KEYS = {"text"}
-
-
-def validate_claude_response_shape(data):
-    """Validate a Claude messages.create response dict (canonical dict form).
-
-    Real SDK shape: message.content[0].text (object with attributes).
-    Canonical dict form: {"content": [{"text": str}]}.
+    Asserts the real SDK attribute structure the backends consume:
+    ``response.choices[0].message.content`` (a str).
     """
-    assert isinstance(data, dict), (
-        f"Claude response must be a dict, got {type(data).__name__}"
+    choices = getattr(response, "choices", _MISSING)
+    assert choices is not _MISSING, (
+        "OpenAI response missing attribute 'choices' — backends read "
+        "response.choices[0].message.content"
     )
-    missing = CLAUDE_RESPONSE_REQUIRED_KEYS - set(data.keys())
-    assert not missing, f"Claude response missing keys: {missing}"
-    assert isinstance(data["content"], list), "'content' must be a list"
-    assert len(data["content"]) > 0, "Non-empty 'content' expected in non-error response"
-    block = data["content"][0]
-    assert isinstance(block, dict), f"content block must be a dict, got {type(block).__name__}"
-    missing_block = CLAUDE_CONTENT_BLOCK_REQUIRED_KEYS - set(block.keys())
-    assert not missing_block, f"Claude content block missing keys: {missing_block}"
-    assert isinstance(block["text"], str), "'text' must be a str"
+    assert isinstance(choices, list), "'choices' must be a list"
+    assert len(choices) > 0, "Non-empty 'choices' expected in non-error response"
+    message = getattr(choices[0], "message", _MISSING)
+    assert message is not _MISSING, "OpenAI choice missing attribute 'message'"
+    content = getattr(message, "content", _MISSING)
+    assert content is not _MISSING, "OpenAI message missing attribute 'content'"
+    assert isinstance(content, str), "'message.content' must be a str"
+
+
+def validate_gemini_response_shape(response):
+    """Validate a Gemini (google.genai) response object.
+
+    Asserts the real SDK attribute structure the backend consumes:
+    ``response.text`` (a str).
+    """
+    text = getattr(response, "text", _MISSING)
+    assert text is not _MISSING, (
+        "Gemini response missing attribute 'text' — the backend reads "
+        "response.text"
+    )
+    assert isinstance(text, str), "'text' must be a str"
+
+
+def validate_claude_response_shape(message):
+    """Validate a Claude (anthropic) messages.create response object.
+
+    Asserts the real SDK attribute structure the backend consumes:
+    ``message.content[0].text`` (a str).
+    """
+    content = getattr(message, "content", _MISSING)
+    assert content is not _MISSING, (
+        "Claude response missing attribute 'content' — the backend reads "
+        "message.content[0].text"
+    )
+    assert isinstance(content, list), "'content' must be a list"
+    assert len(content) > 0, "Non-empty 'content' expected in non-error response"
+    text = getattr(content[0], "text", _MISSING)
+    assert text is not _MISSING, "Claude content block missing attribute 'text'"
+    assert isinstance(text, str), "'text' must be a str"
 
 
 # ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 // ── i18n (Internationalization) ─────────────────────
-import { state, api, setTranslationFunc } from './state.js';
+import { state, api, setTranslationFunc, showToast } from './state.js';
 
 let currentLang = 'no';
 let translations = {};
@@ -69,9 +69,19 @@ export function applyStaticTranslations() {
 }
 
 export async function changeLanguage(lang) {
+  const previousLang = currentLang;
   const ok = await loadTranslations(lang);
   if (!ok) return;
-  await api('/api/settings/language', { method: 'PUT', body: JSON.stringify({ language: lang }) });
+  try {
+    await api('/api/settings/language', { method: 'PUT', body: JSON.stringify({ language: lang }) });
+  } catch (e) {
+    // Persisting failed — revert to the previous language so the UI does not
+    // end up half-translated, and tell the user.
+    await loadTranslations(previousLang);
+    currentLang = previousLang;
+    showToast(t('toast_language_change_failed'), 'error');
+    return;
+  }
   applyStaticTranslations();
   // Immediately update stats-line with cached data so it doesn't flash "loading"
   const statsEl = document.getElementById('stats-line');

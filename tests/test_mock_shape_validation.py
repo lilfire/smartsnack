@@ -147,3 +147,49 @@ class TestRealApiShapeMatchesFrontendMocks:
         data = resp.get_json()
         validate_product_list_response(data)
         assert not isinstance(data, list), "API must NOT return a bare list"
+
+
+class TestValidatorsAgainstLiveResponses:
+    """Run every API-response validator against the real endpoint it models.
+
+    This is the ground truth for the validators themselves: if an endpoint's
+    real response stops satisfying its validator, the validator (and every
+    mock checked by it) has drifted from the actual API contract.
+    """
+
+    @staticmethod
+    def _create_product(client, name, **extra):
+        resp = client.post(
+            "/api/products", json={"type": "Snacks", "name": name, **extra}
+        )
+        assert resp.status_code == 201, resp.get_json()
+        return resp.get_json()
+
+    def test_add_product_response_matches_validator(self, client, app_ctx):
+        data = self._create_product(client, "ShapeCheckAddProduct")
+        validate_add_product_response(data)
+
+    def test_ean_list_response_matches_validator(self, client, app_ctx):
+        from tests.mock_shape_validator import validate_ean_list_response
+
+        created = self._create_product(
+            client, "ShapeCheckEanList", ean="7038010069307"
+        )
+        resp = client.get(f"/api/products/{created['id']}/eans")
+        assert resp.status_code == 200
+        validate_ean_list_response(resp.get_json())
+
+    def test_add_ean_response_matches_validator(self, client, app_ctx):
+        created = self._create_product(client, "ShapeCheckAddEan")
+        resp = client.post(
+            f"/api/products/{created['id']}/eans", json={"ean": "7038010055720"}
+        )
+        assert resp.status_code == 201, resp.get_json()
+        validate_add_ean_response(resp.get_json())
+
+    def test_product_item_matches_validator(self, client, app_ctx):
+        self._create_product(client, "ShapeCheckItem")
+        data = client.get("/api/products").get_json()
+        assert data["products"], "Expected at least one product"
+        for product in data["products"]:
+            validate_product_item(product)

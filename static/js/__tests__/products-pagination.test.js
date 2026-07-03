@@ -1,4 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MOCK_PRODUCTS_RESPONSE, MOCK_PRODUCTS_EMPTY } from './mock-shapes.js';
+
+// Canonical single product row from the shared GET /api/products mock
+// ({ id: 1, name: 'Milk', type: 'dairy', total_score: 80, has_image: 0 }).
+// TODO(LSO-1694): promote a standalone MOCK_PRODUCT_ITEM to mock-shapes.js
+const MOCK_PRODUCT_ITEM = MOCK_PRODUCTS_RESPONSE.products[0];
 
 vi.mock('../scroll.js', () => ({
   initInfiniteScroll: vi.fn(),
@@ -128,10 +134,10 @@ beforeEach(() => {
 describe('Pagination: initial load', () => {
   it('calls fetchProducts and passes result to renderResults', async () => {
     const mockProducts = [
-      { id: 1, name: 'A', total_score: 80 },
-      { id: 2, name: 'B', total_score: 70 },
+      { ...MOCK_PRODUCT_ITEM, name: 'A' },
+      { ...MOCK_PRODUCT_ITEM, id: 2, name: 'B', total_score: 70 },
     ];
-    fetchProducts.mockResolvedValue({ products: mockProducts, total: 2 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: mockProducts, total: 2 });
 
     await loadData();
 
@@ -142,8 +148,8 @@ describe('Pagination: initial load', () => {
 
   it('uses search input value when in search view', async () => {
     document.getElementById('search-input').value = 'Popcorn';
-    const mockProducts = [{ id: 1, name: 'Popcorn', total_score: 90 }];
-    fetchProducts.mockResolvedValue({ products: mockProducts, total: 1 });
+    const mockProducts = [{ ...MOCK_PRODUCT_ITEM, name: 'Popcorn', total_score: 90 }];
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products: mockProducts, total: 1 });
 
     await loadData();
 
@@ -152,7 +158,7 @@ describe('Pagination: initial load', () => {
 
   it('passes current filters to fetchProducts', async () => {
     state.currentFilter = ['Snacks', 'Drikke'];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -163,7 +169,7 @@ describe('Pagination: initial load', () => {
 describe('Pagination: filter/sort reset', () => {
   it('setFilter clears cachedResults and reloads', async () => {
     state.cachedResults = [{ id: 1, name: 'Old' }];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     setFilter('Snacks');
 
@@ -173,7 +179,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('setFilter with "all" resets currentFilter to empty', () => {
     state.currentFilter = ['Snacks', 'Drikke'];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     setFilter('all');
 
@@ -182,7 +188,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('setFilter toggles a single filter type', () => {
     state.currentFilter = [];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     setFilter('Snacks');
     expect(state.currentFilter).toContain('Snacks');
@@ -193,7 +199,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('switchView clears cachedResults', () => {
     state.cachedResults = [{ id: 1, name: 'Cached' }];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     switchView('search');
 
@@ -216,7 +222,7 @@ describe('Pagination: filter/sort reset', () => {
 
   it('clearSearch resets input and reloads data', async () => {
     document.getElementById('search-input').value = 'test';
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     clearSearch();
 
@@ -229,11 +235,12 @@ describe('Pagination: filter/sort reset', () => {
 describe('Pagination: large dataset', () => {
   it('handles 1000 products without error', async () => {
     const products = Array.from({ length: 1000 }, (_, i) => ({
+      ...MOCK_PRODUCT_ITEM,
       id: i + 1,
       name: `Product ${i + 1}`,
       total_score: Math.random() * 100,
     }));
-    fetchProducts.mockResolvedValue({ products, total: 1000 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products, total: 1000 });
 
     await loadData();
 
@@ -242,7 +249,7 @@ describe('Pagination: large dataset', () => {
   });
 
   it('tracks correct total after fetching large dataset', async () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 5000 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY, total: 5000 });
     state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
 
     await loadData();
@@ -255,7 +262,7 @@ describe('Pagination: large dataset', () => {
 
 describe('Pagination: empty result sets', () => {
   it('passes empty array to renderResults when 0 products', async () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -264,7 +271,7 @@ describe('Pagination: empty result sets', () => {
 
   it('passes empty array to renderResults with active filter that matches nothing', async () => {
     state.currentFilter = ['Nonexistent'];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -273,7 +280,7 @@ describe('Pagination: empty result sets', () => {
   });
 
   it('handles total=0 without requesting more pages', async () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -287,11 +294,11 @@ describe('Pagination: empty result sets', () => {
 describe('Pagination: single page results (fewer than page size)', () => {
   it('renders all products when fewer than page size', async () => {
     const products = [
-      { id: 1, name: 'A', total_score: 90 },
-      { id: 2, name: 'B', total_score: 80 },
-      { id: 3, name: 'C', total_score: 70 },
+      { ...MOCK_PRODUCT_ITEM, name: 'A', total_score: 90 },
+      { ...MOCK_PRODUCT_ITEM, id: 2, name: 'B' },
+      { ...MOCK_PRODUCT_ITEM, id: 3, name: 'C', total_score: 70 },
     ];
-    fetchProducts.mockResolvedValue({ products, total: 3 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products, total: 3 });
     state.pagination = { offset: 0, total: null, inFlight: false, pageSize: 50 };
 
     await loadData();
@@ -300,8 +307,8 @@ describe('Pagination: single page results (fewer than page size)', () => {
   });
 
   it('handles exactly 1 product', async () => {
-    const products = [{ id: 1, name: 'Solo', total_score: 95 }];
-    fetchProducts.mockResolvedValue({ products, total: 1 });
+    const products = [{ ...MOCK_PRODUCT_ITEM, name: 'Solo', total_score: 95 }];
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products, total: 1 });
 
     await loadData();
 
@@ -310,9 +317,9 @@ describe('Pagination: single page results (fewer than page size)', () => {
 
   it('max results in one page — no infinite scroll setup needed', async () => {
     const products = Array.from({ length: 50 }, (_, i) => ({
-      id: i + 1, name: `Product ${i + 1}`, total_score: 80,
+      ...MOCK_PRODUCT_ITEM, id: i + 1, name: `Product ${i + 1}`, total_score: 80,
     }));
-    fetchProducts.mockResolvedValue({ products, total: 50 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_RESPONSE, products, total: 50 });
 
     await loadData();
 
@@ -326,7 +333,7 @@ describe('Pagination: filter + pagination interaction', () => {
   it('resets pagination offset when filter changes', () => {
     state.pagination = { offset: 100, total: 500, inFlight: false, pageSize: 50 };
     state.cachedResults = [{ id: 1 }];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     setFilter('Snacks');
 
@@ -337,7 +344,7 @@ describe('Pagination: filter + pagination interaction', () => {
   });
 
   it('fetches with correct filter after setFilter', async () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     setFilter('Drikke');
     await new Promise((r) => setTimeout(r, 10));
@@ -352,7 +359,7 @@ describe('Pagination: filter + pagination interaction', () => {
   it('combining search and filter passes both to fetchProducts', async () => {
     document.getElementById('search-input').value = 'cola';
     state.currentFilter = ['Drikke'];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -362,7 +369,7 @@ describe('Pagination: filter + pagination interaction', () => {
   it('switching view clears cached results and resets pagination', () => {
     state.pagination = { offset: 200, total: 400, inFlight: false, pageSize: 50 };
     state.cachedResults = [{ id: 1 }];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     switchView('search');
 
@@ -376,7 +383,7 @@ describe('Pagination: filter + pagination interaction', () => {
 describe('Pagination: boundary cases', () => {
   it('fetches first page with offset=0 regardless of previous state', async () => {
     state.pagination.offset = 200; // stale offset from previous session
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -385,7 +392,7 @@ describe('Pagination: boundary cases', () => {
 
   it('passes pageSize to fetchProducts', async () => {
     state.pagination.pageSize = 25;
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     await loadData();
 
@@ -397,7 +404,7 @@ describe('Pagination: boundary cases', () => {
   it('does not call fetchProducts when inFlight is true', async () => {
     // This tests the guard against overlapping requests
     state.pagination.inFlight = true;
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue(MOCK_PRODUCTS_EMPTY);
 
     // loadData always resets and runs — but inFlight is reset at start
     await loadData();
@@ -409,7 +416,8 @@ describe('Pagination: boundary cases', () => {
 
   it('single result renders correctly (not plural)', async () => {
     fetchProducts.mockResolvedValue({
-      products: [{ id: 1, name: 'Only Product', total_score: 80 }],
+      ...MOCK_PRODUCTS_RESPONSE,
+      products: [{ ...MOCK_PRODUCT_ITEM, name: 'Only Product' }],
       total: 1,
     });
 

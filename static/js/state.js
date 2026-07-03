@@ -126,7 +126,7 @@ export const state = {
   categories: [],
   imageCache: createLRUCache(IMAGE_CACHE_MAX_SIZE),
   advancedFilters: null,
-  pagination: { offset: 0, total: null, inFlight: false, pageSize: 50 },
+  pagination: { offset: 0, total: null, inFlight: false, pageSize: 50, scrollGeneration: 0 },
 };
 
 // All nutrition field IDs used in register/edit forms

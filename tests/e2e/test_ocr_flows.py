@@ -62,11 +62,9 @@ def test_ocr_ingredient_button_exists_on_edit(page, api_create_product):
 
     row = page.locator(".table-row", has_text="OCREditBtnProd")
     row.first.click()
-    page.wait_for_timeout(300)
     page.locator("[data-action='start-edit']").first.click()
-    page.wait_for_timeout(400)
 
-    expect(page.locator("#ed-ocr-btn")).to_be_attached()
+    expect(page.locator("#ed-ocr-btn")).to_be_attached(timeout=5000)
 
 
 def test_ocr_nutrition_button_exists_on_edit(page, api_create_product):
@@ -76,11 +74,9 @@ def test_ocr_nutrition_button_exists_on_edit(page, api_create_product):
 
     row = page.locator(".table-row", has_text="OCRNutriEditProd")
     row.first.click()
-    page.wait_for_timeout(300)
     page.locator("[data-action='start-edit']").first.click()
-    page.wait_for_timeout(400)
 
-    expect(page.locator("#ed-ocr-nutri-btn")).to_be_attached()
+    expect(page.locator("#ed-ocr-nutri-btn")).to_be_attached(timeout=5000)
 
 
 # ---------------------------------------------------------------------------

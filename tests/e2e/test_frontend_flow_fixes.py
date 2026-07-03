@@ -33,16 +33,16 @@ def _delete_product_via_ui(page, product_name):
     row = page.locator(".table-row[data-product-id]", has_text=product_name)
     expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
-    page.wait_for_timeout(300)
 
     delete_btn = page.locator("[data-action='delete']").first
-    expect(delete_btn).to_be_visible(timeout=3000)
+    expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
 
     confirm_btn = page.locator(".confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
     confirm_btn.click()
-    page.wait_for_timeout(200)
+    # Wait for the confirm modal to close before the caller proceeds
+    expect(confirm_btn).to_be_hidden(timeout=5000)
 
 
 def _api_get_product(live_url, product_id):
@@ -109,13 +109,21 @@ def test_rapid_double_delete_removes_both_products(page, live_url, api_create_pr
     _reload_and_wait(page)
 
     _delete_product_via_ui(page, "RapidDeleteA")
-    # Second delete immediately, well inside A's 5s undo window.
-    _delete_product_via_ui(page, "RapidDeleteB")
+    # Second delete immediately, well inside A's 5s undo window. Confirming
+    # B's delete flushes A's pending DELETE right away — wait for it.
+    with page.expect_response(
+        lambda r: "/api/products/" in r.url and r.request.method == "DELETE",
+        timeout=10000,
+    ):
+        _delete_product_via_ui(page, "RapidDeleteB")
 
     # Wait for B's undo window to expire and its deferred DELETE to complete.
-    toast = page.locator(".toast.show")
-    expect(toast).to_be_hidden(timeout=8000)
-    page.wait_for_timeout(1500)
+    with page.expect_response(
+        lambda r: "/api/products/" in r.url and r.request.method == "DELETE",
+        timeout=10000,
+    ):
+        toast = page.locator(".toast.show")
+        expect(toast).to_be_hidden(timeout=8000)
 
     _reload_and_wait(page)
     results = page.locator("#results-container")
@@ -145,15 +153,13 @@ def test_save_button_reenabled_after_merge_modal_cancel(page, api_create_product
     row = page.locator(".table-row", has_text="StuckSaveTarget")
     expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
-    page.wait_for_timeout(300)
 
     edit_btn = page.locator("[data-action='start-edit']").first
-    expect(edit_btn).to_be_visible(timeout=3000)
+    expect(edit_btn).to_be_visible(timeout=5000)
     edit_btn.click()
-    page.wait_for_timeout(500)
 
     edit_name = page.locator("#ed-name")
-    expect(edit_name).to_be_visible(timeout=3000)
+    expect(edit_name).to_be_visible(timeout=5000)
     edit_name.fill("StuckSaveOrig")
 
     save_btn = page.locator("[data-action='save-product']").first
