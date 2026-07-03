@@ -18,7 +18,7 @@ services:
       - APP_VERSION_SUFFIX=${APP_VERSION_SUFFIX:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5001/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request, ssl; ctx = ssl._create_unverified_context(); urllib.request.urlopen('https://localhost:5000/health', context=ctx)"]
       interval: 30s
       timeout: 5s
       retries: 3
