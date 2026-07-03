@@ -29,7 +29,7 @@ class TestAppErrorHandlers:
 
     def test_unhandled_error_returns_500(self, client):
         """Lines 43-44: unhandled exceptions return 500 JSON."""
-        with patch("blueprints.core.get_db", side_effect=RuntimeError("boom")):
+        with patch("services.core_service.get_db", side_effect=RuntimeError("boom")):
             resp = client.get("/health")
             assert resp.status_code == 500
             data = resp.get_json()
@@ -51,7 +51,7 @@ class TestAppErrorHandlers:
 class TestCoreHealthError:
     def test_health_db_error(self, client):
         """Lines 22-24: health check returns error on DB failure."""
-        with patch("blueprints.core.get_db", side_effect=sqlite3.OperationalError("fail")):
+        with patch("services.core_service.get_db", side_effect=sqlite3.OperationalError("fail")):
             resp = client.get("/health")
             assert resp.status_code == 500
             data = resp.get_json()

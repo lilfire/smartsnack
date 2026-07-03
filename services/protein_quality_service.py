@@ -42,10 +42,15 @@ def list_entries() -> list:
 def add_entry(data: dict) -> dict:
     """Add a new protein quality entry."""
     name = _str_field(data, "name").strip()
-    keywords = data.get("keywords", [])
     pdcaas = data.get("pdcaas")
     diaas = data.get("diaas")
     label = _str_field(data, "label").strip()
+    # Validate keywords first so keywords[0] is always the first keyword word, not
+    # the first character of a comma-separated string.
+    validated_kws, kw_err = _validate_keywords(data.get("keywords", []))
+    if kw_err or validated_kws is None:
+        raise ValueError(kw_err or "Invalid keywords")
+    keywords = validated_kws
     if not name:
         name = label or (keywords[0] if keywords else "")
     if not name or not keywords or pdcaas is None or diaas is None:
@@ -53,10 +58,6 @@ def add_entry(data: dict) -> dict:
     name = re.sub(r"[^a-zA-Z0-9_]", "_", name.lower()).strip("_")
     if not name:
         raise ValueError("Invalid name")
-    validated_kws, kw_err = _validate_keywords(keywords)
-    if kw_err or validated_kws is None:
-        raise ValueError(kw_err or "Invalid keywords")
-    keywords = validated_kws
     if isinstance(label, str) and len(label) > _PQ_MAX_LABEL_LEN:
         raise ValueError(f"label exceeds max length of {_PQ_MAX_LABEL_LEN}")
     pdcaas_f = _safe_float(pdcaas, "pdcaas")

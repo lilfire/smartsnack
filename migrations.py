@@ -283,6 +283,12 @@ MIGRATIONS = [
             "INSERT OR IGNORE INTO bulk_refresh_jobs (id) VALUES (1)",
         ],
     ),
+    (
+        "022_add_product_eans_ean_index",
+        [
+            "CREATE INDEX IF NOT EXISTS idx_product_eans_ean ON product_eans(ean)",
+        ],
+    ),
 ]
 
 

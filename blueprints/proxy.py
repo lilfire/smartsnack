@@ -1,6 +1,7 @@
 """Blueprint for proxying images and API requests from allowed external domains."""
 
 import logging
+import math
 
 from flask import Blueprint, request, jsonify, Response
 
@@ -40,13 +41,18 @@ def off_search():
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
         query = body.get("q", "")
+        if not isinstance(query, str):
+            return jsonify({"error": "q must be a string"}), 400
         category = body.get("category", "")
         raw_nutrition = body.get("nutrition")
         if isinstance(raw_nutrition, dict):
             nutrition = {}
             for k, v in raw_nutrition.items():
                 try:
-                    nutrition[k] = float(v)
+                    f = float(v)
+                    if not math.isfinite(f):
+                        continue
+                    nutrition[k] = f
                 except (TypeError, ValueError):
                     continue
             if not nutrition:

@@ -77,26 +77,22 @@ class TestProductsListPaginationValidation:
         assert status == 400
         assert body["error"] == "limit and offset must be integers"
 
-    def test_negative_limit_passes_validation(self, live_url):
-        """The current route accepts negative ints — ``int("-5")`` succeeds and
-        SQLite ``LIMIT -5`` returns no rows. This test pins the *actual* contract
-        so a future tightening (rejecting negatives at the route layer) is a
-        deliberate breaking change rather than a silent regression."""
+    def test_negative_limit_returns_400(self, live_url):
+        """Since LSO-1679 the route rejects negative ``limit`` at the
+        validation layer instead of passing ``LIMIT -5`` through to SQLite."""
         status, body = _get(_q(live_url, limit="-5"))
-        assert status == 200, (
-            f"Negative limit currently passes validation; if this changes update "
-            f"the audit. Got {status}: {body}"
+        assert status == 400, (
+            f"Expected 400 for negative limit, got {status}: {body}"
         )
-        assert body == {"products": [], "total": 0}
+        assert body == {"error": "limit must be non-negative"}
 
-    def test_negative_offset_passes_validation(self, live_url):
+    def test_negative_offset_returns_400(self, live_url):
         """Same as above for ``offset=-1``."""
         status, body = _get(_q(live_url, offset="-1"))
-        assert status == 200, (
-            f"Negative offset currently passes validation; if this changes "
-            f"update the audit. Got {status}: {body}"
+        assert status == 400, (
+            f"Expected 400 for negative offset, got {status}: {body}"
         )
-        assert "products" in body and "total" in body
+        assert body == {"error": "offset must be non-negative"}
 
     def test_valid_integer_limit_and_offset_succeed(self, live_url):
         """Sanity check: integer values for both params return 200."""
