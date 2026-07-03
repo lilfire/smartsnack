@@ -64,6 +64,8 @@ function _onProviderChange() {
 export async function loadOcrProviders() {
   const sel = document.getElementById('ocr-provider-select');
   if (!sel) return;
+  // Remove first so repeated loads don't accumulate duplicate listeners
+  sel.removeEventListener('change', _onProviderChange);
   sel.addEventListener('change', _onProviderChange);
   try {
     const data = await api('/api/ocr/providers');
