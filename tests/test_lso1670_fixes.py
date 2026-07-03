@@ -137,10 +137,10 @@ def test_products_limit_clamped_min(client):
     assert resp.status_code == 200
 
 
-def test_products_negative_offset_clamped(client):
-    """Negative offset is clamped to 0."""
+def test_products_negative_offset_rejected(client):
+    """Negative offset is rejected with 400 (LSO-1679 tightened validation)."""
     resp = client.get("/api/products?offset=-5")
-    assert resp.status_code == 200
+    assert resp.status_code == 400
 
 
 # ---------------------------------------------------------------------------
