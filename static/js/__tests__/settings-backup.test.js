@@ -104,14 +104,15 @@ describe('downloadBackup', () => {
   it('sets window.location.href to /api/backup when no API key configured', () => {
     downloadBackup();
     expect(assignedHrefs[0]).toBe('/api/backup');
-    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+    // M22: no premature success toast — a neutral "started" info toast instead
+    expect(showToast).toHaveBeenCalledWith('toast_backup_download_started', 'info');
   });
 
   it('includes api_key query param when SMARTSNACK_API_KEY is set', () => {
     window.SMARTSNACK_API_KEY = 'my-secret';
     downloadBackup();
     expect(assignedHrefs[0]).toBe('/api/backup?api_key=my-secret');
-    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'success');
+    expect(showToast).toHaveBeenCalledWith('toast_backup_download_started', 'info');
   });
 
   it('URL-encodes special characters in api_key', () => {
@@ -326,5 +327,61 @@ describe('initRestoreDragDrop', () => {
     drop.dispatchEvent(dropEvent);
     // showConfirmModal not called since no file
     expect(showConfirmModal).not.toHaveBeenCalled();
+  });
+});
+
+// ── M20: image cache must be cleared in place, not replaced ──
+describe('M20: imageCache cleared in place (LRU proxy preserved)', () => {
+  function trackedCache() {
+    const deleted = [];
+    const proxy = new Proxy({}, {
+      deleteProperty(target, key) { deleted.push(key); delete target[key]; return true; },
+    });
+    return { proxy, deleted };
+  }
+
+  it('handleRestore keeps the same imageCache object and empties it via deletes', async () => {
+    const { proxy, deleted } = trackedCache();
+    state.imageCache = proxy;
+    proxy['img-1'] = 'a';
+    proxy['img-2'] = 'b';
+    showConfirmModal.mockResolvedValue(true);
+    api.mockResolvedValue({ message: 'Restored!' });
+
+    const file = new File([JSON.stringify({ products: [] })], 'backup.json', { type: 'application/json' });
+    let captured = '';
+    const input = { files: [file], get value() { return captured; }, set value(v) { captured = v; } };
+    handleRestore(input);
+    await new Promise((r) => setTimeout(r, 50));
+
+    // Same object → the LRU Proxy (and its eviction trap) survives the restore
+    expect(state.imageCache).toBe(proxy);
+    expect(Object.keys(state.imageCache)).toEqual([]);
+    expect(deleted.sort()).toEqual(['img-1', 'img-2']);
+    state.imageCache = {};
+  });
+
+  it('handleImport keeps the same imageCache object and empties it via deletes', async () => {
+    const { proxy, deleted } = trackedCache();
+    state.imageCache = proxy;
+    proxy['img-9'] = 'z';
+    showConfirmModal.mockResolvedValue(true);
+    api.mockResolvedValue({ message: 'Imported!' });
+
+    const file = new File([JSON.stringify({ products: [] })], 'import.json', { type: 'application/json' });
+    let captured = '';
+    const input = { files: [file], get value() { return captured; }, set value(v) { captured = v; } };
+    handleImport(input);
+    await new Promise((r) => setTimeout(r, 50));
+    // Confirm the duplicate-settings dialog
+    const startBtn = document.querySelector('.scan-modal-btn-register');
+    expect(startBtn).not.toBeNull();
+    startBtn.click();
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(state.imageCache).toBe(proxy);
+    expect(Object.keys(state.imageCache)).toEqual([]);
+    expect(deleted).toEqual(['img-9']);
+    state.imageCache = {};
   });
 });

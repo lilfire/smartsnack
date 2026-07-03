@@ -1,6 +1,7 @@
 """Blueprint for health check and main page."""
 
 import logging
+import os
 import sqlite3
 
 from flask import Blueprint, jsonify, render_template
@@ -27,4 +28,8 @@ def health():
 @bp.route("/")
 def index():
     version = f"{APP_VERSION}-{APP_VERSION_SUFFIX}" if APP_VERSION_SUFFIX else APP_VERSION
-    return render_template("index.html", version=version)
+    return render_template(
+        "index.html",
+        version=version,
+        api_key=os.environ.get("SMARTSNACK_API_KEY", ""),
+    )

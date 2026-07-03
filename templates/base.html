@@ -17,6 +17,7 @@
     {% block body %}{% endblock %}
     <div class="version-badge">v{{ version }}</div>
     {% block scripts %}
+    <script>window.SMARTSNACK_API_KEY = {{ (api_key or "") | tojson }};</script>
     <script type="module" src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% endblock %}
   </body>

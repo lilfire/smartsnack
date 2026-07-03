@@ -7,7 +7,17 @@ export function downloadBackup() {
   const apiKey = window.SMARTSNACK_API_KEY;
   const url = apiKey ? '/api/backup?api_key=' + encodeURIComponent(apiKey) : '/api/backup';
   window.location.href = url;
-  showToast(t('toast_backup_downloaded'), 'success');
+  // We cannot know here whether the download actually succeeded (the browser
+  // handles it via navigation), so show a neutral "started" toast instead of
+  // a premature success toast.
+  showToast(t('toast_backup_download_started'), 'info');
+}
+
+// Clear the image cache in place. state.imageCache is an LRU Proxy created by
+// createLRUCache(); assigning a plain `{}` over it would silently disable
+// eviction, so we delete keys instead of replacing the object.
+function _clearImageCache() {
+  Object.keys(state.imageCache).forEach((k) => { delete state.imageCache[k]; });
 }
 
 export async function handleRestore(input) {
@@ -20,7 +30,7 @@ export async function handleRestore(input) {
       const res = await api('/api/restore', { method: 'POST', body: JSON.stringify(data) });
       if (res.error) { showToast(res.error, 'error'); }
       else {
-        state.imageCache = {};
+        _clearImageCache();
         showToast(res.message, 'success');
         loadData();
         if (state.currentView === 'settings') {
@@ -207,7 +217,7 @@ export function handleImport(input) {
       const res = await api('/api/import', { method: 'POST', body: JSON.stringify(data) });
       if (res.error) { showToast(res.error, 'error'); }
       else {
-        state.imageCache = {};
+        _clearImageCache();
         showToast(res.message, 'success');
         loadData();
         if (state.currentView === 'settings') {

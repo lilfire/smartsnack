@@ -611,3 +611,31 @@ describe('EAN manager event delegation', () => {
     expect(api).not.toHaveBeenCalled();
   });
 });
+
+// ── M19: re-render must not stack click listeners ──
+describe('M19: single delegation listener across re-renders', () => {
+  it('fires exactly one DELETE per click after repeated re-renders', async () => {
+    document.body.innerHTML = '<div><div id="ean-manager-7"></div></div>';
+    const eans = [
+      { id: 1, ean: '7038010000001', is_primary: 1, synced_with_off: 0 },
+      { id: 2, ean: '7038010000002', is_primary: 0, synced_with_off: 0 },
+    ];
+    api.mockResolvedValue(eans);
+
+    // Three renders — without the fix each one stacks another click listener
+    await loadEanManager(7);
+    await loadEanManager(7);
+    await loadEanManager(7);
+
+    api.mockClear();
+    api.mockResolvedValue(eans);
+    const delBtn = document.querySelector('[data-ean-action="delete-ean"][data-ean-id="2"]');
+    expect(delBtn).not.toBeNull();
+    delBtn.click();
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+
+    const deleteCalls = api.mock.calls.filter((c) => c[1] && c[1].method === 'DELETE');
+    expect(deleteCalls.length).toBe(1);
+    expect(deleteCalls[0][0]).toBe('/api/products/7/eans/2');
+  });
+});

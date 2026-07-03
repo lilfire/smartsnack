@@ -30,6 +30,9 @@ export async function loadNextPage() {
   if (pg.total !== null && pg.offset + pg.pageSize >= pg.total) return;
 
   const search = _getSearchFn ? _getSearchFn() : '';
+  // Capture the generation at request time; loadData() bumps it when a new
+  // search starts, so a stale in-flight page can be discarded on arrival.
+  const generation = pg.scrollGeneration;
 
   pg.inFlight = true;
   showScrollLoader();
@@ -39,6 +42,8 @@ export async function loadNextPage() {
       limit: pg.pageSize,
       offset: nextOffset,
     });
+    // A new search started while this page was in flight — discard silently.
+    if (generation !== pg.scrollGeneration) return;
     // Handle {products, total} or plain array (backward compat)
     const products = Array.isArray(data) ? data : (data.products || []);
     const total = Array.isArray(data) ? pg.total : (data.total != null ? data.total : pg.total);

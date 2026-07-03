@@ -353,8 +353,12 @@ class TestCategoryToasts:
 class TestBackupToasts:
     """Tests for backup/restore-related toast messages."""
 
-    def test_toast_backup_downloaded(self, page):
-        """Clicking backup download shows success toast."""
+    def test_toast_backup_download_started(self, page):
+        """Clicking backup download shows the neutral 'download started' toast.
+
+        M22 (LSO-1696) replaced the premature success toast with an info toast:
+        the download happens via navigation, so success cannot be observed here.
+        """
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_database_title")
@@ -367,7 +371,7 @@ class TestBackupToasts:
             "button:has-text('Last ned backup')"
         ).first
         download_btn.click()
-        _wait_for_toast(page, t["toast_backup_downloaded"])
+        _wait_for_toast(page, t["toast_backup_download_started"])
 
     def test_toast_invalid_file_restore(self, page):
         """Restoring with non-JSON file shows invalid file toast."""
