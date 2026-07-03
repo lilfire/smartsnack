@@ -27,6 +27,9 @@ import {
   MOCK_OFF_LANGUAGES,
   MOCK_BULK_STATUS_IDLE,
   MOCK_BULK_STATUS_RUNNING,
+  MOCK_OFF_ADD_PRODUCT_OK,
+  MOCK_PQ_ESTIMATE,
+  MOCK_PQ_ESTIMATE_EMPTY,
 } from './mock-shapes.js';
 
 describe('validateMockShape utility', () => {
@@ -254,6 +257,42 @@ describe('OFF credentials + language mock shapes', () => {
     expect(() =>
       validateMockShape('GET /api/off/languages', MOCK_OFF_LANGUAGES),
     ).not.toThrow();
+  });
+});
+
+describe('OFF add-product mock shapes', () => {
+  it('MOCK_OFF_ADD_PRODUCT_OK matches POST /api/off/add-product shape', () => {
+    expect(() =>
+      validateMockShape('POST /api/off/add-product', MOCK_OFF_ADD_PRODUCT_OK),
+    ).not.toThrow();
+  });
+
+  it('MOCK_OFF_ADD_PRODUCT_OK carries the add_and_sync_product() contract', () => {
+    expect(MOCK_OFF_ADD_PRODUCT_OK.ok).toBe(true);
+    // image_warning is string|null in the real response
+    expect(MOCK_OFF_ADD_PRODUCT_OK).toHaveProperty('image_warning');
+    expect(MOCK_OFF_ADD_PRODUCT_OK.image_uploaded).toBeTypeOf('boolean');
+    expect(MOCK_OFF_ADD_PRODUCT_OK.synced_flag_set).toBeTypeOf('boolean');
+  });
+});
+
+describe('Protein quality estimate mock shapes', () => {
+  it('MOCK_PQ_ESTIMATE matches POST /api/estimate-protein-quality shape', () => {
+    expect(() =>
+      validateMockShape('POST /api/estimate-protein-quality', MOCK_PQ_ESTIMATE),
+    ).not.toThrow();
+    expect(MOCK_PQ_ESTIMATE.est_pdcaas).toBeTypeOf('number');
+    expect(MOCK_PQ_ESTIMATE.est_diaas).toBeTypeOf('number');
+    expect(MOCK_PQ_ESTIMATE.sources.length).toBeGreaterThan(0);
+  });
+
+  it('MOCK_PQ_ESTIMATE_EMPTY matches shape with null estimates', () => {
+    expect(() =>
+      validateMockShape('POST /api/estimate-protein-quality', MOCK_PQ_ESTIMATE_EMPTY),
+    ).not.toThrow();
+    expect(MOCK_PQ_ESTIMATE_EMPTY.est_pdcaas).toBeNull();
+    expect(MOCK_PQ_ESTIMATE_EMPTY.est_diaas).toBeNull();
+    expect(MOCK_PQ_ESTIMATE_EMPTY.sources).toEqual([]);
   });
 });
 

@@ -48,6 +48,10 @@ import { loadProductImage, resizeImage, removeProductImage, triggerImageUpload, 
 import { state, api, showConfirmModal, showToast } from '../state.js';
 import { rerender } from '../filters.js';
 
+// TODO(LSO-1694): promote to mock-shapes.js — it has no shape yet for
+// GET /api/products/:id/image ({ image: <base64 data URI> }).
+const MOCK_PRODUCT_IMAGE_RESPONSE = { image: 'data:image/png;base64,xyz' };
+
 beforeEach(() => {
   vi.clearAllMocks();
   state.imageCache = {};
@@ -70,7 +74,7 @@ describe('loadProductImage', () => {
   it('fetches image from API and caches it', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ image: 'data:image/png;base64,xyz' }),
+      json: () => Promise.resolve(MOCK_PRODUCT_IMAGE_RESPONSE),
     });
     const result = await loadProductImage(1);
     expect(result).toBe('data:image/png;base64,xyz');
@@ -78,6 +82,7 @@ describe('loadProductImage', () => {
   });
 
   it('caches null for 404 response', async () => {
+    // Deliberate error response (stays inline — error-branch test).
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 404 });
     const result = await loadProductImage(1);
     expect(result).toBeNull();
@@ -85,6 +90,7 @@ describe('loadProductImage', () => {
   });
 
   it('does not cache on transient error', async () => {
+    // Deliberate error response (stays inline — error-branch test).
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500 });
     const result = await loadProductImage(1);
     expect(result).toBeNull();
@@ -329,7 +335,7 @@ describe('viewProductImage', () => {
   it('loads image via API on cache miss', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ image: 'data:image/png;base64,loaded' }),
+      json: () => Promise.resolve({ ...MOCK_PRODUCT_IMAGE_RESPONSE, image: 'data:image/png;base64,loaded' }),
     });
     await viewProductImage(2);
     const bg = document.querySelector('.img-viewer-bg');

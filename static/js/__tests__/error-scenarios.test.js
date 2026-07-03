@@ -1,6 +1,11 @@
 // Comprehensive error scenario tests for modules that make fetch/API calls.
 // Uses the real state.js api() to test HTTP error codes end-to-end.
 // Each HTTP status code exercises the same error-handling branch in api().
+//
+// NOTE(LSO-1694): the response mocks in this file are deliberately error-shaped
+// or malformed payloads (HTTP error bodies, invalid JSON, network rejections)
+// exercising error branches. They intentionally stay inline and are NOT
+// candidates for the shared mock-shapes.js module.
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Do NOT mock state.js here — these tests exercise the real api() function

@@ -52,6 +52,19 @@ export const SHAPES = {
     // returns an array directly
     _root: 'array',
   },
+  // Contract from off_service.add_and_sync_product() via blueprints/off.py.
+  // image_warning is string|null so it cannot be strictly typed here.
+  'POST /api/off/add-product': {
+    ok: 'boolean',
+    status_verbose: 'string',
+    image_uploaded: 'boolean',
+    synced_flag_set: 'boolean',
+  },
+  // Contract from protein_quality_service.estimate() via blueprints/protein_quality.py.
+  // est_pdcaas and est_diaas are number|null so only sources is strictly typed.
+  'POST /api/estimate-protein-quality': {
+    sources: 'array',
+  },
 };
 
 // ── Realistic mock objects ─────────────────────────────────────────────────
@@ -201,6 +214,32 @@ export const MOCK_BULK_STATUS_IDLE = {
 
 export const MOCK_BULK_STATUS_RUNNING = {
   running: true,
+};
+
+// Canonical POST /api/off/add-product success response — full contract from
+// off_service.add_and_sync_product(): the OFF add succeeded, no image was
+// uploaded and the local synced flag was not set (no product_id supplied).
+export const MOCK_OFF_ADD_PRODUCT_OK = {
+  ok: true,
+  status_verbose: 'fields saved',
+  image_uploaded: false,
+  image_warning: null,
+  synced_flag_set: false,
+};
+
+// Canonical POST /api/estimate-protein-quality response with matches.
+export const MOCK_PQ_ESTIMATE = {
+  est_pdcaas: 0.85,
+  est_diaas: 0.92,
+  sources: ['whey'],
+};
+
+// Canonical POST /api/estimate-protein-quality response when no protein
+// sources are recognized in the ingredients string.
+export const MOCK_PQ_ESTIMATE_EMPTY = {
+  est_pdcaas: null,
+  est_diaas: null,
+  sources: [],
 };
 
 // ── Validation helper ──────────────────────────────────────────────────────

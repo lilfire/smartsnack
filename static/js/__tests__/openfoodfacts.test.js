@@ -1,4 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  MOCK_OFF_PRODUCT_FOUND,
+  MOCK_OFF_PRODUCT_NOT_FOUND,
+  MOCK_OFF_SEARCH_RESULTS,
+  MOCK_OFF_ADD_PRODUCT_OK,
+  MOCK_PQ_ESTIMATE,
+  MOCK_PQ_ESTIMATE_EMPTY,
+} from './mock-shapes.js';
 
 vi.mock('../state.js', () => {
   const _state = {
@@ -137,6 +145,7 @@ describe('searchOFF', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [
           { product_name: 'Milk', code: '123' },
           { product_name_no: 'Melk', code: '456' },
@@ -164,7 +173,7 @@ describe('searchOFF', () => {
   it('sends nutrition and category when provided', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'Milk' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'Milk' }] }),
     });
     const nutrition = { kcal: 60, protein: 3.3 };
     await searchOFF('milk', nutrition, 'dairy');
@@ -176,6 +185,7 @@ describe('searchOFF', () => {
   it('returns empty array when products field is missing', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
+      // Intentionally malformed: missing the "products" key to exercise fallback.
       json: () => Promise.resolve({}),
     });
     const results = await searchOFF('test');
@@ -258,7 +268,7 @@ describe('estimateProteinQuality', () => {
   });
 
   it('posts ingredients and updates DOM on success', async () => {
-    api.mockResolvedValueOnce({ est_pdcaas: 0.85, est_diaas: 0.92, sources: ['whey'] });
+    api.mockResolvedValueOnce(MOCK_PQ_ESTIMATE);
     await estimateProteinQuality('ed');
     expect(document.getElementById('ed-pdcaas-val').textContent).toBe('0.85');
     expect(document.getElementById('ed-diaas-val').textContent).toBe('0.92');
@@ -280,13 +290,13 @@ describe('estimateProteinQuality', () => {
   });
 
   it('shows error when no sources found', async () => {
-    api.mockResolvedValueOnce({ est_pdcaas: null, est_diaas: null, sources: [] });
+    api.mockResolvedValueOnce(MOCK_PQ_ESTIMATE_EMPTY);
     await estimateProteinQuality('ed');
     expect(showToast).toHaveBeenCalledWith('toast_no_protein_sources', 'error');
   });
 
   it('re-enables button after completion', async () => {
-    api.mockResolvedValueOnce({ est_pdcaas: 0.85, est_diaas: 0.92, sources: [] });
+    api.mockResolvedValueOnce({ ...MOCK_PQ_ESTIMATE, sources: [] });
     const btn = document.getElementById('ed-estimate-btn');
     await estimateProteinQuality('ed');
     expect(btn.disabled).toBe(false);
@@ -294,6 +304,7 @@ describe('estimateProteinQuality', () => {
   });
 
   it('shows error when API returns error field', async () => {
+    // Intentionally kept inline: canonical {"error": msg} error envelope, not a success shape.
     api.mockResolvedValueOnce({ error: 'Some error' });
     await estimateProteinQuality('ed');
     expect(showToast).toHaveBeenCalledWith('toast_error_prefix', 'error');
@@ -308,7 +319,7 @@ describe('estimateProteinQuality', () => {
   });
 
   it('displays dash when pdcaas/diaas are null', async () => {
-    api.mockResolvedValueOnce({ est_pdcaas: null, est_diaas: null, sources: [] });
+    api.mockResolvedValueOnce(MOCK_PQ_ESTIMATE_EMPTY);
     await estimateProteinQuality('ed');
     expect(document.getElementById('ed-pdcaas-val').textContent).toBe('\u2013');
     expect(document.getElementById('ed-diaas-val').textContent).toBe('\u2013');
@@ -347,7 +358,7 @@ describe('submitToOff', () => {
     btn.id = 'off-submit-btn';
     document.body.appendChild(btn);
 
-    api.mockResolvedValueOnce({ status: 'ok' });
+    api.mockResolvedValueOnce(MOCK_OFF_ADD_PRODUCT_OK);
     await submitToOff('1234567890123');
     expect(api).toHaveBeenCalledWith('/api/off/add-product', expect.objectContaining({ method: 'POST' }));
     expect(showToast).toHaveBeenCalledWith('toast_off_product_added', 'success');
@@ -392,7 +403,7 @@ describe('submitToOff', () => {
     // Trigger lookupOFF to set _offCtx.prefix = 'ed'
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 1, product: { product_name: 'Test', nutriments: {} } }),
+      json: () => Promise.resolve({ ...MOCK_OFF_PRODUCT_FOUND, product: { product_name: 'Test', nutriments: {} } }),
     });
     await lookupOFF('ed', null);
     vi.clearAllMocks();
@@ -427,7 +438,7 @@ describe('submitToOff', () => {
     btn.id = 'off-submit-btn';
     document.body.appendChild(btn);
 
-    api.mockResolvedValueOnce({ status: 'ok' });
+    api.mockResolvedValueOnce(MOCK_OFF_ADD_PRODUCT_OK);
     await submitToOff('1234567890123');
     const callBody = JSON.parse(api.mock.calls[0][1].body);
     expect(callBody.quantity).toBe('500 g');
@@ -471,7 +482,7 @@ describe('lookupOFF', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        status: 1,
+        ...MOCK_OFF_PRODUCT_FOUND,
         product: { product_name: 'Test Milk', nutriments: {} },
       }),
     });
@@ -488,7 +499,7 @@ describe('lookupOFF', () => {
     ean.value = '1234567890123';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 0, product: null }),
+      json: () => Promise.resolve(MOCK_OFF_PRODUCT_NOT_FOUND),
     });
     await lookupOFF('ed', null);
     // Should create off-modal-bg for the picker
@@ -512,7 +523,7 @@ describe('lookupOFF', () => {
     name.value = 'Milk';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'Milk', code: '123' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'Milk', code: '123' }] }),
     });
     await lookupOFF('ed', null);
     expect(global.fetch).toHaveBeenCalledWith(
@@ -528,7 +539,7 @@ describe('lookupOFF', () => {
     document.getElementById('ed-protein').value = '3.3';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'Milk', code: '123' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'Milk', code: '123' }] }),
     });
     await lookupOFF('ed', null);
     expect(global.fetch).toHaveBeenCalledWith(
@@ -590,7 +601,7 @@ describe('offModalSearch', () => {
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'Milk', code: '123' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'Milk', code: '123' }] }),
     });
 
     await offModalSearch();
@@ -656,6 +667,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [
           { product_name: 'Milk A', nutriments: { 'energy-kcal_100g': 60 } },
           { product_name: 'Milk B', code: '123', nutriments: {} },
@@ -680,6 +692,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{ product_name: 'Milk', code: '9999', nutriments: {} }],
       }),
     });
@@ -690,7 +703,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
-        status: 1,
+        ...MOCK_OFF_PRODUCT_FOUND,
         product: { product_name: 'Detailed Milk', nutriments: { 'energy-kcal_100g': 50 }, code: '9999' },
       }),
     });
@@ -709,6 +722,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{ product_name: 'Milk', code: '9999', nutriments: {} }],
       }),
     });
@@ -730,6 +744,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{ product_name: 'Milk', code: '9999', nutriments: {} }],
       }),
     });
@@ -738,7 +753,7 @@ describe('selectOffResult', () => {
     vi.clearAllMocks();
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 0, product: null }),
+      json: () => Promise.resolve(MOCK_OFF_PRODUCT_NOT_FOUND),
     });
     await selectOffResult(0);
     expect(showToast).toHaveBeenCalledWith(expect.stringContaining('toast_off_fetched'), 'success');
@@ -754,6 +769,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{ product_name: 'Milk', code: '9999', nutriments: {} }],
       }),
     });
@@ -792,6 +808,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'Milk',
           nutriments: { 'energy-kcal_100g': 60 },
@@ -850,6 +867,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'Milk',
           nutriments: {},
@@ -899,6 +917,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'Milk',
           nutriments: { 'energy-kcal_100g': 60 },
@@ -943,6 +962,7 @@ describe('selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'Milk',
           nutriments: {},
@@ -1006,7 +1026,7 @@ describe('showOffAddReview', () => {
     // Since _offCtx is private, we'll use lookupOFF with a short-circuit
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 0, product: null }),
+      json: () => Promise.resolve(MOCK_OFF_PRODUCT_NOT_FOUND),
     });
 
     showOffAddReview('1234567890123');
@@ -1539,7 +1559,7 @@ describe('showOffAddReview without name', () => {
     // Set _offCtx.prefix via lookupOFF
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 0, product: null }),
+      json: () => Promise.resolve(MOCK_OFF_PRODUCT_NOT_FOUND),
     });
     lookupOFF('ed', null);
 
@@ -1595,6 +1615,7 @@ describe('renderOffResults branch coverage via lookupOFF name search', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [
           {
             product_name: 'Product A',
@@ -1628,6 +1649,7 @@ describe('renderOffResults branch coverage via lookupOFF name search', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [
           {
             product_name: 'Product B',
@@ -1652,6 +1674,7 @@ describe('renderOffResults branch coverage via lookupOFF name search', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [
           {
             product_name: 'Product C',
@@ -1673,7 +1696,7 @@ describe('renderOffResults branch coverage via lookupOFF name search', () => {
     setupNameSearch();
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [] }),
     });
     await lookupOFF('ed', null);
     const modal = document.getElementById('off-modal-bg');
@@ -1686,6 +1709,7 @@ describe('renderOffResults branch coverage via lookupOFF name search', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [
           {
             product_name: 'English Name',
@@ -1747,7 +1771,7 @@ describe('lookupOFF name search edge cases', () => {
     document.getElementById('ed-protein').value = '3.3';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'Milk' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'Milk' }] }),
     });
     await lookupOFF('ed', null);
     const callBody = JSON.parse(global.fetch.mock.calls[0][1].body);
@@ -1762,7 +1786,7 @@ describe('lookupOFF name search edge cases', () => {
     // but we can verify search completes successfully
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'Milk' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'Milk' }] }),
     });
     await lookupOFF('ed', null);
     expect(global.fetch).toHaveBeenCalled();
@@ -1793,7 +1817,7 @@ describe('applyOffProduct branches via selectOffResult', () => {
     document.getElementById('ed-name').value = 'Search';
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products }),
     });
     await lookupOFF('ed', null);
     vi.clearAllMocks();
@@ -1885,7 +1909,7 @@ describe('applyOffProduct branches via selectOffResult', () => {
     // Mock fetch for estimateProteinQuality call (triggered by setTimeout)
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
+      json: () => Promise.resolve(MOCK_PQ_ESTIMATE_EMPTY),
     });
     await selectOffResult(0);
     expect(document.getElementById('ed-ingredients').value).toBe('melk, sukker');
@@ -1927,6 +1951,7 @@ describe('applyOffProduct branches via selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'ImgProd',
           image_front_url: 'https://example.com/img.jpg',
@@ -1976,6 +2001,7 @@ describe('applyOffProduct branches via selectOffResult', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'WrapProd',
           image_front_url: 'https://example.com/img2.jpg',
@@ -2009,7 +2035,7 @@ describe('applyOffProduct branches via selectOffResult', () => {
     }]);
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ est_pdcaas: null, est_diaas: null, sources: [] }),
+      json: () => Promise.resolve(MOCK_PQ_ESTIMATE_EMPTY),
     });
     await selectOffResult(0);
     expect(document.getElementById('ed-ingredients').value).toBe('milk, sugar, cocoa');
@@ -2065,7 +2091,7 @@ describe('updateOffPickerResults branches', () => {
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 0, product: null }),
+      json: () => Promise.resolve(MOCK_OFF_PRODUCT_NOT_FOUND),
     });
     await lookupOFF('ed', null, { autoClose: true });
     // autoClose should have closed the picker and shown info toast
@@ -2087,7 +2113,7 @@ describe('updateOffPickerResults branches', () => {
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ status: 0, product: null }),
+      json: () => Promise.resolve(MOCK_OFF_PRODUCT_NOT_FOUND),
     });
     await lookupOFF('ed', null);
     const modal = document.getElementById('off-modal-bg');
@@ -2128,6 +2154,7 @@ describe('renderOffResults product without name fallback', () => {
       json: () => Promise.resolve({
         // The product passes filter because it has product_name_no set
         // But in renderOffResults, it checks product_name_no || product_name || t('off_unknown_product')
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{ product_name_no: '', product_name: '', completeness: 0.5, nutriments: {} }],
       }),
     });
@@ -2139,6 +2166,7 @@ describe('renderOffResults product without name fallback', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{ product_name_no: 'NorskNavn', completeness: 0.5, nutriments: {} }],
       }),
     });
@@ -2347,7 +2375,7 @@ describe('showOffPickerLoading background click', () => {
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'X' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'X' }] }),
     });
     await lookupOFF('ed', null);
     const bg = document.getElementById('off-modal-bg');
@@ -2384,7 +2412,7 @@ describe('offModalSearch Enter key in search input', () => {
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'X' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'X' }] }),
     });
     await lookupOFF('ed', null);
 
@@ -2396,7 +2424,7 @@ describe('offModalSearch Enter key in search input', () => {
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ products: [{ product_name: 'NewResult' }] }),
+      json: () => Promise.resolve({ ...MOCK_OFF_SEARCH_RESULTS, products: [{ product_name: 'NewResult' }] }),
     });
 
     // Dispatch Enter keydown event
@@ -2434,6 +2462,7 @@ describe('fetchImageAsDataUri proxy fallback when proxy also fails', () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({
+        ...MOCK_OFF_SEARCH_RESULTS,
         products: [{
           product_name: 'ProxyFail',
           image_front_url: 'https://example.com/img.jpg',
