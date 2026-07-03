@@ -1,5 +1,6 @@
 """Internationalization system for translations stored as JSON files."""
 
+import fcntl
 import logging
 import os
 import re
@@ -7,6 +8,7 @@ import json
 import sqlite3
 import tempfile
 import threading
+from contextlib import contextmanager
 
 from config import TRANSLATIONS_DIR, SUPPORTED_LANGUAGES, DEFAULT_LANGUAGE
 from db import get_db
@@ -26,6 +28,22 @@ def _get_file_lock(filepath: str) -> threading.Lock:
         if filepath not in _file_locks:
             _file_locks[filepath] = threading.Lock()
         return _file_locks[filepath]
+
+
+@contextmanager
+def _cross_process_lock(filepath: str):
+    """Hold an exclusive fcntl lock on <filepath>.lock for the block.
+
+    The in-process threading lock only serializes within one gunicorn
+    worker; this serializes the read-modify-write cycle across workers.
+    """
+    lock_path = filepath + ".lock"
+    with open(lock_path, "w") as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
 
 
 def _load_translations(lang: str) -> dict:
@@ -156,9 +174,9 @@ def _set_translation_key(key: str, values_by_lang: dict) -> None:
             continue
         filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
         file_lock = _get_file_lock(filepath)
-        # Thread lock protects against concurrent access within this process.
-        # Cross-process safety relies on atomic file writes (temp + rename).
-        with file_lock:
+        # Thread lock serializes within this process; the fcntl lock
+        # serializes the read-modify-write cycle across gunicorn workers.
+        with file_lock, _cross_process_lock(filepath):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)
@@ -175,7 +193,7 @@ def _delete_translation_key(key: str) -> None:
     for lang in SUPPORTED_LANGUAGES:
         filepath = os.path.join(TRANSLATIONS_DIR, f"{lang}.json")
         file_lock = _get_file_lock(filepath)
-        with file_lock:
+        with file_lock, _cross_process_lock(filepath):
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     data = json.load(f)

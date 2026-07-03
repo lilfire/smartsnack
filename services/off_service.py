@@ -89,6 +89,55 @@ def add_product_to_off(product_data: dict) -> dict:
         raise RuntimeError("off_err_network") from e
 
 
+def add_and_sync_product(data: dict) -> dict:
+    """Add a product to OFF, then upload its image and set the synced flag.
+
+    Image upload and flag-setting failures are reported in the response
+    instead of failing the whole operation, since the OFF add succeeded.
+    Raises ValueError for bad input and RuntimeError for OFF API failures.
+    """
+    from services import image_service, product_crud
+
+    result = add_product_to_off(data)
+    response = {
+        "ok": True,
+        "status_verbose": result.get("status_verbose", "fields saved"),
+        "image_uploaded": False,
+        "image_warning": None,
+        "synced_flag_set": False,
+    }
+
+    product_id = data.get("product_id")
+    pid = None
+    if product_id is not None and not isinstance(product_id, bool):
+        try:
+            pid = int(product_id)
+        except (TypeError, ValueError):
+            pid = None
+    if not pid:
+        return response
+
+    code = (data.get("code") or "").strip() or None
+    image = image_service.get_image(pid)
+    if image:
+        try:
+            upload_image_to_off(code, image)
+            response["image_uploaded"] = True
+        except (ValueError, RuntimeError) as img_err:
+            logger.warning(
+                "OFF image upload failed for product %s: %s", pid, img_err
+            )
+            response["image_warning"] = str(img_err)
+    try:
+        product_crud.mark_product_synced_with_off(pid, code)
+        response["synced_flag_set"] = True
+    except Exception:
+        logger.exception(
+            "Failed to set is_synced_with_off for product %s", pid
+        )
+    return response
+
+
 def _decode_data_uri(image_data_uri: str) -> tuple[bytes, str]:
     """Decode a base64 data URI, returning (raw_bytes, content_type)."""
     if not image_data_uri or not image_data_uri.startswith("data:"):

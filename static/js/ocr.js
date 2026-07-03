@@ -191,4 +191,5 @@ export function scanNutrition(prefix) {
 if (typeof window !== 'undefined') {
   window.scanIngredients = scanIngredients;
   window.scanNutrition = scanNutrition;
+  window._handleOcrError = _handleOcrError;
 }

@@ -83,85 +83,80 @@ export async function saveProduct(id) {
   if (data.ean && !isValidEan(data.ean)) { showToast(t('toast_invalid_ean'), 'error'); return; }
   const saveBtn = document.querySelector('[data-action="save-product"][data-id="' + id + '"]');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = t('toast_saving'); }
-  // The outer try/finally guarantees the save button is re-enabled on every
-  // exit path — including the early returns below (merge-modal cancel,
-  // duplicate-check failure, b_synced merge).
-  try {
-    // Check for duplicate EAN/name before saving
-    let mergedOrDeleted = false;
-    if (data.ean || data.name) {
-      try {
-        const dupResult = await api('/api/products/' + id + '/check-duplicate', {
-          method: 'POST', body: JSON.stringify({ ean: data.ean, name: data.name })
-        });
-        if (dupResult.duplicate) {
-          const aIsSynced = dupResult.a_is_synced_with_off;
-          const result = await showDuplicateMergeModal(data, dupResult.duplicate, aIsSynced);
-          if (result === null) return; // User cancelled
-          const { scenario, choices } = result;
-
-          if (scenario === 'skip') {
-            // User confirmed this is not the same product — skip merge, continue saving
-          } else if (scenario === 'b_synced') {
-            // B (duplicate) is synced with OFF — A will be deleted, merge into B
-            // If user fetched fresh OFF data, include OFF-provided fields so B gets updated
-            if (offAppliedFields) {
-              for (const f of offAppliedFields) {
-                if (data[f] != null && data[f] !== '') choices[f] = data[f];
-              }
-            }
-            await api('/api/products/' + dupResult.duplicate.id + '/merge', {
-              method: 'POST', body: JSON.stringify({ source_id: id, choices: choices })
-            });
-            showToast(t('toast_duplicate_merged'), 'success');
-            state.editingId = null;
-            state.cachedResults = state.cachedResults.filter(p => p.id !== id);
-            loadData();
-            // Expand the surviving product (B)
-            setTimeout(() => { state.expandedId = dupResult.duplicate.id; }, 300);
-            return; // Don't save A — it's been deleted by the merge
-          } else if (scenario === 'a_synced') {
-            // A is synced, B is not — B will be deleted, merge into A
-            for (const [field, val] of Object.entries(choices)) {
-              data[field] = val;
-            }
-            await api('/api/products/' + id + '/merge', {
-              method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
-            });
-            showToast(t('toast_duplicate_merged'), 'success');
-            mergedOrDeleted = true;
-            state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
-          } else {
-            // Neither synced — merge into A (A becomes the merged product), delete B
-            for (const [field, val] of Object.entries(choices)) {
-              data[field] = val;
-            }
-            await api('/api/products/' + id + '/merge', {
-              method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
-            });
-            showToast(t('toast_duplicate_merged'), 'success');
-            mergedOrDeleted = true;
-            state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
-          }
-        }
-      } catch (e) {
-        console.error('Duplicate check failed:', e);
-        showToast(t('toast_network_error'), 'error');
-        return;
-      }
-    }
+  // Check for duplicate EAN/name before saving
+  let mergedOrDeleted = false;
+  if (data.ean || data.name) {
     try {
-      await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
-      state.editingId = null;
-      showToast(t('toast_product_updated'), 'success');
-      loadData();
-    } catch(e) {
-      console.error(e);
-      showToast(t('toast_save_error'), 'error');
-      if (mergedOrDeleted) {
-        state.editingId = null;
-        loadData();
+      const dupResult = await api('/api/products/' + id + '/check-duplicate', {
+        method: 'POST', body: JSON.stringify({ ean: data.ean, name: data.name })
+      });
+      if (dupResult.duplicate) {
+        const aIsSynced = dupResult.a_is_synced_with_off;
+        const result = await showDuplicateMergeModal(data, dupResult.duplicate, aIsSynced);
+        if (result === null) return; // User cancelled
+        const { scenario, choices } = result;
+
+        if (scenario === 'skip') {
+          // User confirmed this is not the same product — skip merge, continue saving
+        } else if (scenario === 'b_synced') {
+          // B (duplicate) is synced with OFF — A will be deleted, merge into B
+          // If user fetched fresh OFF data, include OFF-provided fields so B gets updated
+          if (offAppliedFields) {
+            for (const f of offAppliedFields) {
+              if (data[f] != null && data[f] !== '') choices[f] = data[f];
+            }
+          }
+          await api('/api/products/' + dupResult.duplicate.id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          state.editingId = null;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== id);
+          loadData();
+          // Expand the surviving product (B)
+          setTimeout(() => { state.expandedId = dupResult.duplicate.id; }, 300);
+          return; // Don't save A — it's been deleted by the merge
+        } else if (scenario === 'a_synced') {
+          // A is synced, B is not — B will be deleted, merge into A
+          for (const [field, val] of Object.entries(choices)) {
+            data[field] = val;
+          }
+          await api('/api/products/' + id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
+        } else {
+          // Neither synced — merge into A (A becomes the merged product), delete B
+          for (const [field, val] of Object.entries(choices)) {
+            data[field] = val;
+          }
+          await api('/api/products/' + id + '/merge', {
+            method: 'POST', body: JSON.stringify({ source_id: dupResult.duplicate.id, choices: choices })
+          });
+          showToast(t('toast_duplicate_merged'), 'success');
+          mergedOrDeleted = true;
+          state.cachedResults = state.cachedResults.filter(p => p.id !== dupResult.duplicate.id);
+        }
       }
+    } catch (e) {
+      console.error('Duplicate check failed:', e);
+      showToast(t('toast_network_error'), 'error');
+      return;
+    }
+  }
+  try {
+    await api('/api/products/' + id, { method: 'PUT', body: JSON.stringify(data) });
+    state.editingId = null;
+    showToast(t('toast_product_updated'), 'success');
+    loadData();
+  } catch(e) {
+    console.error(e);
+    showToast(t('toast_save_error'), 'error');
+    if (mergedOrDeleted) {
+      state.editingId = null;
+      loadData();
     }
   } finally {
     if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = t('btn_save'); }
@@ -185,9 +180,62 @@ export async function unlockEan(id) {
   }
 }
 
-// Delete-with-undo lives in product-delete.js; re-exported here so existing
-// importers (app.js, tests) keep working after the file split.
-export { deleteProduct } from './product-delete.js';
+let _pendingDelete = null;
+
+export async function deleteProduct(id, name) {
+  if (!name) {
+    const product = state.cachedResults && state.cachedResults.find((p) => p.id === id);
+    name = product ? product.name : '';
+  }
+  if (!await showConfirmModal('\u{1F5D1}', name, t('confirm_delete_product', { name: name }), t('btn_delete'), t('btn_cancel'), true)) return;
+
+  // Cancel any previous pending delete
+  if (_pendingDelete) { clearTimeout(_pendingDelete.timer); _pendingDelete = null; }
+
+  // Cache the product data for undo
+  const cachedProduct = state.cachedResults && state.cachedResults.find((p) => p.id === id);
+  const cachedImage = state.imageCache[id];
+
+  // Remove from UI immediately
+  state.cachedResults = (state.cachedResults || []).filter((p) => p.id !== id);
+  delete state.imageCache[id];
+  state.expandedId = null;
+  state.editingId = null;
+  rerender();
+
+  // Schedule actual delete after 5 seconds
+  var pending = {
+    timer: setTimeout(async () => {
+      _pendingDelete = null;
+      try {
+        await api('/api/products/' + id, { method: 'DELETE' });
+      } catch(e) {
+        console.error(e);
+        showToast(t('toast_network_error'), 'error');
+        // Restore on failure
+        if (cachedProduct) { state.cachedResults.push(cachedProduct); }
+        if (cachedImage) { state.imageCache[id] = cachedImage; }
+        loadData();
+      }
+    }, 5000)
+  };
+  _pendingDelete = pending;
+
+  showToast(t('toast_product_deleted', { name: name }), 'success', {
+    duration: 5000,
+    onUndo: function() {
+      if (_pendingDelete === pending) {
+        clearTimeout(pending.timer);
+        _pendingDelete = null;
+      }
+      // Restore product to cached results
+      if (cachedProduct) { state.cachedResults.push(cachedProduct); }
+      if (cachedImage) { state.imageCache[id] = cachedImage; }
+      rerender();
+      showToast(t('toast_delete_undone'), 'info');
+    }
+  });
+}
 
 export async function loadData() {
   try {

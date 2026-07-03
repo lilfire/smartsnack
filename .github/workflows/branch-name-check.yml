@@ -9,10 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate branch name
-        env:
-          HEAD_REF: ${{ github.head_ref }}
         run: |
-          BRANCH="$HEAD_REF"
+          BRANCH="${{ github.head_ref }}"
           echo "Checking branch name: $BRANCH"
           if [[ "$BRANCH" =~ ^LSO-[0-9]+-. ]] || [[ "$BRANCH" == "main" ]] || [[ "$BRANCH" == "development" ]]; then
             echo "Branch name '$BRANCH' follows naming convention."
