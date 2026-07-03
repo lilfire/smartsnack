@@ -59,6 +59,7 @@ vi.mock('../products.js', () => ({
 vi.mock('../off-utils.js', () => ({
   validateOffBtn: vi.fn(),
   isValidEan: vi.fn((v) => /^\d{8,13}$/.test(v || '')),
+  offState: { ctx: null },
 }));
 vi.mock('../off-api.js', () => ({
   lookupOFF: vi.fn(),
@@ -79,6 +80,7 @@ import { showToast, switchView, loadData } from '../products.js';
 import { rerender, buildFilters } from '../filters.js';
 import { loadProductImage } from '../images.js';
 import { renderResults } from '../render.js';
+import { lookupOFF } from '../off-api.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -1780,9 +1782,14 @@ describe('M23: one-shot scan guard', () => {
     cb('7038010000000');
     // Let onBarcodeDetected's dynamic import of off-utils settle inside the test
     await vi.dynamicImportSettled();
+    // Flush the 300ms lookup timer inside the test so the off-api dynamic
+    // import resolves against the mock, not after file teardown.
+    vi.advanceTimersByTime(300);
+    await vi.dynamicImportSettled();
 
     const scanToasts = showToast.mock.calls.filter((c) => c[0] === 'toast_barcode_scanned');
     expect(scanToasts.length).toBe(1);
+    expect(lookupOFF).toHaveBeenCalledTimes(1);
     closeScanner();
   });
 
@@ -1793,14 +1800,19 @@ describe('M23: one-shot scan guard', () => {
     openScanner('ed', 1);
     getCb()('7038010000000');
     await vi.dynamicImportSettled();
+    vi.advanceTimersByTime(300);
+    await vi.dynamicImportSettled();
     closeScanner();
 
     openScanner('ed', 1);
     getCb()('7038010000001');
     await vi.dynamicImportSettled();
+    vi.advanceTimersByTime(300);
+    await vi.dynamicImportSettled();
     closeScanner();
 
     const scanToasts = showToast.mock.calls.filter((c) => c[0] === 'toast_barcode_scanned');
     expect(scanToasts.length).toBe(2);
+    expect(lookupOFF).toHaveBeenCalledTimes(2);
   });
 });
