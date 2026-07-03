@@ -5,7 +5,14 @@ errors and that the API returns payloads as JSON-encoded strings (not
 executed content). Each test sets up and tears down its own data.
 """
 
+import uuid
+
 import pytest
+
+
+def _unique(payload: str) -> str:
+    """Append a unique suffix so repeated runs/loops never hit 409 duplicate."""
+    return f"{payload}-{uuid.uuid4().hex[:8]}"
 
 
 # Common XSS payloads targeting various injection points
@@ -38,43 +45,40 @@ class TestProductNameXss:
     """XSS payloads in product name are stored and returned as literal strings."""
 
     def test_script_tag_in_name_stored_as_string(self, client, seed_category):
-        """<script> in product name must be stored and returned verbatim.
-
-        The API stores the raw string and returns it as a JSON-encoded
-        string (output escaping is the frontend's job) — the round-trip
-        must be exact, with no HTML-escaping or mangling server-side.
-        """
-        payload = "<script>alert(1)</script>"
+        """<script> in product name must be stored and returned as-is."""
+        payload = _unique("<script>alert(1)</script>")
         resp = client.post(
             "/api/products",
             json={"name": payload, "type": "Snacks"},
         )
         assert resp.status_code == 201, (
-            f"Create failed with {resp.status_code}: {resp.get_json()}"
+            f"expected 201, got {resp.status_code}: {resp.get_json()}"
         )
         pid = resp.get_json()["id"]
-
-        list_resp = client.get("/api/products")
-        assert list_resp.status_code == 200
-        products = list_resp.get_json()["products"]
-        matching = [p for p in products if p["id"] == pid]
-        assert len(matching) == 1, "Stored product not found in listing"
-        assert matching[0]["name"] == payload
+        get_resp = client.get(f"/api/products/{pid}")
+        assert get_resp.status_code == 200
+        # Stored value must round-trip verbatim — not stripped, not HTML-escaped.
+        assert get_resp.get_json()["name"] == payload
 
     @pytest.mark.parametrize("xss_payload", XSS_PAYLOADS)
-    def test_xss_payloads_in_name_no_server_error(self, client, seed_category, xss_payload):
-        """XSS payload in product name must not cause a 500 error."""
+    def test_xss_payloads_in_name_stored_verbatim(self, client, seed_category, xss_payload):
+        """XSS payload in product name is accepted and round-trips verbatim."""
+        name = _unique(xss_payload)
         resp = client.post(
             "/api/products",
-            json={"name": xss_payload, "type": "Snacks"},
+            json={"name": name, "type": "Snacks"},
         )
-        assert resp.status_code != 500, (
-            f"XSS payload {xss_payload!r} caused 500"
+        assert resp.status_code == 201, (
+            f"XSS payload {xss_payload!r} expected 201, got {resp.status_code}"
         )
+        pid = resp.get_json()["id"]
+        get_resp = client.get(f"/api/products/{pid}")
+        assert get_resp.status_code == 200
+        assert get_resp.get_json()["name"] == name
 
     def test_xss_in_name_returned_as_json_string(self, client, seed_category):
         """XSS payload stored in name must be returned as a JSON string, not HTML."""
-        payload = "<script>alert('xss')</script>"
+        payload = _unique("<script>alert('xss')</script>")
         create_resp = client.post(
             "/api/products",
             json={"name": payload, "type": "Snacks"},
@@ -89,7 +93,7 @@ class TestProductNameXss:
         assert list_resp.status_code == 200
         products = list_resp.get_json()["products"]
         matching = [p for p in products if p["id"] == pid]
-        assert len(matching) == 1, "Stored product not found in listing"
+        assert matching, f"product {pid} missing from /api/products listing"
         # Name must be the raw string, not escaped HTML
         assert matching[0]["name"] == payload
 
@@ -98,19 +102,24 @@ class TestProductDescriptionXss:
     """XSS payloads in product description fields (ingredients, taste_note) are safe."""
 
     @pytest.mark.parametrize("xss_payload", XSS_PAYLOADS)
-    def test_xss_in_ingredients_no_server_error(self, client, seed_category, xss_payload):
-        """XSS in ingredients field must not cause a 500 error."""
+    def test_xss_in_ingredients_stored_verbatim(self, client, seed_category, xss_payload):
+        """XSS in ingredients is accepted (201) and round-trips verbatim."""
+        name = _unique("IngXss")
         resp = client.post(
             "/api/products",
             json={
-                "name": "TestProduct",
+                "name": name,
                 "type": "Snacks",
                 "ingredients": xss_payload,
             },
         )
-        assert resp.status_code != 500, (
-            f"XSS in ingredients caused 500: {xss_payload!r}"
+        assert resp.status_code == 201, (
+            f"XSS in ingredients expected 201, got {resp.status_code}: {xss_payload!r}"
         )
+        pid = resp.get_json()["id"]
+        get_resp = client.get(f"/api/products/{pid}")
+        assert get_resp.status_code == 200
+        assert get_resp.get_json()["ingredients"] == xss_payload
 
     def test_xss_in_ingredients_stored_correctly(self, client, seed_category):
         """XSS payload in ingredients is stored and returned verbatim."""
@@ -118,7 +127,7 @@ class TestProductDescriptionXss:
         resp = client.post(
             "/api/products",
             json={
-                "name": "IngXssProduct",
+                "name": _unique("IngXssProduct"),
                 "type": "Snacks",
                 "ingredients": payload,
             },
@@ -135,31 +144,41 @@ class TestProductDescriptionXss:
         # Stored value must match input exactly
         assert matching[0]["ingredients"] == payload
 
-    def test_xss_in_taste_note_no_server_error(self, client, seed_category):
-        """XSS payload in taste_note must not cause a server error."""
-        for payload in XSS_PAYLOADS:
-            resp = client.post(
-                "/api/products",
-                json={
-                    "name": "TasteNoteTest",
-                    "type": "Snacks",
-                    "taste_note": payload,
-                },
-            )
-            assert resp.status_code != 500
+    @pytest.mark.parametrize("xss_payload", XSS_PAYLOADS)
+    def test_xss_in_taste_note_stored_verbatim(self, client, seed_category, xss_payload):
+        """XSS payload in taste_note is accepted and round-trips verbatim."""
+        name = _unique("TasteNoteXss")
+        resp = client.post(
+            "/api/products",
+            json={
+                "name": name,
+                "type": "Snacks",
+                "taste_note": xss_payload,
+            },
+        )
+        assert resp.status_code == 201
+        pid = resp.get_json()["id"]
+        get_resp = client.get(f"/api/products/{pid}")
+        assert get_resp.status_code == 200
+        assert get_resp.get_json()["taste_note"] == xss_payload
 
-    def test_xss_in_brand_no_server_error(self, client, seed_category):
-        """XSS payload in brand field must not cause a server error."""
-        for payload in XSS_PAYLOADS:
-            resp = client.post(
-                "/api/products",
-                json={
-                    "name": "BrandXssTest",
-                    "type": "Snacks",
-                    "brand": payload,
-                },
-            )
-            assert resp.status_code != 500
+    @pytest.mark.parametrize("xss_payload", XSS_PAYLOADS)
+    def test_xss_in_brand_stored_verbatim(self, client, seed_category, xss_payload):
+        """XSS payload in brand field is accepted and round-trips verbatim."""
+        name = _unique("BrandXss")
+        resp = client.post(
+            "/api/products",
+            json={
+                "name": name,
+                "type": "Snacks",
+                "brand": xss_payload,
+            },
+        )
+        assert resp.status_code == 201
+        pid = resp.get_json()["id"]
+        get_resp = client.get(f"/api/products/{pid}")
+        assert get_resp.status_code == 200
+        assert get_resp.get_json()["brand"] == xss_payload
 
 
 class TestCategoryXss:

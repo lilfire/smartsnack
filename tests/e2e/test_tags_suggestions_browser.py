@@ -141,8 +141,11 @@ class TestTagSuggestionsBrowser:
         modal_input.press("ArrowDown")
         page.wait_for_timeout(200)
 
-        # A suggestion item must be highlighted after ArrowDown
+        # ArrowDown must highlight a suggestion — the seeded tag matches the
+        # typed prefix, so the list is non-empty and tags.js applies the
+        # .highlighted class to the first item.
         highlighted = page.locator("#tag-modal-suggestions .highlighted")
         expect(highlighted.first).to_be_visible(timeout=3000)
+        expect(highlighted.first).to_contain_text(tag_label)
 
         _cleanup_tag(live_url, tag["id"])

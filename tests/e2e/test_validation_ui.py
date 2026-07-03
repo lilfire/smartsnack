@@ -97,7 +97,7 @@ class TestRegisterValidation:
         # products.js surfaces the server error message in an error toast.
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)
-        expect(toast).to_contain_text("exceeds max length")
+        expect(toast).to_contain_text("name exceeds max length of 200")
 
         # The product must NOT have been persisted.
         req = urllib.request.Request(
