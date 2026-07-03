@@ -1398,3 +1398,33 @@ describe('registerProduct - OFF prompt branches', () => {
     expect(showOffAddReview).not.toHaveBeenCalled();
   });
 });
+
+// ── M18: overlapping loadData calls — only the latest response renders ──
+describe('M18: loadData sequence guard', () => {
+  beforeEach(() => {
+    if (!document.getElementById('stats-line')) {
+      const statsLine = document.createElement('div');
+      statsLine.id = 'stats-line';
+      document.body.appendChild(statsLine);
+    }
+    fetchStats.mockResolvedValue({ total: 10, types: 3 });
+    state.cachedStats = { total: 10, types: 3 };
+  });
+
+  it('discards a stale response that resolves after a newer loadData call', async () => {
+    let resolveFirst;
+    fetchProducts
+      .mockReturnValueOnce(new Promise((r) => { resolveFirst = r; }))
+      .mockResolvedValueOnce({ products: [{ id: 2, name: 'Fresh' }], total: 1 });
+
+    const first = loadData();
+    const second = loadData();
+    await second;
+    // The older request resolves late — it must NOT overwrite the fresh render
+    resolveFirst({ products: [{ id: 1, name: 'Stale' }], total: 1 });
+    await first;
+
+    expect(renderResults).toHaveBeenCalledTimes(1);
+    expect(renderResults.mock.calls[0][0]).toEqual([{ id: 2, name: 'Fresh' }]);
+  });
+});

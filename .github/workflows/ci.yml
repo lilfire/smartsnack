@@ -130,8 +130,13 @@ jobs:
       # exhaustion from blocking feature-branch CI. When the tests do run,
       # 429/quota errors are converted to skips (tests/e2e/groq_helpers.py) so
       # provider rate limits never fail the build — real assertion failures
-      # still do. Post-merge pushes therefore remain the enforcement point for
-      # live-LLM behavior.
+      # still do (the helper re-raises every non-quota exception). Post-merge
+      # pushes therefore remain the enforcement point for live-LLM behavior.
+      # PRs are still gated on the OCR pipeline via the mock-based suites
+      # that run unconditionally in this job: test_e2e_ocr_ingredients.py /
+      # test_e2e_ocr_nutrition.py (full HTTP path with mocked providers) and
+      # TestOcrToasts in test_toast_coverage.py (UI error mapping against a
+      # mocked backend).
       RUN_GROQ_E2E: ${{ github.event_name == 'push' && '1' || '' }}
     steps:
       - name: Checkout

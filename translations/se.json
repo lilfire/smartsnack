@@ -131,6 +131,8 @@
   "toast_pq_added": "\"{name}\" tillagd",
   "toast_pq_deleted": "\"{name}\" raderad",
   "toast_backup_downloaded": "Säkerhetskopia nedladdad",
+  "toast_backup_download_started": "Nedladdning av säkerhetskopia startad",
+  "toast_language_change_failed": "Kunde inte spara språkinställningen. Återgick till föregående språk.",
   "toast_invalid_file": "Ogiltig fil",
   "toast_scanner_load_error": "Skannerbiblioteket kunde inte laddas. Kontrollera din internetanslutning.",
   "toast_scanner_not_loaded": "Skannerbiblioteket kunde inte laddas.",

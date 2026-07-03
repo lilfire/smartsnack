@@ -13,6 +13,22 @@ class TestCoreBlueprint:
         resp = client.get("/")
         assert resp.status_code == 200
 
+    def test_index_injects_api_key(self, client, monkeypatch):
+        # M22: the API key must be exposed to the frontend so downloadBackup()
+        # can authenticate; without it the backup endpoint returns 401.
+        monkeypatch.setenv("SMARTSNACK_API_KEY", "test-key-123")
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'window.SMARTSNACK_API_KEY = "test-key-123";' in html
+
+    def test_index_injects_empty_api_key_when_unset(self, client, monkeypatch):
+        monkeypatch.delenv("SMARTSNACK_API_KEY", raising=False)
+        resp = client.get("/")
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert 'window.SMARTSNACK_API_KEY = "";' in html
+
 
 class TestProductsBlueprint:
     def test_list_products(self, client):

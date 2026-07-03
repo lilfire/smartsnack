@@ -50,19 +50,25 @@ class TestImageUploadBrowser:
         preview = page.locator("#f-image-preview")
         expect(preview).to_be_hidden()
 
-    def test_image_controls_in_edit(self, page, api_create_product):
-        """The expanded/edit view must show the change-image control.
+    def test_image_controls_in_expanded_row(self, page, api_create_product):
+        """The expanded product row must show an image upload control.
 
-        render.js always emits a [data-action='change-image'] button in the
-        expanded image section (upload or change variant), which persists
-        in edit mode.
+        The button lives in the sibling ``.expanded`` div (see render.js),
+        not inside ``.table-row`` — a row-scoped locator never matches, which
+        is why the old guarded version silently passed without asserting.
         """
-        api_create_product(name="ImgEditProd")
+        product = api_create_product(name="ImgEditProd")
         _reload_and_wait(page)
-        _open_edit_form(page, "ImgEditProd")
+        row = page.locator(".table-row:has-text('ImgEditProd')").first
+        row.click()
+        page.wait_for_timeout(300)
 
-        img_btns = page.locator("[data-action='change-image']")
-        expect(img_btns.first).to_be_visible(timeout=5000)
+        # Product has no image → render.js emits the upload button with
+        # data-action='change-image' in the expanded area.
+        img_btn = page.locator(
+            f"[data-action='change-image'][data-id='{product['id']}']"
+        )
+        expect(img_btn.first).to_be_visible(timeout=3000)
 
 
 class TestImageDisplayBrowser:

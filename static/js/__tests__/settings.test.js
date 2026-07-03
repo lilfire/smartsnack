@@ -203,7 +203,8 @@ describe('downloadBackup', () => {
     window.location = { href: '' };
     downloadBackup();
     expect(window.location.href).toBe('/api/backup');
-    expect(showToast).toHaveBeenCalledWith('toast_backup_downloaded', 'success');
+    // M22: neutral "started" toast — success cannot be known at navigation time
+    expect(showToast).toHaveBeenCalledWith('toast_backup_download_started', 'info');
     window.location = origLocation;
   });
 });

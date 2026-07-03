@@ -93,8 +93,13 @@ function startScannerHardware(onSuccess, closeFn) {
   });
 }
 
+// One-shot guard: the camera keeps decoding frames after the first hit, so
+// without this the callback fires once per decoded frame (duplicate lookups).
+let _registerScanDone = false;
+
 export function openScanner(prefix, productId) {
   _scannerCtx = { prefix: prefix, productId: productId || null };
+  _registerScanDone = false;
 
   if (typeof Html5Qrcode === 'undefined') {
     showToast(t('toast_scanner_load_error'), 'error');
@@ -108,7 +113,11 @@ export function openScanner(prefix, productId) {
   );
 
   startScannerHardware(
-    (code) => onBarcodeDetected(code),
+    (code) => {
+      if (_registerScanDone) return;
+      _registerScanDone = true;
+      onBarcodeDetected(code);
+    },
     () => closeScanner()
   );
 }

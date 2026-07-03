@@ -260,12 +260,16 @@ class TestI18nImageTooLarge:
 
     @pytest.mark.parametrize("lang", LANGUAGES)
     def test_image_too_large_toast(self, page, lang):
-        """Uploading oversized image shows localized error toast."""
+        """Uploading oversized image shows localized error toast.
+
+        The register form has no static file input — captureProductImage
+        (images.js) creates one when #f-image-btn is clicked, so the file
+        must go through the file chooser. The >10MB check then shows
+        toast_image_too_large in the active language.
+        """
         t = _load_translations(lang)
         _change_language(page, lang)
         _go_to_register(page)
-        # The register-form image button opens a file chooser (images.js
-        # creates the input dynamically); a >10MB file trips the size check.
         with page.expect_file_chooser() as fc_info:
             page.locator("#f-image-btn").click()
         fc_info.value.set_files(

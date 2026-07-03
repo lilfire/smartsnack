@@ -6,7 +6,18 @@ Verifies that:
 - Scanner button exists in register view and is clickable
 """
 
+import json
+import os
+
 from playwright.sync_api import expect
+
+
+def _load_translations(lang="no"):
+    path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "translations", f"{lang}.json"
+    )
+    with open(path) as f:
+        return json.load(f)
 
 
 def test_scanner_not_allowed_error(browser, app_server, api_create_product):
@@ -42,30 +53,24 @@ def test_scanner_not_allowed_error(browser, app_server, api_create_product):
         # Navigate to register view to access the scanner button
         nav_register = page.locator("[data-view='register']")
         nav_register.click()
+        page.wait_for_timeout(500)
 
         # Click the scanner button in the register form
         scan_btn = page.locator(".btn-scan")
-        expect(scan_btn).to_be_visible(timeout=5000)
+        expect(scan_btn).to_be_visible(timeout=3000)
         scan_btn.click()
 
-        # The scanner should show an error state
-        # Either toast_scanner_load_error or scan_camera_error should appear
-        page.wait_for_selector(".scanner-error, .toast", timeout=5000)
-
-        # Check for the scanner error UI (camera error message)
+        # html5-qrcode is bundled locally (static/js/vendor), so the library
+        # loads and Html5Qrcode.start() rejects on the mocked getUserMedia.
+        # scanner.js's catch handler then shows BOTH the load-error toast and
+        # the .scanner-error div with scan_camera_error — assert both.
+        t = _load_translations()
         scanner_error = page.locator(".scanner-error")
-        toast = page.locator(".toast")
-        # At least one of these should be visible
-        has_error_ui = scanner_error.count() > 0 or toast.count() > 0
-        assert has_error_ui, "Expected scanner error UI (toast or .scanner-error div) to appear"
-
-        # Verify toast contains the scanner load error message
-        if toast.count() > 0:
-            # Norwegian: "Skanner-biblioteket ble ikke lastet" or camera error
-            toast_text = toast.first.text_content()
-            assert "Skanner" in toast_text or "kamera" in toast_text.lower(), (
-                f"Toast should mention scanner/camera error, got: {toast_text}"
-            )
+        expect(scanner_error.first).to_be_visible(timeout=5000)
+        expect(scanner_error.first).to_contain_text(t["scan_camera_error"])
+        toast = page.locator(".toast").first
+        expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text(t["toast_scanner_load_error"])
     finally:
         page.close()
 
@@ -102,25 +107,23 @@ def test_scanner_not_found_error(browser, app_server, api_create_product):
         # Navigate to register view
         nav_register = page.locator("[data-view='register']")
         nav_register.click()
+        page.wait_for_timeout(500)
 
         # Click scanner button
         scan_btn = page.locator(".btn-scan")
-        expect(scan_btn).to_be_visible(timeout=5000)
+        expect(scan_btn).to_be_visible(timeout=3000)
         scan_btn.click()
 
-        page.wait_for_selector(".scanner-error, .toast", timeout=5000)
-
-        # Check for error indication
+        # Same deterministic error path as the NotAllowedError test: the
+        # local html5-qrcode lib loads, start() rejects on the mocked
+        # getUserMedia, and scanner.js shows both the toast and error div.
+        t = _load_translations()
         scanner_error = page.locator(".scanner-error")
-        toast = page.locator(".toast")
-        has_error_ui = scanner_error.count() > 0 or toast.count() > 0
-        assert has_error_ui, "Expected scanner error UI (toast or .scanner-error div) to appear"
-
-        if toast.count() > 0:
-            toast_text = toast.first.text_content()
-            assert "Skanner" in toast_text or "kamera" in toast_text.lower(), (
-                f"Toast should mention scanner/camera error, got: {toast_text}"
-            )
+        expect(scanner_error.first).to_be_visible(timeout=5000)
+        expect(scanner_error.first).to_contain_text(t["scan_camera_error"])
+        toast = page.locator(".toast").first
+        expect(toast).to_be_visible(timeout=5000)
+        expect(toast).to_contain_text(t["toast_scanner_load_error"])
     finally:
         page.close()
 
@@ -130,10 +133,11 @@ def test_scanner_button_exists_in_register_view(page):
     # Navigate to register view
     nav_register = page.locator("[data-view='register']")
     nav_register.click()
+    page.wait_for_timeout(500)
 
     # The scan button should be visible
     scan_btn = page.locator(".btn-scan")
-    expect(scan_btn).to_be_visible(timeout=5000)
+    expect(scan_btn).to_be_visible(timeout=3000)
     expect(scan_btn).to_be_enabled()
 
     # Verify the button has the i18n aria-label key (translated at runtime)
