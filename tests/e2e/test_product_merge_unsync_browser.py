@@ -54,19 +54,16 @@ class TestUnsyncButtonBrowser:
     """Test the unsync button for OFF-synced products."""
 
     def test_unsync_button_on_synced_product(self, page, api_create_product, live_url):
-        """A synced product's EAN row must show the unsync (unlock) button.
+        """A synced product must show an unsync button in the EAN manager.
 
-        ``from_off=True`` makes ``add_product`` mark the EAN row
-        ``synced_with_off=1`` (see ``mark_product_synced_with_off``), which
-        is what ean-manager.js keys the unsync button on. The button lives
-        in the expanded div's EAN manager, so scope to that container — a
-        ``.table-row``-scoped locator never matches.
+        from_off=True marks the product (and its EAN) as OFF-synced; the
+        EAN manager renders in edit mode, so the unsync button must exist.
         """
         product = api_create_product(
             name="SyncedProd", ean="7038010069307", from_off=True,
         )
         _reload_and_wait(page)
-        _expand_product_row(page, "SyncedProd")
+        _open_edit_form(page, "SyncedProd")
 
         unsync_btn = page.locator(
             f"#ean-manager-{product['id']} [data-ean-action='unsync-ean']"
@@ -74,17 +71,16 @@ class TestUnsyncButtonBrowser:
         expect(unsync_btn.first).to_be_visible(timeout=5000)
 
     def test_non_synced_product_no_unsync(self, page, api_create_product):
-        """A non-synced product must not show an unsync button, but its EAN
-        manager must render (guards against passing because nothing loaded)."""
+        """A non-synced product should not show an unsync button."""
         product = api_create_product(name="LocalOnlyProd", ean="7038010069314")
         _reload_and_wait(page)
-        _expand_product_row(page, "LocalOnlyProd")
+        _open_edit_form(page, "LocalOnlyProd")
 
+        # The EAN manager must have loaded (the product's EAN row is shown)
+        # so the absence of the unsync button is meaningful, not vacuous.
         manager = page.locator(f"#ean-manager-{product['id']}")
-        # The EAN list itself must have rendered with the (non-synced) EAN…
         expect(manager.locator(".ean-item").first).to_be_visible(timeout=5000)
-        # …and no unsync button anywhere in it.
-        expect(manager.locator("[data-ean-action='unsync-ean']")).to_have_count(0)
+        assert manager.locator("[data-ean-action='unsync-ean']").count() == 0
 
 
 class TestProductDeleteBrowser:

@@ -89,15 +89,33 @@ export function _detectConflicts(offValues, prefix) {
       const offEmpty = isNaN(offNum) || offNum === 0;
 
       if (offEmpty) return; // keep local (or both empty)
-      autoApply[key] = _formatNumeric(key, offNum);
+      const formatted = _formatNumeric(key, offNum);
+      const localNum = parseFloat(localRaw);
+      if (localRaw !== '' && !isNaN(localNum) && localNum !== offNum) {
+        conflicts.push({ key, local: localRaw, off: formatted });
+      } else {
+        autoApply[key] = formatted;
+      }
     } else {
       const offStr = (offVal || '').trim();
 
       if (offStr === '') return; // keep local (or both empty)
-      autoApply[key] = offStr;
+      if (localRaw !== '' && localRaw !== offStr) {
+        conflicts.push({ key, local: localRaw, off: offStr });
+      } else {
+        autoApply[key] = offStr;
+      }
     }
   });
   return { autoApply, conflicts };
+}
+
+// Parse a serving-size string like "2,5 g" / "150 g" / "10g" into grams.
+// Accepts both dot and comma decimal separators; returns null when no
+// gram value is present.
+export function _parseServingGrams(serving) {
+  const m = (serving || '').match(/(\d+[.,]\d+|\d+)\s*g/i);
+  return m ? parseFloat(m[1].replace(',', '.')) : null;
 }
 
 export function _esc(s) {
@@ -158,9 +176,8 @@ export async function applyOffProduct(prod, prefix, productId, duplicateResolved
   };
 
   // Build unified OFF values map (nutrition + metadata)
-  const serving = prod.serving_size || '';
-  const servMatch = serving.match(/([\d.]+)\s*g/);
-  if (servMatch) offMap.portion = parseFloat(servMatch[1]);
+  const servingGrams = _parseServingGrams(prod.serving_size);
+  if (servingGrams != null) offMap.portion = servingGrams;
   const qty = prod.product_quantity || 0;
   if (qty) offMap.weight = parseFloat(qty);
   offMap.name = prod.product_name_no || prod.product_name || '';

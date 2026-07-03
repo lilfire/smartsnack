@@ -6,6 +6,7 @@ import time
 
 from flask import Blueprint, Response, jsonify, request
 
+from extensions import limiter
 from services import bulk_service
 
 bp = Blueprint("bulk", __name__)
@@ -13,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @bp.route("/api/bulk/refresh-off", methods=["POST"])
+@limiter.limit("5 per minute")
 def refresh_off():
     try:
         result = bulk_service.refresh_from_off()
@@ -25,6 +27,7 @@ def refresh_off():
 
 
 @bp.route("/api/bulk/refresh-off/start", methods=["POST"])
+@limiter.limit("5 per minute")
 def refresh_off_start():
     data = request.get_json(silent=True) or {}
     try:
@@ -71,6 +74,7 @@ def refresh_off_stream():
 
 
 @bp.route("/api/bulk/estimate-pq", methods=["POST"])
+@limiter.limit("5 per minute")
 def estimate_pq():
     try:
         result = bulk_service.estimate_all_pq()

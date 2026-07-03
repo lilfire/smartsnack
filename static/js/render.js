@@ -442,9 +442,10 @@ export function appendResults(newProducts) {
   if (!tableWrap) return;
   const cols = getActiveCols();
   const gridTpl = getGridTemplate(cols);
-  const sorted = applySorting(newProducts);
+  // Do NOT re-sort here: the server returns pages already sorted; sorting each
+  // page independently produces a sawtooth ordering across pages.
   let h = '';
-  sorted.forEach((p) => {
+  newProducts.forEach((p) => {
     const hasImg = p.has_image;
     const thumbHtml = '<div class="prod-thumb-wrap">' + (hasImg ? '<img class="prod-thumb" id="thumb-' + p.id + '" src="" alt="' + esc(p.name) + '">' : '') + '</div>';
     const eanCount = p.ean_count || 1;
@@ -471,7 +472,7 @@ export function appendResults(newProducts) {
     h += '</div>';
   });
   tableWrap.insertAdjacentHTML('beforeend', h);
-  sorted.forEach((p) => {
+  newProducts.forEach((p) => {
     if (p.has_image) {
       loadProductImage(p.id).then((dataUri) => {
         if (!dataUri) return;

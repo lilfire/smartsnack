@@ -16,7 +16,8 @@ def get_weights():
 @bp.route("/api/weights", methods=["PUT"])
 def update_weights():
     try:
-        data = _require_json()
+        # Body is a JSON array; update_weights validates the shape itself
+        data = _require_json(expect=None)
         weight_service.update_weights(data)
     except (ValueError, TypeError) as e:
         return jsonify({"error": str(e)}), 400

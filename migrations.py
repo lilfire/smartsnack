@@ -261,6 +261,28 @@ MIGRATIONS = [
             )""",
         ],
     ),
+    (
+        # Single-row (id=1) job state for the bulk OFF refresh, shared across
+        # gunicorn workers. See services/bulk_refresh_state.py.
+        "021_bulk_refresh_jobs",
+        [
+            """CREATE TABLE IF NOT EXISTS bulk_refresh_jobs (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                running INTEGER NOT NULL DEFAULT 0,
+                current INTEGER NOT NULL DEFAULT 0,
+                total INTEGER NOT NULL DEFAULT 0,
+                name TEXT NOT NULL DEFAULT '',
+                ean TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT '',
+                updated INTEGER NOT NULL DEFAULT 0,
+                skipped INTEGER NOT NULL DEFAULT 0,
+                errors INTEGER NOT NULL DEFAULT 0,
+                done INTEGER NOT NULL DEFAULT 0,
+                report TEXT NOT NULL DEFAULT ''
+            )""",
+            "INSERT OR IGNORE INTO bulk_refresh_jobs (id) VALUES (1)",
+        ],
+    ),
 ]
 
 

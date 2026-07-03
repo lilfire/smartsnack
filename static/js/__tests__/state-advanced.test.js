@@ -435,4 +435,48 @@ describe('upgradeSelect mobile – native change callback', () => {
     expect(cb).toHaveBeenCalledWith('v');
     div.remove();
   });
+
+  // LSO-1700 Bug 4: repeated upgradeSelect calls must not stack listeners
+  it('does not accumulate change listeners across repeated calls', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 375, writable: true });
+    const div = document.createElement('div');
+    const sel = document.createElement('select');
+    const opt = document.createElement('option');
+    opt.value = 'v';
+    sel.appendChild(opt);
+    div.appendChild(sel);
+    document.body.appendChild(div);
+
+    const cb = vi.fn();
+    upgradeSelect(sel, cb);
+    upgradeSelect(sel, cb);
+    upgradeSelect(sel, cb);
+
+    sel.value = 'v';
+    sel.dispatchEvent(new Event('change'));
+    expect(cb).toHaveBeenCalledTimes(1);
+    div.remove();
+  });
+
+  it('replaces the previous callback when re-upgraded with a new one', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 375, writable: true });
+    const div = document.createElement('div');
+    const sel = document.createElement('select');
+    const opt = document.createElement('option');
+    opt.value = 'v';
+    sel.appendChild(opt);
+    div.appendChild(sel);
+    document.body.appendChild(div);
+
+    const cb1 = vi.fn();
+    const cb2 = vi.fn();
+    upgradeSelect(sel, cb1);
+    upgradeSelect(sel, cb2);
+
+    sel.value = 'v';
+    sel.dispatchEvent(new Event('change'));
+    expect(cb1).not.toHaveBeenCalled();
+    expect(cb2).toHaveBeenCalledTimes(1);
+    div.remove();
+  });
 });
