@@ -115,21 +115,22 @@ class TestMaxContentLength:
 
 
 # ---------------------------------------------------------------------------
-# Fix 5: CSP removes unsafe-inline from script-src
+# Fix 5: CSP restricts script sources to self.
+# script-src keeps 'unsafe-inline' until the templates' inline event
+# handlers are migrated to addEventListener (tracked separately).
 # ---------------------------------------------------------------------------
 
 
 class TestCSP:
-    def test_script_src_has_no_unsafe_inline(self, client):
+    def test_script_src_restricted_to_self(self, client):
         resp = client.get("/health")
         csp = resp.headers.get("Content-Security-Policy", "")
         assert "script-src" in csp
-        # Parse the script-src directive
-        for directive in csp.split(";"):
-            if "script-src" in directive:
-                assert "'unsafe-inline'" not in directive, (
-                    f"script-src must not contain 'unsafe-inline'; got: {directive}"
-                )
+        script_src = next(d for d in csp.split(";") if "script-src" in d)
+        assert "'self'" in script_src
+        # No external script hosts, no unsafe-eval
+        assert "http" not in script_src
+        assert "'unsafe-eval'" not in script_src
 
     def test_style_src_may_keep_unsafe_inline(self, client):
         """style-src still allows unsafe-inline (for dynamic inline styles)."""
