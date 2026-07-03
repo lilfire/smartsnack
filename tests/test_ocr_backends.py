@@ -8,6 +8,9 @@ import pytest
 from PIL import Image
 
 from tests.mock_shape_validator import (
+    make_openai_response,
+    make_gemini_response,
+    make_claude_response,
     validate_openai_response_shape,
     validate_gemini_response_shape,
     validate_claude_response_shape,
@@ -69,9 +72,7 @@ class TestOpenAI:
     def test_success_returns_extracted_text(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="  sugar, flour  "))]
-        )
+        mock_response = make_openai_response("  sugar, flour  ")
         with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
@@ -81,9 +82,7 @@ class TestOpenAI:
     def test_image_url_starts_with_data_uri(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
-        )
+        mock_response = make_openai_response("text")
         with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
@@ -97,9 +96,7 @@ class TestOpenAI:
     def test_system_message_contains_hardened_prompt(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "test-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
-        )
+        mock_response = make_openai_response("text")
         with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openai import _extract_openai
@@ -135,9 +132,7 @@ class TestOpenRouter:
     def test_success_returns_text(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ingredients"))]
-        )
+        mock_response = make_openai_response("ingredients")
         with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
@@ -148,9 +143,7 @@ class TestOpenRouter:
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         monkeypatch.delenv("OPENROUTER_MODEL", raising=False)
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
-        )
+        mock_response = make_openai_response("text")
         with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
@@ -178,9 +171,7 @@ class TestOpenRouter:
     def test_system_message_contains_hardened_prompt(self, monkeypatch):
         monkeypatch.setenv("OPENROUTER_API_KEY", "or-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
-        )
+        mock_response = make_openai_response("text")
         with patch("openai.OpenAI") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.openrouter import _extract_openrouter
@@ -200,9 +191,7 @@ class TestGroq:
     def test_success_returns_text(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="groq result"))]
-        )
+        mock_response = make_openai_response("groq result")
         with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
@@ -212,9 +201,7 @@ class TestGroq:
     def test_model_is_llama(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="ok"))]
-        )
+        mock_response = make_openai_response("ok")
         with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
@@ -242,9 +229,7 @@ class TestGroq:
     def test_system_message_contains_hardened_prompt(self, monkeypatch):
         monkeypatch.setenv("GROQ_API_KEY", "groq-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(
-            choices=[types.SimpleNamespace(message=types.SimpleNamespace(content="text"))]
-        )
+        mock_response = make_openai_response("text")
         with patch("groq.Groq") as mock_cls:
             mock_cls.return_value.chat.completions.create.return_value = mock_response
             from services.ocr_backends.groq import _extract_groq
@@ -263,9 +248,7 @@ class TestClaude:
     def test_success_returns_text(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text="  claude result  ")]
-        )
+        mock_message = make_claude_response("  claude result  ")
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
@@ -275,9 +258,7 @@ class TestClaude:
     def test_model_is_claude_sonnet(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text="ok")]
-        )
+        mock_message = make_claude_response("ok")
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
@@ -289,9 +270,7 @@ class TestClaude:
     def test_image_source_type_is_base64(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text="ok")]
-        )
+        mock_message = make_claude_response("ok")
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
@@ -320,9 +299,7 @@ class TestClaude:
     def test_system_prompt_is_sent(self, monkeypatch):
         monkeypatch.setenv("ANTHROPIC_API_KEY", "ant-key")
         img = _tiny_png_bytes()
-        mock_message = types.SimpleNamespace(
-            content=[types.SimpleNamespace(text="ok")]
-        )
+        mock_message = make_claude_response("ok")
         with patch("anthropic.Anthropic") as mock_cls:
             mock_cls.return_value.messages.create.return_value = mock_message
             from services.ocr_backends.claude import _extract_claude_vision
@@ -342,7 +319,7 @@ class TestGemini:
     def test_extract_gemini_returns_text(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(text="  gemini result  ")
+        mock_response = make_gemini_response("  gemini result  ")
         with patch("google.genai.Client", autospec=True) as mock_cls:
             mock_cls.return_value.models.generate_content.return_value = mock_response
             from services.ocr_backends.gemini import _extract_gemini
@@ -392,7 +369,7 @@ class TestGemini:
     def test_system_instruction_contains_hardened_prompt(self, monkeypatch):
         monkeypatch.setenv("GEMINI_API_KEY", "gem-key")
         img = _tiny_png_bytes()
-        mock_response = types.SimpleNamespace(text="text")
+        mock_response = make_gemini_response("text")
         with patch("google.genai.Client", autospec=True) as mock_cls:
             mock_cls.return_value.models.generate_content.return_value = mock_response
             from services.ocr_backends.gemini import _extract_gemini
@@ -464,68 +441,73 @@ class TestTesseract:
         assert result == ""
 
 
-# ── Mock shape validation: canonical dict forms ────────────────────────────────
+# ── Mock shape validation: real SDK attribute structure ───────────────────────
 
 
 class TestOcrApiMockShapes:
-    """Validate that the canonical dict forms of external API responses match their real shapes.
+    """Validate the shared SDK-shaped mock builders against the real structure.
 
-    If the real API changes its response structure, update these canonical dicts
-    AND the corresponding validators in mock_shape_validator.py — these tests will
-    fail to remind you to keep them in sync.
+    The make_*_response builders are the single source for LLM response
+    mocks in these tests, and the validators assert the exact attribute
+    paths the backends consume (response.choices[0].message.content,
+    response.text, message.content[0].text). If an SDK changes its
+    response structure, update the builder AND validator together —
+    these tests will fail to remind you to keep them in sync.
     """
 
-    def test_openai_canonical_response_shape(self):
-        canonical = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "sugar, flour"}}
-            ]
-        }
-        validate_openai_response_shape(canonical)
+    def test_openai_builder_matches_real_sdk_shape(self):
+        response = make_openai_response("sugar, flour")
+        validate_openai_response_shape(response)
+        assert response.choices[0].message.content == "sugar, flour"
 
-    def test_groq_canonical_response_shape(self):
+    def test_groq_uses_openai_compatible_shape(self):
         """Groq uses the OpenAI-compatible API format."""
-        canonical = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "ingredienser"}}
-            ]
-        }
-        validate_openai_response_shape(canonical)
+        validate_openai_response_shape(make_openai_response("ingredienser"))
 
-    def test_openrouter_canonical_response_shape(self):
+    def test_openrouter_uses_openai_compatible_shape(self):
         """OpenRouter uses the OpenAI-compatible API format."""
-        canonical = {
-            "choices": [
-                {"message": {"role": "assistant", "content": "ingredients list"}}
-            ]
-        }
-        validate_openai_response_shape(canonical)
+        validate_openai_response_shape(make_openai_response("ingredients list"))
 
-    def test_gemini_canonical_response_shape(self):
-        canonical = {"text": "sukker, mel, vann"}
-        validate_gemini_response_shape(canonical)
+    def test_gemini_builder_matches_real_sdk_shape(self):
+        response = make_gemini_response("sukker, mel, vann")
+        validate_gemini_response_shape(response)
+        assert response.text == "sukker, mel, vann"
 
-    def test_claude_canonical_response_shape(self):
-        canonical = {
-            "content": [{"type": "text", "text": "ingredienser"}]
-        }
-        validate_claude_response_shape(canonical)
+    def test_claude_builder_matches_real_sdk_shape(self):
+        message = make_claude_response("ingredienser")
+        validate_claude_response_shape(message)
+        assert message.content[0].text == "ingredienser"
 
     def test_openai_rejects_missing_choices(self):
-        with pytest.raises(AssertionError, match="missing keys"):
-            validate_openai_response_shape({"id": "chatcmpl-123"})
+        with pytest.raises(AssertionError, match="missing attribute 'choices'"):
+            validate_openai_response_shape(types.SimpleNamespace(id="chatcmpl-123"))
 
     def test_openai_rejects_empty_choices(self):
         with pytest.raises(AssertionError, match="Non-empty"):
-            validate_openai_response_shape({"choices": []})
+            validate_openai_response_shape(types.SimpleNamespace(choices=[]))
+
+    def test_openai_rejects_dict_form(self):
+        """A dict mock is NOT the real SDK shape — backends read attributes."""
+        with pytest.raises(AssertionError, match="missing attribute 'choices'"):
+            validate_openai_response_shape(
+                {"choices": [{"message": {"content": "text"}}]}
+            )
 
     def test_gemini_rejects_missing_text(self):
-        with pytest.raises(AssertionError, match="missing keys"):
-            validate_gemini_response_shape({"candidates": []})
+        with pytest.raises(AssertionError, match="missing attribute 'text'"):
+            validate_gemini_response_shape(types.SimpleNamespace(candidates=[]))
+
+    def test_gemini_rejects_dict_form(self):
+        with pytest.raises(AssertionError, match="missing attribute 'text'"):
+            validate_gemini_response_shape({"text": "sukker"})
 
     def test_claude_rejects_empty_content(self):
         with pytest.raises(AssertionError, match="Non-empty"):
-            validate_claude_response_shape({"content": []})
+            validate_claude_response_shape(types.SimpleNamespace(content=[]))
+
+    def test_claude_rejects_dict_form(self):
+        with pytest.raises(AssertionError, match="missing attribute 'content'"):
+            validate_claude_response_shape({"content": [{"text": "x"}]})
 
 
 # ── looks_like_llm_refusal ────────────────────────────────────────────────────
@@ -756,9 +738,7 @@ class TestChineseLabelRegression:
         ]
 
         for leak in leak_variants:
-            mock_message = types.SimpleNamespace(
-                content=[types.SimpleNamespace(text=leak)]
-            )
+            mock_message = make_claude_response(leak)
             with patch.multiple(
                 "services.settings_service",
                 get_ocr_backend=MagicMock(return_value="claude_vision"),

@@ -64,6 +64,18 @@ import { renderNutriTable, fmtCell, getActiveCols, getGridTemplate, renderResult
 import { state } from '../state.js';
 import { weightData } from '../settings-weights.js';
 
+// TODO(LSO-1694): promote to mock-shapes.js — it has no shape yet for
+// GET /api/flag-config (object of flagName → { type, label | labelKey }).
+const MOCK_FLAG_USER_VEGAN = { type: 'user', label: 'Vegan' };
+const MOCK_FLAG_SYSTEM_PROCESSED = { type: 'system', label: 'Processed' };
+
+// Installs a fetch mock returning the given /api/flag-config payload.
+function mockFlagConfigFetch(config) {
+  global.fetch = vi.fn().mockResolvedValue({
+    json: vi.fn().mockResolvedValue(config),
+  });
+}
+
 beforeEach(() => {
   state.expandedId = null;
   state.editingId = null;
@@ -735,10 +747,8 @@ describe('renderResults - event delegation', () => {
 
   it('renders flag badges in expanded view', async () => {
     // Load flag config first
-    const mockConfig = { vegan: { type: 'user', label: 'Vegan' }, processed: { type: 'system', label: 'Processed' } };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    const mockConfig = { vegan: MOCK_FLAG_USER_VEGAN, processed: MOCK_FLAG_SYSTEM_PROCESSED };
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -778,10 +788,8 @@ describe('renderResults - event delegation', () => {
   });
 
   it('renders edit form with user flag checkboxes', async () => {
-    const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    const mockConfig = { vegan: MOCK_FLAG_USER_VEGAN };
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -802,10 +810,8 @@ describe('renderResults - event delegation', () => {
   });
 
   it('skips unknown flags not in _flagConfig', async () => {
-    const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    const mockConfig = { vegan: MOCK_FLAG_USER_VEGAN };
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -824,12 +830,10 @@ describe('renderResults - event delegation', () => {
 
   it('renders system flag badges in edit form', async () => {
     const mockConfig = {
-      vegan: { type: 'user', label: 'Vegan' },
-      sys_processed: { type: 'system', label: 'Processed' },
+      vegan: MOCK_FLAG_USER_VEGAN,
+      sys_processed: MOCK_FLAG_SYSTEM_PROCESSED,
     };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -853,12 +857,10 @@ describe('renderResults - event delegation', () => {
 
   it('renders edit form without system flags when product has none', async () => {
     const mockConfig = {
-      vegan: { type: 'user', label: 'Vegan' },
-      sys_processed: { type: 'system', label: 'Processed' },
+      vegan: MOCK_FLAG_USER_VEGAN,
+      sys_processed: MOCK_FLAG_SYSTEM_PROCESSED,
     };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -1108,13 +1110,13 @@ describe('renderResults - additional branch coverage', () => {
   });
 
   it('renders edit form flag with labelKey instead of label', async () => {
+    // Inline on purpose: labelKey-variant flag config (distinct from the
+    // label-based MOCK_FLAG_* consts above).
     const mockConfig = {
       organic: { type: 'user', labelKey: 'flag_organic' },
       sys_score: { type: 'system', labelKey: 'flag_score' },
     };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -1138,12 +1140,11 @@ describe('renderResults - additional branch coverage', () => {
   });
 
   it('renders expanded flag badges with labelKey fallback', async () => {
+    // Inline on purpose: labelKey-variant flag config.
     const mockConfig = {
       bio: { type: 'user', labelKey: 'flag_bio' },
     };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
 
     state.expandedId = 1;
@@ -1504,10 +1505,8 @@ describe('renderResults - EAN display in product list', () => {
 
 describe('loadFlagConfig', () => {
   it('fetches from /api/flag-config and stores result', async () => {
-    const mockConfig = { vegan: { type: 'user', label: 'Vegan' } };
-    global.fetch = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue(mockConfig),
-    });
+    const mockConfig = { vegan: MOCK_FLAG_USER_VEGAN };
+    mockFlagConfigFetch(mockConfig);
     await loadFlagConfig();
     expect(global.fetch).toHaveBeenCalledWith('/api/flag-config');
     expect(getFlagConfig()).toEqual(mockConfig);

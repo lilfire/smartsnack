@@ -28,7 +28,6 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(300)
 
 
 class TestOcrProviderSelectBrowser:
@@ -67,6 +66,8 @@ class TestOcrProviderSelectBrowser:
         """Tesseract option should always be available."""
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
+        # Provider options are populated asynchronously from /api/ocr/providers.
+        page.wait_for_selector("#ocr-provider-select option", state="attached", timeout=5000)
         options = page.locator("#ocr-provider-select option")
         texts = options.all_text_contents()
         assert any("Tesseract" in t or "tesseract" in t for t in texts)
@@ -82,9 +83,8 @@ class TestOcrModelRowBrowser:
         # force=True bypasses visibility check — native select is hidden on desktop
         # by the custom-dropdown CSS (.custom-select-wrap select { display:none }).
         page.locator("#ocr-provider-select").select_option("tesseract", force=True)
-        page.wait_for_timeout(300)
         model_row = page.locator("#ocr-model-row")
-        expect(model_row).to_be_hidden()
+        expect(model_row).to_be_hidden(timeout=5000)
 
 
 class TestOcrFallbackBrowser:
@@ -103,8 +103,7 @@ class TestOcrFallbackBrowser:
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
         page.locator("#ocr-provider-select").select_option("openai", force=True)
-        page.wait_for_timeout(400)  # allow CSS transition (0.3s) to complete
-        expect(page.locator("#ocr-fallback-checkbox")).to_be_visible()
+        expect(page.locator("#ocr-fallback-checkbox")).to_be_visible(timeout=5000)
 
     def test_fallback_checkbox_toggleable(self, page):
         """The fallback checkbox should be toggleable when a non-tesseract provider is active."""
@@ -119,12 +118,11 @@ class TestOcrFallbackBrowser:
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
         page.locator("#ocr-provider-select").select_option("openai", force=True)
-        page.wait_for_timeout(400)  # allow CSS transition (0.3s) to complete
 
         cb = page.locator("#ocr-fallback-checkbox")
+        expect(cb).to_be_visible(timeout=5000)
         was_checked = cb.is_checked()
         cb.click()
-        page.wait_for_timeout(200)
 
         if was_checked:
             expect(cb).not_to_be_checked()
@@ -155,9 +153,9 @@ class TestOcrSaveBrowser:
         _go_to_settings(page)
         _open_section(page, "settings_ocr_title")
 
-        # Save current settings
+        # Save current settings; the toast confirms the save round-trip finished.
         page.locator("button[data-i18n='btn_save_ocr_settings']").click()
-        page.wait_for_timeout(500)
+        expect(page.locator(".toast").first).to_be_visible(timeout=5000)
 
         # Reload and verify
         page.reload(wait_until="domcontentloaded")

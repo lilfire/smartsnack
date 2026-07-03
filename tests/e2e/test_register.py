@@ -58,10 +58,12 @@ def test_register_product_success(page):
     toast = page.locator(".toast")
     expect(toast.first).to_be_visible(timeout=5000)
 
-    # Verify product appears in search
+    # Verify product appears in search; switching views reloads the product
+    # list, and to_contain_text retries until the row is rendered.
     page.locator("button[data-view='search']").click()
-    page.wait_for_timeout(500)
-    expect(page.locator("#results-container")).to_contain_text("E2E Test Product")
+    expect(page.locator("#results-container")).to_contain_text(
+        "E2E Test Product", timeout=5000
+    )
 
 
 def test_register_product_without_name_fails(page):
@@ -127,8 +129,8 @@ def test_taste_slider_keeps_value_and_focus_on_release(page):
         )
     page.mouse.up()
 
-    # Allow requestAnimationFrame to fire
-    page.wait_for_timeout(100)
+    # Wait for one animation frame so the oninput rAF label update runs
+    page.evaluate("() => new Promise(requestAnimationFrame)")
 
     # The value should NOT have snapped back to the default "3"
     val = slider.input_value()

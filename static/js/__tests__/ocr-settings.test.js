@@ -52,8 +52,10 @@ vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn(), getFlagConfig: vi.fn((
 import { loadOcrSettings, saveOcrSettings } from '../settings-ocr.js';
 import { api, showToast } from '../state.js';
 import { t } from '../i18n.js';
+import { MOCK_OCR_SETTINGS } from './mock-shapes.js';
 
 const MOCK_SETTINGS_RESPONSE = {
+  ...MOCK_OCR_SETTINGS,
   provider: 'google_vision',
   fallback_to_tesseract: true,
 };
@@ -99,7 +101,7 @@ describe('loadOcrSettings', () => {
   });
 
   it('unchecks fallback when disabled', async () => {
-    api.mockResolvedValueOnce({ provider: 'easyocr', fallback_to_tesseract: false });
+    api.mockResolvedValueOnce({ ...MOCK_OCR_SETTINGS, provider: 'easyocr' });
     await loadOcrSettings();
 
     const cb = document.getElementById('ocr-fallback-checkbox');
@@ -199,7 +201,7 @@ describe('OCR settings E2E flow', () => {
     expect(showToast).toHaveBeenCalledWith('toast_ocr_settings_saved', 'success');
 
     // Reload with new provider
-    api.mockResolvedValueOnce({ provider: 'easyocr', fallback_to_tesseract: false });
+    api.mockResolvedValueOnce({ ...MOCK_OCR_SETTINGS, provider: 'easyocr' });
     await loadOcrSettings();
 
     expect(sel.value).toBe('easyocr');

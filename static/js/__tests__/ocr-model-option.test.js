@@ -61,6 +61,7 @@ vi.mock('../render.js', () => ({ loadFlagConfig: vi.fn(), getFlagConfig: vi.fn((
 
 import { loadOcrProviders, loadOcrSettings, saveOcrSettings } from '../settings-ocr.js';
 import { api, showToast } from '../state.js';
+import { MOCK_OCR_SETTINGS, MOCK_OCR_SETTINGS_SAVE_OK } from './mock-shapes.js';
 
 const MOCK_PROVIDERS_RESPONSE = {
   providers: [
@@ -115,7 +116,7 @@ describe('Model selector visibility', () => {
     await loadOcrProviders();
 
     // Load settings with tesseract
-    api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
+    api.mockResolvedValueOnce(MOCK_OCR_SETTINGS);
     await loadOcrSettings();
 
     const sel = document.getElementById('ocr-provider-select');
@@ -329,7 +330,7 @@ describe('Native select integration', () => {
     api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
     await loadOcrProviders();
 
-    api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
+    api.mockResolvedValueOnce(MOCK_OCR_SETTINGS);
     await loadOcrSettings();
 
     const providerSel = document.getElementById('ocr-provider-select');
@@ -397,10 +398,10 @@ describe('Model validation edge cases', () => {
     api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
     await loadOcrProviders();
 
-    api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
+    api.mockResolvedValueOnce(MOCK_OCR_SETTINGS);
     await loadOcrSettings();
 
-    api.mockResolvedValueOnce({ ok: true });
+    api.mockResolvedValueOnce(MOCK_OCR_SETTINGS_SAVE_OK);
     await expect(saveOcrSettings()).resolves.not.toThrow();
     expect(api).toHaveBeenCalledWith('/api/ocr/settings', expect.objectContaining({ method: 'POST' }));
   });
@@ -409,14 +410,14 @@ describe('Model validation edge cases', () => {
     api.mockResolvedValueOnce(MOCK_PROVIDERS_RESPONSE);
     await loadOcrProviders();
 
-    api.mockResolvedValueOnce({ provider: 'tesseract', fallback_to_tesseract: false, models: {} });
+    api.mockResolvedValueOnce(MOCK_OCR_SETTINGS);
     await loadOcrSettings();
 
     const providerSel = document.getElementById('ocr-provider-select');
     providerSel.value = 'tesseract';
     providerSel.dispatchEvent(new Event('change'));
 
-    api.mockResolvedValueOnce({ ok: true });
+    api.mockResolvedValueOnce(MOCK_OCR_SETTINGS_SAVE_OK);
     await saveOcrSettings();
 
     const lastCall = api.mock.calls[api.mock.calls.length - 1];

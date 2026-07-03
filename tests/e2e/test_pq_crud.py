@@ -37,7 +37,6 @@ def _open_pq_section(page):
             }
         }
     }""")
-    page.wait_for_timeout(600)
 
 
 def _api(live_url, path, *, method="GET", body=None):
@@ -119,7 +118,6 @@ def test_add_pq_entry_appears_in_list(page):
     add_btn = page.locator("[data-i18n='btn_add_protein_source']")
     expect(add_btn.first).to_be_visible(timeout=3000)
     add_btn.first.click()
-    page.wait_for_timeout(600)
 
     # Toast must appear.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
@@ -153,13 +151,11 @@ def test_delete_pq_entry_removes_from_list(page, live_url):
     delete_btn = page.locator(f"[data-action='delete-pq'][data-pq-id='{pq_id}']")
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(300)
 
     # Confirmation modal — click yes.
     confirm_btn = page.locator("button.confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
     confirm_btn.click()
-    page.wait_for_timeout(600)
 
     # Success toast must appear.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
@@ -187,12 +183,12 @@ def test_delete_pq_entry_cancel_keeps_entry(page, live_url):
     delete_btn = page.locator(f"[data-action='delete-pq'][data-pq-id='{pq_id}']")
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(300)
 
     cancel_btn = page.locator("button.confirm-no")
     expect(cancel_btn).to_be_visible(timeout=3000)
     cancel_btn.click()
-    page.wait_for_timeout(400)
+    # The confirm modal is removed from the DOM when dismissed.
+    page.wait_for_selector(".scan-modal-bg", state="detached", timeout=3000)
 
     # Entry must still be in the list.
     expect(page.locator("#pq-list")).to_contain_text("E2E Cancel Del PQ", timeout=3000)
@@ -223,7 +219,6 @@ def test_inline_pdcaas_edit_saves_and_shows_toast(page, live_url):
 
     pdcaas_input.fill("0.95")
     pdcaas_input.press("Tab")
-    page.wait_for_timeout(600)
 
     # A toast must appear confirming the save.
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
@@ -249,7 +244,6 @@ def test_inline_diaas_edit_saves_and_shows_toast(page, live_url):
 
     diaas_input.fill("0.80")
     diaas_input.press("Tab")
-    page.wait_for_timeout(600)
 
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
 

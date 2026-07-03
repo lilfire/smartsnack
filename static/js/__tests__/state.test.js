@@ -6,6 +6,11 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function() {};
 }
 
+// TODO(LSO-1694): promote to mock-shapes.js — GET /api/stats response shape
+// (mock-shapes.js has no stats endpoint shape yet; category items here are the
+// slim {name, emoji, label} stats variant, not the full MOCK_CATEGORY_ITEM).
+const MOCK_STATS_RESPONSE = { total: 10, types: 3, categories: [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }] };
+
 beforeEach(() => {
   state.currentView = 'search';
   state.currentFilter = [];
@@ -251,6 +256,8 @@ describe('api', () => {
 
 describe('fetchProducts', () => {
   beforeEach(() => {
+    // fetchProducts passes the parsed body through verbatim; this plain-array body is
+    // coupled to the passthrough assertion below, so it stays inline (legacy format).
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve('[{"id":1,"name":"Test"}]'),
@@ -283,7 +290,7 @@ describe('fetchProducts', () => {
 
 describe('fetchStats', () => {
   it('updates state.cachedStats and state.categories', async () => {
-    const statsData = { total: 10, types: 3, categories: [{ name: 'dairy', emoji: '🧀', label: 'Dairy' }] };
+    const statsData = MOCK_STATS_RESPONSE;
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve(JSON.stringify(statsData)),
@@ -295,6 +302,7 @@ describe('fetchStats', () => {
   });
 
   it('sets empty categories when not provided', async () => {
+    // Deliberately omits the `categories` key to exercise the fallback branch — stays inline.
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       text: () => Promise.resolve('{"total":0,"types":0}'),

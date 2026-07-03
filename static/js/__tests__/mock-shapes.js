@@ -48,6 +48,23 @@ export const SHAPES = {
   'GET /api/bulk/refresh-off/status': {
     running: 'boolean',
   },
+  'GET /api/categories': {
+    // returns an array directly
+    _root: 'array',
+  },
+  // Contract from off_service.add_and_sync_product() via blueprints/off.py.
+  // image_warning is string|null so it cannot be strictly typed here.
+  'POST /api/off/add-product': {
+    ok: 'boolean',
+    status_verbose: 'string',
+    image_uploaded: 'boolean',
+    synced_flag_set: 'boolean',
+  },
+  // Contract from protein_quality_service.estimate() via blueprints/protein_quality.py.
+  // est_pdcaas and est_diaas are number|null so only sources is strictly typed.
+  'POST /api/estimate-protein-quality': {
+    sources: 'array',
+  },
 };
 
 // ── Realistic mock objects ─────────────────────────────────────────────────
@@ -138,9 +155,44 @@ export const MOCK_PRODUCTS_RESPONSE = {
   total: 2,
 };
 
+// Canonical empty GET /api/products response (no matches).
+export const MOCK_PRODUCTS_EMPTY = {
+  products: [],
+  total: 0,
+};
+
+// Canonical GET /api/weights item — full contract from weight_service.get_weights():
+// field, label, desc, enabled, weight, direction, formula, formula_min, formula_max.
+export const MOCK_WEIGHT_ITEM = {
+  field: 'kcal',
+  label: 'Kcal',
+  desc: 'Energy',
+  enabled: true,
+  weight: 100,
+  direction: 'lower',
+  formula: 'minmax',
+  formula_min: 0,
+  formula_max: 100,
+};
+
 export const MOCK_WEIGHTS_RESPONSE = [
-  { field: 'kcal', label: 'Kcal', desc: 'Energy', direction: 'lower', weight: 100, enabled: true },
-  { field: 'protein', label: 'Protein', desc: 'Protein', direction: 'higher', weight: 100, enabled: true },
+  MOCK_WEIGHT_ITEM,
+  { ...MOCK_WEIGHT_ITEM, field: 'protein', label: 'Protein', desc: 'Protein', direction: 'higher' },
+];
+
+// Canonical GET /api/categories item — contract from category_service.list_categories():
+// name, emoji, label, count, has_weight_overrides.
+export const MOCK_CATEGORY_ITEM = {
+  name: 'dairy',
+  emoji: '\u{1F95B}',
+  label: 'Dairy',
+  count: 3,
+  has_weight_overrides: false,
+};
+
+export const MOCK_CATEGORIES_RESPONSE = [
+  MOCK_CATEGORY_ITEM,
+  { ...MOCK_CATEGORY_ITEM, name: 'snacks', emoji: '\u{1F37F}', label: 'Snacks', count: 1 },
 ];
 
 export const MOCK_OFF_CREDENTIALS = {
@@ -162,6 +214,32 @@ export const MOCK_BULK_STATUS_IDLE = {
 
 export const MOCK_BULK_STATUS_RUNNING = {
   running: true,
+};
+
+// Canonical POST /api/off/add-product success response — full contract from
+// off_service.add_and_sync_product(): the OFF add succeeded, no image was
+// uploaded and the local synced flag was not set (no product_id supplied).
+export const MOCK_OFF_ADD_PRODUCT_OK = {
+  ok: true,
+  status_verbose: 'fields saved',
+  image_uploaded: false,
+  image_warning: null,
+  synced_flag_set: false,
+};
+
+// Canonical POST /api/estimate-protein-quality response with matches.
+export const MOCK_PQ_ESTIMATE = {
+  est_pdcaas: 0.85,
+  est_diaas: 0.92,
+  sources: ['whey'],
+};
+
+// Canonical POST /api/estimate-protein-quality response when no protein
+// sources are recognized in the ingredients string.
+export const MOCK_PQ_ESTIMATE_EMPTY = {
+  est_pdcaas: null,
+  est_diaas: null,
+  sources: [],
 };
 
 // ── Validation helper ──────────────────────────────────────────────────────

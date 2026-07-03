@@ -36,7 +36,7 @@ def _go_to_settings(page):
 def _go_to_search(page):
     """Navigate to search view."""
     page.locator("button[data-view='search']").click()
-    page.wait_for_timeout(300)
+    expect(page.locator("#view-search")).to_be_visible(timeout=5000)
 
 
 def _open_settings_section(page, i18n_key):
@@ -45,7 +45,7 @@ def _open_settings_section(page, i18n_key):
         f".settings-toggle:has(span[data-i18n='{i18n_key}'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(300)
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 def _wait_for_toast(page, expected_text, timeout=5000):
@@ -62,7 +62,7 @@ def _dismiss_toast(page):
         close_btn = toast.locator(".toast-close")
         if close_btn.is_visible():
             close_btn.click()
-            page.wait_for_timeout(200)
+            expect(toast).not_to_be_visible(timeout=5000)
 
 
 def _dismiss_modal(page):
@@ -70,7 +70,7 @@ def _dismiss_modal(page):
     cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
     if cancel.is_visible():
         cancel.click()
-        page.wait_for_timeout(200)
+        expect(page.locator(".scan-modal-bg")).not_to_be_visible(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -112,8 +112,8 @@ class TestProductToasts:
         page.locator("#f-salt").fill("0.5")
         page.locator("#f-smak").fill("4")
         page.locator("#btn-submit").click()
-        # May get OFF modal - dismiss it
-        page.wait_for_timeout(500)
+        # May get OFF modal - wait for either the toast or a modal, dismiss it
+        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
         _dismiss_modal(page)
         # The toast text is the template with {name} replaced
         expected = t["toast_product_added"].replace("{name}", prod_name)
@@ -133,7 +133,6 @@ class TestProductToasts:
         # Click the product row to expand it
         row = page.locator(f".table-row[data-product-id='{product['id']}']")
         row.click()
-        page.wait_for_timeout(500)
         # Click delete button (data-action="delete")
         delete_btn = page.locator(
             f"button[data-action='delete'][data-id='{product['id']}']"
@@ -141,7 +140,7 @@ class TestProductToasts:
         expect(delete_btn).to_be_visible(timeout=5000)
         delete_btn.click()
         # Confirm delete modal
-        page.wait_for_timeout(300)
+        page.wait_for_selector(".scan-modal-bg .scan-modal button", timeout=5000)
         confirm_btn = page.locator(".scan-modal-bg .scan-modal button").first
         if confirm_btn.is_visible():
             confirm_btn.click()
@@ -160,14 +159,12 @@ class TestProductToasts:
         )
         row = page.locator(f".table-row[data-product-id='{product['id']}']")
         row.click()
-        page.wait_for_timeout(500)
         # Click edit button (data-action="start-edit")
         edit_btn = page.locator(
             f"button[data-action='start-edit'][data-id='{product['id']}']"
         )
         expect(edit_btn).to_be_visible(timeout=5000)
         edit_btn.click()
-        page.wait_for_timeout(500)
         # Save (data-action="save-product")
         save_btn = page.locator(
             f"button[data-action='save-product'][data-id='{product['id']}']"
@@ -218,14 +215,12 @@ class TestProductToasts:
         )
         row = page.locator(f".table-row[data-product-id='{product['id']}']")
         row.click()
-        page.wait_for_timeout(500)
         # Click edit button
         edit_btn = page.locator(
             f"button[data-action='start-edit'][data-id='{product['id']}']"
         )
         expect(edit_btn).to_be_visible(timeout=5000)
         edit_btn.click()
-        page.wait_for_timeout(500)
         # Clear the name field (#ed-name)
         name_input = page.locator("#ed-name")
         expect(name_input).to_be_visible(timeout=5000)
@@ -251,7 +246,6 @@ class TestCategoryToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_categories_title")
-        page.wait_for_timeout(300)
         # Fill category name and label using their IDs
         name_input = page.locator("#cat-name")
         label_input = page.locator("#cat-label")
@@ -271,7 +265,6 @@ class TestCategoryToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_categories_title")
-        page.wait_for_timeout(300)
         # Ensure fields are empty
         page.locator("#cat-name").fill("")
         page.locator("#cat-label").fill("")
@@ -304,12 +297,11 @@ class TestCategoryToasts:
 
         _go_to_settings(page)
         _open_settings_section(page, "settings_categories_title")
-        page.wait_for_timeout(500)
         # The categories section renders one label input per category (see
         # loadCategories in settings-categories.js); its `change` event
-        # drives updateCategoryLabel → PUT + toast_category_updated. The old
-        # selector (.category-row input[data-field='display']) never existed,
-        # so this test used to silently pass without asserting anything.
+        # drives updateCategoryLabel → PUT + toast_category_updated. Rows
+        # render async after settings load; the retrying attach expectation
+        # below is the wait — no fixed sleep needed.
         cat_input = page.locator(
             "#cat-list input.cat-item-label-input[data-cat-name='updatecat']"
         )
@@ -335,13 +327,13 @@ class TestCategoryToasts:
         if len(categories) <= 1:
             _go_to_settings(page)
             _open_settings_section(page, "settings_categories_title")
-            page.wait_for_timeout(500)
+            # Category rows render async after settings load
+            page.wait_for_selector(".cat-item", timeout=5000)
             del_btn = page.locator(
                 ".category-row .btn-delete-category, .category-row button[aria-label*='Slett']"
             ).first
             if del_btn.is_visible():
                 del_btn.click()
-                page.wait_for_timeout(300)
                 _wait_for_toast(page, t["toast_cannot_delete_only_category"])
 
 
@@ -362,7 +354,6 @@ class TestBackupToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_database_title")
-        page.wait_for_timeout(300)
         # Mock the navigation to prevent actual download
         page.evaluate(
             "() => { window._origLocation = window.location.href; }"
@@ -378,7 +369,6 @@ class TestBackupToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_database_title")
-        page.wait_for_timeout(300)
         # Set input files with non-JSON content
         restore_input = page.locator("#restore-input, input[type='file'][accept='.json']").first
         restore_input.set_input_files(
@@ -388,8 +378,8 @@ class TestBackupToasts:
                 "buffer": b"not json at all",
             }
         )
-        # Confirm the restore modal
-        page.wait_for_timeout(500)
+        # Confirm the restore modal (restore always shows a confirm dialog)
+        page.wait_for_selector(".scan-modal-bg", timeout=5000)
         confirm_btn = page.locator(".scan-modal-bg button").first
         if confirm_btn.is_visible():
             confirm_btn.click()
@@ -516,7 +506,6 @@ class TestOcrToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_ocr_title")
-        page.wait_for_timeout(300)
         save_btn = page.locator(
             "button:has-text('Lagre OCR'), button[data-i18n='btn_save_ocr_settings']"
         ).first
@@ -529,7 +518,6 @@ class TestOcrToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_ocr_title")
-        page.wait_for_timeout(300)
         # Mock OCR settings endpoint to fail
         page.route(
             "**/api/ocr/settings",
@@ -568,7 +556,8 @@ class TestEanToasts:
         )
         row = page.locator(f".table-row[data-product-id='{product['id']}']")
         row.click()
-        page.wait_for_timeout(300)
+        # Row click expands the product row synchronously on rerender
+        page.wait_for_selector(".expanded", timeout=5000)
         # Look for EAN input in expanded view
         ean_input = page.locator(
             f".expanded-content[data-product-id='{product['id']}'] input[name='ean'], "
@@ -609,6 +598,8 @@ class TestScannerToasts:
         ).first
         if scan_btn.is_visible():
             scan_btn.click()
+            # Fixed wait: the toast may legitimately never appear (guarded
+            # is_visible check below); absence has no event to await.
             page.wait_for_timeout(500)
             toast = page.locator("#toast.show")
             if toast.is_visible():
@@ -632,7 +623,6 @@ class TestFlagToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_flags_title")
-        page.wait_for_timeout(300)
         # Fill flag name and label using IDs
         name_input = page.locator("#flag-add-name")
         label_input = page.locator("#flag-add-label")
@@ -650,7 +640,6 @@ class TestFlagToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_flags_title")
-        page.wait_for_timeout(300)
         # Ensure fields are empty
         page.locator("#flag-add-name").fill("")
         page.locator("#flag-add-label").fill("")
@@ -672,7 +661,6 @@ class TestPqToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_pq_title")
-        page.wait_for_timeout(300)
         add_btn = page.locator(
             "button:has-text('Legg til proteinkilde')"
         ).first
@@ -685,7 +673,6 @@ class TestPqToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_pq_title")
-        page.wait_for_timeout(300)
         # Fill the PQ form fields
         # The form has name, keywords, pdcaas, diaas fields
         pq_inputs = page.locator(
@@ -772,15 +759,14 @@ class TestWeightToasts:
 
         _go_to_settings(page)
         _open_settings_section(page, "settings_weights_title")
-        page.wait_for_timeout(500)
         # Look for delete category override button
         del_override_btn = page.locator(
             "button:has-text('Slett kategori-overstyring'), button[data-i18n='btn_delete_category_override']"
         ).first
         if del_override_btn.is_visible():
             del_override_btn.click()
-            # Confirm if needed
-            page.wait_for_timeout(300)
+            # Deleting an override always opens a confirm modal
+            page.wait_for_selector(".scan-modal-bg", timeout=5000)
             confirm_btn = page.locator(".scan-modal-bg button").first
             if confirm_btn.is_visible():
                 confirm_btn.click()
@@ -800,7 +786,6 @@ class TestOffToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_off_title")
-        page.wait_for_timeout(300)
         user_input = page.locator(
             "input[placeholder*='OFF-brukernavn'], input[data-i18n-placeholder='ph_off_user_id']"
         ).first
@@ -825,7 +810,6 @@ class TestOffToasts:
         t = _load_translations()
         _go_to_settings(page)
         _open_settings_section(page, "settings_off_title")
-        page.wait_for_timeout(300)
         # Mock the settings save endpoint
         page.route(
             "**/api/settings/off-lang-priority",
@@ -841,6 +825,9 @@ class TestOffToasts:
                 if (window.saveOffLangPriority) window.saveOffLangPriority();
             }"""
         )
+        # Fixed wait: saveOffLangPriority may not be exposed on window, so the
+        # toast may legitimately never appear (guarded check below); absence
+        # has no event to await.
         page.wait_for_timeout(500)
         toast = page.locator("#toast.show")
         if toast.is_visible():
@@ -865,9 +852,9 @@ class TestNetworkToasts:
             "**/api/products*",
             lambda route: route.abort("connectionrefused"),
         )
-        # Trigger a reload to fetch products
+        # Trigger a reload to fetch products; page.evaluate awaits the async
+        # loadData() promise, so the error toast (if any) is already shown.
         page.evaluate("() => window.loadData && window.loadData()")
-        page.wait_for_timeout(1000)
         toast = page.locator("#toast.show")
         if toast.is_visible():
             toast_text = toast.text_content()
@@ -890,8 +877,9 @@ class TestNetworkToasts:
                 content_type="application/json",
             ),
         )
+        # page.evaluate awaits the async loadData() promise, so the error
+        # toast (if any) is already shown when it returns.
         page.evaluate("() => window.loadData && window.loadData()")
-        page.wait_for_timeout(1000)
         toast = page.locator("#toast.show")
         if toast.is_visible():
             toast_text = toast.text_content()
@@ -931,7 +919,8 @@ class TestEanUnlockToasts:
         )
         row = page.locator(".table-row", has_text="EanUnlockToastProd").first
         row.click()
-        page.wait_for_timeout(300)
+        # Clicking the row expands it; wait for the expanded area to render.
+        expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
         edit_btn = page.locator("[data-action='start-edit']").first
         expect(edit_btn).to_be_visible(timeout=5000)
         edit_btn.click()

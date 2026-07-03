@@ -66,6 +66,7 @@ import {
 } from '../settings-backup.js';
 import { saveOffCredentials, checkRefreshStatus, refreshAllFromOff } from '../settings-off.js';
 import { state, api, showToast, fetchStats, showConfirmModal } from '../state.js';
+import { MOCK_CATEGORY_ITEM } from './mock-shapes.js';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -214,8 +215,8 @@ describe('loadCategories', () => {
     list.id = 'cat-list';
     document.body.appendChild(list);
     api.mockResolvedValueOnce([
-      { name: 'dairy', emoji: '🧀', label: 'Dairy', count: 5 },
-      { name: 'meat', emoji: '🥩', label: 'Meat', count: 3 },
+      { ...MOCK_CATEGORY_ITEM, emoji: '🧀', count: 5 },
+      { ...MOCK_CATEGORY_ITEM, name: 'meat', emoji: '🥩', label: 'Meat', count: 3 },
     ]);
     await loadCategories();
     expect(list.innerHTML).toContain('Dairy');
@@ -332,8 +333,8 @@ describe('deleteCategory', () => {
 
   it('shows reassignment modal when category has products', async () => {
     api.mockResolvedValueOnce([
-      { name: 'snack', emoji: '🍿', label: 'Snacks' },
-      { name: 'dairy', emoji: '🧀', label: 'Dairy' },
+      { ...MOCK_CATEGORY_ITEM, name: 'snack', emoji: '🍿', label: 'Snacks' },
+      { ...MOCK_CATEGORY_ITEM, emoji: '🧀' },
     ]);
     await deleteCategory('snack', 'Snacks', 5);
     expect(document.querySelector('.cat-move-modal')).not.toBeNull();
@@ -941,7 +942,7 @@ describe('deleteCategory with only category', () => {
     list.id = 'cat-list';
     document.body.appendChild(list);
     // Has products but only one category
-    api.mockResolvedValueOnce([{ name: 'snack', emoji: '', label: 'Snacks' }]);
+    api.mockResolvedValueOnce([{ ...MOCK_CATEGORY_ITEM, name: 'snack', emoji: '', label: 'Snacks' }]);
     await deleteCategory('snack', 'Snacks', 5);
     expect(showToast).toHaveBeenCalledWith('toast_cannot_delete_only_category', 'error');
   });

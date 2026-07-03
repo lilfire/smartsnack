@@ -14,13 +14,15 @@ vi.mock('../products.js', () => ({
 
 import { loadOffLanguagePriority } from '../settings-off.js';
 import { api, showToast } from '../state.js';
+import { MOCK_OFF_LANGUAGE_PRIORITY, MOCK_OFF_LANGUAGES } from './mock-shapes.js';
 
 /** Return fresh mock data each call to prevent mutation leakage. */
 function mockPriority(codes) {
-  return { priority: [...(codes || ['no', 'en', 'sv'])] };
+  return { ...MOCK_OFF_LANGUAGE_PRIORITY, priority: [...(codes || ['no', 'en', 'sv'])] };
 }
 function mockAllLangs() {
   return {
+    ...MOCK_OFF_LANGUAGES,
     languages: ['no', 'en', 'sv', 'de', 'fr'],
   };
 }

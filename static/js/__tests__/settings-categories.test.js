@@ -25,6 +25,7 @@ import {
   deleteCategory,
 } from '../settings-categories.js';
 import { api, showToast, fetchStats, showConfirmModal } from '../state.js';
+import { MOCK_CATEGORY_ITEM } from './mock-shapes.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -43,7 +44,7 @@ describe('loadCategories', () => {
   });
 
   it('renders categories list', async () => {
-    const cats = [{ name: 'dairy', label: 'Dairy', emoji: '🥛', count: 3 }];
+    const cats = [{ ...MOCK_CATEGORY_ITEM }];
     api.mockResolvedValue(cats);
     document.body.innerHTML = '<div id="cat-list"></div>';
     await loadCategories();
@@ -180,15 +181,15 @@ describe('deleteCategory', () => {
 
   it('shows error when only category (no others)', async () => {
     // category has products, api returns only itself
-    api.mockResolvedValue([{ name: 'snacks', label: 'Snacks', emoji: '🍕' }]);
+    api.mockResolvedValue([{ ...MOCK_CATEGORY_ITEM, name: 'snacks', label: 'Snacks', emoji: '🍕' }]);
     await deleteCategory('snacks', 'Snacks', 3);
     expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error');
   });
 
   it('shows move modal when category has products and others exist', async () => {
     api.mockResolvedValue([
-      { name: 'snacks', label: 'Snacks', emoji: '🍕' },
-      { name: 'dairy', label: 'Dairy', emoji: '🥛' },
+      { ...MOCK_CATEGORY_ITEM, name: 'snacks', label: 'Snacks', emoji: '🍕' },
+      { ...MOCK_CATEGORY_ITEM },
     ]);
     deleteCategory('snacks', 'Snacks', 3);
     await new Promise((r) => setTimeout(r, 0));

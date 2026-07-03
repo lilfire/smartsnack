@@ -1,14 +1,23 @@
 // State management edge cases: concurrent mutations, race conditions, state recovery.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { MOCK_PRODUCTS_EMPTY } from './mock-shapes.js';
 
-vi.mock('../state.js', () => {
+// TODO(LSO-1694): promote to mock-shapes.js — it has no shape yet for
+// GET /api/stats ({ total, types, categories }).
+const { MOCK_STATS_EMPTY } = vi.hoisted(() => ({
+  MOCK_STATS_EMPTY: { total: 0, types: 0, categories: [] },
+}));
+
+vi.mock('../state.js', async () => {
+  // Imported inside the factory: vi.mock is hoisted above top-level imports.
+  const { MOCK_PRODUCTS_EMPTY } = await import('./mock-shapes.js');
   const _state = {
     currentView: 'search',
     currentFilter: [],
     expandedId: null,
     editingId: null,
     searchTimeout: null,
-    cachedStats: { total: 0, types: 0, categories: [] },
+    cachedStats: { ...MOCK_STATS_EMPTY },
     cachedResults: [],
     sortCol: 'total_score',
     sortDir: 'desc',
@@ -19,9 +28,9 @@ vi.mock('../state.js', () => {
   };
   return {
     state: _state,
-    api: vi.fn().mockResolvedValue({ products: [], total: 0 }),
-    fetchProducts: vi.fn().mockResolvedValue({ products: [], total: 0 }),
-    fetchStats: vi.fn().mockResolvedValue({ total: 0, types: 0, categories: [] }),
+    api: vi.fn().mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY }),
+    fetchProducts: vi.fn().mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY }),
+    fetchStats: vi.fn().mockResolvedValue({ ...MOCK_STATS_EMPTY }),
     NUTRI_IDS: ['kcal', 'energy_kj', 'fat', 'saturated_fat', 'carbs', 'sugar', 'protein', 'fiber', 'salt', 'weight', 'portion'],
     showConfirmModal: vi.fn().mockResolvedValue(true),
     showToast: vi.fn(),
@@ -101,7 +110,7 @@ beforeEach(() => {
 
 describe('Concurrent state mutations', () => {
   it('last setFilter wins when called rapidly', () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY });
 
     setFilter('Snacks');
     setFilter('Drikke');
@@ -112,7 +121,7 @@ describe('Concurrent state mutations', () => {
   });
 
   it('multiple setFilter calls accumulate filters', () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY });
 
     setFilter('Snacks');
     setFilter('Drikke');
@@ -122,7 +131,7 @@ describe('Concurrent state mutations', () => {
   });
 
   it('resetting via setFilter("all") clears all pending filters', () => {
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY });
 
     setFilter('Snacks');
     setFilter('Drikke');
@@ -159,8 +168,8 @@ describe('Race conditions: fetchProducts', () => {
     const first = loadData();
     const second = loadData();
 
-    resolveSecond({ products: [{ id: 2, name: 'B' }], total: 1 });
-    resolveFirst({ products: [{ id: 1, name: 'A' }], total: 1 });
+    resolveSecond({ ...MOCK_PRODUCTS_EMPTY, products: [{ id: 2, name: 'B' }], total: 1 });
+    resolveFirst({ ...MOCK_PRODUCTS_EMPTY, products: [{ id: 1, name: 'A' }], total: 1 });
 
     await Promise.all([first, second]);
 
@@ -224,7 +233,7 @@ describe('State recovery: fetchProducts error', () => {
 describe('State recovery: filter reset after view switch', () => {
   it('cachedResults empty after switchView allows fresh fetch', async () => {
     state.cachedResults = [{ id: 99, name: 'Old' }];
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY });
 
     switchView('search');
 
@@ -234,7 +243,7 @@ describe('State recovery: filter reset after view switch', () => {
 
   it('pagination resets to offset 0 after setFilter', () => {
     state.pagination.offset = 150;
-    fetchProducts.mockResolvedValue({ products: [], total: 0 });
+    fetchProducts.mockResolvedValue({ ...MOCK_PRODUCTS_EMPTY });
 
     setFilter('Snacks');
 

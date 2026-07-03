@@ -12,7 +12,7 @@ def _add_product(client, name="TestProduct", ean="12345678", type_="Snacks"):
         "/api/products",
         json={"type": type_, "name": name, "ean": ean},
     )
-    assert resp.status_code in (201, 200), resp.get_json()
+    assert resp.status_code == 201, resp.get_json()
     return resp.get_json()["id"]
 
 

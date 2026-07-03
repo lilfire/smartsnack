@@ -26,7 +26,7 @@ def _reload_and_wait(page) -> None:
 
 
 def _expand_product_row(page, product_name: str) -> None:
-    """Click the product row to expand it and wait for the animation.
+    """Click the product row to expand it.
 
     Args:
         page: Playwright page object.
@@ -34,7 +34,6 @@ def _expand_product_row(page, product_name: str) -> None:
     """
     row = page.locator(".table-row", has_text=product_name)
     row.first.click()
-    page.wait_for_timeout(300)
 
 
 def _open_edit_form(page, product_name: str) -> None:
@@ -47,7 +46,8 @@ def _open_edit_form(page, product_name: str) -> None:
     _expand_product_row(page, product_name)
     edit_btn = page.locator("[data-action='start-edit']").first
     edit_btn.click()
-    page.wait_for_timeout(500)
+    # The edit form always renders the #ed-name input once open.
+    page.wait_for_selector("#ed-name", state="visible", timeout=5000)
 
 
 def _check_duplicate_api(
@@ -167,7 +167,6 @@ def test_edit_cancel_discards_changes(page, api_create_product):
     edit_name.fill("CancelEditChanged")
 
     page.locator("[data-action='cancel-edit']").first.click()
-    page.wait_for_timeout(300)
 
     # The results container should still show the original name
     results = page.locator("#results-container")
@@ -432,7 +431,6 @@ def test_sort_by_column(page, api_create_product):
     sort_header = page.locator("[data-action='sort']").first
     expect(sort_header).to_be_visible(timeout=5000)
     sort_header.click()
-    page.wait_for_timeout(400)
 
     # The active sort indicator must appear somewhere in the table header
     active_header = page.locator(".th-active")
@@ -516,10 +514,10 @@ def test_edit_category_change_persists(page, api_create_product, live_url):
 
     # Open the custom dropdown
     category_trigger.click()
-    page.wait_for_timeout(300)
 
     # Find an option that differs from the current category ("Snacks")
     custom_options = edit_form.locator(".custom-select-option")
+    expect(custom_options.first).to_be_visible(timeout=3000)
     new_category_value = None
     new_category_label = None
     option_count = custom_options.count()
@@ -535,7 +533,6 @@ def test_edit_category_change_persists(page, api_create_product, live_url):
     assert new_category_value is not None, (
         "Expected at least one non-Snacks category option in the dropdown"
     )
-    page.wait_for_timeout(300)
 
     # Assertion: custom dropdown trigger label updated after picking new option
     expect(category_trigger).to_contain_text(new_category_label)

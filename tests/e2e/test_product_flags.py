@@ -125,7 +125,8 @@ def test_assign_flag_to_product_persists_in_list(page, live_url, api_create_prod
     row = page.locator(".table-row", has_text=product_name)
     expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
-    page.wait_for_timeout(300)
+    # The expanded section (including flag chips) renders in one pass.
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
     # The chip is scoped to the row's expanded section. Scope the locator
     # to the product-flags container so we don't accidentally match the
@@ -173,7 +174,9 @@ def test_clear_flag_assignment_removes_chip(page, live_url, api_create_product, 
     row = page.locator(".table-row", has_text=product_name)
     expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
-    page.wait_for_timeout(300)
+    # Wait for the expanded section; chips render in the same pass, so once
+    # it is visible the negative count check below is safe.
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
     # No chip with this label may remain inside the expanded row.
     chips = page.locator(".product-flags .flag-badge", has_text=flag_label)

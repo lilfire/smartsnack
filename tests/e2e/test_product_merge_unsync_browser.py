@@ -38,7 +38,8 @@ def _reload_and_wait(page):
 def _expand_product_row(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
+    # Clicking the row expands it; wait for the expanded area to render.
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
 
 def _open_edit_form(page, name):
@@ -114,6 +115,9 @@ class TestProductDeleteBrowser:
         row = page.locator(f".table-row:has-text('DeleteMeProd')").first
         delete_btn = row.locator("[data-action='delete']")
         delete_btn.click()
+        # Fixed wait: delete may surface an undo toast or remove the row
+        # directly; the guarded is_visible check below tolerates both, and
+        # the "no toast" outcome has no DOM event to await.
         page.wait_for_timeout(1000)
 
         # Product should no longer be in the list (or an undo toast appears)

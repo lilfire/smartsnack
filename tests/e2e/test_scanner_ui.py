@@ -53,7 +53,6 @@ def test_scanner_not_allowed_error(browser, app_server, api_create_product):
         # Navigate to register view to access the scanner button
         nav_register = page.locator("[data-view='register']")
         nav_register.click()
-        page.wait_for_timeout(500)
 
         # Click the scanner button in the register form
         scan_btn = page.locator(".btn-scan")
@@ -107,7 +106,6 @@ def test_scanner_not_found_error(browser, app_server, api_create_product):
         # Navigate to register view
         nav_register = page.locator("[data-view='register']")
         nav_register.click()
-        page.wait_for_timeout(500)
 
         # Click scanner button
         scan_btn = page.locator(".btn-scan")
@@ -133,7 +131,6 @@ def test_scanner_button_exists_in_register_view(page):
     # Navigate to register view
     nav_register = page.locator("[data-view='register']")
     nav_register.click()
-    page.wait_for_timeout(500)
 
     # The scan button should be visible
     scan_btn = page.locator(".btn-scan")

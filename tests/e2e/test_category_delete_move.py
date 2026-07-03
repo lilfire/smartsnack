@@ -112,7 +112,6 @@ def test_add_category_creates_item_in_list(page):
     add_btn = page.locator("button[data-action='add-cat'], [data-i18n='btn_add_category']")
     expect(add_btn.first).to_be_visible(timeout=3000)
     add_btn.first.click()
-    page.wait_for_timeout(800)
 
     expect(page.locator("#cat-list")).to_contain_text("E2E Add Cat", timeout=5000)
 
@@ -135,7 +134,6 @@ def test_delete_empty_category_shows_confirm_modal(page, live_url):
     )
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(400)
 
     # The standard confirm modal must appear.
     confirm_modal = page.locator(".scan-modal-bg[role='dialog']")
@@ -158,10 +156,10 @@ def test_delete_empty_category_cancel_keeps_category(page, live_url):
     )
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(400)
 
     page.locator("button.confirm-no").click()
-    page.wait_for_timeout(400)
+    # Cancelling dismisses the confirm modal — wait for it to disappear.
+    expect(page.locator(".scan-modal-bg[role='dialog']")).to_be_hidden(timeout=3000)
 
     # Category must still appear in the list.
     expect(page.locator("#cat-list")).to_contain_text("E2E Cancel Del Cat", timeout=3000)
@@ -186,7 +184,6 @@ def test_delete_category_with_products_shows_move_modal(page, live_url, api_crea
     )
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(600)
 
     # The move modal specifically (not a plain confirm) must appear.
     move_modal = page.locator(".cat-move-modal-bg")
@@ -206,7 +203,6 @@ def test_move_modal_contains_target_dropdown(page, live_url, api_create_product)
     )
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(600)
 
     # The select dropdown must be visible.
     move_select = page.locator(".cat-move-select")
@@ -231,7 +227,6 @@ def test_move_modal_cancel_preserves_category(page, live_url, api_create_product
     )
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(600)
 
     move_modal = page.locator(".cat-move-modal-bg")
     expect(move_modal).to_be_visible(timeout=3000)
@@ -239,7 +234,6 @@ def test_move_modal_cancel_preserves_category(page, live_url, api_create_product
     cancel_btn = page.locator("button.cat-move-cancel")
     expect(cancel_btn).to_be_visible(timeout=3000)
     cancel_btn.click()
-    page.wait_for_timeout(500)
 
     # Modal must be gone.
     expect(move_modal).to_be_hidden(timeout=3000)
@@ -262,7 +256,6 @@ def test_move_and_delete_shows_success_toast(page, live_url, api_create_product)
     )
     expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(600)
 
     move_modal = page.locator(".cat-move-modal-bg")
     expect(move_modal).to_be_visible(timeout=3000)
@@ -276,7 +269,6 @@ def test_move_and_delete_shows_success_toast(page, live_url, api_create_product)
     expect(page.locator("#toast.show")).to_be_visible(timeout=5000)
 
     # The source category must no longer appear in the list.
-    page.wait_for_timeout(800)
     expect(page.locator("#cat-list")).not_to_contain_text(
         "E2E Move Confirm", timeout=5000
     )

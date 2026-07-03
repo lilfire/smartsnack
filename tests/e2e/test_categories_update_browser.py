@@ -28,7 +28,8 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(600)
+    # toggleSettingsSection sets aria-expanded when the section body is shown.
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 class TestCategoryListBrowser:
@@ -78,11 +79,13 @@ class TestCategoryAddBrowser:
 
         page.locator("#cat-name").fill("e2e_persist_cat")
         page.locator("#cat-label").fill("Persist Category")
-        page.locator("button[data-i18n='btn_add_category']").first.click()
-        page.wait_for_timeout(500)
+        with page.expect_response(
+            lambda r: "/api/categories" in r.url and r.request.method == "POST"
+        ):
+            page.locator("button[data-i18n='btn_add_category']").first.click()
 
         cat_list = page.locator("#cat-list")
-        expect(cat_list).to_contain_text("Persist Category")
+        expect(cat_list).to_contain_text("Persist Category", timeout=5000)
 
     def test_category_available_in_register(self, page):
         """An added category should be selectable in the registration form."""
@@ -91,8 +94,10 @@ class TestCategoryAddBrowser:
         _open_section(page, "settings_categories_title")
         page.locator("#cat-name").fill("e2e_reg_cat")
         page.locator("#cat-label").fill("Register Category")
-        page.locator("button[data-i18n='btn_add_category']").first.click()
-        page.wait_for_timeout(500)
+        with page.expect_response(
+            lambda r: "/api/categories" in r.url and r.request.method == "POST"
+        ):
+            page.locator("button[data-i18n='btn_add_category']").first.click()
 
         # Now go to register and check
         page.locator("button[data-view='register']").click()

@@ -29,9 +29,15 @@ sys.path.insert(
 )
 
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(autouse=True)
 def _inject_csrf_header():
-    """Auto-inject X-Requested-With header into all urllib requests for CSRF."""
+    """Auto-inject X-Requested-With header into all urllib requests for CSRF.
+
+    Function-scoped so the global ``urllib.request.Request.__init__`` patch
+    is applied only while an E2E test is running. A session-scoped patch
+    would stay active for the rest of the process and leak into non-E2E
+    tests when unit and E2E suites run in the same pytest invocation.
+    """
     _orig_init = urllib.request.Request.__init__
 
     def _patched_init(self, *args, **kwargs):

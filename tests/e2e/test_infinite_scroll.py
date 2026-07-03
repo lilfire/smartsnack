@@ -9,6 +9,7 @@ flag would cause tests 2-5 to run against an empty database.
 """
 
 import pytest
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import expect
 
 
@@ -103,9 +104,20 @@ def test_all_products_eventually_visible(page, api_create_product):
     _reload_and_wait(page)
 
     # Scroll several times to load all pages
+    row_sel = ".table-row[data-product-id]"
     for _ in range(6):
+        before = page.locator(row_sel).count()
         _scroll_to_bottom(page)
-        page.wait_for_timeout(800)
+        try:
+            # Wait for this scroll's page of results to be appended.
+            page.wait_for_function(
+                "([sel, prev]) => document.querySelectorAll(sel).length > prev",
+                arg=[row_sel, before],
+                timeout=5000,
+            )
+        except PlaywrightTimeoutError:
+            # No new rows appeared — all pages are loaded; stop scrolling.
+            break
 
     container_text = page.locator("#results-container").inner_text()
     found = [n for n in names if n in container_text]

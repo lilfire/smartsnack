@@ -31,12 +31,12 @@ def _open_delete_confirm(page, product_name: str) -> None:
     row = page.locator(".table-row[data-product-id]", has_text=product_name)
     expect(row.first).to_be_visible(timeout=5000)
     row.first.click()
-    page.wait_for_timeout(300)
 
     delete_btn = page.locator("[data-action='delete']").first
-    expect(delete_btn).to_be_visible(timeout=3000)
+    expect(delete_btn).to_be_visible(timeout=5000)
     delete_btn.click()
-    page.wait_for_timeout(300)
+    # Wait for the confirmation modal to open
+    expect(page.locator(".confirm-yes")).to_be_visible(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +99,10 @@ def test_undo_restores_product(page, api_create_product):
     expect(undo_btn).to_be_visible(timeout=3000)
     undo_btn.click()
 
-    page.wait_for_timeout(500)
+    # Undo re-renders the list with the product restored
+    expect(page.locator("#results-container")).to_contain_text(
+        "UndoRestoreProd", timeout=5000
+    )
 
     # After undo, reload and verify the product is still present
     _reload_and_wait(page)
@@ -124,11 +127,13 @@ def test_delete_without_undo_removes_product(page, api_create_product):
     toast = page.locator(".toast.show")
     expect(toast).to_be_visible(timeout=5000)
 
-    # Wait for the undo toast to auto-dismiss (duration=5000ms) plus buffer
-    expect(toast).to_be_hidden(timeout=8000)
-
-    # Allow the deferred DELETE request to complete
-    page.wait_for_timeout(1500)
+    # Wait for the undo toast to auto-dismiss (duration=5000ms) and for the
+    # deferred DELETE request to complete before reloading.
+    with page.expect_response(
+        lambda r: "/api/products/" in r.url and r.request.method == "DELETE",
+        timeout=10000,
+    ):
+        expect(toast).to_be_hidden(timeout=8000)
 
     _reload_and_wait(page)
     expect(page.locator("#results-container")).not_to_contain_text("NoUndoProd")
@@ -161,8 +166,6 @@ def test_delete_confirmation_cancel_keeps_product(page, api_create_product):
     expect(cancel_btn).to_be_visible(timeout=3000)
     cancel_btn.click()
 
-    page.wait_for_timeout(300)
-
     # Modal should be gone and product still visible
-    expect(page.locator(".scan-modal-bg[role='dialog']")).to_be_hidden(timeout=3000)
+    expect(page.locator(".scan-modal-bg[role='dialog']")).to_be_hidden(timeout=5000)
     expect(page.locator("#results-container")).to_contain_text("CancelDeleteProd")

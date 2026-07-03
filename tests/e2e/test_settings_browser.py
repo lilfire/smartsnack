@@ -25,7 +25,7 @@ def _open_section(page, key):
     """Open a settings section by its data-i18n key."""
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(300)
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 def _api_put(live_url, path, payload):
@@ -77,12 +77,9 @@ class TestOffLanguagePriorityBrowser:
         add_select.select_option("en", force=True)
         page.locator("#off-lang-add-btn").click()
 
-        # Wait for the list to update
-        page.wait_for_timeout(500)
-
-        # Verify 'en' now appears in the priority list
+        # Verify 'en' now appears in the priority list (expect auto-waits)
         priority_list = page.locator("#off-lang-priority-list")
-        expect(priority_list).to_contain_text("en")
+        expect(priority_list).to_contain_text("en", timeout=5000)
 
     def test_remove_language_from_priority(self, page, live_url):
         """Removing a language via the UI should update the priority list."""
@@ -100,8 +97,7 @@ class TestOffLanguagePriorityBrowser:
         remove_btn = priority_list.locator("button[aria-label*='en']").first
         if remove_btn.is_visible():
             remove_btn.click()
-            page.wait_for_timeout(500)
-            expect(priority_list).not_to_contain_text("en")
+            expect(priority_list).not_to_contain_text("en", timeout=5000)
 
     def test_language_priority_persists_after_reload(self, page, live_url):
         """Language priority should persist after page reload."""
@@ -160,7 +156,8 @@ class TestOffCredentialsBrowser:
         page.locator("#off-user-id").fill("persist-user")
         page.locator("#off-password").fill("persist-pass")
         page.locator("button[data-i18n='btn_save_off_credentials']").click()
-        page.wait_for_timeout(500)
+        # The success toast confirms the save request completed
+        expect(page.locator(".toast").first).to_be_visible(timeout=5000)
 
         # Reload
         page.reload(wait_until="domcontentloaded")

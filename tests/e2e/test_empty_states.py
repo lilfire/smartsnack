@@ -49,8 +49,8 @@ def test_search_no_results_shows_message(page, api_create_product):
 
     search = page.locator("#search-input")
     search.fill("ZZZNonExistentProductXYZ")
-    page.wait_for_timeout(500)
 
+    # The debounced search re-renders; the .empty expect below waits for it.
     results = page.locator("#results-container")
     expect(results.locator(".empty")).to_be_visible(timeout=5000)
     expect(results).to_contain_text("Ingen produkter funnet")
@@ -67,8 +67,8 @@ def test_search_no_results_shows_create_button(page, api_create_product):
 
     search = page.locator("#search-input")
     search.fill("BrandNewNonExistentItem")
-    page.wait_for_timeout(500)
 
+    # The debounced search re-renders; the .empty expect below waits for it.
     results = page.locator("#results-container")
     expect(results.locator(".empty")).to_be_visible(timeout=5000)
 
@@ -89,8 +89,8 @@ def test_create_from_search_navigates_to_register(page, api_create_product):
 
     search = page.locator("#search-input")
     search.fill("TotallyNewProduct")
-    page.wait_for_timeout(500)
 
+    # The debounced search re-renders; the .empty expect below waits for it.
     results = page.locator("#results-container")
     expect(results.locator(".empty")).to_be_visible(timeout=5000)
 
