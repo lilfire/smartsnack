@@ -13,6 +13,10 @@ _LANG_NAMES = {
 
 _KEYS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "GROQ_API_KEY"]
 
+# Client-side timeout for LLM backend HTTP calls, so a slow provider can't
+# hang the worker (bulk OFF search fires ~40 sequential translate calls).
+_LLM_TIMEOUT_SECONDS = 15
+
 
 def is_available() -> bool:
     """Return True if at least one LLM backend is configured."""
@@ -57,7 +61,7 @@ def _try_claude(prompt: str) -> str | None:
     if not api_key:
         return None
     import anthropic
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=_LLM_TIMEOUT_SECONDS)
     msg = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=2048,
@@ -72,7 +76,7 @@ def _try_openai(prompt: str) -> str | None:
     if not api_key:
         return None
     import openai
-    client = openai.OpenAI(api_key=api_key)
+    client = openai.OpenAI(api_key=api_key, timeout=_LLM_TIMEOUT_SECONDS)
     resp = client.chat.completions.create(
         model="gpt-4o-mini",
         max_tokens=2048,
@@ -93,6 +97,7 @@ def _try_gemini(prompt: str) -> str | None:
     resp = model.generate_content(
         prompt,
         generation_config={"max_output_tokens": 2048, "temperature": 0},
+        request_options={"timeout": _LLM_TIMEOUT_SECONDS},
     )
     return resp.text.strip() if resp.text else None
 
@@ -102,7 +107,7 @@ def _try_groq(prompt: str) -> str | None:
     if not api_key:
         return None
     import groq
-    client = groq.Groq(api_key=api_key)
+    client = groq.Groq(api_key=api_key, timeout=_LLM_TIMEOUT_SECONDS)
     resp = client.chat.completions.create(
         model="meta-llama/llama-4-scout-17b-16e-instruct",
         max_tokens=2048,
@@ -125,11 +130,14 @@ def translate_ingredients(text: str, target_lang: str) -> str:
     if not text:
         return text
     prompt = _build_prompt(text, target_lang)
-    try:
-        for backend in _BACKENDS:
+    for backend in _BACKENDS:
+        try:
             result = backend(prompt)
-            if result is not None:
-                return result
-    except Exception as e:
-        logger.warning("LLM translation failed: %s", e)
+        except Exception as e:
+            logger.warning(
+                "LLM translation backend %s failed: %s", backend.__name__, e
+            )
+            continue
+        if result is not None:
+            return result
     return text

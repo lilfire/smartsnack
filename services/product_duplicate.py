@@ -1,7 +1,40 @@
 """Duplicate detection and product merging."""
 
+import math
+
 from db import get_db
-from config import ALL_PRODUCT_FIELDS
+from config import ALL_PRODUCT_FIELDS, NUMERIC_FIELDS
+
+
+def _validate_choices(choices: dict, merge_fields: list) -> dict:
+    """Validate user-supplied merge choices against expected column types.
+
+    Numeric columns accept real numbers or numeric strings (coerced to
+    float); text columns accept strings. None/"" are allowed to clear a
+    field. Raises ValueError on unknown fields or type mismatches.
+    """
+    validated = {}
+    for f, v in choices.items():
+        if f not in merge_fields:
+            raise ValueError(f"Invalid merge field: {f}")
+        if v is None or v == "":
+            validated[f] = None
+            continue
+        if f in NUMERIC_FIELDS:
+            if isinstance(v, bool) or not isinstance(v, (int, float, str)):
+                raise ValueError(f"Value for '{f}' must be a number")
+            try:
+                num = float(v)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"Value for '{f}' must be a number") from e
+            if not math.isfinite(num):
+                raise ValueError(f"Value for '{f}' must be finite")
+            validated[f] = num
+        else:
+            if not isinstance(v, str):
+                raise ValueError(f"Value for '{f}' must be a string")
+            validated[f] = v
+    return validated
 
 
 def _find_duplicate(ean, name, exclude_id=None):
@@ -104,8 +137,8 @@ def merge_products(target_id: int, source_id: int, choices: dict | None = None) 
     if not source:
         raise LookupError("Source product not found")
 
-    choices = choices or {}
     merge_fields = [f for f in ALL_PRODUCT_FIELDS if f not in ("type",)]
+    choices = _validate_choices(choices or {}, merge_fields)
     updates, vals = [], []
     for f in merge_fields:
         if f in choices:
