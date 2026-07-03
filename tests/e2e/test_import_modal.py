@@ -38,7 +38,8 @@ def _open_database_section(page):
         ".settings-toggle:has(span[data-i18n='settings_database_title'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(400)
+    # Wait for the section body to expand and expose the import button
+    expect(page.locator("[data-i18n='btn_import']").first).to_be_visible(timeout=5000)
 
 
 def _get_backup_json(live_url: str) -> dict:
@@ -73,7 +74,6 @@ def _open_import_modal(page, backup_data: dict) -> str:
         page.locator("[data-i18n='btn_import']").first.click()
 
     fc_info.value.set_files(tmp_path)
-    page.wait_for_timeout(600)
 
     # The import duplicate resolution modal must appear
     modal = page.locator(".scan-modal.import-dup-modal")
@@ -190,8 +190,7 @@ def test_import_modal_cancel_closes(page, live_url, api_create_product):
         expect(cancel_btn).to_be_visible(timeout=3000)
         cancel_btn.click()
 
-        page.wait_for_timeout(400)
-        expect(modal).to_be_hidden(timeout=3000)
+        expect(modal).to_be_hidden(timeout=5000)
     finally:
         os.unlink(tmp_path)
 
@@ -232,10 +231,10 @@ def test_import_skip_calls_api_and_shows_toast(page, live_url, api_create_produc
         # Click the start button
         start_btn = modal.locator("button.scan-modal-btn-register")
         expect(start_btn).to_be_visible(timeout=3000)
-        start_btn.click()
+        with page.expect_response("**/api/import", timeout=5000):
+            start_btn.click()
 
         # The API must be called
-        page.wait_for_timeout(1000)
         assert len(import_calls) == 1, (
             f"Expected one POST to /api/import, got {len(import_calls)}"
         )
@@ -265,7 +264,6 @@ def test_import_merge_shows_merge_rules_section(page, live_url, api_create_produ
 
         merge_radio = modal.locator("input[name='on_duplicate'][value='merge']")
         merge_radio.check()
-        page.wait_for_timeout(300)
 
         # The merge rules section should become visible
         merge_section = modal.locator(".import-dup-merge-rules")

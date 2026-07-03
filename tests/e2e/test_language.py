@@ -20,19 +20,24 @@ def _open_language_section(page):
         ".settings-toggle:has(span[data-i18n='settings_language'])"
     ).first
     lang_toggle.click()
-    page.wait_for_timeout(300)
+    expect(lang_toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 def _change_language(page, lang_code):
     """Change language via JS (native select is hidden by custom overlay)."""
-    page.evaluate(
-        f"""() => {{
-            const sel = document.querySelector('#language-select');
-            sel.value = '{lang_code}';
-            window.changeLanguage('{lang_code}');
-        }}"""
-    )
-    page.wait_for_timeout(1000)
+    # changeLanguage() persists the choice via PUT /api/settings/language
+    # before re-rendering — wait for that request to complete.
+    with page.expect_response(
+        lambda r: "/api/settings/language" in r.url and r.request.method == "PUT",
+        timeout=5000,
+    ):
+        page.evaluate(
+            f"""() => {{
+                const sel = document.querySelector('#language-select');
+                sel.value = '{lang_code}';
+                window.changeLanguage('{lang_code}');
+            }}"""
+        )
 
 
 def _load_translations(lang="se"):
@@ -168,12 +173,12 @@ def test_register_product_in_swedish(page):
     page.locator("#f-smak").fill("4")
     page.locator("#btn-submit").click()
 
-    page.wait_for_timeout(500)
+    # Wait until either the success toast or an OFF modal appears
+    page.wait_for_selector("#toast.show, .scan-modal-bg .scan-modal", timeout=5000)
     # Dismiss OFF modal if it appears
     cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
     if cancel.is_visible():
         cancel.click()
-        page.wait_for_timeout(200)
 
     expected = t["toast_product_added"].replace("{name}", product_name)
     toast = page.locator("#toast.show")

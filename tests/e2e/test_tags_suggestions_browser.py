@@ -42,11 +42,11 @@ def _reload_and_wait(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
     edit_btn = row.locator("[data-action='start-edit']")
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # The edit form renders synchronously; wait for the tag field to appear.
+    expect(page.locator("#tag-field-ed")).to_be_visible(timeout=5000)
 
 
 class TestTagSuggestionsBrowser:
@@ -71,19 +71,17 @@ class TestTagSuggestionsBrowser:
 
         # Open tag modal
         page.locator("#tag-field-ed").click()
-        page.wait_for_timeout(300)
 
         modal_input = page.locator("#tag-modal-input")
         expect(modal_input).to_be_visible()
 
         # Type the shared prefix
         modal_input.fill(prefix)
-        page.wait_for_timeout(500)
 
-        # Suggestions should include both tags
+        # Suggestions should include both tags (after debounce + fetch)
         suggestions = page.locator("#tag-modal-suggestions")
-        expect(suggestions).to_contain_text(alpha_label)
-        expect(suggestions).to_contain_text(beta_label)
+        expect(suggestions).to_contain_text(alpha_label, timeout=5000)
+        expect(suggestions).to_contain_text(beta_label, timeout=5000)
 
         _cleanup_tag(live_url, tag1["id"])
         _cleanup_tag(live_url, tag2["id"])
@@ -97,19 +95,17 @@ class TestTagSuggestionsBrowser:
         _open_edit_form(page, prod_name)
 
         page.locator("#tag-field-ed").click()
-        page.wait_for_timeout(300)
 
         modal_input = page.locator("#tag-modal-input")
         modal_input.fill(new_tag_label)
-        page.wait_for_timeout(500)
 
         # Either suggestions list is empty or shows a "create" option
-        # Pressing Enter should create the new tag
+        # Pressing Enter should create the new tag and close the modal
         modal_input.press("Enter")
-        page.wait_for_timeout(500)
+        expect(page.locator("#tag-modal-overlay")).to_be_hidden(timeout=5000)
 
         tag_field = page.locator("#tag-field-ed")
-        expect(tag_field).to_contain_text(new_tag_label)
+        expect(tag_field).to_contain_text(new_tag_label, timeout=5000)
 
         # Cleanup
         _, tags = _api_raw(live_url, f"/api/tags?q={new_tag_label}")
@@ -131,15 +127,15 @@ class TestTagSuggestionsBrowser:
         _open_edit_form(page, prod_name)
 
         page.locator("#tag-field-ed").click()
-        page.wait_for_timeout(300)
 
         modal_input = page.locator("#tag-modal-input")
         modal_input.fill(search_prefix)
-        page.wait_for_timeout(500)
+        # Wait for the suggestion list to be populated (debounce + fetch)
+        # so ArrowDown has an item to highlight.
+        page.wait_for_selector("#tag-modal-suggestions li", timeout=5000)
 
         # Press ArrowDown to highlight a suggestion
         modal_input.press("ArrowDown")
-        page.wait_for_timeout(200)
 
         # A suggestion item should have a highlighted class
         highlighted = page.locator("#tag-modal-suggestions .highlighted")

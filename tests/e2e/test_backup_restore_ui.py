@@ -40,7 +40,6 @@ def _open_database_section(page):
         ".settings-toggle:has(span[data-i18n='settings_database_title'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(400)
 
 
 def _reload_and_wait(page):
@@ -157,7 +156,6 @@ def test_restore_via_file_input_shows_confirm_modal(page, live_url, api_create_p
 
         file_chooser = fc_info.value
         file_chooser.set_files(tmp_path)
-        page.wait_for_timeout(500)
 
         # The JS reads the file and immediately shows a confirmation modal
         confirm_modal = page.locator(".scan-modal-bg[role='dialog']")
@@ -187,7 +185,6 @@ def test_restore_cancel_does_not_restore(page, live_url, api_create_product):
             page.locator("#restore-drop").click()
 
         fc_info.value.set_files(tmp_path)
-        page.wait_for_timeout(500)
 
         confirm_modal = page.locator(".scan-modal-bg[role='dialog']")
         expect(confirm_modal).to_be_visible(timeout=5000)
@@ -196,7 +193,6 @@ def test_restore_cancel_does_not_restore(page, live_url, api_create_product):
         cancel_btn = page.locator(".confirm-no")
         expect(cancel_btn).to_be_visible(timeout=3000)
         cancel_btn.click()
-        page.wait_for_timeout(500)
 
         # Modal must close and no restore occurred
         expect(confirm_modal).to_be_hidden(timeout=3000)
@@ -241,15 +237,14 @@ def test_restore_via_file_input_calls_api_and_shows_toast(
             page.locator("#restore-drop").click()
 
         fc_info.value.set_files(tmp_path)
-        page.wait_for_timeout(500)
 
-        # Confirm the restore
+        # Confirm the restore and wait for the (mocked) /api/restore response.
         confirm_btn = page.locator(".confirm-yes")
         expect(confirm_btn).to_be_visible(timeout=5000)
-        confirm_btn.click()
+        with page.expect_response("**/api/restore", timeout=10000):
+            confirm_btn.click()
 
         # The API must have been called
-        page.wait_for_timeout(1000)
         assert len(restore_called) == 1, (
             "Expected exactly one POST to /api/restore after confirming restore"
         )

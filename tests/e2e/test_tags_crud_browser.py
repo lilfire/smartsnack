@@ -44,7 +44,6 @@ def _expand_product_row(page, name):
     """Expand a product row by clicking it."""
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
 
 
 def _open_edit_form(page, name):
@@ -54,7 +53,8 @@ def _open_edit_form(page, name):
     edit_btn = row.locator("[data-action='start-edit']")
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # The edit form renders synchronously; wait for the tag field to appear.
+    expect(page.locator("#tag-field-ed")).to_be_visible(timeout=5000)
 
 
 # ===========================================================================
@@ -126,7 +126,6 @@ class TestTagEditModal:
         _open_edit_form(page, prod_name)
         tag_field = page.locator("#tag-field-ed")
         tag_field.click()
-        page.wait_for_timeout(300)
 
         # The tag modal overlay should appear
         modal = page.locator("#tag-modal-overlay")
@@ -153,17 +152,15 @@ class TestTagEditModal:
 
         _open_edit_form(page, prod_name)
         page.locator("#tag-field-ed").click()
-        page.wait_for_timeout(300)
 
         # Search for the tag
         modal_input = page.locator("#tag-modal-input")
         expect(modal_input).to_be_visible()
         modal_input.fill(search_prefix)
-        page.wait_for_timeout(500)
 
-        # Suggestions should appear
+        # Suggestions should appear (after the input debounce + fetch)
         suggestions = page.locator("#tag-modal-suggestions")
-        expect(suggestions).to_contain_text(tag_label)
+        expect(suggestions).to_contain_text(tag_label, timeout=5000)
 
         _cleanup_tag(live_url, tag["id"])
 
@@ -181,26 +178,23 @@ class TestTagEditModal:
 
         _open_edit_form(page, prod_name)
         page.locator("#tag-field-ed").click()
-        page.wait_for_timeout(300)
 
         # Type a new tag name
         modal_input = page.locator("#tag-modal-input")
         modal_input.fill(new_tag_label)
-        page.wait_for_timeout(300)
 
-        # Press Enter to create
+        # Press Enter to create — the modal closes once the tag is created.
         modal_input.press("Enter")
-        page.wait_for_timeout(500)
+        expect(page.locator("#tag-modal-overlay")).to_be_hidden(timeout=5000)
 
         # Confirm the modal
         confirm = page.locator("#tag-modal-confirm")
         if confirm.is_visible():
             confirm.click()
-            page.wait_for_timeout(300)
 
         # The tag pill should appear in the tag field
         tag_field = page.locator("#tag-field-ed")
-        expect(tag_field).to_contain_text(new_tag_label)
+        expect(tag_field).to_contain_text(new_tag_label, timeout=5000)
 
         # Cleanup
         _, tags = _api_raw(live_url, f"/api/tags?q={new_tag_label}")
@@ -220,12 +214,10 @@ class TestTagEditModal:
 
         _open_edit_form(page, prod_name)
         page.locator("#tag-field-ed").click()
-        page.wait_for_timeout(300)
 
         modal = page.locator("#tag-modal-overlay")
         expect(modal).to_be_visible(timeout=3000)
 
         page.keyboard.press("Escape")
-        page.wait_for_timeout(300)
 
         expect(modal).to_be_hidden()

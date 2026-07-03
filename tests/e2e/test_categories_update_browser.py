@@ -19,7 +19,7 @@ def _go_to_settings(page):
 def _open_section(page, key):
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(600)
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 class TestCategoryListBrowser:
@@ -70,10 +70,9 @@ class TestCategoryAddBrowser:
         page.locator("#cat-name").fill("e2e_persist_cat")
         page.locator("#cat-label").fill("Persist Category")
         page.locator("button[data-i18n='btn_add_category']").first.click()
-        page.wait_for_timeout(500)
 
         cat_list = page.locator("#cat-list")
-        expect(cat_list).to_contain_text("Persist Category")
+        expect(cat_list).to_contain_text("Persist Category", timeout=5000)
 
     def test_category_available_in_register(self, page):
         """An added category should be selectable in the registration form."""
@@ -82,8 +81,14 @@ class TestCategoryAddBrowser:
         _open_section(page, "settings_categories_title")
         page.locator("#cat-name").fill("e2e_reg_cat")
         page.locator("#cat-label").fill("Register Category")
-        page.locator("button[data-i18n='btn_add_category']").first.click()
-        page.wait_for_timeout(500)
+        # Wait for the create request to complete so the register view's
+        # category refetch sees the new category.
+        with page.expect_response(
+            lambda r: r.url.endswith("/api/categories")
+            and r.request.method == "POST",
+            timeout=5000,
+        ):
+            page.locator("button[data-i18n='btn_add_category']").first.click()
 
         # Now go to register and check
         page.locator("button[data-view='register']").click()
@@ -113,16 +118,19 @@ class TestCategoryEditBrowser:
         edit_btns = page.locator("#cat-list [data-action='edit-category']")
         if edit_btns.count() > 0:
             edit_btns.first.click()
-            page.wait_for_timeout(300)
 
-            # An inline edit input should appear
+            # An inline edit input should appear (tolerated if it does not:
+            # the test deliberately branches on visibility)
             inline_input = page.locator(
                 "#cat-list input.settings-item-edit-input"
             ).first
+            try:
+                inline_input.wait_for(state="visible", timeout=3000)
+            except Exception:
+                pass
             if inline_input.is_visible():
                 inline_input.fill("Updated Label")
                 inline_input.press("Enter")
-                page.wait_for_timeout(300)
 
                 toast = page.locator(".toast")
                 expect(toast.first).to_be_visible(timeout=5000)

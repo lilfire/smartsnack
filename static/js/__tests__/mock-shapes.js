@@ -48,6 +48,10 @@ export const SHAPES = {
   'GET /api/bulk/refresh-off/status': {
     running: 'boolean',
   },
+  'GET /api/categories': {
+    // returns an array directly
+    _root: 'array',
+  },
 };
 
 // ── Realistic mock objects ─────────────────────────────────────────────────
@@ -138,9 +142,44 @@ export const MOCK_PRODUCTS_RESPONSE = {
   total: 2,
 };
 
+// Canonical empty GET /api/products response (no matches).
+export const MOCK_PRODUCTS_EMPTY = {
+  products: [],
+  total: 0,
+};
+
+// Canonical GET /api/weights item — full contract from weight_service.get_weights():
+// field, label, desc, enabled, weight, direction, formula, formula_min, formula_max.
+export const MOCK_WEIGHT_ITEM = {
+  field: 'kcal',
+  label: 'Kcal',
+  desc: 'Energy',
+  enabled: true,
+  weight: 100,
+  direction: 'lower',
+  formula: 'minmax',
+  formula_min: 0,
+  formula_max: 100,
+};
+
 export const MOCK_WEIGHTS_RESPONSE = [
-  { field: 'kcal', label: 'Kcal', desc: 'Energy', direction: 'lower', weight: 100, enabled: true },
-  { field: 'protein', label: 'Protein', desc: 'Protein', direction: 'higher', weight: 100, enabled: true },
+  MOCK_WEIGHT_ITEM,
+  { ...MOCK_WEIGHT_ITEM, field: 'protein', label: 'Protein', desc: 'Protein', direction: 'higher' },
+];
+
+// Canonical GET /api/categories item — contract from category_service.list_categories():
+// name, emoji, label, count, has_weight_overrides.
+export const MOCK_CATEGORY_ITEM = {
+  name: 'dairy',
+  emoji: '\u{1F95B}',
+  label: 'Dairy',
+  count: 3,
+  has_weight_overrides: false,
+};
+
+export const MOCK_CATEGORIES_RESPONSE = [
+  MOCK_CATEGORY_ITEM,
+  { ...MOCK_CATEGORY_ITEM, name: 'snacks', emoji: '\u{1F37F}', label: 'Snacks', count: 1 },
 ];
 
 export const MOCK_OFF_CREDENTIALS = {

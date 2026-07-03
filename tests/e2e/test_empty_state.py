@@ -33,7 +33,6 @@ def test_search_no_results_shows_empty_state(page, api_create_product):
 
     search_input = page.locator("#search-input")
     search_input.fill("xyzXYZnonexistentq999zzz")
-    page.wait_for_timeout(800)
 
     # The render.js empty-state path produces a div.empty inside #results-container
     empty = page.locator("#results-container .empty")
@@ -46,7 +45,6 @@ def test_empty_state_shows_no_products_text(page, api_create_product):
     _reload_and_wait(page)
 
     page.locator("#search-input").fill("xyzXYZnonexistentq999zzz")
-    page.wait_for_timeout(800)
 
     empty = page.locator("#results-container .empty")
     expect(empty).to_be_visible(timeout=5000)
@@ -67,7 +65,6 @@ def test_empty_state_has_icon(page, api_create_product):
     _reload_and_wait(page)
 
     page.locator("#search-input").fill("xyzXYZnonexistentq999zzz")
-    page.wait_for_timeout(800)
 
     empty_icon = page.locator("#results-container .empty-icon")
     expect(empty_icon).to_be_visible(timeout=5000)
@@ -79,7 +76,6 @@ def test_create_from_search_button_appears_on_empty_search(page, api_create_prod
     _reload_and_wait(page)
 
     page.locator("#search-input").fill("xyzXYZnonexistentq999zzz")
-    page.wait_for_timeout(800)
 
     # render.js only renders the btn-create-from-search when search is non-empty
     cta = page.locator("button.btn-create-from-search")
@@ -93,12 +89,10 @@ def test_create_from_search_button_navigates_to_register(page, api_create_produc
 
     search_term = "UniqueNewItemXYZ"
     page.locator("#search-input").fill(search_term)
-    page.wait_for_timeout(800)
 
     cta = page.locator("button.btn-create-from-search")
     expect(cta).to_be_visible(timeout=5000)
     cta.click()
-    page.wait_for_timeout(400)
 
     # Should have navigated to the register view
     expect(page.locator("#view-register")).to_be_visible(timeout=3000)

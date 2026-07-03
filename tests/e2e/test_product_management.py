@@ -15,11 +15,10 @@ def test_product_row_expandable(page, api_create_product):
     # Click the product row to expand
     row = page.locator(".table-row", has_text="ExpandTestProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     # Expanded section should be visible
     expanded = page.locator(".expanded")
-    expect(expanded.first).to_be_visible(timeout=3000)
+    expect(expanded.first).to_be_visible(timeout=5000)
 
 
 def test_edit_product(page, api_create_product):
@@ -34,16 +33,14 @@ def test_edit_product(page, api_create_product):
     # Click product to expand
     row = page.locator(".table-row", has_text="EditOriginalName")
     row.first.click()
-    page.wait_for_timeout(300)
 
-    # Click edit button
+    # Click edit button (click auto-waits for the expanded row to render it)
     edit_btn = page.locator("[data-action='start-edit']").first
     edit_btn.click()
-    page.wait_for_timeout(500)
 
     # The edit form should be visible
     edit_name = page.locator("#ed-name")
-    expect(edit_name).to_be_visible(timeout=3000)
+    expect(edit_name).to_be_visible(timeout=5000)
 
     # Change the name
     edit_name.fill("EditUpdatedName")
@@ -69,12 +66,10 @@ def test_delete_product(page, api_create_product):
     # Click product to expand
     row = page.locator(".table-row", has_text="DeleteMeProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
-    # Click delete button
+    # Click delete button (click auto-waits for the expanded row to render it)
     delete_btn = page.locator("[data-action='delete']").first
     delete_btn.click()
-    page.wait_for_timeout(300)
 
     # Click confirm in the custom modal, then wait for the deferred DELETE
     # request that deleteProduct() schedules ~5s after confirmation (undo window).

@@ -130,14 +130,11 @@ def test_edit_empty_name_shows_error_toast(page, api_create_product):
 
     row = page.locator(".table-row", has_text="EditEmptyNameProd")
     row.first.click()
-    page.wait_for_timeout(300)
 
     page.locator("[data-action='start-edit']").first.click()
-    page.wait_for_timeout(500)
 
     page.locator("#ed-name").fill("")
     page.locator("[data-action='save-product']").first.click()
-    page.wait_for_timeout(500)
 
     toast = page.locator("#toast")
     expect(toast).to_be_visible(timeout=5000)
@@ -160,8 +157,11 @@ def test_toast_auto_dismiss_after_duration(page):
     # Confirm it appears first
     expect(toast).to_be_visible(timeout=5000)
 
-    # state.js default duration is 3000ms; wait well beyond that
-    page.wait_for_timeout(4500)
+    # state.js default duration is 3000ms; wait for the 'show' class removal
+    page.wait_for_function(
+        "() => !document.getElementById('toast').classList.contains('show')",
+        timeout=10000,
+    )
 
     # The toast must no longer have the 'show' class (auto-dismissed)
     classes = toast.get_attribute("class") or ""

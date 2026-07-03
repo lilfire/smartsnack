@@ -35,7 +35,6 @@ def _open_weights_section(page):
             }
         }
     }""")
-    page.wait_for_timeout(600)
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +132,8 @@ def test_slider_value_display_updates_on_change(page):
     # Set to a value unlikely to equal the initial value.
     new_raw = "30" if initial_text.strip() not in ("30", "30.0") else "70"
     slider.fill(new_raw)
-    page.wait_for_timeout(200)
+    # The display updates on the slider's input event; wait for it to change.
+    expect(value_display).not_to_have_text(initial_text, timeout=5000)
 
     updated_text = value_display.inner_text()
     assert updated_text != initial_text, (
@@ -174,7 +174,6 @@ def test_config_button_expands_advanced_config(page):
     expect(cfg_btn).to_be_visible(timeout=5000)
 
     cfg_btn.click()
-    page.wait_for_timeout(300)
 
     # The corresponding wcfg- div must now be visible.
     visible_cfg = page.locator("#weight-items [id^='wcfg-']:visible")
@@ -191,7 +190,6 @@ def test_config_section_has_direction_select(page):
     _open_weights_section(page)
 
     page.locator("#weight-items .weight-cfg-btn").first.click()
-    page.wait_for_timeout(300)
 
     direction_wrapper = page.locator("#weight-items .wc-row .custom-select-wrap").first
     expect(direction_wrapper.locator(".custom-select-trigger")).to_be_visible(timeout=3000)
@@ -221,7 +219,6 @@ def test_add_category_override_button_opens_picker_modal(page):
     add_btn = page.locator("#weight-scope-add")
     expect(add_btn).to_be_visible(timeout=5000)
     add_btn.click()
-    page.wait_for_timeout(500)
 
     # Either a modal appeared, or a toast appeared — both are valid outcomes.
     # Both elements use position:fixed, so offsetParent is always null;

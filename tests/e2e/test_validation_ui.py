@@ -38,7 +38,7 @@ def _open_section(page, i18n_key):
         f".settings-toggle:has(span[data-i18n='{i18n_key}'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(300)
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -89,12 +89,12 @@ class TestRegisterValidation:
         page.locator("#f-salt").fill("0.1")
         page.locator("#btn-submit").click()
 
-        page.wait_for_timeout(1000)
+        # Wait for either the toast or a modal to appear
+        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
         # Dismiss OFF modal if it appears
         cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
         if cancel.is_visible():
             cancel.click()
-            page.wait_for_timeout(200)
 
         # Either a toast appeared (error or success) — just verify
         # the form didn't silently do nothing
@@ -112,12 +112,12 @@ class TestRegisterValidation:
             page.locator(f"#f-{field}").fill("0")
         page.locator("#btn-submit").click()
 
-        page.wait_for_timeout(500)
+        # Wait for either the toast or a modal to appear
+        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
         # Dismiss OFF modal if it appears
         cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
         if cancel.is_visible():
             cancel.click()
-            page.wait_for_timeout(200)
 
         expected = t["toast_product_added"].replace("{name}", product_name)
         toast = page.locator(".toast").last
@@ -138,12 +138,12 @@ class TestRegisterValidation:
         page.locator("#f-salt").fill("0.1")
         page.locator("#btn-submit").click()
 
-        page.wait_for_timeout(1000)
+        # Wait for either the toast or a modal to appear
+        page.wait_for_selector("#toast.show, .scan-modal-bg", timeout=5000)
         # Dismiss OFF modal if it appears
         cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
         if cancel.is_visible():
             cancel.click()
-            page.wait_for_timeout(200)
 
         # Either accepted (server clamps to 0) or shows error toast
         toast = page.locator(".toast").last
@@ -196,7 +196,8 @@ class TestCategoryValidation:
 
         _go_to_settings(page)
         _open_section(page, "settings_categories_title")
-        page.wait_for_timeout(500)
+        # Category rows render async after settings load
+        page.wait_for_selector("input.cat-item-label-input", timeout=5000)
 
         # Find the label input for our test category and clear it
         label_input = page.locator(
@@ -250,6 +251,8 @@ class TestCategoryValidation:
 
         delete_btn = page.locator("[data-action='delete-cat']").first
         delete_btn.click()
+        # Fixed wait: the next check asserts the cat-move modal does NOT
+        # appear; absence has no event to await.
         page.wait_for_timeout(300)
 
         # With only one category there is nowhere to move products — the
@@ -377,7 +380,6 @@ class TestWeightOverrideValidation:
 
         # Wait for weight items to load (async)
         page.wait_for_selector("#weight-items .weight-item", timeout=10000)
-        page.wait_for_timeout(500)
 
         # The add button is hidden by JS when all categories have overrides.
         # Force it visible and click it to trigger openAddOverridePicker.
@@ -385,7 +387,6 @@ class TestWeightOverrideValidation:
             "() => document.getElementById('weight-scope-add').style.display = ''"
         )
         page.locator("#weight-scope-add").click()
-        page.wait_for_timeout(300)
 
         toast = page.locator(".toast").last
         expect(toast).to_be_visible(timeout=5000)

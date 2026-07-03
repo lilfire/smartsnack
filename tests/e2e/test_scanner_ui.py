@@ -42,16 +42,15 @@ def test_scanner_not_allowed_error(browser, app_server, api_create_product):
         # Navigate to register view to access the scanner button
         nav_register = page.locator("[data-view='register']")
         nav_register.click()
-        page.wait_for_timeout(500)
 
         # Click the scanner button in the register form
         scan_btn = page.locator(".btn-scan")
-        expect(scan_btn).to_be_visible(timeout=3000)
+        expect(scan_btn).to_be_visible(timeout=5000)
         scan_btn.click()
 
         # The scanner should show an error state
         # Either toast_scanner_load_error or scan_camera_error should appear
-        page.wait_for_timeout(2000)
+        page.wait_for_selector(".scanner-error, .toast", timeout=5000)
 
         # Check for the scanner error UI (camera error message)
         scanner_error = page.locator(".scanner-error")
@@ -103,14 +102,13 @@ def test_scanner_not_found_error(browser, app_server, api_create_product):
         # Navigate to register view
         nav_register = page.locator("[data-view='register']")
         nav_register.click()
-        page.wait_for_timeout(500)
 
         # Click scanner button
         scan_btn = page.locator(".btn-scan")
-        expect(scan_btn).to_be_visible(timeout=3000)
+        expect(scan_btn).to_be_visible(timeout=5000)
         scan_btn.click()
 
-        page.wait_for_timeout(2000)
+        page.wait_for_selector(".scanner-error, .toast", timeout=5000)
 
         # Check for error indication
         scanner_error = page.locator(".scanner-error")
@@ -132,11 +130,10 @@ def test_scanner_button_exists_in_register_view(page):
     # Navigate to register view
     nav_register = page.locator("[data-view='register']")
     nav_register.click()
-    page.wait_for_timeout(500)
 
     # The scan button should be visible
     scan_btn = page.locator(".btn-scan")
-    expect(scan_btn).to_be_visible(timeout=3000)
+    expect(scan_btn).to_be_visible(timeout=5000)
     expect(scan_btn).to_be_enabled()
 
     # Verify the button has the i18n aria-label key (translated at runtime)

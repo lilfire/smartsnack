@@ -38,7 +38,8 @@ def _reload_and_wait(page):
 def _expand_product_row(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
+    # Wait for the expanded details section to render
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
 
 def _open_edit_form(page, name):
@@ -47,7 +48,8 @@ def _open_edit_form(page, name):
     edit_btn = row.locator("[data-action='start-edit']")
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # Wait for the inline edit form to render
+    expect(page.locator("#ed-name")).to_be_visible(timeout=5000)
 
 
 class TestUnsyncButtonBrowser:
@@ -101,10 +103,11 @@ class TestProductDeleteBrowser:
         row = page.locator(f".table-row:has-text('DeleteMeProd')").first
         delete_btn = row.locator("[data-action='delete']")
         delete_btn.click()
-        page.wait_for_timeout(1000)
+        # Clicking delete opens the confirm modal; a toast only appears once a
+        # delete is actually triggered. Wait for either signal.
+        page.wait_for_selector(".confirm-yes, .toast.show", timeout=5000)
 
         # Product should no longer be in the list (or an undo toast appears)
-        # Give the undo period time to pass or verify the toast
         toast = page.locator(".toast")
         if toast.first.is_visible():
             # Undo toast visible means delete was triggered
