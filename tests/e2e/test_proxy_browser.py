@@ -24,13 +24,15 @@ def _go_to_register(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
+    # Clicking the row expands it; wait for the expanded area to render.
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
     # The [data-action='start-edit'] button lives in the sibling .expanded div,
     # not inside .table-row, so use a page-scoped locator.
     edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # Entering edit mode re-renders the expanded row with the edit form.
+    expect(page.locator("#ed-name")).to_be_visible(timeout=5000)
 
 
 class TestImageUploadBrowser:

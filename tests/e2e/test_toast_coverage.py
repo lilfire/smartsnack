@@ -866,7 +866,8 @@ class TestEanUnlockToasts:
         )
         row = page.locator(".table-row", has_text="EanUnlockToastProd").first
         row.click()
-        page.wait_for_timeout(300)
+        # Clicking the row expands it; wait for the expanded area to render.
+        expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
         edit_btn = page.locator("[data-action='start-edit']").first
         expect(edit_btn).to_be_visible(timeout=5000)
         edit_btn.click()

@@ -24,12 +24,14 @@ def _reload_and_wait(page):
 def _open_edit_form(page, name):
     row = page.locator(f".table-row:has-text('{name}')").first
     row.click()
-    page.wait_for_timeout(300)
+    # Clicking the row expands it; wait for the expanded area to render.
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
     # The start-edit button is in the sibling .expanded div, not inside .table-row.
     edit_btn = page.locator("[data-action='start-edit']").first
     expect(edit_btn).to_be_visible(timeout=3000)
     edit_btn.click()
-    page.wait_for_timeout(300)
+    # Entering edit mode re-renders the expanded row with the edit form.
+    expect(page.locator("#ed-name")).to_be_visible(timeout=5000)
 
 
 class TestOcrScanButtonBrowser:
@@ -81,7 +83,7 @@ class TestOcrIngredientTranslationBrowser:
             ".settings-toggle:has(span[data-i18n='settings_language'])"
         ).first
         toggle.click()
-        page.wait_for_timeout(300)
+        expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
         # On desktop upgradeSelect() wraps the native select in .custom-select-wrap and
         # hides it with CSS, exposing .custom-select-trigger instead.  On mobile the

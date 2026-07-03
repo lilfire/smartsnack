@@ -26,9 +26,9 @@ def _expand_and_edit(page, product_name):
     """Click a product row to expand it, then open the edit form."""
     row = page.locator(".table-row", has_text=product_name)
     row.first.click()
-    page.wait_for_timeout(300)
+    expect(page.locator("[data-action='start-edit']").first).to_be_visible(timeout=5000)
     page.locator("[data-action='start-edit']").first.click()
-    page.wait_for_timeout(500)
+    page.wait_for_selector("#tag-field-ed", state="visible", timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -106,7 +106,6 @@ def test_tag_modal_opens_on_add_click(page, api_create_product, unique_name):
     _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
 
     modal = page.locator("#tag-modal-overlay")
     expect(modal).to_be_visible(timeout=3000)
@@ -120,7 +119,6 @@ def test_tag_modal_has_role_dialog(page, api_create_product, unique_name):
     _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
 
     modal = page.locator("#tag-modal-overlay")
     expect(modal).to_be_visible(timeout=3000)
@@ -138,7 +136,6 @@ def test_tag_modal_has_input_and_buttons(page, api_create_product, unique_name):
     _expand_and_edit(page, name)
 
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
 
     expect(page.locator("#tag-modal-input")).to_be_visible(timeout=3000)
     expect(page.locator("#tag-modal-confirm")).to_be_visible(timeout=3000)
@@ -157,7 +154,6 @@ def test_tag_modal_cancel_closes_modal(page, api_create_product, unique_name):
     expect(modal).to_be_visible(timeout=3000)
 
     page.locator("#tag-modal-cancel").click()
-    page.wait_for_timeout(300)
 
     expect(modal).to_be_hidden(timeout=3000)
 
@@ -171,11 +167,11 @@ def test_adding_tag_creates_pill(page, api_create_product, unique_name):
     _expand_and_edit(page, prod_name)
 
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
+    expect(page.locator("#tag-modal-input")).to_be_visible(timeout=3000)
 
     page.locator("#tag-modal-input").fill(tag_label)
     page.locator("#tag-modal-confirm").click()
-    page.wait_for_timeout(600)
+    expect(page.locator("#tag-modal-overlay")).to_be_hidden(timeout=5000)
 
     pills = page.locator("#tag-field-ed .tag-pill")
     pill_count = pills.count()
@@ -194,10 +190,10 @@ def test_tag_remove_button_decreases_pill_count(page, api_create_product, unique
 
     # Add a tag so there is something to remove
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
+    expect(page.locator("#tag-modal-input")).to_be_visible(timeout=3000)
     page.locator("#tag-modal-input").fill(tag_label)
     page.locator("#tag-modal-confirm").click()
-    page.wait_for_timeout(600)
+    expect(page.locator("#tag-field-ed .tag-pill").first).to_be_visible(timeout=5000)
 
     pills_before = page.locator("#tag-field-ed .tag-pill").count()
     assert pills_before >= 1, (
@@ -206,7 +202,10 @@ def test_tag_remove_button_decreases_pill_count(page, api_create_product, unique
 
     # Click the remove button on the first pill
     page.locator("#tag-field-ed .tag-remove").first.click()
-    page.wait_for_timeout(300)
+    page.wait_for_function(
+        f"() => document.querySelectorAll('#tag-field-ed .tag-pill').length < {pills_before}",
+        timeout=5000,
+    )
 
     pills_after = page.locator("#tag-field-ed .tag-pill").count()
     assert pills_after < pills_before, (
@@ -233,13 +232,13 @@ def test_tag_suggestions_appear_for_existing_tag(page, api_create_product, live_
     _expand_and_edit(page, prod_name)
 
     page.locator("#add-tag-btn").click()
-    page.wait_for_timeout(300)
+    expect(page.locator("#tag-modal-input")).to_be_visible(timeout=3000)
 
     # Type a prefix of the known tag label so the suggestion search matches
     search_prefix = tag_label.split("-")[0]
     page.locator("#tag-modal-input").fill(search_prefix)
-    # Wait for the debounced fetch (200 ms) plus render time
-    page.wait_for_timeout(700)
+    # Wait for the debounced (200 ms) suggestion fetch to render its results
+    page.wait_for_selector("#tag-modal-suggestions li", state="visible", timeout=5000)
 
     suggestions = page.locator("#tag-modal-suggestions li")
     suggestion_count = suggestions.count()

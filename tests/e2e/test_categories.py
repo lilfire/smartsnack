@@ -23,7 +23,8 @@ def _open_section(page, key):
     """Open a settings section by its data-i18n key."""
     toggle = page.locator(f".settings-toggle:has(span[data-i18n='{key}'])").first
     toggle.click()
-    page.wait_for_timeout(300)
+    # toggleSettingsSection sets aria-expanded when the section body is shown.
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -315,10 +316,11 @@ def test_category_filter_pills_filter_products(live_url, page, api_create_produc
     # Pills are built as <button class="pill"> with the category label text
     pill = filter_row.locator("button.pill", has_text=cat_label)
     expect(pill).to_be_visible(timeout=5000)
-    pill.click()
-
-    # Wait for debounce / re-render
-    page.wait_for_timeout(500)
+    # Clicking the pill triggers a filtered /api/products request; wait for it.
+    with page.expect_response(
+        lambda r: "/api/products" in r.url and "type=" in r.url
+    ):
+        pill.click()
 
     results = page.locator("#results-container")
     # Product in the filtered category should be visible

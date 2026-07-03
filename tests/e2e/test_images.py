@@ -99,7 +99,7 @@ def _reload_and_wait(page) -> None:
 
 
 def _expand_product_row(page, product_name: str) -> None:
-    """Click the product row to expand it and wait for the animation.
+    """Click the product row to expand it and wait for the expanded area.
 
     Args:
         page: Playwright page object.
@@ -107,7 +107,7 @@ def _expand_product_row(page, product_name: str) -> None:
     """
     row = page.locator(".table-row", has_text=product_name)
     row.first.click()
-    page.wait_for_timeout(300)
+    expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
 
 # ---------------------------------------------------------------------------
@@ -214,13 +214,15 @@ def test_remove_image_via_ui(page, live_url, api_create_product):
     # Click the remove button
     remove_btn = page.locator(f"[data-action='remove-image'][data-id='{product_id}']")
     remove_btn.click()
-    page.wait_for_timeout(300)
 
-    # Confirm the modal dialog
+    # Confirm the modal dialog and wait for the DELETE request to complete
     confirm_btn = page.locator(".confirm-yes")
     expect(confirm_btn).to_be_visible(timeout=3000)
-    confirm_btn.click()
-    page.wait_for_timeout(500)
+    with page.expect_response(
+        lambda r: f"/api/products/{product_id}/image" in r.url
+        and r.request.method == "DELETE"
+    ):
+        confirm_btn.click()
 
     # Reload to confirm the deletion is persisted in the database
     _reload_and_wait(page)

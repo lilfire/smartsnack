@@ -181,21 +181,16 @@ def test_logic_toggle_visible_with_two_conditions(page):
 
     # Add a second condition to make the logic toggle appear.
     page.locator(".adv-add-condition-btn").first.click()
-    # The row is appended (and visibility updated) synchronously; wait for
-    # the second row to exist before reading the computed style.
     page.wait_for_function(
         "() => document.querySelectorAll('.adv-row').length === 2",
         timeout=5000,
     )
 
     logic_btn = page.locator(".adv-group-logic-btn").first
-    # The button exists in the DOM — check its computed visibility style is
-    # not 'hidden' (the JS sets style.visibility, not display).
-    visibility = logic_btn.evaluate("el => window.getComputedStyle(el).visibility")
-    assert visibility != "hidden", (
-        f"Expected .adv-group-logic-btn to be visible with 2 conditions, "
-        f"but got visibility='{visibility}'"
-    )
+    # The JS flips style.visibility (not display). A one-shot computed-style
+    # read races any pending rAF/re-render hop (flaked in CI run 28642337190),
+    # so use the retrying CSS assertion instead.
+    expect(logic_btn).to_have_css("visibility", "visible", timeout=5000)
 
 
 def test_filter_by_numeric_field(page, api_create_product):

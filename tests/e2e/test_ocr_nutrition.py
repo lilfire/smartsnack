@@ -183,12 +183,13 @@ class TestEditFormNutritionOcr:
 
         row = page.locator(".table-row", has_text="OCR Edit Target").first
         row.click()
-        page.wait_for_timeout(300)
+        # Clicking the row expands it; wait for the expanded area to render.
+        expect(page.locator(".expanded").first).to_be_visible(timeout=5000)
 
         edit_btn = page.locator("[data-action='start-edit']").first
         edit_btn.click()
-        page.wait_for_timeout(300)
-
+        # Entering edit mode re-renders the expanded row with the edit form;
+        # the scan button visibility expect below waits for it.
         scan_btn = page.locator("#ed-ocr-nutri-btn")
         expect(scan_btn).to_be_visible(timeout=5000)
 

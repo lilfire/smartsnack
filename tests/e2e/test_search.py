@@ -24,9 +24,11 @@ def test_search_filters_products(page, api_create_product):
     )
 
     search = page.locator("#search-input")
-    search.fill("UniqueAlpha")
-    # Wait for debounce and results to update
-    page.wait_for_timeout(500)
+    # Wait for the debounced search request to complete instead of sleeping
+    with page.expect_response(
+        lambda r: "/api/products" in r.url and "search=UniqueAlpha" in r.url
+    ):
+        search.fill("UniqueAlpha")
 
     results = page.locator("#results-container")
     expect(results).to_contain_text("UniqueAlphaProduct")
@@ -44,9 +46,12 @@ def test_clear_search(page, api_create_product):
 
     search = page.locator("#search-input")
     search.fill("ClearTestProd")
-    page.wait_for_timeout(500)
+    # onSearchInput shows the clear button synchronously; wait for it instead
+    # of sleeping through the search debounce.
+    clear_btn = page.locator("#search-clear")
+    expect(clear_btn).to_be_visible(timeout=5000)
 
-    page.locator("#search-clear").click()
+    clear_btn.click()
     expect(search).to_have_value("")
 
 

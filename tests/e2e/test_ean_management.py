@@ -29,7 +29,8 @@ def _expand_and_edit(page, product_name):
     """Click a product row to expand it, then click the edit button."""
     row = page.locator(".table-row", has_text=product_name)
     row.first.click()
-    page.wait_for_timeout(300)
+    # Wait for the expanded detail panel (hosting the edit button) to render.
+    page.wait_for_selector("[data-action='start-edit']", state="visible", timeout=5000)
 
     # [data-action='start-edit'] lives in the sibling .expanded div, not
     # inside .table-row, so use a page-scoped locator.

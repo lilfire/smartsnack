@@ -36,7 +36,13 @@ def _load_translations(lang="no"):
 def _change_language(page, lang_code):
     """Change language via JS."""
     page.evaluate(f"() => window.changeLanguage('{lang_code}')")
-    page.wait_for_timeout(500)
+    # applyStaticTranslations() sets <html lang> once the new translations are
+    # loaded and applied; also wait out any results re-render it triggers.
+    page.wait_for_function(
+        f"() => document.documentElement.lang === '{lang_code}'"
+        " && !document.querySelector('#results-container .loading')",
+        timeout=10000,
+    )
 
 
 def _go_to_register(page):
@@ -55,7 +61,7 @@ def _go_to_settings(page):
 def _go_to_search(page):
     """Navigate to search view."""
     page.locator("button[data-view='search']").click()
-    page.wait_for_timeout(300)
+    expect(page.locator("#view-search")).to_be_visible()
 
 
 def _open_settings_section(page, i18n_key):
@@ -64,7 +70,7 @@ def _open_settings_section(page, i18n_key):
         f".settings-toggle:has(span[data-i18n='{i18n_key}'])"
     ).first
     toggle.click()
-    page.wait_for_timeout(300)
+    expect(toggle).to_have_attribute("aria-expanded", "true", timeout=5000)
 
 
 def _wait_for_toast(page, expected_text, timeout=5000):
@@ -81,7 +87,7 @@ def _dismiss_toast(page):
         close_btn = toast.locator(".toast-close")
         if close_btn.is_visible():
             close_btn.click()
-            page.wait_for_timeout(200)
+            expect(toast).to_be_hidden(timeout=3000)
 
 
 def _dismiss_modal(page):
@@ -89,7 +95,7 @@ def _dismiss_modal(page):
     cancel = page.locator(".scan-modal-bg .scan-modal button:last-child")
     if cancel.is_visible():
         cancel.click()
-        page.wait_for_timeout(200)
+        expect(cancel).to_be_hidden(timeout=3000)
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +151,9 @@ class TestI18nProductAdded:
         page.locator("#f-salt").fill("0.5")
         page.locator("#f-smak").fill("4")
         page.locator("#btn-submit").click()
-        page.wait_for_timeout(500)
+        # Wait until the submit handler surfaces either the success toast or a
+        # modal (duplicate/OFF prompt) — whichever the app shows first.
+        page.wait_for_selector("#toast.show, .scan-modal-bg", state="visible", timeout=5000)
         _dismiss_modal(page)
         expected = t["toast_product_added"].replace("{name}", product_name)
         _wait_for_toast(page, expected)
@@ -171,14 +179,14 @@ class TestI18nProductDeleted:
         _change_language(page, lang)
         row = page.locator(f".table-row[data-product-id='{product['id']}']")
         row.click()
-        page.wait_for_timeout(500)
         # Click delete (data-action="delete")
         delete_btn = page.locator(
             f"button[data-action='delete'][data-id='{product['id']}']"
         )
         expect(delete_btn).to_be_visible(timeout=5000)
         delete_btn.click()
-        page.wait_for_timeout(300)
+        # Deleting always opens a confirm modal (showConfirmModal)
+        page.wait_for_selector(".scan-modal-bg .scan-modal button", state="visible", timeout=5000)
         # Confirm modal
         confirm_btn = page.locator(".scan-modal-bg .scan-modal button").first
         if confirm_btn.is_visible():
@@ -197,7 +205,6 @@ class TestI18nCategoryAdded:
         _change_language(page, lang)
         _go_to_settings(page)
         _open_settings_section(page, "settings_categories_title")
-        page.wait_for_timeout(300)
         cat_name = f"i18ncat{lang}"
         display_name = f"I18n Cat {lang.upper()}"
         # Use IDs for the category form
@@ -224,7 +231,11 @@ class TestI18nInvalidFile:
         _change_language(page, lang)
         _go_to_settings(page)
         _open_settings_section(page, "settings_database_title")
-        page.wait_for_timeout(300)
+        page.wait_for_selector(
+            "#restore-input, input[type='file'][accept='.json']",
+            state="attached",
+            timeout=5000,
+        )
         restore_input = page.locator(
             "#restore-input, input[type='file'][accept='.json']"
         ).first
@@ -235,7 +246,8 @@ class TestI18nInvalidFile:
                 "buffer": b"not json",
             }
         )
-        page.wait_for_timeout(500)
+        # handleRestore always opens a confirm modal before parsing the file
+        page.wait_for_selector(".scan-modal-bg button", state="visible", timeout=5000)
         # Confirm restore modal
         confirm_btn = page.locator(".scan-modal-bg button").first
         if confirm_btn.is_visible():
