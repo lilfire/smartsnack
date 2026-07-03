@@ -377,9 +377,9 @@ class TestPaginationValidation:
         resp = client.get("/api/products?limit=10&offset=0")
         assert resp.status_code == 200
 
-    def test_zero_limit_accepted(self, client, seed_category):
-        """limit=0 must be accepted (returns empty page)."""
+    def test_zero_limit_clamped_to_one(self, client, seed_category):
+        """limit=0 is clamped to 1 (minimum page size)."""
         resp = client.get("/api/products?limit=0&offset=0")
         assert resp.status_code == 200
         data = resp.get_json()
-        assert data["products"] == []
+        assert len(data["products"]) <= 1

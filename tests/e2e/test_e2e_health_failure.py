@@ -2,14 +2,13 @@
 
 Closes the LSO-1352 Phase 2A gap for ``blueprints/core.py``: the route's
 DB-failure branch was previously untested. This file exercises the
-``sqlite3.OperationalError`` branch by monkeypatching the ``get_db``
-reference inside the ``blueprints.core`` module so that the handler's
-``try/except`` actually fires.
+error branch by monkeypatching ``core_service.get_product_count``
+so that the handler's ``try/except`` actually fires.
 
 Conventions:
 - Live Flask server fixture (`live_url`) from ``tests/e2e/conftest.py``.
-- No real DB failure is induced; the symbol is swapped on the module the
-  route looks up, then restored at teardown.
+- No real DB failure is induced; the service function is swapped,
+  then restored at teardown.
 - Rule 18: assertions are specific to the error response shape — status
   code 500, ``{"status":"error"}`` body, and that the error was logged.
 """
@@ -65,15 +64,10 @@ def test_health_ok_returns_status_ok(live_url):
 
 @pytest.fixture()
 def patch_health_db(monkeypatch):
-    """Swap the ``get_db`` reference inside ``blueprints.core`` so the route's
-    ``try`` block raises ``sqlite3.OperationalError`` exactly once.
-
-    ``blueprints.core`` does ``from db import get_db`` at import time, which
-    means the route handler holds its OWN reference to the function. Patching
-    ``db.get_db`` is therefore not enough — we must patch the symbol on the
-    blueprint module.
+    """Swap ``core_service.get_product_count`` so the route's ``try`` block
+    raises ``sqlite3.OperationalError`` exactly once.
     """
-    from blueprints import core as core_bp
+    from services import core_service
 
     calls: list[int] = []
 
@@ -81,7 +75,7 @@ def patch_health_db(monkeypatch):
         calls.append(1)
         raise sqlite3.OperationalError("database is locked")
 
-    monkeypatch.setattr(core_bp, "get_db", _raise_db)
+    monkeypatch.setattr(core_service, "get_product_count", _raise_db)
     return calls
 
 
@@ -126,12 +120,12 @@ def test_health_os_error_also_returns_500(live_url, monkeypatch):
     Documents the union ``(sqlite3.Error, OSError)`` in the handler so a
     future refactor can't silently narrow it without breaking this test.
     """
-    from blueprints import core as core_bp
+    from services import core_service
 
     def _raise_os():
         raise OSError("disk read-only")
 
-    monkeypatch.setattr(core_bp, "get_db", _raise_os)
+    monkeypatch.setattr(core_service, "get_product_count", _raise_os)
     status, body, _ = _get(f"{live_url}/health")
     assert status == 500, f"Expected 500 for OSError branch, got {status}: {body}"
     assert body == {"status": "error"}

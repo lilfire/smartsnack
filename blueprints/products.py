@@ -24,8 +24,8 @@ def get_products():
     type_filter = request.args.get("type")
     advanced_filters = request.args.get("filters", "").strip() or None
     try:
-        limit = int(request.args.get("limit", DEFAULT_PAGE_SIZE))
-        offset = int(request.args.get("offset", 0))
+        limit = max(1, min(200, int(request.args.get("limit", DEFAULT_PAGE_SIZE))))
+        offset = max(0, int(request.args.get("offset", 0)))
     except ValueError:
         return jsonify({"error": "limit and offset must be integers"}), 400
     try:

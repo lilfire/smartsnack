@@ -24,7 +24,7 @@ def create_app() -> Flask:
         sys.exit(1)
 
     app = Flask(__name__)
-    app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100 MB
+    app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
 
     app.teardown_appcontext(close_db)
 
@@ -53,7 +53,7 @@ def create_app() -> Flask:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
             "style-src 'self' 'unsafe-inline'; "
             "img-src 'self' data: https://*.openfoodfacts.org https://*.openfoodfacts.net; "
             "connect-src 'self'; "

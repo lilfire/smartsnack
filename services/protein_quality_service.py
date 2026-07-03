@@ -112,7 +112,8 @@ def update_entry(pid, data):
         label = _str_field(data, "label").strip()
         if len(label) > _PQ_MAX_LABEL_LEN:
             raise ValueError(f"label exceeds max length of {_PQ_MAX_LABEL_LEN}")
-        _set_translation_key(f"pq_{pq_name}_label", {lang: label})
+        if label:
+            _set_translation_key(f"pq_{pq_name}_label", {lang: label})
 
 
 def delete_entry(pid):
