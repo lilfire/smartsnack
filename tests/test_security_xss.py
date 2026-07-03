@@ -45,7 +45,12 @@ class TestProductNameXss:
     """XSS payloads in product name are stored and returned as literal strings."""
 
     def test_script_tag_in_name_stored_as_string(self, client, seed_category):
-        """<script> in product name must be stored and returned as-is."""
+        """<script> in product name must be stored and returned verbatim.
+
+        The API stores the raw string and returns it as a JSON-encoded
+        string (output escaping is the frontend's job) — the round-trip
+        must be exact, with no HTML-escaping or mangling server-side.
+        """
         payload = _unique("<script>alert(1)</script>")
         resp = client.post(
             "/api/products",
@@ -83,14 +88,17 @@ class TestProductNameXss:
             "/api/products",
             json={"name": payload, "type": "Snacks"},
         )
-        assert create_resp.status_code == 201
+        assert create_resp.status_code == 201, (
+            f"Create failed with {create_resp.status_code}: {create_resp.get_json()}"
+        )
         pid = create_resp.get_json()["id"]
+        assert pid
 
         list_resp = client.get("/api/products")
         assert list_resp.status_code == 200
         products = list_resp.get_json()["products"]
         matching = [p for p in products if p["id"] == pid]
-        assert matching, f"product {pid} missing from /api/products listing"
+        assert len(matching) == 1, "Stored product not found in listing"
         # Name must be the raw string, not escaped HTML
         assert matching[0]["name"] == payload
 
@@ -129,14 +137,17 @@ class TestProductDescriptionXss:
                 "ingredients": payload,
             },
         )
-        assert resp.status_code == 201
+        assert resp.status_code == 201, (
+            f"Create failed with {resp.status_code}: {resp.get_json()}"
+        )
         pid = resp.get_json()["id"]
         list_resp = client.get("/api/products")
+        assert list_resp.status_code == 200
         products = list_resp.get_json()["products"]
         matching = [p for p in products if p["id"] == pid]
-        assert matching, f"product {pid} missing from /api/products listing"
+        assert len(matching) == 1, "Stored product not found in listing"
         # Stored value must match input exactly
-        assert matching[0].get("ingredients") == payload
+        assert matching[0]["ingredients"] == payload
 
     @pytest.mark.parametrize("xss_payload", XSS_PAYLOADS)
     def test_xss_in_taste_note_stored_verbatim(self, client, seed_category, xss_payload):

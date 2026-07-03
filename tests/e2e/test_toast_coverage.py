@@ -516,9 +516,9 @@ class TestOcrToasts:
         save_btn = page.locator(
             "button:has-text('Lagre OCR'), button[data-i18n='btn_save_ocr_settings']"
         ).first
-        if save_btn.is_visible():
-            save_btn.click()
-            _wait_for_toast(page, t["toast_ocr_settings_saved"])
+        expect(save_btn).to_be_visible(timeout=5000)
+        save_btn.click()
+        _wait_for_toast(page, t["toast_ocr_settings_saved"])
 
     def test_toast_ocr_settings_error(self, page):
         """OCR settings save failure shows error toast."""
@@ -538,9 +538,9 @@ class TestOcrToasts:
         save_btn = page.locator(
             "button:has-text('Lagre OCR'), button[data-i18n='btn_save_ocr_settings']"
         ).first
-        if save_btn.is_visible():
-            save_btn.click()
-            _wait_for_toast(page, t["toast_ocr_settings_error"])
+        expect(save_btn).to_be_visible(timeout=5000)
+        save_btn.click()
+        _wait_for_toast(page, t["toast_ocr_settings_error"])
         page.unroute("**/api/ocr/settings")
 
 
@@ -906,15 +906,35 @@ class TestNetworkToasts:
 class TestEanUnlockToasts:
     """Tests for EAN unlock toast messages."""
 
-    def test_toast_ean_unlocked(self, page, api_create_product, unique_name):
-        """The real unlock flow (POST /unsync via unlockEan) shows the toast.
+    def test_toast_ean_unlocked(self, page, api_create_product):
+        """Unsyncing an OFF-synced EAN via the EAN manager shows the toast.
 
-        ``unlockEan`` (products.js) only shows toast_ean_unlocked after the
-        server confirms POST /api/products/<id>/unsync — on failure it shows
-        toast_network_error instead. So the toast appearing proves the whole
-        production path worked, not just that showToast can print a string.
+        Drives the real path: an OFF-synced product's EAN row renders an
+        unsync button in the edit-mode EAN manager; clicking it POSTs to
+        /api/products/<pid>/eans/<id>/unsync and ean-manager.js shows
+        toast_ean_unlocked on success.
         """
         t = _load_translations()
-        product = api_create_product(name=unique_name("EanUnlockToast"))
-        page.evaluate("(id) => window.unlockEan(id)", product["id"])
+        product = api_create_product(
+            name="EanUnlockToastProd", ean="7038010069307", from_off=True
+        )
+        pid = product["id"]
+
+        page.reload(wait_until="domcontentloaded")
+        page.wait_for_function(
+            "() => !document.querySelector('#results-container .loading')",
+            timeout=10000,
+        )
+        row = page.locator(".table-row", has_text="EanUnlockToastProd").first
+        row.click()
+        page.wait_for_timeout(300)
+        edit_btn = page.locator("[data-action='start-edit']").first
+        expect(edit_btn).to_be_visible(timeout=5000)
+        edit_btn.click()
+
+        unsync_btn = page.locator(
+            f"#ean-manager-{pid} [data-ean-action='unsync-ean']"
+        ).first
+        expect(unsync_btn).to_be_visible(timeout=5000)
+        unsync_btn.click()
         _wait_for_toast(page, t["toast_ean_unlocked"])

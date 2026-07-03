@@ -1,5 +1,6 @@
 """SQLite database connection management, schema init, and seed data."""
 
+import fcntl
 import os
 import sqlite3
 
@@ -28,15 +29,26 @@ def init_db():
     db_dir = os.path.dirname(DB_PATH)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA busy_timeout = 5000")
-    conn.execute("PRAGMA journal_mode=WAL")
-    cur = conn.cursor()
-    try:
-        _init_schema(cur, conn)
-    finally:
-        conn.close()
+    # Cross-process file lock: all gunicorn workers call init_db() at startup;
+    # only one at a time may run schema init/migrations (concurrent ALTER TABLE
+    # would crash with "duplicate column"). Later workers re-enter after the
+    # first finishes and skip already-applied migrations.
+    lock_path = os.path.join(db_dir or ".", ".db_init.lock")
+    with open(lock_path, "w") as lock_fh:
+        fcntl.flock(lock_fh, fcntl.LOCK_EX)
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA foreign_keys = ON")
+            conn.execute("PRAGMA busy_timeout = 5000")
+            conn.execute("PRAGMA journal_mode=WAL")
+            cur = conn.cursor()
+            try:
+                _init_schema(cur, conn)
+            finally:
+                conn.close()
+        finally:
+            fcntl.flock(lock_fh, fcntl.LOCK_UN)
 
 
 def _init_schema(cur, conn):
@@ -233,6 +245,11 @@ def _init_schema(cur, conn):
     # on existing databases and would cause an OperationalError before migrations run.
 
     run_migrations(cur)
+
+    # A bulk refresh cannot survive a restart, but its DB-persisted running
+    # flag can. Clear it so a crash/redeploy mid-refresh doesn't leave the
+    # already-running guard stuck forever.
+    cur.execute("UPDATE bulk_refresh_jobs SET running = 0 WHERE id = 1 AND running = 1")
 
     _repair_ean_mismatches(cur)
 

@@ -138,3 +138,9 @@ class TestCategoryEditBrowser:
         expect(toast).to_be_visible(timeout=5000)
         t = _load_translations()
         expect(toast).to_contain_text(t["toast_category_updated"])
+        # The list re-renders from the API — the new label must round-trip.
+        expect(
+            page.locator(
+                "#cat-list input.cat-item-label-input[data-cat-name='Snacks']"
+            )
+        ).to_have_value("Updated Label", timeout=5000)
