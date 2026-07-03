@@ -1755,3 +1755,52 @@ describe('onSearchScanDetected secondary EAN match', () => {
     fetchProducts.mockResolvedValue({ products: [], total: 0 });
   });
 });
+
+// ── M23: register/edit scanner one-shot guard ──
+describe('M23: one-shot scan guard', () => {
+  function mockScannerCapturingCallback() {
+    let successCb;
+    global.Html5Qrcode = vi.fn().mockImplementation(() => ({
+      start: vi.fn((cam, cfg, onSuccess) => { successCb = onSuccess; return Promise.resolve(); }),
+      stop: vi.fn().mockResolvedValue(),
+      clear: vi.fn(),
+    }));
+    global.Html5QrcodeSupportedFormats = { EAN_13: 0, EAN_8: 1, UPC_A: 2, UPC_E: 3 };
+    return () => successCb;
+  }
+
+  it('handles the barcode exactly once when multiple frames decode', async () => {
+    const getCb = mockScannerCapturingCallback();
+    document.body.innerHTML = '<input id="ed-ean" /><input id="ed-name" /><button id="ed-off-btn"></button>';
+    openScanner('ed', 1);
+
+    const cb = getCb();
+    cb('7038010000000');
+    cb('7038010000000');
+    cb('7038010000000');
+    // Let onBarcodeDetected's dynamic import of off-utils settle inside the test
+    await vi.dynamicImportSettled();
+
+    const scanToasts = showToast.mock.calls.filter((c) => c[0] === 'toast_barcode_scanned');
+    expect(scanToasts.length).toBe(1);
+    closeScanner();
+  });
+
+  it('resets the guard so the next openScanner can scan again', async () => {
+    const getCb = mockScannerCapturingCallback();
+    document.body.innerHTML = '<input id="ed-ean" /><input id="ed-name" /><button id="ed-off-btn"></button>';
+
+    openScanner('ed', 1);
+    getCb()('7038010000000');
+    await vi.dynamicImportSettled();
+    closeScanner();
+
+    openScanner('ed', 1);
+    getCb()('7038010000001');
+    await vi.dynamicImportSettled();
+    closeScanner();
+
+    const scanToasts = showToast.mock.calls.filter((c) => c[0] === 'toast_barcode_scanned');
+    expect(scanToasts.length).toBe(2);
+  });
+});

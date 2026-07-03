@@ -189,13 +189,21 @@ export async function unlockEan(id) {
 // importers (app.js, tests) keep working after the file split.
 export { deleteProduct } from './product-delete.js';
 
+// Monotonic sequence for loadData calls; a response is only rendered if no
+// newer loadData call started while it was in flight (prevents a stale
+// response from overwriting a fresher one).
+let _loadSeq = 0;
+
 export async function loadData() {
+  const seq = ++_loadSeq;
   try {
     // Reset pagination for fresh load
     teardownInfiniteScroll();
     state.pagination.offset = 0;
     state.pagination.total = null;
     state.pagination.inFlight = false;
+    // Invalidate any in-flight infinite-scroll page from the previous search
+    state.pagination.scrollGeneration = (state.pagination.scrollGeneration || 0) + 1;
 
     await fetchStats();
     buildFilters();
@@ -209,6 +217,9 @@ export async function loadData() {
       limit: state.pagination.pageSize,
       offset: 0,
     });
+    // A newer loadData started while this one was in flight — discard this
+    // stale response so it does not overwrite the fresher one.
+    if (seq !== _loadSeq) return;
     // Handle {products, total} response or plain array (backend compat)
     const results = Array.isArray(data) ? data : (data.products || []);
     const total = Array.isArray(data) ? null : (data.total != null ? data.total : null);

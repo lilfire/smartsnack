@@ -131,6 +131,8 @@
   "toast_pq_added": "\"{name}\" added",
   "toast_pq_deleted": "\"{name}\" deleted",
   "toast_backup_downloaded": "Backup downloaded",
+  "toast_backup_download_started": "Backup download started",
+  "toast_language_change_failed": "Could not save language setting. Reverted to previous language.",
   "toast_invalid_file": "Invalid file",
   "toast_scanner_load_error": "Scanner library failed to load. Check your internet connection.",
   "toast_scanner_not_loaded": "Scanner library failed to load.",

@@ -262,3 +262,44 @@ describe('changeLanguage', () => {
     expect(getCurrentLang()).toBe('se');
   });
 });
+
+// ── M24: changeLanguage must surface persistence failures ──
+describe('M24: changeLanguage error handling', () => {
+  it('reverts language, restores translations, and shows an error toast when the PUT fails', async () => {
+    const { showToast } = await import('../state.js');
+    api.mockImplementation((url, opts) => {
+      if (url === '/api/settings/language' && opts && opts.method === 'PUT') {
+        return Promise.reject(new Error('network down'));
+      }
+      if (url === '/api/settings/language') return Promise.resolve({ language: 'no' });
+      if (url === '/api/translations/no') return Promise.resolve({ greeting: 'hei' });
+      if (url === '/api/translations/en') return Promise.resolve({ greeting: 'hello' });
+      return Promise.resolve({});
+    });
+
+    await initLanguage();
+    expect(getCurrentLang()).toBe('no');
+
+    await changeLanguage('en');
+
+    expect(getCurrentLang()).toBe('no');
+    expect(t('greeting')).toBe('hei');
+    expect(showToast).toHaveBeenCalledWith('toast_language_change_failed', 'error');
+  });
+
+  it('applies the new language when the PUT succeeds', async () => {
+    api.mockImplementation((url, opts) => {
+      if (url === '/api/settings/language' && opts && opts.method === 'PUT') return Promise.resolve({});
+      if (url === '/api/settings/language') return Promise.resolve({ language: 'no' });
+      if (url === '/api/translations/no') return Promise.resolve({ greeting: 'hei' });
+      if (url === '/api/translations/en') return Promise.resolve({ greeting: 'hello' });
+      return Promise.resolve({});
+    });
+
+    await initLanguage();
+    await changeLanguage('en');
+
+    expect(getCurrentLang()).toBe('en');
+    expect(t('greeting')).toBe('hello');
+  });
+});

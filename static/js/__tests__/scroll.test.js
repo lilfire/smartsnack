@@ -230,3 +230,34 @@ describe('_onScroll (via scroll event)', () => {
     Object.defineProperty(window, 'scrollY', { get: () => 0, configurable: true });
   });
 });
+
+// ── M17: stale infinite-scroll page discarded after a new search ──
+describe('M17: scrollGeneration guard', () => {
+  it('discards an in-flight page when a new search bumps scrollGeneration', async () => {
+    state.pagination = { offset: 0, total: 200, inFlight: false, pageSize: 50, scrollGeneration: 0 };
+    let resolveFetch;
+    fetchProducts.mockReturnValue(new Promise((r) => { resolveFetch = r; }));
+
+    const inFlight = loadNextPage();
+    // A new search starts while the page request is in flight (loadData bumps the generation)
+    state.pagination.scrollGeneration++;
+    resolveFetch({ products: [{ id: 99, name: 'Stale' }], total: 200 });
+    await inFlight;
+
+    expect(appendResults).not.toHaveBeenCalled();
+    expect(state.cachedResults).toEqual([]);
+    expect(state.pagination.offset).toBe(0);
+    expect(state.pagination.inFlight).toBe(false);
+  });
+
+  it('appends the page normally when no new search started mid-flight', async () => {
+    state.pagination = { offset: 0, total: 200, inFlight: false, pageSize: 50, scrollGeneration: 3 };
+    fetchProducts.mockResolvedValue({ products: [{ id: 1, name: 'Fresh' }], total: 200 });
+
+    await loadNextPage();
+
+    expect(appendResults).toHaveBeenCalledWith([{ id: 1, name: 'Fresh' }]);
+    expect(state.cachedResults).toEqual([{ id: 1, name: 'Fresh' }]);
+    expect(state.pagination.offset).toBe(50);
+  });
+});

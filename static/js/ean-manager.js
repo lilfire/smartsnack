@@ -5,7 +5,7 @@ import { isValidEan } from './off-utils.js';
 import { lookupOFF } from './off-api.js';
 
 function _renderEanList(productId, eans) {
-  const container = document.getElementById('ean-manager-' + productId);
+  let container = document.getElementById('ean-manager-' + productId);
   if (!container) return;
 
   // Sync hidden ed-ean with current primary EAN for OFF/scan compatibility
@@ -44,6 +44,14 @@ function _renderEanList(productId, eans) {
     + '<button class="btn-ean-add" data-ean-action="add-ean" data-product-id="' + productId + '">' + t('btn_add_ean') + '</button>'
     + '</div>'
     + '<div id="ean-error-' + productId + '" class="field-error" style="display:none"></div>';
+  // Replace the container with a childless clone to strip any click listener
+  // attached by a previous render — otherwise every re-render stacks another
+  // listener and one click fires duplicate actions (e.g. double DELETEs).
+  if (container.parentNode) {
+    const fresh = container.cloneNode(false);
+    container.parentNode.replaceChild(fresh, container);
+    container = fresh;
+  }
   container.innerHTML = html;
 
   // Attach event delegation
