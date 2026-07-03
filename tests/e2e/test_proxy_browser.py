@@ -61,14 +61,14 @@ class TestImageUploadBrowser:
         _reload_and_wait(page)
         row = page.locator(".table-row:has-text('ImgEditProd')").first
         row.click()
-        page.wait_for_timeout(300)
 
         # Product has no image → render.js emits the upload button with
-        # data-action='change-image' in the expanded area.
+        # data-action='change-image' in the expanded area. The auto-waiting
+        # expect also covers the row-expansion render.
         img_btn = page.locator(
             f"[data-action='change-image'][data-id='{product['id']}']"
         )
-        expect(img_btn.first).to_be_visible(timeout=3000)
+        expect(img_btn.first).to_be_visible(timeout=5000)
 
 
 class TestImageDisplayBrowser:
