@@ -29,7 +29,7 @@ FROM python:3.12-slim
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
-    openssl tesseract-ocr tesseract-ocr-nor tesseract-ocr-eng
+    openssl gosu tesseract-ocr tesseract-ocr-nor tesseract-ocr-eng
 
 WORKDIR /app
 
@@ -64,6 +64,9 @@ ENV DB_PATH=/data/smartsnack.sqlite
 
 EXPOSE 5000
 
-USER appuser
-
+# NOTE: We intentionally do NOT set `USER appuser` here. The container starts as
+# root so the entrypoint can chown the mounted /data named volume (which Docker
+# leaves root-owned when it pre-exists an image rebuild), then drops privileges
+# to appuser via gosu before starting gunicorn. The server processes still run
+# unprivileged; only the brief pre-flight chown runs as root.
 ENTRYPOINT ["/app/entrypoint.sh"]
