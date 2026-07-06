@@ -1,6 +1,8 @@
 """Scoring formula and weight computation for products."""
 
+import os
 import sqlite3
+import threading
 
 from config import (
     SCORE_CONFIG_MAP,
@@ -10,19 +12,69 @@ from config import (
 )
 
 _weight_cache: tuple | None = None
-_weight_cache_version: int | None = None
+_weight_cache_version: tuple | None = None
 _range_cache: dict | None = None  # keyed by frozenset(enabled_fields)
 _range_cache_key: frozenset | None = None
-_range_cache_version: int | None = None
+_range_cache_version: tuple | None = None
+
+# Long-lived probe connection used only for PRAGMA data_version (see
+# _db_data_version). Guarded by _probe_lock; request threads share it.
+_probe_lock = threading.Lock()
+_probe_conn: sqlite3.Connection | None = None
+_probe_file_key: tuple | None = None  # (db_path, st_dev, st_ino)
+_probe_generation = 0
 
 
-def _db_data_version(cur: sqlite3.Cursor) -> int:
-    """Return SQLite's data_version, which bumps on every cross-connection commit.
+def _close_version_probe() -> None:
+    """Close the probe connection (tests / interpreter teardown)."""
+    global _probe_conn, _probe_file_key
+    with _probe_lock:
+        if _probe_conn is not None:
+            try:
+                _probe_conn.close()
+            except sqlite3.Error:
+                pass
+        _probe_conn = None
+        _probe_file_key = None
 
-    Used as the cache key so that all Gunicorn workers detect writes made by
-    any other worker (a TTL-only cache stays stale on non-writer workers).
+
+def _db_data_version() -> tuple:
+    """Return a cache key that changes whenever any connection commits.
+
+    PRAGMA data_version only increments when the queried connection itself
+    observes a commit made by another connection *during its own lifetime*;
+    a freshly opened connection always reports the same baseline value.
+    Request-scoped connections (db.get_db) are opened per request, so
+    querying them can never detect writes from other workers — the cache
+    would stay stale forever on every Gunicorn worker that did not handle
+    the write (LSO-1798). A long-lived module-level probe connection does
+    observe commits from all other connections, including other processes.
+
+    The probe is reopened when DB_PATH changes (test isolation) or the file
+    is replaced on disk (backup restore); each reopen bumps a generation
+    counter so post-reopen keys never collide with pre-reopen ones.
     """
-    return cur.execute("PRAGMA data_version").fetchone()[0]
+    global _probe_conn, _probe_file_key, _probe_generation
+    from config import DB_PATH  # read at call time: tests monkeypatch it
+
+    with _probe_lock:
+        try:
+            st = os.stat(DB_PATH)
+            file_key = (DB_PATH, st.st_dev, st.st_ino)
+        except OSError:
+            file_key = (DB_PATH, None, None)
+        if _probe_conn is None or _probe_file_key != file_key:
+            if _probe_conn is not None:
+                try:
+                    _probe_conn.close()
+                except sqlite3.Error:
+                    pass
+            _probe_conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+            _probe_conn.execute("PRAGMA busy_timeout = 5000")
+            _probe_file_key = file_key
+            _probe_generation += 1
+        version = _probe_conn.execute("PRAGMA data_version").fetchone()[0]
+        return (_probe_generation, version)
 
 
 def invalidate_scoring_cache() -> None:
@@ -51,7 +103,7 @@ def _load_weight_config(cur: sqlite3.Cursor) -> tuple:
     category_overrides is keyed by (category, field).
     """
     global _weight_cache, _weight_cache_version
-    db_version = _db_data_version(cur)
+    db_version = _db_data_version()
     if _weight_cache is not None and _weight_cache_version == db_version:
         return _weight_cache
     weight_rows = cur.execute(
@@ -119,7 +171,7 @@ def _compute_category_ranges(
 ) -> dict:
     """Compute min/max ranges per category for minmax scoring."""
     global _range_cache, _range_cache_key, _range_cache_version
-    db_version = _db_data_version(cur)
+    db_version = _db_data_version()
     cache_key = frozenset(enabled_fields)
     if (
         _range_cache is not None
