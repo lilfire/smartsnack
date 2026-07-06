@@ -29,8 +29,10 @@ def _reset_scoring_caches():
     """Reset module-level scoring caches between tests to prevent cross-test pollution."""
     import services.product_scoring as ps
     ps.invalidate_scoring_cache()
+    ps._close_version_probe()
     yield
     ps.invalidate_scoring_cache()
+    ps._close_version_probe()
 
 
 @pytest.fixture(autouse=True)
