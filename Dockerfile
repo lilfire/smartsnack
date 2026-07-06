@@ -6,9 +6,15 @@ WORKDIR /build
 
 COPY requirements.txt .
 
+# LSO-1803: Prefer the CPU-only pytorch wheel index (~100 MB) but fall back to
+# PyPI's full torch build if download-r2.pytorch.org is unreachable, so upstream
+# CDN outages don't hard-block the Docker Build CI job. The fallback image is
+# ~2.5 GB larger but functionally correct for CPU inference; the CPU-only wheels
+# return automatically on the next rebuild once the CDN recovers.
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --prefix=/install \
-        torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+    ( pip install --prefix=/install \
+          torch torchvision --index-url https://download.pytorch.org/whl/cpu \
+      || pip install --prefix=/install torch torchvision ) \
     && pip install --prefix=/install -r requirements.txt \
     && ( \
        find /install -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null; \
